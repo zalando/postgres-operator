@@ -201,7 +201,7 @@ spec:
                 type: boolean
               init_containers:
                 type: array
-                Description: "deprecated"
+                description: deprecated
                 nullable: true
                 items:
                   type: object
@@ -349,7 +349,7 @@ spec:
                   type: string
               pod_priority_class_name:
                 type: string
-                Description: "deprecated"
+                description: deprecated
               podPriorityClassName:
                 type: string
               postgresql:
@@ -395,7 +395,7 @@ spec:
                       type: string
               replicaLoadBalancer:
                 type: boolean
-                Description: "deprecated"
+                description: deprecated
               resources:
                 type: object
                 required:
@@ -515,7 +515,7 @@ spec:
                       type: integer
               useLoadBalancer:
                 type: boolean
-                Description: "deprecated"
+                description: deprecated
               users:
                 type: object
                 additionalProperties:
