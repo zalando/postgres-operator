@@ -108,7 +108,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 			upgradeCommand := fmt.Sprintf("/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
 
 			// ######## checking if the spilo image runs with root or non-root (check for user id=0)
-			c.logger.Infof("checking if the spilo image runs with root or non-root (check for user id=0)")
+			c.logger.Debugf("checking if the spilo image runs with root or non-root (check for user id=0)")
 
 			resultIdCheck, errIdCheck := c.ExecCommand(podName, "/bin/bash", "-c", "/usr/bin/id -u")
 			if errIdCheck != nil {
