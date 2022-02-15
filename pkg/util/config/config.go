@@ -20,6 +20,7 @@ type CRD struct {
 	RepairPeriod          time.Duration `name:"repair_period" default:"5m"`
 	EnableCRDRegistration *bool         `name:"enable_crd_registration" default:"true"`
 	EnableCRDValidation   *bool         `name:"enable_crd_validation" default:"true"`
+	CRDCategories         []string      `name:"crd_categories" default:"all"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters

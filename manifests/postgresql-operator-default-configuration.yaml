@@ -5,7 +5,8 @@ metadata:
 configuration:
   docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p3
   # enable_crd_registration: true
-  # enable_crd_validation: true
+  # crd_categories:
+  # - all
   # enable_lazy_spilo_upgrade: false
   enable_pgversion_env_var: true
   # enable_shm_volume: true

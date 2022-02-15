@@ -22,6 +22,7 @@ data:
   # connection_pooler_number_of_instances: 2
   # connection_pooler_schema: "pooler"
   # connection_pooler_user: "pooler"
+  crd_categories: "all"
   # custom_service_annotations: "keyx:valuez,keya:valuea"
   # custom_pod_annotations: "keya:valuea,keyb:valueb"
   db_hosted_zone: db.example.com
@@ -36,7 +37,6 @@ data:
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_registration: "true"
-  # enable_crd_validation: "true"
   # enable_cross_namespace_secret: "false"
   # enable_database_access: "true"
   enable_ebs_gp3_migration: "false"
