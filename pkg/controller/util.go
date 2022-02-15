@@ -54,22 +54,27 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 }
 
 func (c *Controller) createOperatorCRD(desiredCrd *apiextv1.CustomResourceDefinition) error {
-	if crd, err := c.KubeClient.CustomResourceDefinitions().Create(context.TODO(), desiredCrd, metav1.CreateOptions{}); err != nil {
-		if k8sutil.ResourceAlreadyExists(err) {
-			c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
-			// copy annotations and labels from existing CRD since we do not define them
-			desiredCrd.Annotations = crd.Annotations
-			desiredCrd.Labels = crd.Labels
-			patch, err := json.Marshal(desiredCrd)
-			if err != nil {
-				return fmt.Errorf("could not marshal new customResourceDefintion %q: %v", desiredCrd.Name, err)
-			}
-			if _, err := c.KubeClient.CustomResourceDefinitions().Patch(
-				context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
-				return fmt.Errorf("could not update customResourceDefinition %q: %v", crd.Name, err)
-			}
-		} else {
-			c.logger.Errorf("could not create customResourceDefinition %q: %v", desiredCrd.Name, err)
+	crd, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), desiredCrd.Name, metav1.GetOptions{})
+	if k8sutil.ResourceNotFound(err) {
+		if _, err := c.KubeClient.CustomResourceDefinitions().Create(context.TODO(), desiredCrd, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("could not create customResourceDefinition %q: %v", desiredCrd.Name, err)
+		}
+	}
+	if err != nil {
+		c.logger.Errorf("could not get customResourceDefinition %q: %v", desiredCrd.Name, err)
+	}
+	if crd != nil {
+		c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
+		// copy annotations and labels from existing CRD since we do not define them
+		desiredCrd.Annotations = crd.Annotations
+		desiredCrd.Labels = crd.Labels
+		patch, err := json.Marshal(desiredCrd)
+		if err != nil {
+			return fmt.Errorf("could not marshal new customResourceDefintion %q: %v", desiredCrd.Name, err)
+		}
+		if _, err := c.KubeClient.CustomResourceDefinitions().Patch(
+			context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("could not update customResourceDefinition %q: %v", crd.Name, err)
 		}
 	} else {
 		c.logger.Infof("customResourceDefinition %q has been registered", crd.Name)
