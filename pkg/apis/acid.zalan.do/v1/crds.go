@@ -368,7 +368,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 																	"operator": {
 																		Type: "string",
 																	},
-																	"value": {
+																	"values": {
 																		Type: "array",
 																		Items: &apiextv1.JSONSchemaPropsOrArray{
 																			Schema: &apiextv1.JSONSchemaProps{
@@ -393,7 +393,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 																	"operator": {
 																		Type: "string",
 																	},
-																	"value": {
+																	"values": {
 																		Type: "array",
 																		Items: &apiextv1.JSONSchemaPropsOrArray{
 																			Schema: &apiextv1.JSONSchemaProps{
@@ -438,7 +438,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 																	"operator": {
 																		Type: "string",
 																	},
-																	"value": {
+																	"values": {
 																		Type: "array",
 																		Items: &apiextv1.JSONSchemaPropsOrArray{
 																			Schema: &apiextv1.JSONSchemaProps{
@@ -463,7 +463,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 																	"operator": {
 																		Type: "string",
 																	},
-																	"value": {
+																	"values": {
 																		Type: "array",
 																		Items: &apiextv1.JSONSchemaPropsOrArray{
 																			Schema: &apiextv1.JSONSchemaProps{
