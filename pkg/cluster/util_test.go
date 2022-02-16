@@ -98,8 +98,8 @@ func TestInheritedAnnotations(t *testing.T) {
 			t.Errorf("%s: pod template %v not inherited annotations %#v, got %#v", testName, sts.ObjectMeta.Name, inheritedAnnotations, sts.ObjectMeta.Annotations)
 		}
 		// pvc template
-		if util.MapContains(sts.Spec.VolumeClaimTemplates[0].Annotations, inheritedAnnotations) {
-			t.Errorf("%s: PVC template %v not expected to have inherited annotations %#v, got %#v", testName, sts.ObjectMeta.Name, inheritedAnnotations, sts.ObjectMeta.Annotations)
+		if !(util.MapContains(sts.Spec.VolumeClaimTemplates[0].Annotations, inheritedAnnotations)) {
+			t.Errorf("%s: PVC template %v not inherited annotations %#v, got %#v", testName, sts.ObjectMeta.Name, inheritedAnnotations, sts.ObjectMeta.Annotations)
 		}
 	}
 

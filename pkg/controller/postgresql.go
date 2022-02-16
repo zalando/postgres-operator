@@ -505,8 +505,6 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 		// We will not get multiple Add events for the same cluster
 		c.queueClusterEvent(nil, pg, EventAdd)
 	}
-
-	return
 }
 
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
@@ -521,8 +519,6 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 		}
 		c.queueClusterEvent(pgOld, pgNew, EventUpdate)
 	}
-
-	return
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {
@@ -530,8 +526,6 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 	if pg != nil {
 		c.queueClusterEvent(pg, nil, EventDelete)
 	}
-
-	return
 }
 
 func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {

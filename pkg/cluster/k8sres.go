@@ -1291,7 +1291,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
-	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(spec.Volume.Size,
+	if volumeClaimTemplate, err = c.generatePersistentVolumeClaimTemplate(spec.Volume.Size,
 		spec.Volume.StorageClass, spec.Volume.Selector); err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
@@ -1540,21 +1540,12 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 	podSpec.Volumes = volumes
 }
 
-func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string,
+func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string,
 	volumeSelector *metav1.LabelSelector) (*v1.PersistentVolumeClaim, error) {
 
 	var storageClassName *string
-
-	metadata := metav1.ObjectMeta{
-		Name: constants.DataVolumeName,
-	}
 	if volumeStorageClass != "" {
-		// TODO: remove the old annotation, switching completely to the StorageClassName field.
-		metadata.Annotations = map[string]string{"volume.beta.kubernetes.io/storage-class": volumeStorageClass}
 		storageClassName = &volumeStorageClass
-	} else {
-		metadata.Annotations = map[string]string{"volume.alpha.kubernetes.io/storage-class": "default"}
-		storageClassName = nil
 	}
 
 	quantity, err := resource.ParseQuantity(volumeSize)
@@ -1564,7 +1555,11 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 
 	volumeMode := v1.PersistentVolumeFilesystem
 	volumeClaim := &v1.PersistentVolumeClaim{
-		ObjectMeta: metadata,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        constants.DataVolumeName,
+			Annotations: c.annotationsSet(nil),
+			Labels:      c.labelsSet(true),
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources: v1.ResourceRequirements{
