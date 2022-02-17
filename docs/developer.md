@@ -72,20 +72,30 @@ make docker
 
 # kind
 make docker
-kind load docker-image <image> --name <kind-cluster-name>
+kind load docker-image registry.opensource.zalan.do/acid/postgres-operator:${TAG} --name <kind-cluster-name>
 ```
 
-Then create a new Postgres Operator deployment. You can reuse the provided
-manifest but replace the version and tag. Don't forget to also apply
+Then create a new Postgres Operator deployment.
+
+### Deploying manually with manifests and kubectl
+
+You can reuse the provided manifest but replace the version and tag. Don't forget to also apply
 configuration and RBAC manifests first, e.g.:
 
 ```bash
 kubectl create -f manifests/configmap.yaml
 kubectl create -f manifests/operator-service-account-rbac.yaml
-sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml | kubectl create  -f -
+sed -e "s/\(image\:.*\:\).*$/\1$TAG/" -e "s/\(imagePullPolicy\:\).*$/\1 Never/" manifests/postgres-operator.yaml | kubectl create  -f -
 
 # check if the operator is coming up
 kubectl get pod -l name=postgres-operator
+```
+
+### Deploying with Helm chart
+
+Yoy can reuse the provided Helm chart to deploy local operator build with the following command:
+```bash
+helm install postgres-operator ./charts/postgres-operator --namespace zalando-operator --set image.tag=${TAG} --set image.pullPolicy=Never
 ```
 
 ## Code generation
