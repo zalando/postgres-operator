@@ -203,7 +203,8 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_postgres_team_crd": "true",
                 "enable_team_member_deprecation": "true",
                 "role_deletion_suffix": "_delete_me",
-                "resync_period": "15s"
+                "resync_period": "15s",
+                "repair_period": "10s",
             },
         }
         k8s.update_config(enable_postgres_team_crd)
@@ -287,6 +288,7 @@ class EndToEndTestCase(unittest.TestCase):
         revert_resync = {
             "data": {
                 "resync_period": "4m",
+                "repair_period": "1m",
             },
         }
         k8s.update_config(revert_resync)
@@ -1287,6 +1289,7 @@ class EndToEndTestCase(unittest.TestCase):
             "data": {
                 "pod_label_wait_timeout": "2s",
                 "resync_period": "30s",
+                "repair_period": "10s",
             }
         }
 
@@ -1328,6 +1331,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "data": {
                     "pod_label_wait_timeout": "10m",
                     "resync_period": "4m",
+                    "repair_period": "2m",
                 }
             }
             k8s.update_config(patch_resync_config, "revert resync interval and pod_label_wait_timeout")
