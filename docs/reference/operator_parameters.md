@@ -174,6 +174,28 @@ under the `users` key.
   Postgres username used for replication between instances. The default is
   `standby`.
 
+* **enable_password_rotation**
+  For all `LOGIN` roles that are not database owners the operator can rotate
+  credentials in the corresponding K8s secrets by replacing the username and
+  password. This means, new users will be added on each rotation inheriting
+  all priviliges from the original roles. The rotation date (in YYMMDD format)
+  is appended to the names of the new user. The timestamp of the next rotation
+  is written to the secret. The default is `false`.
+
+* **password_rotation_interval**
+  If password rotation is enabled (either from config or cluster manifest) the
+  interval can be configured with this parameter. The measure is in days which
+  means daily rotation (`1`) is the most frequent interval possible.
+  Default is `90`.
+
+* **password_rotation_user_retention**
+  To avoid an ever growing amount of new users due to password rotation the
+  operator will remove the created users again after a certain amount of days
+  has passed. The number can be configured with this parameter. However, the
+  operator will check that the retention policy is at least twice as long as
+  the rotation interval and update to this minimum in case it is not.
+  Default is `180`.
+
 ## Major version upgrades
 
 Parameters configuring automatic major version upgrades. In a

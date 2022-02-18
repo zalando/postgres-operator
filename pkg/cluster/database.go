@@ -14,18 +14,25 @@ import (
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	"github.com/zalando/postgres-operator/pkg/util/users"
 )
 
 const (
 	getUserSQL = `SELECT a.rolname, COALESCE(a.rolpassword, ''), a.rolsuper, a.rolinherit,
-	        a.rolcreaterole, a.rolcreatedb, a.rolcanlogin, s.setconfig,
-	        ARRAY(SELECT b.rolname
-	              FROM pg_catalog.pg_auth_members m
-	              JOIN pg_catalog.pg_authid b ON (m.roleid = b.oid)
-	             WHERE m.member = a.oid) as memberof
-	 FROM pg_catalog.pg_authid a LEFT JOIN pg_db_role_setting s ON (a.oid = s.setrole AND s.setdatabase = 0::oid)
-	 WHERE a.rolname = ANY($1)
-	 ORDER BY 1;`
+	       a.rolcreaterole, a.rolcreatedb, a.rolcanlogin, s.setconfig,
+	       ARRAY(SELECT b.rolname
+	             FROM pg_catalog.pg_auth_members m
+	             JOIN pg_catalog.pg_authid b ON (m.roleid = b.oid)
+	            WHERE m.member = a.oid) as memberof
+	FROM pg_catalog.pg_authid a LEFT JOIN pg_db_role_setting s ON (a.oid = s.setrole AND s.setdatabase = 0::oid)
+	WHERE a.rolname = ANY($1)
+	ORDER BY 1;`
+
+	getUsersForRetention = `SELECT r.rolname, right(r.rolname, 6) AS roldatesuffix
+	        FROM pg_roles r
+	        JOIN unnest($1::text[]) AS u(name) ON r.rolname LIKE u.name || '%'
+			AND right(r.rolname, 6) ~ '^[0-9\.]+$'
+			ORDER BY 1;`
 
 	getDatabasesSQL = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
 	getSchemasSQL   = `SELECT n.nspname AS dbschema FROM pg_catalog.pg_namespace n
@@ -225,6 +232,65 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 	}
 
 	return users, nil
+}
+
+func findUsersFromRotation(rotatedUsers []string, db *sql.DB) (map[string]string, error) {
+	extraUsers := make(map[string]string, 0)
+	rows, err := db.Query(getUsersForRetention, pq.Array(rotatedUsers))
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %v", err)
+	}
+	defer func() {
+		if err2 := rows.Close(); err2 != nil {
+			err = fmt.Errorf("error when closing query cursor: %v", err2)
+		}
+	}()
+
+	for rows.Next() {
+		var (
+			rolname, roldatesuffix string
+		)
+		err := rows.Scan(&rolname, &roldatesuffix)
+		if err != nil {
+			return nil, fmt.Errorf("error when processing rows of deprecated users: %v", err)
+		}
+		extraUsers[rolname] = roldatesuffix
+	}
+
+	return extraUsers, nil
+}
+
+func (c *Cluster) cleanupRotatedUsers(rotatedUsers []string, db *sql.DB) error {
+	c.setProcessName("checking for rotated users to remove from the database due to configured retention")
+	extraUsers, err := findUsersFromRotation(rotatedUsers, db)
+	if err != nil {
+		return fmt.Errorf("error when querying for deprecated users from password rotation: %v", err)
+	}
+
+	// make sure user retention policy aligns with rotation interval
+	retenionDays := c.OpConfig.PasswordRotationUserRetention
+	if retenionDays < 2*c.OpConfig.PasswordRotationInterval {
+		retenionDays = 2 * c.OpConfig.PasswordRotationInterval
+		c.logger.Warnf("user retention days too few compared to rotation interval %d - setting it to %d", c.OpConfig.PasswordRotationInterval, retenionDays)
+	}
+	retentionDate := time.Now().AddDate(0, 0, int(retenionDays)*-1)
+
+	for rotatedUser, dateSuffix := range extraUsers {
+		userCreationDate, err := time.Parse("060102", dateSuffix)
+		if err != nil {
+			c.logger.Errorf("could not parse creation date suffix of user %q: %v", rotatedUser, err)
+			continue
+		}
+		if retentionDate.After(userCreationDate) {
+			c.logger.Infof("dropping user %q due to configured days in password_rotation_user_retention", rotatedUser)
+			if err = users.DropPgUser(rotatedUser, db); err != nil {
+				c.logger.Errorf("could not drop role %q: %v", rotatedUser, err)
+				continue
+			}
+		}
+	}
+
+	return nil
 }
 
 // getDatabases returns the map of current databases with owners

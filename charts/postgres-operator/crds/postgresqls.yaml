@@ -551,6 +551,16 @@ spec:
                     - SUPERUSER
                     - nosuperuser
                     - NOSUPERUSER
+              usersWithPasswordRotation:
+                type: array
+                nullable: true
+                items:
+                  type: string
+              usersWithInPlacePasswordRotation:
+                type: array
+                nullable: true
+                items:
+                  type: string
               volume:
                 type: object
                 required:

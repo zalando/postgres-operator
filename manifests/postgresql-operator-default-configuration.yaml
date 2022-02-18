@@ -25,6 +25,9 @@ configuration:
   #     protocol: TCP
   workers: 8
   users:
+    enable_password_rotation: false
+    password_rotation_interval: 90
+    password_rotation_user_retention: 180
     replication_username: standby
     super_username: postgres
   major_version_upgrade:

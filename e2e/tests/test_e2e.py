@@ -4,8 +4,9 @@ import time
 import timeout_decorator
 import os
 import yaml
+import base64
 
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from kubernetes import client
 
 from tests.k8s_api import K8s
@@ -579,6 +580,7 @@ class EndToEndTestCase(unittest.TestCase):
                             "Parameters": None,
                             "AdminRole": "",
                             "Origin": 2,
+                            "IsDbOwner": False,
                             "Deleted": False
                         })
                         return True
@@ -600,7 +602,6 @@ class EndToEndTestCase(unittest.TestCase):
         but lets pods run with the old image until they are recreated for
         reasons other than operator's activity. That works because the operator
         configures stateful sets to use "onDelete" pod update policy.
-
         The test covers:
         1) enabling lazy upgrade in existing operator deployment
         2) forcing the normal rolling upgrade by changing the operator
@@ -695,7 +696,6 @@ class EndToEndTestCase(unittest.TestCase):
         Ensure we can (a) create the cron job at user request for a specific PG cluster
                       (b) update the cluster-wide image for the logical backup pod
                       (c) delete the job at user request
-
         Limitations:
         (a) Does not run the actual batch job because there is no S3 mock to upload backups to
         (b) Assumes 'acid-minimal-cluster' exists as defined in setUp
@@ -1073,6 +1073,122 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
                              0, "Pooler pods not scaled down")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_password_rotation(self):
+        '''
+           Test password rotation and removal of users due to retention policy
+        '''
+        k8s = self.k8s
+        leader = k8s.get_cluster_leader_pod()
+        today = date.today()
+
+        # enable password rotation for owner of foo database
+        pg_patch_inplace_rotation_for_owner = {
+            "spec": {
+                "usersWithInPlaceSecretRotation": [
+                    "zalando"
+                ]
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_inplace_rotation_for_owner)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        # check if next rotation date was set in secret
+        secret_data = k8s.get_secret_data("zalando")
+        next_rotation_timestamp = datetime.fromisoformat(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'))
+        today90days = today+timedelta(days=90)
+        self.assertEqual(today90days, next_rotation_timestamp.date(),
+                        "Unexpected rotation date in secret of zalando user: expected {}, got {}".format(today90days, next_rotation_timestamp.date()))
+
+        # create fake rotation users that should be removed by operator
+        # but have one that would still fit into the retention period
+        create_fake_rotation_user = """
+            CREATE ROLE foo_user201031 IN ROLE foo_user;
+            CREATE ROLE foo_user211031 IN ROLE foo_user;
+            CREATE ROLE foo_user"""+(today-timedelta(days=40)).strftime("%y%m%d")+""" IN ROLE foo_user;
+        """
+        self.query_database(leader.metadata.name, "postgres", create_fake_rotation_user)
+
+        # patch foo_user secret with outdated rotation date
+        fake_rotation_date = today.isoformat() + ' 00:00:00'
+        fake_rotation_date_encoded = base64.b64encode(fake_rotation_date.encode('utf-8'))
+        secret_fake_rotation = {
+            "data": {
+                "nextRotation": str(fake_rotation_date_encoded, 'utf-8'),
+            },
+        }
+        k8s.api.core_v1.patch_namespaced_secret(
+            name="foo-user.acid-minimal-cluster.credentials.postgresql.acid.zalan.do", 
+            namespace="default",
+            body=secret_fake_rotation)
+
+        # enable password rotation for all other users (foo_user)
+        # this will force a sync of secrets for further assertions
+        enable_password_rotation = {
+            "data": {
+                "enable_password_rotation": "true",
+                "password_rotation_interval": "30",
+                "password_rotation_user_retention": "30",  # should be set to 60 
+            },
+        }
+        k8s.update_config(enable_password_rotation)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+
+        # check if next rotation date and username have been replaced
+        secret_data = k8s.get_secret_data("foo_user")
+        secret_username = str(base64.b64decode(secret_data["username"]), 'utf-8')
+        next_rotation_timestamp = datetime.fromisoformat(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'))
+        rotation_user = "foo_user"+today.strftime("%y%m%d")
+        today30days = today+timedelta(days=30)
+
+        self.assertEqual(rotation_user, secret_username,
+                        "Unexpected username in secret of foo_user: expected {}, got {}".format(rotation_user, secret_username))
+        self.assertEqual(today30days, next_rotation_timestamp.date(),
+                        "Unexpected rotation date in secret of foo_user: expected {}, got {}".format(today30days, next_rotation_timestamp.date()))
+
+        # check if oldest fake rotation users were deleted
+        # there should only be foo_user, foo_user+today and foo_user+today-40days
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname LIKE 'foo_user%';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 3,
+            "Found incorrect number of rotation users", 10, 5)
+
+        # disable password rotation for all other users (foo_user)
+        # and pick smaller intervals to see if the third fake rotation user is dropped 
+        enable_password_rotation = {
+            "data": {
+                "enable_password_rotation": "false",
+                "password_rotation_interval": "15",
+                "password_rotation_user_retention": "30",  # 2 * rotation interval
+            },
+        }
+        k8s.update_config(enable_password_rotation)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+
+        # check if username in foo_user secret is reset
+        secret_data = k8s.get_secret_data("foo_user")
+        secret_username = str(base64.b64decode(secret_data["username"]), 'utf-8')
+        next_rotation_timestamp = str(base64.b64decode(secret_data["nextRotation"]), 'utf-8')
+        self.assertEqual("foo_user", secret_username,
+                        "Unexpected username in secret of foo_user: expected {}, got {}".format("foo_user", secret_username))
+        self.assertEqual('', next_rotation_timestamp,
+                        "Unexpected rotation date in secret of foo_user: expected empty string, got {}".format(next_rotation_timestamp))
+
+        # check roles again, there should only be foo_user and foo_user+today
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname LIKE 'foo_user%';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
+            "Found incorrect number of rotation users", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_patroni_config_update(self):
