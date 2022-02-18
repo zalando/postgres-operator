@@ -147,7 +147,7 @@ spec:
                       - "transaction"
                   numberOfInstances:
                     type: integer
-                    minimum: 2
+                    minimum: 1
                   resources:
                     type: object
                     required:
@@ -201,8 +201,9 @@ spec:
                 type: boolean
               enableShmVolume:
                 type: boolean
-              init_containers:  # deprecated
+              init_containers:
                 type: array
+                description: deprecated
                 nullable: true
                 items:
                   type: object
@@ -229,8 +230,8 @@ spec:
                     items:
                       type: object
                       required:
-                      - weight
                       - preference
+                      - weight
                       properties:
                         preference:
                           type: object
@@ -348,8 +349,9 @@ spec:
                 type: object
                 additionalProperties:
                   type: string
-              pod_priority_class_name:  # deprecated
+              pod_priority_class_name:
                 type: string
+                description: deprecated
               podPriorityClassName:
                 type: string
               postgresql:
@@ -393,8 +395,9 @@ spec:
                             type: boolean
                     secretNamespace:
                       type: string
-              replicaLoadBalancer:  # deprecated
+              replicaLoadBalancer:
                 type: boolean
+                description: deprecated
               resources:
                 type: object
                 required:
@@ -512,14 +515,14 @@ spec:
                         - PreferNoSchedule
                     tolerationSeconds:
                       type: integer
-              useLoadBalancer:  # deprecated
+              useLoadBalancer:
                 type: boolean
+                description: deprecated
               users:
                 type: object
                 additionalProperties:
                   type: array
                   nullable: true
-                  description: "Role flags specified here must not contradict each other"
                   items:
                     type: string
                     enum:

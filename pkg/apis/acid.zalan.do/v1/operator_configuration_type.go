@@ -221,6 +221,7 @@ type OperatorLogicalBackupConfiguration struct {
 type OperatorConfigurationData struct {
 	EnableCRDRegistration      *bool                              `json:"enable_crd_registration,omitempty"`
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
+	CRDCategories              []string                           `json:"crd_categories,omitempty"`
 	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
 	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`

@@ -3,6 +3,25 @@
 Learn how to configure and manage the Postgres Operator in your Kubernetes (K8s)
 environment.
 
+## CRD registration and validation
+
+On startup, the operator will try to register the necessary
+[CustomResourceDefinitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions)
+`Postgresql` and `OperatorConfiguration`. The latter will only get created if
+the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
+is set in the deployment yaml and is not empty. If the CRDs already exists they
+will only be patched. If you do not wish the operator to create or update the
+CRDs set `enable_crd_registration` config option to `false`.
+
+CRDs are defined with a `openAPIV3Schema` structural schema against which new
+manifests of [`postgresql`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql.crd.yaml) or [`OperatorConfiguration`](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml)
+resources will be validated. On creation you can bypass the validation with 
+`kubectl create --validate=false`.
+
+By default, the operator will register the CRDs in the `all` category so
+that resources are listed on `kubectl get all` commands. The `crd_categories`
+config option allows for customization of categories.
+
 ## Upgrading the operator
 
 The Postgres Operator is upgraded by changing the docker image within the
@@ -62,30 +81,6 @@ upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/z
 
 When `major_version_upgrade_mode` is set to `manual` the operator will run
 the upgrade script for you after the manifest is updated and pods are rotated.
-
-## CRD Validation
-
-[CustomResourceDefinitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions)
-will be registered with schema validation by default when the operator is
-deployed. The `OperatorConfiguration` CRD will only get created if the
-`POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
-in the deployment yaml is set and not empty.
-
-When submitting manifests of [`postgresql`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql.crd.yaml) or
-[`OperatorConfiguration`](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml) custom
-resources with kubectl, validation can be bypassed with `--validate=false`. The
-operator can also be configured to not register CRDs with validation on `ADD` or
-`UPDATE` events. Running instances are not affected when enabling the validation
-afterwards unless the manifests is not changed then. Note, that the provided CRD
-manifests contain the validation for users to understand what schema is
-enforced.
-
-Once the validation is enabled it can only be disabled manually by editing or
-patching the CRD manifest:
-
-```bash
-kubectl patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
-```
 
 ## Non-default cluster domain
 

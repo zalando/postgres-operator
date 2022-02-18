@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"fmt"
+
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	"github.com/zalando/postgres-operator/pkg/util"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -11,11 +13,13 @@ import (
 const (
 	PostgresCRDResourceKind   = "postgresql"
 	PostgresCRDResourcePlural = "postgresqls"
+	PostgresCRDResourceList   = PostgresCRDResourceKind + "List"
 	PostgresCRDResouceName    = PostgresCRDResourcePlural + "." + acidzalando.GroupName
 	PostgresCRDResourceShort  = "pg"
 
 	OperatorConfigCRDResouceKind    = "OperatorConfiguration"
 	OperatorConfigCRDResourcePlural = "operatorconfigurations"
+	OperatorConfigCRDResourceList   = OperatorConfigCRDResouceKind + "List"
 	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
 	OperatorConfigCRDResourceShort  = "opconfig"
 )
@@ -148,7 +152,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "string",
 									},
 									"targetContainers": {
-										Type: "array",
+										Type:     "array",
+										Nullable: true,
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
 												Type: "string",
@@ -199,9 +204,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 							},
 							"timestamp": {
-								Type:        "string",
-								Description: "Date-time format that specifies a timezone as an offset relative to UTC e.g. 1996-12-19T16:39:57-08:00",
-								Pattern:     "^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\\.[0-9]+)?(([+-]([01][0-9]|2[0-3]):[0-5][0-9]))$",
+								Type:    "string",
+								Pattern: "^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\\.[0-9]+)?(([+-]([01][0-9]|2[0-3]):[0-5][0-9]))$",
 							},
 							"uid": {
 								Type:   "string",
@@ -242,14 +246,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Required: []string{"cpu", "memory"},
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"cpu": {
-												Type:        "string",
-												Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
-												Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+												Type:    "string",
+												Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 											},
 											"memory": {
-												Type:        "string",
-												Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
-												Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+												Type:    "string",
+												Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 											},
 										},
 									},
@@ -258,14 +260,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Required: []string{"cpu", "memory"},
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"cpu": {
-												Type:        "string",
-												Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
-												Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+												Type:    "string",
+												Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 											},
 											"memory": {
-												Type:        "string",
-												Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
-												Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+												Type:    "string",
+												Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 											},
 										},
 									},
@@ -283,8 +283,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "object",
 						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type:        "string",
-								Description: "User names specified here as database owners must be declared in the users key of the spec key",
+								Type: "string",
 							},
 						},
 					},
@@ -311,7 +310,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					},
 					"init_containers": {
 						Type:        "array",
-						Description: "Deprecated",
+						Description: "deprecated",
+						Nullable:    true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
 								Type:                   "object",
@@ -320,7 +320,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						},
 					},
 					"initContainers": {
-						Type: "array",
+						Type:     "array",
+						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
 								Type:                   "object",
@@ -358,9 +359,23 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Type: "array",
 														Items: &apiextv1.JSONSchemaPropsOrArray{
 															Schema: &apiextv1.JSONSchemaProps{
-																Type: "object",
-																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-																	Allows: true,
+																Type:     "object",
+																Required: []string{"key", "operator"},
+																Properties: map[string]apiextv1.JSONSchemaProps{
+																	"key": {
+																		Type: "string",
+																	},
+																	"operator": {
+																		Type: "string",
+																	},
+																	"values": {
+																		Type: "array",
+																		Items: &apiextv1.JSONSchemaPropsOrArray{
+																			Schema: &apiextv1.JSONSchemaProps{
+																				Type: "string",
+																			},
+																		},
+																	},
 																},
 															},
 														},
@@ -369,9 +384,23 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Type: "array",
 														Items: &apiextv1.JSONSchemaPropsOrArray{
 															Schema: &apiextv1.JSONSchemaProps{
-																Type: "object",
-																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-																	Allows: true,
+																Type:     "object",
+																Required: []string{"key", "operator"},
+																Properties: map[string]apiextv1.JSONSchemaProps{
+																	"key": {
+																		Type: "string",
+																	},
+																	"operator": {
+																		Type: "string",
+																	},
+																	"values": {
+																		Type: "array",
+																		Items: &apiextv1.JSONSchemaPropsOrArray{
+																			Schema: &apiextv1.JSONSchemaProps{
+																				Type: "string",
+																			},
+																		},
+																	},
 																},
 															},
 														},
@@ -400,9 +429,23 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Type: "array",
 														Items: &apiextv1.JSONSchemaPropsOrArray{
 															Schema: &apiextv1.JSONSchemaProps{
-																Type: "object",
-																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-																	Allows: true,
+																Type:     "object",
+																Required: []string{"key", "operator"},
+																Properties: map[string]apiextv1.JSONSchemaProps{
+																	"key": {
+																		Type: "string",
+																	},
+																	"operator": {
+																		Type: "string",
+																	},
+																	"values": {
+																		Type: "array",
+																		Items: &apiextv1.JSONSchemaPropsOrArray{
+																			Schema: &apiextv1.JSONSchemaProps{
+																				Type: "string",
+																			},
+																		},
+																	},
 																},
 															},
 														},
@@ -411,9 +454,23 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Type: "array",
 														Items: &apiextv1.JSONSchemaPropsOrArray{
 															Schema: &apiextv1.JSONSchemaProps{
-																Type: "object",
-																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-																	Allows: true,
+																Type:     "object",
+																Required: []string{"key", "operator"},
+																Properties: map[string]apiextv1.JSONSchemaProps{
+																	"key": {
+																		Type: "string",
+																	},
+																	"operator": {
+																		Type: "string",
+																	},
+																	"values": {
+																		Type: "array",
+																		Items: &apiextv1.JSONSchemaPropsOrArray{
+																			Schema: &apiextv1.JSONSchemaProps{
+																				Type: "string",
+																			},
+																		},
+																	},
 																},
 															},
 														},
@@ -492,7 +549,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					},
 					"pod_priority_class_name": {
 						Type:        "string",
-						Description: "Deprecated",
+						Description: "deprecated",
 					},
 					"podPriorityClassName": {
 						Type: "string",
@@ -579,7 +636,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					},
 					"replicaLoadBalancer": {
 						Type:        "boolean",
-						Description: "Deprecated",
+						Description: "deprecated",
 					},
 					"resources": {
 						Type:     "object",
@@ -590,14 +647,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Required: []string{"cpu", "memory"},
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"cpu": {
-										Type:        "string",
-										Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
-										Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+										Type:    "string",
+										Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 									},
 									"memory": {
-										Type:        "string",
-										Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
-										Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 									},
 								},
 							},
@@ -606,14 +661,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Required: []string{"cpu", "memory"},
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"cpu": {
-										Type:        "string",
-										Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
-										Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+										Type:    "string",
+										Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 									},
 									"memory": {
-										Type:        "string",
-										Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
-										Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 									},
 								},
 							},
@@ -631,7 +684,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						},
 					},
 					"sidecars": {
-						Type: "array",
+						Type:     "array",
+						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
 								Type:                   "object",
@@ -730,15 +784,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					},
 					"useLoadBalancer": {
 						Type:        "boolean",
-						Description: "Deprecated",
+						Description: "deprecated",
 					},
 					"users": {
 						Type: "object",
 						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type:        "array",
-								Description: "Role flags specified here must not contradict each other",
-								Nullable:    true,
+								Type:     "array",
+								Nullable: true,
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
 										Type: "string",
@@ -907,9 +960,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								},
 							},
 							"size": {
-								Type:        "string",
-								Description: "Value must not be zero",
-								Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
 							"storageClass": {
 								Type: "string",
@@ -961,6 +1013,15 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 			"configuration": {
 				Type: "object",
 				Properties: map[string]apiextv1.JSONSchemaProps{
+					"crd_categories": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type: "string",
+							},
+						},
+					},
 					"docker_image": {
 						Type: "string",
 					},
@@ -968,7 +1029,8 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "boolean",
 					},
 					"enable_crd_validation": {
-						Type: "boolean",
+						Type:        "boolean",
+						Description: "deprecated",
 					},
 					"enable_lazy_spilo_upgrade": {
 						Type: "boolean",
@@ -1013,7 +1075,8 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						},
 					},
 					"sidecars": {
-						Type: "array",
+						Type:     "array",
+						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
 								Type:                   "object",
@@ -1124,7 +1187,8 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 							},
 							"infrastructure_roles_secrets": {
-								Type: "array",
+								Type:     "array",
+								Nullable: true,
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
 										Type:     "object",
@@ -1626,18 +1690,27 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 	},
 }
 
-func buildCRD(name, kind, plural, short string, columns []apiextv1.CustomResourceColumnDefinition, validation apiextv1.CustomResourceValidation) *apiextv1.CustomResourceDefinition {
+func buildCRD(name, kind, plural, list, short string,
+	categories []string,
+	columns []apiextv1.CustomResourceColumnDefinition,
+	validation apiextv1.CustomResourceValidation) *apiextv1.CustomResourceDefinition {
 	return &apiextv1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", apiextv1.GroupName, apiextv1.SchemeGroupVersion.Version),
+			Kind:       "CustomResourceDefinition",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: apiextv1.CustomResourceDefinitionSpec{
 			Group: SchemeGroupVersion.Group,
 			Names: apiextv1.CustomResourceDefinitionNames{
-				Plural:     plural,
-				ShortNames: []string{short},
 				Kind:       kind,
-				Categories: []string{"all"},
+				ListKind:   list,
+				Plural:     plural,
+				Singular:   kind,
+				ShortNames: []string{short},
+				Categories: categories,
 			},
 			Scope: apiextv1.NamespaceScoped,
 			Versions: []apiextv1.CustomResourceDefinitionVersion{
@@ -1657,33 +1730,25 @@ func buildCRD(name, kind, plural, short string, columns []apiextv1.CustomResourc
 }
 
 // PostgresCRD returns CustomResourceDefinition built from PostgresCRDResource
-func PostgresCRD(enableValidation *bool) *apiextv1.CustomResourceDefinition {
-	postgresCRDvalidation := apiextv1.CustomResourceValidation{}
-
-	if enableValidation != nil && *enableValidation {
-		postgresCRDvalidation = PostgresCRDResourceValidation
-	}
-
+func PostgresCRD(crdCategories []string) *apiextv1.CustomResourceDefinition {
 	return buildCRD(PostgresCRDResouceName,
 		PostgresCRDResourceKind,
 		PostgresCRDResourcePlural,
+		PostgresCRDResourceList,
 		PostgresCRDResourceShort,
+		crdCategories,
 		PostgresCRDResourceColumns,
-		postgresCRDvalidation)
+		PostgresCRDResourceValidation)
 }
 
 // ConfigurationCRD returns CustomResourceDefinition built from OperatorConfigCRDResource
-func ConfigurationCRD(enableValidation *bool) *apiextv1.CustomResourceDefinition {
-	opconfigCRDvalidation := apiextv1.CustomResourceValidation{}
-
-	if enableValidation != nil && *enableValidation {
-		opconfigCRDvalidation = OperatorConfigCRDResourceValidation
-	}
-
+func ConfigurationCRD(crdCategories []string) *apiextv1.CustomResourceDefinition {
 	return buildCRD(OperatorConfigCRDResourceName,
 		OperatorConfigCRDResouceKind,
 		OperatorConfigCRDResourcePlural,
+		OperatorConfigCRDResourceList,
 		OperatorConfigCRDResourceShort,
+		crdCategories,
 		OperatorConfigCRDResourceColumns,
-		opconfigCRDvalidation)
+		OperatorConfigCRDResourceValidation)
 }

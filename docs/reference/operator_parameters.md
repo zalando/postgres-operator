@@ -75,9 +75,12 @@ Those are top-level keys, containing both leaf keys and groups.
   The default is `true`.
 
 * **enable_crd_validation**
-  toggles if the operator will create or update CRDs with
+  *deprecated*: toggles if the operator will create or update CRDs with
   [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
-  The default is `true`.
+  The default is `true`. `false` will be ignored, since `apiextensions.io/v1` requires a structural schema definition.
+
+* **crd_categories**
+  The operator will register CRDs in the `all` category by default so that they will be returned by a `kubectl get all` call. You are free to change categories or leave them empty.
 
 * **enable_lazy_spilo_upgrade**
   Instruct operator to update only the statefulsets with new images (Spilo and InitContainers) without immediately doing the rolling update. The assumption is pods will be re-started later with new images, for example due to the node rotation.

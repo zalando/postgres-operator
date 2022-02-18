@@ -61,6 +61,11 @@ spec:
           configuration:
             type: object
             properties:
+              crd_categories:
+                type: array
+                nullable: true
+                items:
+                  type: string
               docker_image:
                 type: string
                 default: "registry.opensource.zalan.do/acid/spilo-14:2.1-p3"
@@ -69,6 +74,7 @@ spec:
                 default: true
               enable_crd_validation:
                 type: boolean
+                description: deprecated
                 default: true
               enable_lazy_spilo_upgrade:
                 type: boolean
@@ -90,11 +96,13 @@ spec:
                 default: false
               max_instances:
                 type: integer
-                minimum: -1  # -1 = disabled
+                description: "-1 = disabled"
+                minimum: -1
                 default: -1
               min_instances:
                 type: integer
-                minimum: -1  # -1 = disabled
+                description: "-1 = disabled"
+                minimum: -1
                 default: -1
               resync_period:
                 type: string
@@ -184,12 +192,12 @@ spec:
                     type: array
                     items:
                       type: string
-                  enable_init_containers:
-                    type: boolean
-                    default: true
                   enable_cross_namespace_secret:
                     type: boolean
                     default: false
+                  enable_init_containers:
+                    type: boolean
+                    default: true
                   enable_pod_antiaffinity:
                     type: boolean
                     default: false
@@ -410,11 +418,11 @@ spec:
                     type: string
                   log_s3_bucket:
                     type: string
+                  wal_az_storage_account:
+                    type: string
                   wal_gs_bucket:
                     type: string
                   wal_s3_bucket:
-                    type: string
-                  wal_az_storage_account:
                     type: string
               logical_backup:
                 type: object
