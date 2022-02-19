@@ -124,6 +124,22 @@ func ResourceNotFound(err error) bool {
 	return apierrors.IsNotFound(err)
 }
 
+// ResourceIgnoreNotFound return an error ignoring IsNotFound
+func ResourceIgnoreNotFound(err error) error {
+	if ResourceNotFound(err) {
+		return nil
+	}
+	return err
+}
+
+// ResourceIgnoreAlreadyExists return an error ignoring IsAlreadyExists
+func ResourceIgnoreAlreadyExists(err error) error {
+	if ResourceAlreadyExists(err) {
+		return nil
+	}
+	return err
+}
+
 // NewFromConfig create Kubernetes Interface using REST config
 func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient := KubernetesClient{}

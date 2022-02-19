@@ -246,6 +246,7 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		}
 	}
 	out.PodEnvironmentConfigMap = in.PodEnvironmentConfigMap
+	out.PodEnvironmentSecret = in.PodEnvironmentSecret
 	return
 }
 

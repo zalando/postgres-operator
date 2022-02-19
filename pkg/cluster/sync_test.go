@@ -2,16 +2,11 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
-
-	"context"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/sirupsen/logrus"
@@ -23,6 +18,9 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -48,7 +46,8 @@ func newFakeK8sSyncClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 
 func newFakeK8sSyncSecretsClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 	return k8sutil.KubernetesClient{
-		SecretsGetter: clientSet.CoreV1(),
+		SecretsGetter:    clientSet.CoreV1(),
+		NamespacesGetter: clientSet.CoreV1(),
 	}, clientSet
 }
 
@@ -364,4 +363,62 @@ func TestUpdateSecret(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestCopyPodEnvironmentSecret(t *testing.T) {
+	client, _ := newFakeK8sSyncSecretsClient()
+
+	const (
+		clusterNamespace = metav1.NamespaceDefault
+		clusterName      = "acid-test-cluster"
+		secretEnvVar     = "POD_ENV_VARIABLE"
+		secretNamespace  = "secret-ns"
+		secretName       = "pod-environment-secret"
+	)
+
+	podEnvironmentSecret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: secretNamespace,
+		},
+		StringData: map[string]string{
+			secretEnvVar: "data",
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentSecret: spec.NamespacedName{
+						Name:      secretName,
+						Namespace: secretNamespace,
+					},
+					ResourceCheckInterval: time.Duration(3),
+					ResourceCheckTimeout:  time.Duration(10),
+				},
+			},
+		}, client, acidv1.Postgresql{}, logger, eventRecorder)
+	cluster.Name = clusterName
+	cluster.Namespace = clusterNamespace
+
+	// Run copyPodEnvironmentSecret without podEnvironmentSecret presence in the namespace
+	err := cluster.copyPodEnvironmentSecret()
+	assert.Error(t, err)
+
+	// Create a Secret in the separate namespace and try to run copyPodEnvironmentSecret again
+	_, err = client.Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: clusterNamespace}}, metav1.CreateOptions{})
+	assert.NoError(t, err)
+	_, err = client.Secrets(secretNamespace).Create(context.TODO(), podEnvironmentSecret, metav1.CreateOptions{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, cluster.copyPodEnvironmentSecret())
+	// Validate, that original Secret was copied to the cluster namespace
+	copySecret, err := client.Secrets(clusterNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, podEnvironmentSecret.Data[secretEnvVar], copySecret.Data[secretEnvVar])
+
+	// Run copyPodEnvironmentSecret and validate that no error happens on retry (Secret already copied)
+	assert.NoError(t, cluster.copyPodEnvironmentSecret())
 }

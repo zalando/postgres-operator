@@ -893,13 +893,13 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	secretPodEnvVarsList := make([]v1.EnvVar, 0)
 
-	if c.OpConfig.PodEnvironmentSecret == "" {
+	if c.OpConfig.PodEnvironmentSecret.Name == "" {
 		return secretPodEnvVarsList, nil
 	}
 
 	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
 		context.TODO(),
-		c.OpConfig.PodEnvironmentSecret,
+		c.OpConfig.PodEnvironmentSecret.Name,
 		metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
@@ -910,7 +910,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 			v1.EnvVar{Name: k, ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: c.OpConfig.PodEnvironmentSecret,
+						Name: c.OpConfig.PodEnvironmentSecret.Name,
 					},
 					Key: k,
 				},

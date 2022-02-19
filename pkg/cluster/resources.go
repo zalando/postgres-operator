@@ -526,6 +526,24 @@ func (c *Cluster) deleteSecret(uid types.UID, secret v1.Secret) error {
 	return nil
 }
 
+func (c *Cluster) getSecretWithRetry(name, namespace string) (*v1.Secret, error) {
+	secret := &v1.Secret{}
+	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+		func() (bool, error) {
+			var err error
+			secret, err = c.KubeClient.Secrets(namespace).Get(
+				context.TODO(),
+				name,
+				metav1.GetOptions{})
+			if err != nil {
+				return false, nil
+			}
+			return true, nil
+		},
+	)
+	return secret, err
+}
+
 func (c *Cluster) createRoles() (err error) {
 	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
 	return c.syncRoles()

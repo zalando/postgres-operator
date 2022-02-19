@@ -54,7 +54,7 @@ type Resources struct {
 	MinCPULimit                   string              `name:"min_cpu_limit" default:"250m"`
 	MinMemoryLimit                string              `name:"min_memory_limit" default:"250Mi"`
 	PodEnvironmentConfigMap       spec.NamespacedName `name:"pod_environment_configmap"`
-	PodEnvironmentSecret          string              `name:"pod_environment_secret"`
+	PodEnvironmentSecret          spec.NamespacedName `name:"pod_environment_secret"`
 	NodeReadinessLabel            map[string]string   `name:"node_readiness_label" default:""`
 	NodeReadinessLabelMerge       string              `name:"node_readiness_label_merge" default:"OR"`
 	MaxInstances                  int32               `name:"max_instances" default:"-1"`

@@ -19,6 +19,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var requireMasterRestartWhenDecreased = []string{
@@ -621,13 +622,17 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 }
 
 func (c *Cluster) syncSecrets() error {
-
 	c.logger.Info("syncing secrets")
 	c.setProcessName("syncing secrets")
 	generatedSecrets := c.generateUserSecrets()
 	rotationUsers := make(spec.PgUserMap)
 	retentionUsers := make([]string, 0)
 	currentTime := time.Now()
+
+	c.logger.Debug("coping PodEnvironmentSecretName if needed")
+	if err := c.copyPodEnvironmentSecret(); err != nil {
+		return err
+	}
 
 	for secretUsername, generatedSecret := range generatedSecrets {
 		secret, err := c.KubeClient.Secrets(generatedSecret.Namespace).Create(context.TODO(), generatedSecret, metav1.CreateOptions{})
@@ -792,6 +797,61 @@ func (c *Cluster) updateSecret(
 		c.Secrets[secret.UID] = secret
 	}
 
+	return nil
+}
+
+func (c *Cluster) copyPodEnvironmentSecret() error {
+	if c.OpConfig.PodEnvironmentSecret.Name == "" {
+		return nil
+	}
+	// Searching for a Secret within a namespace defined by the configuration
+	originalSecret, err := c.getSecretWithRetry(c.OpConfig.PodEnvironmentSecret.Name, c.OpConfig.PodEnvironmentSecret.Namespace)
+	if err != nil {
+		return fmt.Errorf("could not read Secret PodEnvironmentSecretName: %w", err)
+	}
+
+	if c.OpConfig.PodEnvironmentSecret.Namespace == c.Namespace {
+		return nil
+	}
+	// Attempting to find a Secret in the cluster's namespace if that namespace is not equal to the namespace defined by the configuration
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
+		context.TODO(),
+		c.OpConfig.PodEnvironmentSecret.Name,
+		metav1.GetOptions{})
+	if err != nil {
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not read Secret PodEnvironmentSecretName in cluster namespace: %w", err)
+		}
+		// Secret within cluster namespace not found. Let's create it
+		createSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        originalSecret.Name,
+				Namespace:   c.Namespace,
+				Labels:      originalSecret.Labels,
+				Annotations: originalSecret.Annotations,
+			},
+			Data: originalSecret.Data,
+		}
+		_, err = c.KubeClient.Secrets(c.Namespace).Create(context.TODO(), createSecret, metav1.CreateOptions{})
+		return k8sutil.ResourceIgnoreAlreadyExists(err)
+	}
+	// The secret exists. We need to check if it needs to be updated or not
+	if !reflect.DeepEqual(originalSecret.Data, secret.Data) {
+		patchData, err := secretDataPath(originalSecret.Data)
+		if err != nil {
+			return fmt.Errorf("could not form patch for the Secret %q: %w", c.OpConfig.PodEnvironmentSecret.Name, err)
+		}
+		_, err = c.KubeClient.Secrets(c.Namespace).Patch(
+			context.TODO(),
+			c.OpConfig.PodEnvironmentSecret.Name,
+			types.MergePatchType,
+			patchData,
+			metav1.PatchOptions{},
+			"")
+		if err != nil {
+			return fmt.Errorf("could not patch Secret %q: %w", c.OpConfig.PodEnvironmentSecret.Name, err)
+		}
+	}
 	return nil
 }
 

@@ -789,7 +789,9 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			subTest: "Secret referenced by PodEnvironmentSecret does not exist",
 			opConfig: config.Config{
 				Resources: config.Resources{
-					PodEnvironmentSecret: "idonotexist",
+					PodEnvironmentSecret: spec.NamespacedName{
+						Name: "idonotexist",
+					},
 				},
 			},
 			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret not found"),
@@ -798,7 +800,9 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			subTest: "Pod environment vars reference all keys from secret configured by PodEnvironmentSecret",
 			opConfig: config.Config{
 				Resources: config.Resources{
-					PodEnvironmentSecret: testPodEnvironmentSecretName,
+					PodEnvironmentSecret: spec.NamespacedName{
+						Name: testPodEnvironmentSecretName,
+					},
 				},
 			},
 			envVars: []v1.EnvVar{
