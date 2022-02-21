@@ -316,7 +316,7 @@ func (c *Cluster) syncStreams() error {
 		dbName := slots[publication]["database"]
 		err = c.syncPublication(publication, dbName, tables)
 		if err != nil {
-			c.logger.Warningf("could not sync publication %q in database %d: %v", publication, dbName, err)
+			c.logger.Warningf("could not sync publication %q in database %q: %v", publication, dbName, err)
 		}
 	}
 
