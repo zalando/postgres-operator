@@ -82,8 +82,8 @@ var (
 
 	fes = &v1.FabricEventStream{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "FabricEventStream",
-			APIVersion: "zalando.org/v1",
+			APIVersion: constants.EventStreamCRDApiVersion,
+			Kind:       constants.EventStreamCRDKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fesName,

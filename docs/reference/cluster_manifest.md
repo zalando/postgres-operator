@@ -536,11 +536,18 @@ Those parameters are grouped under the `tls` top-level key.
 
 ## Change data capture streams
 
-This sections enables change data capture (CDC) streams e.g. into Zalando’s
-distributed event broker [Nakadi](https://nakadi.io/). Parameters grouped
-under the `streams` top-level key will be used by the operator to create
-custom resources for Zalando's internal CDC operator. Each stream object can
-have the following properties:
+This sections enables change data capture (CDC) streams via Postgres' 
+[logical decoding](https://www.postgresql.org/docs/14/logicaldecoding.html)
+feature and `pgoutput` plugin. While the Postgres operator takes responsibility
+for providing the setup to publish change events, it relies on external tools
+to consume them. At Zalando, we are using a workflow based on
+[Debezium Connector](https://debezium.io/documentation/reference/stable/connectors/postgresql.html)
+which can feed streams into Zalando’s distributed event broker [Nakadi](https://nakadi.io/)
+among others.
+
+The Postgres Operator creates custom resources for Zalando's internal CDC
+operator which will be used to set up the consumer part. Each stream object
+can have the following properties:
 
 * **applicationId**
   The application name to which the database and CDC belongs to. For each

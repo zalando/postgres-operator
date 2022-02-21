@@ -2,8 +2,9 @@ package constants
 
 // PostgreSQL specific constants
 const (
-	EventStreamSourceCRDKind     = "FabricEventStream"
-	EventStreamSourceCRDName     = "fabriceventstreams.zalando.org"
+	EventStreamCRDApiVersion     = "zalando.org/v1"
+	EventStreamCRDKind           = "FabricEventStream"
+	EventStreamCRDName           = "fabriceventstreams.zalando.org"
 	EventStreamSourcePGType      = "PostgresLogicalReplication"
 	EventStreamSourceSlotPrefix  = "fes"
 	EventStreamSourcePluginType  = "pgoutput"
