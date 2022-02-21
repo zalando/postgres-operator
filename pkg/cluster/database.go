@@ -633,7 +633,7 @@ func (c *Cluster) executeAlterPublication(pubName, tableList string) error {
 
 func (c *Cluster) execCreateOrAlterPublication(pubName, tableList, statement, doing, operation string) error {
 
-	c.logger.Infof("%s %q with table list %q", doing, pubName, tableList)
+	c.logger.Debugf("%s %q with table list %q", doing, pubName, tableList)
 	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, pubName, tableList)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}

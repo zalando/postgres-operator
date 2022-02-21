@@ -205,13 +205,15 @@ spec:
 #  - applicationId: test-app
 #    database: foo
 #    tables:
-#      data.tab_a:
-#        eventType: event_type_a
-#      data.tab_b:
-#        eventType: event_type_b
-#        idColumn: tb_id
-#        payloadColumn: tb_payload
+#      data.state_pending_outbox:
+#        eventType: test-app.status-pending
+#      data.state_approved_outbox:
+#        eventType: test-app.status-approved
+#      data.orders_outbox:
+#        eventType: test-app.order-completed
+#        idColumn: o_id
+#        payloadColumn: o_payload
 #    # Optional. Filter ignores events before a certain txnId and lsn. Can be used to skip bad events
 #    filter:
-#      data.tab_a: "[?(@.source.txId > 500 && @.source.lsn > 123456)]"
+#      data.orders_outbox: "[?(@.source.txId > 500 && @.source.lsn > 123456)]"
 #    batchSize: 1000
