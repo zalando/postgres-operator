@@ -115,6 +115,22 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   create the K8s secret in that namespace. The part after the first `.` is
   considered to be the user name. Optional.
 
+* **usersWithSecretRotation**
+  list of users to enable credential rotation in K8s secrets. The rotation
+  interval can only be configured globally. On each rotation a new user will
+  be added in the database replacing the `username` value in the secret of
+  the listed user. Although, rotation users inherit all rights from the
+  original role, keep in mind that ownership is not transferred. See more
+  details in the [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#password-rotation-in-k8s-secrets).
+
+* **usersWithInPlaceSecretRotation**
+  list of users to enable in-place password rotation in K8s secrets. The
+  rotation interval can only be configured globally. On each rotation the
+  password value will be replaced in the secrets which the operator reflects
+  in the database, too. List only users here that rarely connect to the
+  database, like a flyway user running a migration on Pod start. See more
+  details in the [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#password-replacement-without-extra-users).
+
 * **databases**
   a map of database names to database owners for the databases that should be
   created by the operator. The owner users should already exist on the cluster

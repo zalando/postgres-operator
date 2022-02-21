@@ -310,7 +310,7 @@ func (c *Controller) initController() {
 
 	if configObjectName := os.Getenv("POSTGRES_OPERATOR_CONFIGURATION_OBJECT"); configObjectName != "" {
 		if c.opConfig.EnableCRDRegistration != nil && *c.opConfig.EnableCRDRegistration {
-			if err := c.createConfigurationCRD(c.opConfig.EnableCRDValidation); err != nil {
+			if err := c.createConfigurationCRD(); err != nil {
 				c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
 			}
 		}
@@ -328,7 +328,7 @@ func (c *Controller) initController() {
 	c.modifyConfigFromEnvironment()
 
 	if c.opConfig.EnableCRDRegistration != nil && *c.opConfig.EnableCRDRegistration {
-		if err := c.createPostgresCRD(c.opConfig.EnableCRDValidation); err != nil {
+		if err := c.createPostgresCRD(); err != nil {
 			c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
 		}
 	}

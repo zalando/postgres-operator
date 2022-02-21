@@ -19,6 +19,7 @@ import (
 	"github.com/zalando/postgres-operator/mocks"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
@@ -26,6 +27,8 @@ import (
 )
 
 var patroniLogger = logrus.New().WithField("test", "patroni")
+var acidClientSet = fakeacidv1.NewSimpleClientset()
+var clientSet = fake.NewSimpleClientset()
 
 func newMockPod(ip string) *v1.Pod {
 	return &v1.Pod{
@@ -36,13 +39,16 @@ func newMockPod(ip string) *v1.Pod {
 }
 
 func newFakeK8sSyncClient() (k8sutil.KubernetesClient, *fake.Clientset) {
-	acidClientSet := fakeacidv1.NewSimpleClientset()
-	clientSet := fake.NewSimpleClientset()
-
 	return k8sutil.KubernetesClient{
 		PodsGetter:         clientSet.CoreV1(),
 		PostgresqlsGetter:  acidClientSet.AcidV1(),
 		StatefulSetsGetter: clientSet.AppsV1(),
+	}, clientSet
+}
+
+func newFakeK8sSyncSecretsClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	return k8sutil.KubernetesClient{
+		SecretsGetter: clientSet.CoreV1(),
 	}, clientSet
 }
 
@@ -255,5 +261,74 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		if requireMasterRestart != tt.restartMaster {
 			t.Errorf("%s - %s: unexpect master restart strategy, got %v, expected %v", testName, tt.subtest, requireMasterRestart, tt.restartMaster)
 		}
+	}
+}
+
+func TestUpdateSecret(t *testing.T) {
+	testName := "test syncing secrets"
+	client, _ := newFakeK8sSyncSecretsClient()
+
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	username := "foo"
+	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
+	rotationUsers := make(spec.PgUserMap)
+	retentionUsers := make([]string, 0)
+	yesterday := time.Now().AddDate(0, 0, -1)
+
+	// new cluster with pvc storage resize mode and configured labels
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				Auth: config.Auth{
+					SecretNameTemplate:            secretTemplate,
+					EnablePasswordRotation:        true,
+					PasswordRotationInterval:      1,
+					PasswordRotationUserRetention: 3,
+				},
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: "cluster-name",
+				},
+			},
+		}, client, acidv1.Postgresql{}, logger, eventRecorder)
+
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+	cluster.pgUsers = map[string]spec.PgUser{}
+	cluster.Spec.Users = map[string]acidv1.UserFlags{username: {}}
+	cluster.initRobotUsers()
+
+	// create a secret for user foo
+	cluster.syncSecrets()
+
+	secret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+	assert.NoError(t, err)
+	generatedSecret := cluster.Secrets[secret.UID]
+
+	// now update the secret setting next rotation date (yesterday + interval)
+	cluster.updateSecret(username, generatedSecret, &rotationUsers, &retentionUsers, yesterday)
+	updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	nextRotation := string(updatedSecret.Data["nextRotation"])
+	_, nextRotationDate := cluster.getNextRotationDate(yesterday)
+	if nextRotation != nextRotationDate {
+		t.Errorf("%s: updated secret does not contain correct rotation date: expected %s, got %s", testName, nextRotationDate, nextRotation)
+	}
+
+	// update secret again but use current time to trigger rotation
+	cluster.updateSecret(username, generatedSecret, &rotationUsers, &retentionUsers, time.Now())
+	updatedSecret, err = cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	if len(rotationUsers) != 1 && len(retentionUsers) != 1 {
+		t.Errorf("%s: unexpected number of users to rotate - expected only foo, found %d", testName, len(rotationUsers))
+	}
+
+	secretUsername := string(updatedSecret.Data["username"])
+	rotatedUsername := username + time.Now().Format("060102")
+	if secretUsername != rotatedUsername {
+		t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, rotatedUsername, secretUsername)
 	}
 }

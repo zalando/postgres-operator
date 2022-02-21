@@ -3,6 +3,25 @@
 Learn how to configure and manage the Postgres Operator in your Kubernetes (K8s)
 environment.
 
+## CRD registration and validation
+
+On startup, the operator will try to register the necessary
+[CustomResourceDefinitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions)
+`Postgresql` and `OperatorConfiguration`. The latter will only get created if
+the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
+is set in the deployment yaml and is not empty. If the CRDs already exists they
+will only be patched. If you do not wish the operator to create or update the
+CRDs set `enable_crd_registration` config option to `false`.
+
+CRDs are defined with a `openAPIV3Schema` structural schema against which new
+manifests of [`postgresql`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql.crd.yaml) or [`OperatorConfiguration`](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml)
+resources will be validated. On creation you can bypass the validation with 
+`kubectl create --validate=false`.
+
+By default, the operator will register the CRDs in the `all` category so
+that resources are listed on `kubectl get all` commands. The `crd_categories`
+config option allows for customization of categories.
+
 ## Upgrading the operator
 
 The Postgres Operator is upgraded by changing the docker image within the
@@ -62,30 +81,6 @@ upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/z
 
 When `major_version_upgrade_mode` is set to `manual` the operator will run
 the upgrade script for you after the manifest is updated and pods are rotated.
-
-## CRD Validation
-
-[CustomResourceDefinitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions)
-will be registered with schema validation by default when the operator is
-deployed. The `OperatorConfiguration` CRD will only get created if the
-`POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
-in the deployment yaml is set and not empty.
-
-When submitting manifests of [`postgresql`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql.crd.yaml) or
-[`OperatorConfiguration`](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml) custom
-resources with kubectl, validation can be bypassed with `--validate=false`. The
-operator can also be configured to not register CRDs with validation on `ADD` or
-`UPDATE` events. Running instances are not affected when enabling the validation
-afterwards unless the manifests is not changed then. Note, that the provided CRD
-manifests contain the validation for users to understand what schema is
-enforced.
-
-Once the validation is enabled it can only be disabled manually by editing or
-patching the CRD manifest:
-
-```bash
-kubectl patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
-```
 
 ## Non-default cluster domain
 
@@ -293,6 +288,84 @@ that are aggregated into the K8s [default roles](https://kubernetes.io/docs/refe
 
 For Helm deployments setting `rbac.createAggregateClusterRoles: true` adds these clusterroles to the deployment.
 
+## Password rotation in K8s secrets
+
+The operator regularly updates credentials in the K8s secrets if the
+`enable_password_rotation` option is set to `true` in the configuration.
+It happens only for `LOGIN` roles with an associated secret (manifest roles,
+default users from `preparedDatabases`). Furthermore, there are the following
+exceptions:
+
+1. Infrastructure role secrets since rotation should happen by the infrastructure.
+2. Team API roles that connect via OAuth2 and JWT token (no secrets to these roles anyway).
+3. Database owners since ownership on database objects can not be inherited.
+4. System users such as `postgres`, `standby` and `pooler` user.
+
+The interval of days can be set with `password_rotation_interval` (default
+`90` = 90 days, minimum 1). On each rotation the user name and password values
+are replaced in the K8s secret. They belong to a newly created user named after
+the original role plus rotation date in YYMMDD format. All priviliges are
+inherited meaning that migration scripts should still grant and revoke rights
+against the original role. The timestamp of the next rotation is written to the
+secret as well. Note, if the rotation interval is decreased it is reflected in
+the secrets only if the next rotation date is more days away than the new
+length of the interval.
+
+Pods still using the previous secret values which they keep in memory continue
+to connect to the database since the password of the corresponding user is not
+replaced. However, a retention policy can be configured for users created by
+the password rotation feature with `password_rotation_user_retention`. The
+operator will ensure that this period is at least twice as long as the
+configured rotation interval, hence the default of `180` = 180 days. When
+the creation date of a rotated user is older than the retention period it
+might not get removed immediately. Only on the next user rotation it is checked
+if users can get removed. Therefore, you might want to configure the retention
+to be a multiple of the rotation interval.
+
+### Password rotation for single users
+
+From the configuration, password rotation is enabled for all secrets with the
+mentioned exceptions. If you wish to first test rotation for a single user (or
+just have it enabled only for a few secrets) you can specify it in the cluster
+manifest. The rotation and retention intervals can only be configured globally.
+
+```
+spec:
+  usersWithSecretRotation:
+  - foo_user
+  - bar_reader_user
+```
+
+### Password replacement without extra users
+
+For some use cases where the secret is only used rarely - think of a `flyway`
+user running a migration script on pod start - we do not need to create extra
+database users but can replace only the password in the K8s secret. This type
+of rotation cannot be configured globally but specified in the cluster
+manifest:
+
+```
+spec:
+  usersWithInPlaceSecretRotation:
+  - flyway
+  - bar_owner_user
+```
+
+This would be the recommended option to enable rotation in secrets of database
+owners, but only if they are not used as application users for regular read
+and write operations.
+
+### Turning off password rotation
+
+When password rotation is turned off again the operator will check if the
+`username` value in the secret matches the original username and replace it
+with the latter. A new password is assigned and the `nextRotation` field is
+cleared. A final lookup for child (rotation) users to be removed is done but
+they will only be dropped if the retention policy allows for it. This is to
+avoid sudden connection issues in pods which still use credentials of these
+users in memory. You have to remove these child users manually or re-enable
+password rotation with smaller interval so they get cleaned up.
+
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application pods,
@@ -338,6 +411,81 @@ Depending on your setup, you may want to adjust these parameters to prevent
 master pods from being evicted by the K8s runtime. To prevent eviction
 completely, specify the toleration by leaving out the `tolerationSeconds` value
 (similar to how Kubernetes' own DaemonSets are configured)
+
+## Node readiness labels
+
+The operator can watch on certain node labels to detect e.g. the start of a
+Kubernetes cluster upgrade procedure and move master pods off the nodes to be
+decommissioned. Key-value pairs for these node readiness labels can be
+specified in the configuration (option name is in singular form):
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  node_readiness_label: "status1:ready,status2:ready"
+```
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-configuration
+configuration:
+  kubernetes:
+    node_readiness_label:
+      status1: ready
+      status2: ready
+```
+
+The operator will create a `nodeAffinity` on the pods. This makes the
+`node_readiness_label` option the global configuration for defining node
+affinities for all Postgres clusters. You can have both, cluster-specific and
+global affinity, defined and they will get merged on the pods. If
+`node_readiness_label_merge` is configured to `"AND"` the node readiness
+affinity will end up under the same `matchExpressions` section(s) from the
+manifest affinity.
+
+```yaml
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: environment
+            operator: In
+            values:
+            - pci
+          - key: status1
+            operator: In
+            values:
+            - ready
+          - key: status2
+            ...
+```
+
+If `node_readiness_label_merge` is set to `"OR"` (default) the readiness label
+affinty will be appended with its own expressions block:
+
+```yaml
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: environment
+            ...
+        - matchExpressions:
+          - key: storage
+            ...
+        - matchExpressions:
+          - key: status1
+            ...
+          - key: status2
+            ...
+```
 
 ## Enable pod anti affinity
 

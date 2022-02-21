@@ -671,7 +671,9 @@ configured [default requests](reference/operator_parameters.md#kubernetes-resour
 
 To ensure Postgres pods are running on nodes without any other application pods,
 you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
-and configure the required toleration in the manifest.
+and configure the required toleration in the manifest. Tolerations can also be
+defined in the [operator config](administrator.md#use-taints-and-tolerations-for-dedicated-postgresql-nodes)
+to apply for all Postgres clusters.
 
 ```yaml
 spec:
@@ -702,6 +704,9 @@ spec:
           values:
           - pci
 ```
+
+If you need to define a `nodeAffinity` for all your Postgres clusters use the
+`node_readiness_label` [configuration](administrator.md#node-readiness-labels).
 
 ## In-place major version upgrade
 

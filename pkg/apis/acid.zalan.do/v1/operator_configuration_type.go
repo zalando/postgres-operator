@@ -37,8 +37,11 @@ type OperatorConfigurationList struct {
 
 // PostgresUsersConfiguration defines the system users of Postgres.
 type PostgresUsersConfiguration struct {
-	SuperUsername       string `json:"super_username,omitempty"`
-	ReplicationUsername string `json:"replication_username,omitempty"`
+	SuperUsername                 string `json:"super_username,omitempty"`
+	ReplicationUsername           string `json:"replication_username,omitempty"`
+	EnablePasswordRotation        bool   `json:"enable_password_rotation,omitempty"`
+	PasswordRotationInterval      uint32 `json:"password_rotation_interval,omitempty"`
+	PasswordRotationUserRetention uint32 `json:"password_rotation_user_retention,omitempty"`
 }
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
@@ -82,6 +85,7 @@ type KubernetesMetaConfiguration struct {
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
 	DeleteAnnotationNameKey                string                       `json:"delete_annotation_name_key,omitempty"`
 	NodeReadinessLabel                     map[string]string            `json:"node_readiness_label,omitempty"`
+	NodeReadinessLabelMerge                string                       `json:"node_readiness_label_merge,omitempty"`
 	CustomPodAnnotations                   map[string]string            `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration              map[string]string   `json:"toleration,omitempty"`
@@ -217,6 +221,7 @@ type OperatorLogicalBackupConfiguration struct {
 type OperatorConfigurationData struct {
 	EnableCRDRegistration      *bool                              `json:"enable_crd_registration,omitempty"`
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
+	CRDCategories              []string                           `json:"crd_categories,omitempty"`
 	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
 	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`

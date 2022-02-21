@@ -20,6 +20,7 @@ type CRD struct {
 	RepairPeriod          time.Duration `name:"repair_period" default:"5m"`
 	EnableCRDRegistration *bool         `name:"enable_crd_registration" default:"true"`
 	EnableCRDValidation   *bool         `name:"enable_crd_validation" default:"true"`
+	CRDCategories         []string      `name:"crd_categories" default:"all"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
@@ -55,6 +56,7 @@ type Resources struct {
 	PodEnvironmentConfigMap       spec.NamespacedName `name:"pod_environment_configmap"`
 	PodEnvironmentSecret          string              `name:"pod_environment_secret"`
 	NodeReadinessLabel            map[string]string   `name:"node_readiness_label" default:""`
+	NodeReadinessLabelMerge       string              `name:"node_readiness_label_merge" default:"OR"`
 	MaxInstances                  int32               `name:"max_instances" default:"-1"`
 	MinInstances                  int32               `name:"min_instances" default:"-1"`
 	ShmVolume                     *bool               `name:"enable_shm_volume" default:"true"`
@@ -99,6 +101,9 @@ type Auth struct {
 	InfrastructureRolesDefs       string                `name:"infrastructure_roles_secrets"`
 	SuperUsername                 string                `name:"super_username" default:"postgres"`
 	ReplicationUsername           string                `name:"replication_username" default:"standby"`
+	EnablePasswordRotation        bool                  `name:"enable_password_rotation" default:"false"`
+	PasswordRotationInterval      uint32                `name:"password_rotation_interval" default:"90"`
+	PasswordRotationUserRetention uint32                `name:"password_rotation_user_retention" default:"180"`
 }
 
 // Scalyr holds the configuration for the Scalyr Agent sidecar for log shipping:

@@ -5,7 +5,8 @@ metadata:
 configuration:
   docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p3
   # enable_crd_registration: true
-  # enable_crd_validation: true
+  # crd_categories:
+  # - all
   # enable_lazy_spilo_upgrade: false
   enable_pgversion_env_var: true
   # enable_shm_volume: true
@@ -25,6 +26,9 @@ configuration:
   #     protocol: TCP
   workers: 8
   users:
+    enable_password_rotation: false
+    password_rotation_interval: 90
+    password_rotation_user_retention: 180
     replication_username: standby
     super_username: postgres
   major_version_upgrade:
@@ -70,6 +74,7 @@ configuration:
     master_pod_move_timeout: 20m
     # node_readiness_label:
     #   status: ready
+    # node_readiness_label_merge: "OR"
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
