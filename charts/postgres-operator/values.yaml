@@ -22,8 +22,9 @@ enableJsonLogging: false
 configGeneral:
   # the deployment should create/update the CRDs
   enable_crd_registration: true
-  # choose if deployment creates/updates CRDs with OpenAPIV3Validation
-  enable_crd_validation: true
+  # specify categories under which crds should be listed
+  crd_categories:
+  - "all"
   # update only the statefulsets without immediately doing the rolling update
   enable_lazy_spilo_upgrade: false
   # set the PGVERSION env var instead of providing the version via postgresql.bin_dir in SPILO_CONFIGURATION

@@ -377,6 +377,11 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 		*out = new(bool)
 		**out = **in
 	}
+	if in.CRDCategories != nil {
+		in, out := &in.CRDCategories, &out.CRDCategories
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.ShmVolume != nil {
 		in, out := &in.ShmVolume, &out.ShmVolume
 		*out = new(bool)
@@ -640,6 +645,16 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			}
 			(*out)[key] = outVal
 		}
+	}
+	if in.UsersWithSecretRotation != nil {
+		in, out := &in.UsersWithSecretRotation, &out.UsersWithSecretRotation
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.UsersWithInPlaceSecretRotation != nil {
+		in, out := &in.UsersWithInPlaceSecretRotation, &out.UsersWithInPlaceSecretRotation
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	if in.MaintenanceWindows != nil {
 		in, out := &in.MaintenanceWindows, &out.MaintenanceWindows

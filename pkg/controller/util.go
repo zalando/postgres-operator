@@ -53,28 +53,35 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 	return c.clusterWorkers[clusterName]
 }
 
-func (c *Controller) createOperatorCRD(crd *apiextv1.CustomResourceDefinition) error {
-	if _, err := c.KubeClient.CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
-		if k8sutil.ResourceAlreadyExists(err) {
-			c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
-
-			patch, err := json.Marshal(crd)
-			if err != nil {
-				return fmt.Errorf("could not marshal new customResourceDefintion: %v", err)
-			}
-			if _, err := c.KubeClient.CustomResourceDefinitions().Patch(
-				context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
-				return fmt.Errorf("could not update customResourceDefinition: %v", err)
-			}
-		} else {
-			c.logger.Errorf("could not create customResourceDefinition %q: %v", crd.Name, err)
+func (c *Controller) createOperatorCRD(desiredCrd *apiextv1.CustomResourceDefinition) error {
+	crd, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), desiredCrd.Name, metav1.GetOptions{})
+	if k8sutil.ResourceNotFound(err) {
+		if _, err := c.KubeClient.CustomResourceDefinitions().Create(context.TODO(), desiredCrd, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("could not create customResourceDefinition %q: %v", desiredCrd.Name, err)
+		}
+	}
+	if err != nil {
+		c.logger.Errorf("could not get customResourceDefinition %q: %v", desiredCrd.Name, err)
+	}
+	if crd != nil {
+		c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
+		// copy annotations and labels from existing CRD since we do not define them
+		desiredCrd.Annotations = crd.Annotations
+		desiredCrd.Labels = crd.Labels
+		patch, err := json.Marshal(desiredCrd)
+		if err != nil {
+			return fmt.Errorf("could not marshal new customResourceDefintion %q: %v", desiredCrd.Name, err)
+		}
+		if _, err := c.KubeClient.CustomResourceDefinitions().Patch(
+			context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("could not update customResourceDefinition %q: %v", crd.Name, err)
 		}
 	} else {
 		c.logger.Infof("customResourceDefinition %q has been registered", crd.Name)
 	}
 
 	return wait.Poll(c.config.CRDReadyWaitInterval, c.config.CRDReadyWaitTimeout, func() (bool, error) {
-		c, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+		c, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), desiredCrd.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -96,12 +103,12 @@ func (c *Controller) createOperatorCRD(crd *apiextv1.CustomResourceDefinition) e
 	})
 }
 
-func (c *Controller) createPostgresCRD(enableValidation *bool) error {
-	return c.createOperatorCRD(acidv1.PostgresCRD(enableValidation))
+func (c *Controller) createPostgresCRD() error {
+	return c.createOperatorCRD(acidv1.PostgresCRD(c.opConfig.CRDCategories))
 }
 
-func (c *Controller) createConfigurationCRD(enableValidation *bool) error {
-	return c.createOperatorCRD(acidv1.ConfigurationCRD(enableValidation))
+func (c *Controller) createConfigurationCRD() error {
+	return c.createOperatorCRD(acidv1.ConfigurationCRD(c.opConfig.CRDCategories))
 }
 
 func readDecodedRole(s string) (*spec.PgUser, error) {

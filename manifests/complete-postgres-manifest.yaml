@@ -16,6 +16,9 @@ spec:
     zalando:
     - superuser
     - createdb
+    foo_user: []
+#  usersWithSecretRotation: "foo_user"
+#  usersWithInPlaceSecretRotation: "flyway,bar_owner_user"
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
   enableConnectionPooler: false # enable/disable connection pooler deployment

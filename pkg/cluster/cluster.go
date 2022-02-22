@@ -711,13 +711,18 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// connection pooler needs one system user created, which is done in
-	// initUsers. Check if it needs to be called.
+	// check if users need to be synced
 	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
 		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
+	sameRotatedUsers := reflect.DeepEqual(oldSpec.Spec.UsersWithSecretRotation, newSpec.Spec.UsersWithSecretRotation) &&
+		reflect.DeepEqual(oldSpec.Spec.UsersWithInPlaceSecretRotation, newSpec.Spec.UsersWithInPlaceSecretRotation)
+
+	// connection pooler needs one system user created, which is done in
+	// initUsers. Check if it needs to be called.
 	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
 		needReplicaConnectionPoolerWorker(&newSpec.Spec)
-	if !sameUsers || needConnectionPooler {
+
+	if !sameUsers || !sameRotatedUsers || needConnectionPooler {
 		c.logger.Debugf("initialize users")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
@@ -1001,6 +1006,7 @@ func (c *Cluster) initSystemUsers() {
 		Origin:    spec.RoleOriginSystem,
 		Name:      c.OpConfig.ReplicationUsername,
 		Namespace: c.Namespace,
+		Flags:     []string{constants.RoleFlagLogin},
 		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 
@@ -1113,7 +1119,6 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix, searchPath, secretNamespace string) error {
 
 	for defaultRole, inherits := range defaultRoles {
-
 		namespace := c.Namespace
 		//if namespaced secrets are allowed
 		if secretNamespace != "" {
@@ -1136,8 +1141,10 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		}
 
 		adminRole := ""
+		isOwner := false
 		if strings.Contains(defaultRole, constants.OwnerRoleNameSuffix) {
 			adminRole = admin
+			isOwner = true
 		} else {
 			adminRole = prefix + constants.OwnerRoleNameSuffix
 		}
@@ -1151,6 +1158,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 			MemberOf:   memberOf,
 			Parameters: map[string]string{"search_path": searchPath},
 			AdminRole:  adminRole,
+			IsDbOwner:  isOwner,
 		}
 		if currentRole, present := c.pgUsers[roleName]; present {
 			c.pgUsers[roleName] = c.resolveNameConflict(&currentRole, &newRole)
@@ -1171,6 +1179,14 @@ func (c *Cluster) initRobotUsers() error {
 			continue
 		}
 		namespace := c.Namespace
+
+		// check if role is specified as database owner
+		isOwner := false
+		for _, owner := range c.Spec.Databases {
+			if username == owner {
+				isOwner = true
+			}
+		}
 
 		//if namespaced secrets are allowed
 		if c.Config.OpConfig.EnableCrossNamespaceSecret {
@@ -1196,6 +1212,7 @@ func (c *Cluster) initRobotUsers() error {
 			Password:  util.RandomPassword(constants.PasswordLength),
 			Flags:     flags,
 			AdminRole: adminRole,
+			IsDbOwner: isOwner,
 		}
 		if currentRole, present := c.pgUsers[username]; present {
 			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
