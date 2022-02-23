@@ -718,7 +718,7 @@ func (c *Cluster) updateSecret(
 
 		// initialize password rotation setting first rotation date
 		nextRotationDateStr = string(secret.Data["nextRotation"])
-		if nextRotationDate, err = time.ParseInLocation(time.RFC3339, nextRotationDateStr, time.Now().UTC().Location()); err != nil {
+		if nextRotationDate, err = time.ParseInLocation(time.RFC3339, nextRotationDateStr, currentTime.UTC().Location()); err != nil {
 			nextRotationDate, nextRotationDateStr = c.getNextRotationDate(currentTime)
 			secret.Data["nextRotation"] = []byte(nextRotationDateStr)
 			updateSecret = true
