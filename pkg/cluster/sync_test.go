@@ -319,7 +319,7 @@ func TestUpdateSecret(t *testing.T) {
 	// initialize rotation with current time
 	cluster.syncSecrets()
 
-	tomorrow := time.Now().AddDate(0, 0, 2)
+	dayAfterTomorrow := time.Now().AddDate(0, 0, 2)
 
 	for username := range cluster.Spec.Users {
 		pgUser := cluster.pgUsers[username]
@@ -330,7 +330,7 @@ func TestUpdateSecret(t *testing.T) {
 		secretPassword := string(secret.Data["password"])
 
 		// now update the secret setting a next rotation date (tomorrow + interval)
-		cluster.updateSecret(username, secret, &rotationUsers, &retentionUsers, tomorrow)
+		cluster.updateSecret(username, secret, &rotationUsers, &retentionUsers, dayAfterTomorrow)
 		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
 		assert.NoError(t, err)
 
@@ -342,7 +342,7 @@ func TestUpdateSecret(t *testing.T) {
 
 		// check that next rotation date is tomorrow + interval, not date in secret + interval
 		nextRotation := string(updatedSecret.Data["nextRotation"])
-		_, nextRotationDate := cluster.getNextRotationDate(tomorrow)
+		_, nextRotationDate := cluster.getNextRotationDate(dayAfterTomorrow)
 		if nextRotation != nextRotationDate {
 			t.Errorf("%s: updated secret of %s does not contain correct rotation date: expected %s, got %s", testName, username, nextRotationDate, nextRotation)
 		}
@@ -354,7 +354,7 @@ func TestUpdateSecret(t *testing.T) {
 				t.Errorf("%s: username differs in updated secret: expected %s, got %s", testName, username, secretUsername)
 			}
 		} else {
-			rotatedUsername := username + tomorrow.Format("060102")
+			rotatedUsername := username + dayAfterTomorrow.Format("060102")
 			if secretUsername != rotatedUsername {
 				t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, rotatedUsername, secretUsername)
 			}
