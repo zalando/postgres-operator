@@ -306,10 +306,10 @@ The interval of days can be set with `password_rotation_interval` (default
 are replaced in the K8s secret. They belong to a newly created user named after
 the original role plus rotation date in YYMMDD format. All priviliges are
 inherited meaning that migration scripts should still grant and revoke rights
-against the original role. The timestamp of the next rotation is written to the
-secret as well. Note, if the rotation interval is decreased it is reflected in
-the secrets only if the next rotation date is more days away than the new
-length of the interval.
+against the original role. The timestamp of the next rotation (in RFC 3339
+format, UTC timezone) is written to the secret as well. Note, if the rotation
+interval is decreased it is reflected in the secrets only if the next rotation
+date is more days away than the new length of the interval.
 
 Pods still using the previous secret values which they keep in memory continue
 to connect to the database since the password of the corresponding user is not
