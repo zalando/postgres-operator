@@ -727,7 +727,7 @@ func (c *Cluster) updateSecret(
 
 		// check if next rotation can happen sooner
 		// if rotation interval has been decreased
-		currentRotationDate, _ := c.getNextRotationDate(currentTime)
+		currentRotationDate, nextRotationDateStr := c.getNextRotationDate(currentTime)
 		if nextRotationDate.After(currentRotationDate) {
 			nextRotationDate = currentRotationDate
 		}
@@ -747,8 +747,6 @@ func (c *Cluster) updateSecret(
 				*retentionUsers = append(*retentionUsers, secretUsername)
 			}
 			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
-
-			_, nextRotationDateStr = c.getNextRotationDate(currentTime)
 			secret.Data["nextRotation"] = []byte(nextRotationDateStr)
 
 			updateSecret = true
