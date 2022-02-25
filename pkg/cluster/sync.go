@@ -277,6 +277,7 @@ func (c *Cluster) syncStatefulSet() error {
 		restartMasterFirst bool
 	)
 	podsToRecreate := make([]v1.Pod, 0)
+	isSafeToRecreatePods := true
 	switchoverCandidates := make([]spec.NamespacedName, 0)
 
 	pods, err := c.listPods()
@@ -402,21 +403,20 @@ func (c *Cluster) syncStatefulSet() error {
 	// get Postgres config, compare with manifest and update via Patroni PATCH endpoint if it differs
 	// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used.
 	for i, pod := range pods {
-		emptyPatroniConfig := acidv1.Patroni{}
-		podName := util.NameFromMeta(pods[i].ObjectMeta)
-		patroniConfig, pgParameters, err := c.patroni.GetConfig(&pod)
+		patroniConfig, pgParameters, err := c.getPatroniConfig(&pod)
 		if err != nil {
-			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
+			c.logger.Warningf("%v", err)
+			isSafeToRecreatePods = false
 			continue
 		}
 		restartWait = patroniConfig.LoopWait
 
 		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
 		// do not attempt a restart
-		if !reflect.DeepEqual(patroniConfig, emptyPatroniConfig) || len(pgParameters) > 0 {
+		if !reflect.DeepEqual(patroniConfig, acidv1.Patroni{}) || len(pgParameters) > 0 {
 			restartMasterFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, pgParameters)
 			if err != nil {
-				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
+				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", pods[i].Name, err)
 				continue
 			}
 			// it could take up to LoopWait to apply the config
@@ -437,50 +437,59 @@ func (c *Cluster) syncStatefulSet() error {
 			remainingPods = append(remainingPods, &pods[i])
 			continue
 		}
-		c.restartInstance(&pod, restartWait)
+		if err = c.restartInstance(&pod, restartWait); err != nil {
+			c.logger.Errorf("%v", err)
+			isSafeToRecreatePods = false
+		}
 	}
 
 	// in most cases only the master should be left to restart
 	if len(remainingPods) > 0 {
 		for _, remainingPod := range remainingPods {
-			c.restartInstance(remainingPod, restartWait)
+			if err = c.restartInstance(remainingPod, restartWait); err != nil {
+				c.logger.Errorf("%v", err)
+				isSafeToRecreatePods = false
+			}
 		}
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if len(podsToRecreate) > 0 {
-		c.logger.Debugln("performing rolling update")
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
-		if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
-			return fmt.Errorf("could not recreate pods: %v", err)
+		if isSafeToRecreatePods {
+			c.logger.Debugln("performing rolling update")
+			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
+			if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
+				return fmt.Errorf("could not recreate pods: %v", err)
+			}
+			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
+		} else {
+			c.logger.Warningf("postpone pod recreation until next sync")
 		}
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 	}
 	return nil
 }
 
-func (c *Cluster) restartInstance(pod *v1.Pod, restartWait uint32) {
+func (c *Cluster) restartInstance(pod *v1.Pod, restartWait uint32) error {
+	// if the config update requires a restart, call Patroni restart
 	podName := util.NameFromMeta(pod.ObjectMeta)
 	role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-
-	// if the config update requires a restart, call Patroni restart
-	memberData, err := c.patroni.GetMemberData(pod)
+	memberData, err := c.getPatroniMemberData(pod)
 	if err != nil {
-		c.logger.Debugf("could not get member data of %s pod %s - skipping possible restart attempt: %v", role, podName, err)
-		return
+		return fmt.Errorf("could not restart Postgres in %s pod %s: %v", role, podName, err)
 	}
 
 	// do restart only when it is pending
 	if memberData.PendingRestart {
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("restarting Postgres server within %s pod %s", role, pod.Name))
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("restarting Postgres server within %s pod %s", role, podName))
 		if err := c.patroni.Restart(pod); err != nil {
-			c.logger.Warningf("could not restart Postgres server within %s pod %s: %v", role, podName, err)
-			return
+			return err
 		}
 		time.Sleep(time.Duration(restartWait) * time.Second)
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for %s pod %s", role, pod.Name))
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for %s pod %s", role, podName))
 	}
+
+	return nil
 }
 
 // AnnotationsToPropagate get the annotations to update if required
