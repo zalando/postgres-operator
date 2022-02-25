@@ -1232,7 +1232,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         # check if next rotation date was set in secret
         secret_data = k8s.get_secret_data("zalando")
-        next_rotation_timestamp = datetime.datetime.strptime(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
+        next_rotation_timestamp = datetime.strptime(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
         today90days = today+timedelta(days=90)
         self.assertEqual(today90days, next_rotation_timestamp.date(),
                         "Unexpected rotation date in secret of zalando user: expected {}, got {}".format(today90days, next_rotation_timestamp.date()))
@@ -1275,7 +1275,7 @@ class EndToEndTestCase(unittest.TestCase):
         # check if next rotation date and username have been replaced
         secret_data = k8s.get_secret_data("foo_user")
         secret_username = str(base64.b64decode(secret_data["username"]), 'utf-8')
-        next_rotation_timestamp = datetime.datetime.strptime(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
+        next_rotation_timestamp = datetime.strptime(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
         rotation_user = "foo_user"+today.strftime("%y%m%d")
         today30days = today+timedelta(days=30)
 
