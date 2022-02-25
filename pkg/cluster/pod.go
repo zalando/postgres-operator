@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
@@ -349,6 +350,54 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 	return nil
 }
 
+func (c *Cluster) getPatroniConfig(pod *v1.Pod) (acidv1.Patroni, map[string]string, error) {
+	var (
+		patroniConfig acidv1.Patroni
+		pgParameters  map[string]string
+	)
+	podName := util.NameFromMeta(pod.ObjectMeta)
+	err := retryutil.Retry(1*time.Second, 5*time.Second,
+		func() (bool, error) {
+			var err error
+			patroniConfig, pgParameters, err = c.patroni.GetConfig(pod)
+
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+	)
+
+	if err != nil {
+		return acidv1.Patroni{}, nil, fmt.Errorf("could not get Postgres config from pod %s: %v", podName, err)
+	}
+
+	return patroniConfig, pgParameters, nil
+}
+
+func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) {
+	var memberData patroni.MemberData
+	err := retryutil.Retry(1*time.Second, 5*time.Second,
+		func() (bool, error) {
+			var err error
+			memberData, err = c.patroni.GetMemberData(pod)
+
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		return patroni.MemberData{}, fmt.Errorf("could not get member data: %v", err)
+	}
+	if memberData.State == "creating replica" {
+		return patroni.MemberData{}, fmt.Errorf("replica currently being initialized")
+	}
+
+	return memberData, nil
+}
+
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
@@ -380,53 +429,9 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	return pod, nil
 }
 
-func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
-
-	/*
-	 Operator should not re-create pods if there is at least one replica being bootstrapped
-	 because Patroni might use other replicas to take basebackup from (see Patroni's "clonefrom" tag).
-
-	 XXX operator cannot forbid replica re-init, so we might still fail if re-init is started
-	 after this check succeeds but before a pod is re-created
-	*/
-	for _, pod := range pods {
-		c.logger.Debugf("name=%s phase=%s ip=%s", pod.Name, pod.Status.Phase, pod.Status.PodIP)
-	}
-
-	for _, pod := range pods {
-
-		var data patroni.MemberData
-
-		err := retryutil.Retry(1*time.Second, 5*time.Second,
-			func() (bool, error) {
-				var err error
-				data, err = c.patroni.GetMemberData(&pod)
-
-				if err != nil {
-					return false, err
-				}
-				return true, nil
-			},
-		)
-
-		if err != nil {
-			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
-			return false
-		} else if data.State == "creating replica" {
-			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
-			return false
-		}
-	}
-	return true
-}
-
 func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.NamespacedName) error {
 	c.setProcessName("starting to recreate pods")
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods))
-
-	if !c.isSafeToRecreatePods(pods) {
-		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initialized")
-	}
 
 	var (
 		masterPod, newMasterPod *v1.Pod
