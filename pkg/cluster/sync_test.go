@@ -270,13 +270,29 @@ func TestUpdateSecret(t *testing.T) {
 
 	clusterName := "acid-test-cluster"
 	namespace := "default"
-	username := "foo"
+	dbname := "app"
+	dbowner := "appowner"
 	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
 	rotationUsers := make(spec.PgUserMap)
 	retentionUsers := make([]string, 0)
-	yesterday := time.Now().AddDate(0, 0, -1)
 
-	// new cluster with pvc storage resize mode and configured labels
+	// define manifest users and enable rotation for dbowner
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			Databases:                      map[string]string{dbname: dbowner},
+			Users:                          map[string]acidv1.UserFlags{"foo": {}, dbowner: {}},
+			UsersWithInPlaceSecretRotation: []string{dbowner},
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	// new cluster with enabled password rotation
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -291,44 +307,61 @@ func TestUpdateSecret(t *testing.T) {
 					ClusterNameLabel: "cluster-name",
 				},
 			},
-		}, client, acidv1.Postgresql{}, logger, eventRecorder)
+		}, client, pg, logger, eventRecorder)
 
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
 	cluster.pgUsers = map[string]spec.PgUser{}
-	cluster.Spec.Users = map[string]acidv1.UserFlags{username: {}}
 	cluster.initRobotUsers()
 
-	// create a secret for user foo
+	// create secrets
+	cluster.syncSecrets()
+	// initialize rotation with current time
 	cluster.syncSecrets()
 
-	secret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
-	assert.NoError(t, err)
-	generatedSecret := cluster.Secrets[secret.UID]
+	dayAfterTomorrow := time.Now().AddDate(0, 0, 2)
 
-	// now update the secret setting next rotation date (yesterday + interval)
-	cluster.updateSecret(username, generatedSecret, &rotationUsers, &retentionUsers, yesterday)
-	updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
-	assert.NoError(t, err)
+	for username := range cluster.Spec.Users {
+		pgUser := cluster.pgUsers[username]
 
-	nextRotation := string(updatedSecret.Data["nextRotation"])
-	_, nextRotationDate := cluster.getNextRotationDate(yesterday)
-	if nextRotation != nextRotationDate {
-		t.Errorf("%s: updated secret does not contain correct rotation date: expected %s, got %s", testName, nextRotationDate, nextRotation)
-	}
+		// first, get the secret
+		secret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+		assert.NoError(t, err)
+		secretPassword := string(secret.Data["password"])
 
-	// update secret again but use current time to trigger rotation
-	cluster.updateSecret(username, generatedSecret, &rotationUsers, &retentionUsers, time.Now())
-	updatedSecret, err = cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
-	assert.NoError(t, err)
+		// now update the secret setting a next rotation date (tomorrow + interval)
+		cluster.updateSecret(username, secret, &rotationUsers, &retentionUsers, dayAfterTomorrow)
+		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+		assert.NoError(t, err)
 
-	if len(rotationUsers) != 1 && len(retentionUsers) != 1 {
-		t.Errorf("%s: unexpected number of users to rotate - expected only foo, found %d", testName, len(rotationUsers))
-	}
+		// check that passwords are different
+		rotatedPassword := string(updatedSecret.Data["password"])
+		if secretPassword == rotatedPassword {
+			t.Errorf("%s: password unchanged in updated secret for %s", testName, username)
+		}
 
-	secretUsername := string(updatedSecret.Data["username"])
-	rotatedUsername := username + time.Now().Format("060102")
-	if secretUsername != rotatedUsername {
-		t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, rotatedUsername, secretUsername)
+		// check that next rotation date is tomorrow + interval, not date in secret + interval
+		nextRotation := string(updatedSecret.Data["nextRotation"])
+		_, nextRotationDate := cluster.getNextRotationDate(dayAfterTomorrow)
+		if nextRotation != nextRotationDate {
+			t.Errorf("%s: updated secret of %s does not contain correct rotation date: expected %s, got %s", testName, username, nextRotationDate, nextRotation)
+		}
+
+		// compare username, when it's dbowner they should be equal because of UsersWithInPlaceSecretRotation
+		secretUsername := string(updatedSecret.Data["username"])
+		if pgUser.IsDbOwner {
+			if secretUsername != username {
+				t.Errorf("%s: username differs in updated secret: expected %s, got %s", testName, username, secretUsername)
+			}
+		} else {
+			rotatedUsername := username + dayAfterTomorrow.Format("060102")
+			if secretUsername != rotatedUsername {
+				t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, rotatedUsername, secretUsername)
+			}
+
+			if len(rotationUsers) != 1 && len(retentionUsers) != 1 {
+				t.Errorf("%s: unexpected number of users to rotate - expected only %s, found %d", testName, username, len(rotationUsers))
+			}
+		}
 	}
 }

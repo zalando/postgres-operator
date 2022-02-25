@@ -620,11 +620,6 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 	return requiresMasterRestart, nil
 }
 
-func (c *Cluster) getNextRotationDate(currentDate time.Time) (time.Time, string) {
-	nextRotationDate := currentDate.AddDate(0, 0, int(c.OpConfig.PasswordRotationInterval))
-	return nextRotationDate, nextRotationDate.Format("2006-01-02 15:04:05")
-}
-
 func (c *Cluster) syncSecrets() error {
 
 	c.logger.Info("syncing secrets")
@@ -682,6 +677,11 @@ func (c *Cluster) syncSecrets() error {
 	return nil
 }
 
+func (c *Cluster) getNextRotationDate(currentDate time.Time) (time.Time, string) {
+	nextRotationDate := currentDate.AddDate(0, 0, int(c.OpConfig.PasswordRotationInterval))
+	return nextRotationDate, nextRotationDate.Format(time.RFC3339)
+}
+
 func (c *Cluster) updateSecret(
 	secretUsername string,
 	generatedSecret *v1.Secret,
@@ -727,7 +727,7 @@ func (c *Cluster) updateSecret(
 
 		// initialize password rotation setting first rotation date
 		nextRotationDateStr = string(secret.Data["nextRotation"])
-		if nextRotationDate, err = time.ParseInLocation("2006-01-02 15:04:05", nextRotationDateStr, time.Local); err != nil {
+		if nextRotationDate, err = time.ParseInLocation(time.RFC3339, nextRotationDateStr, currentTime.UTC().Location()); err != nil {
 			nextRotationDate, nextRotationDateStr = c.getNextRotationDate(currentTime)
 			secret.Data["nextRotation"] = []byte(nextRotationDateStr)
 			updateSecret = true
@@ -736,7 +736,7 @@ func (c *Cluster) updateSecret(
 
 		// check if next rotation can happen sooner
 		// if rotation interval has been decreased
-		currentRotationDate, _ := c.getNextRotationDate(currentTime)
+		currentRotationDate, nextRotationDateStr := c.getNextRotationDate(currentTime)
 		if nextRotationDate.After(currentRotationDate) {
 			nextRotationDate = currentRotationDate
 		}
@@ -756,8 +756,6 @@ func (c *Cluster) updateSecret(
 				*retentionUsers = append(*retentionUsers, secretUsername)
 			}
 			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
-
-			_, nextRotationDateStr = c.getNextRotationDate(nextRotationDate)
 			secret.Data["nextRotation"] = []byte(nextRotationDateStr)
 
 			updateSecret = true
