@@ -205,7 +205,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_team_member_deprecation": "true",
                 "role_deletion_suffix": "_delete_me",
                 "resync_period": "15s",
-                "repair_period": "10s",
+                "repair_period": "15s",
             },
         }
         k8s.update_config(enable_postgres_team_crd)
@@ -295,6 +295,133 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.update_config(revert_resync)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_config_update(self):
+        '''
+            Change Postgres config under Spec.Postgresql.Parameters and Spec.Patroni
+            and query Patroni config endpoint to check if manifest changes got applied
+            via restarting cluster through Patroni's rest api
+        '''
+        k8s = self.k8s
+        leader = k8s.get_cluster_leader_pod()
+        replica = k8s.get_cluster_replica_pod()
+        masterCreationTimestamp = leader.metadata.creation_timestamp
+        replicaCreationTimestamp = replica.metadata.creation_timestamp
+        new_max_connections_value = "50"
+
+        # adjust Postgres config
+        pg_patch_config = {
+            "spec": {
+                "postgresql": {
+                    "parameters": {
+                        "max_connections": new_max_connections_value
+                     }
+                 },
+                 "patroni": {
+                    "slots": {
+                        "test_slot": {
+                            "type": "physical"
+                        }
+                    },
+                    "ttl": 29,
+                    "loop_wait": 9,
+                    "retry_timeout": 9,
+                    "synchronous_mode": True
+                 }
+            }
+        }
+
+        try:
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_config)
+            
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            def compare_config():
+                effective_config = k8s.patroni_rest(leader.metadata.name, "config")
+                desired_config = pg_patch_config["spec"]["patroni"]
+                desired_parameters = pg_patch_config["spec"]["postgresql"]["parameters"]
+                effective_parameters = effective_config["postgresql"]["parameters"]
+                self.assertEqual(desired_parameters["max_connections"], effective_parameters["max_connections"],
+                            "max_connections not updated")
+                self.assertTrue(effective_config["slots"] is not None, "physical replication slot not added")
+                self.assertEqual(desired_config["ttl"], effective_config["ttl"],
+                            "ttl not updated")
+                self.assertEqual(desired_config["loop_wait"], effective_config["loop_wait"],
+                            "loop_wait not updated")
+                self.assertEqual(desired_config["retry_timeout"], effective_config["retry_timeout"],
+                            "retry_timeout not updated")
+                self.assertEqual(desired_config["synchronous_mode"], effective_config["synchronous_mode"],
+                            "synchronous_mode not updated")
+                return True
+
+            # check if Patroni config has been updated
+            self.eventuallyTrue(compare_config, "Postgres config not applied")
+
+            # make sure that pods were not recreated
+            leader = k8s.get_cluster_leader_pod()
+            replica = k8s.get_cluster_replica_pod()
+            self.assertEqual(masterCreationTimestamp, leader.metadata.creation_timestamp,
+                            "Master pod creation timestamp is updated")
+            self.assertEqual(replicaCreationTimestamp, replica.metadata.creation_timestamp,
+                            "Master pod creation timestamp is updated")
+
+            # query max_connections setting
+            setting_query = """
+               SELECT setting
+                 FROM pg_settings
+                WHERE name = 'max_connections';
+            """
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "New max_connections setting not applied on master", 10, 5)
+            self.eventuallyNotEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "Expected max_connections not to be updated on replica since Postgres was restarted there first", 10, 5)
+
+            # the next sync should restart the replica because it has pending_restart flag set
+            # force next sync by deleting the operator pod
+            k8s.delete_operator_pod()
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "New max_connections setting not applied on replica", 10, 5)
+
+            # decrease max_connections again
+            # this time restart will be correct and new value should appear on both instances
+            lower_max_connections_value = "30"
+            pg_patch_max_connections = {
+                "spec": {
+                    "postgresql": {
+                        "parameters": {
+                            "max_connections": lower_max_connections_value
+                        }
+                    }
+                }
+            }
+
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
+
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            # check Patroni config again
+            pg_patch_config["spec"]["postgresql"]["parameters"]["max_connections"] = lower_max_connections_value
+            self.eventuallyTrue(compare_config, "Postgres config not applied")
+
+            # and query max_connections setting again
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
+                "Previous max_connections setting not applied on master", 10, 5)
+            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
+                "Previous max_connections setting not applied on replica", 10, 5)
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+        # make sure cluster is in a good state for further tests
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
+                             "No 2 pods running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_cross_namespace_secrets(self):
@@ -794,7 +921,11 @@ class EndToEndTestCase(unittest.TestCase):
         Lower resource limits below configured minimum and let operator fix it
         '''
         k8s = self.k8s
-        # self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Cluster not healthy at start")
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        # get nodes of master and replica(s) (expected target of new master)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+        self.assertNotEqual(replica_nodes, [])
 
         # configure minimum boundaries for CPU and memory limits
         minCPULimit = '503m'
@@ -827,7 +958,9 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
+        # wait for switched over
+        k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members()), 2, "Postgres status did not enter running")
 
         def verify_pod_limits():
@@ -968,15 +1101,15 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # node affinity change should cause another rolling update and relocation of replica
-            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=replica,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
         # toggle pod anti affinity to make sure replica and master run on separate nodes
-        self.assert_distributed_pods(replica_nodes)
+        self.assert_distributed_pods(master_nodes)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_node_readiness_label(self):
@@ -1193,133 +1326,6 @@ class EndToEndTestCase(unittest.TestCase):
             "Found incorrect number of rotation users", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_patroni_config_update(self):
-        '''
-            Change Postgres config under Spec.Postgresql.Parameters and Spec.Patroni
-            and query Patroni config endpoint to check if manifest changes got applied
-            via restarting cluster through Patroni's rest api
-        '''
-        k8s = self.k8s
-        leader = k8s.get_cluster_leader_pod()
-        replica = k8s.get_cluster_replica_pod()
-        masterCreationTimestamp = leader.metadata.creation_timestamp
-        replicaCreationTimestamp = replica.metadata.creation_timestamp
-        new_max_connections_value = "50"
-
-        # adjust Postgres config
-        pg_patch_config = {
-            "spec": {
-                "postgresql": {
-                    "parameters": {
-                        "max_connections": new_max_connections_value
-                     }
-                 },
-                 "patroni": {
-                    "slots": {
-                        "test_slot": {
-                            "type": "physical"
-                        }
-                    },
-                    "ttl": 29,
-                    "loop_wait": 9,
-                    "retry_timeout": 9,
-                    "synchronous_mode": True
-                 }
-            }
-        }
-
-        try:
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_config)
-            
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-            def compare_config():
-                effective_config = k8s.patroni_rest(leader.metadata.name, "config")
-                desired_config = pg_patch_config["spec"]["patroni"]
-                desired_parameters = pg_patch_config["spec"]["postgresql"]["parameters"]
-                effective_parameters = effective_config["postgresql"]["parameters"]
-                self.assertEqual(desired_parameters["max_connections"], effective_parameters["max_connections"],
-                            "max_connections not updated")
-                self.assertTrue(effective_config["slots"] is not None, "physical replication slot not added")
-                self.assertEqual(desired_config["ttl"], effective_config["ttl"],
-                            "ttl not updated")
-                self.assertEqual(desired_config["loop_wait"], effective_config["loop_wait"],
-                            "loop_wait not updated")
-                self.assertEqual(desired_config["retry_timeout"], effective_config["retry_timeout"],
-                            "retry_timeout not updated")
-                self.assertEqual(desired_config["synchronous_mode"], effective_config["synchronous_mode"],
-                            "synchronous_mode not updated")
-                return True
-
-            # check if Patroni config has been updated
-            self.eventuallyTrue(compare_config, "Postgres config not applied")
-
-            # make sure that pods were not recreated
-            leader = k8s.get_cluster_leader_pod()
-            replica = k8s.get_cluster_replica_pod()
-            self.assertEqual(masterCreationTimestamp, leader.metadata.creation_timestamp,
-                            "Master pod creation timestamp is updated")
-            self.assertEqual(replicaCreationTimestamp, replica.metadata.creation_timestamp,
-                            "Master pod creation timestamp is updated")
-
-            # query max_connections setting
-            setting_query = """
-               SELECT setting
-                 FROM pg_settings
-                WHERE name = 'max_connections';
-            """
-            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
-                "New max_connections setting not applied on master", 10, 5)
-            self.eventuallyNotEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
-                "Expected max_connections not to be updated on replica since Postgres was restarted there first", 10, 5)
-
-            # the next sync should restart the replica because it has pending_restart flag set
-            # force next sync by deleting the operator pod
-            k8s.delete_operator_pod()
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
-                "New max_connections setting not applied on replica", 10, 5)
-
-            # decrease max_connections again
-            # this time restart will be correct and new value should appear on both instances
-            lower_max_connections_value = "30"
-            pg_patch_max_connections = {
-                "spec": {
-                    "postgresql": {
-                        "parameters": {
-                            "max_connections": lower_max_connections_value
-                        }
-                    }
-                }
-            }
-
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
-
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-            # check Patroni config again
-            pg_patch_config["spec"]["postgresql"]["parameters"]["max_connections"] = lower_max_connections_value
-            self.eventuallyTrue(compare_config, "Postgres config not applied")
-
-            # and query max_connections setting again
-            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
-                "Previous max_connections setting not applied on master", 10, 5)
-            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
-                "Previous max_connections setting not applied on replica", 10, 5)
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
-
-        # make sure cluster is in a good state for further tests
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
-                             "No 2 pods running")
-
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_rolling_update_flag(self):
         '''
             Add rolling update flag to only the master and see it failing over
@@ -1405,7 +1411,7 @@ class EndToEndTestCase(unittest.TestCase):
             "data": {
                 "pod_label_wait_timeout": "2s",
                 "resync_period": "30s",
-                "repair_period": "10s",
+                "repair_period": "30s",
             }
         }
 
