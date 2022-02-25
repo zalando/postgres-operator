@@ -164,6 +164,7 @@ type Patroni struct {
 	Slots                 map[string]map[string]string `json:"slots,omitempty"`
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
+	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:1`
 }
 
 // StandbyDescription contains s3 wal path

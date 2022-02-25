@@ -534,6 +534,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"synchronous_mode_strict": {
 								Type: "boolean",
 							},
+							"synchronous_node_count": {
+								Type: "integer",
+							},
 							"ttl": {
 								Type: "integer",
 							},
