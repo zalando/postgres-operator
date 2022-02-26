@@ -495,10 +495,6 @@ spec:
                 type: array
                 items:
                   type: object
-                  required:
-                    - key
-                    - operator
-                    - effect
                   properties:
                     key:
                       type: string
