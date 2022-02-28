@@ -472,6 +472,39 @@ spec:
                     type: string
                   gs_wal_path:
                     type: string
+              streams:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  required:
+                    - applicationId
+                    - database
+                    - tables
+                  properties:
+                    applicationId:
+                      type: string
+                    batchSize:
+                      type: integer
+                    database:
+                      type: string
+                    filter:
+                      type: object
+                      additionalProperties:
+                        type: string
+                    tables:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        required:
+                          - eventType
+                        properties:
+                          eventType:
+                            type: string
+                          idColumn:
+                            type: string
+                          payloadColumn:
+                            type: string
               teamId:
                 type: string
               tls:

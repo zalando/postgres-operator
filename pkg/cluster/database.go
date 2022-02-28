@@ -46,6 +46,13 @@ const (
 	createExtensionSQL      = `CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
 	alterExtensionSQL       = `ALTER EXTENSION "%s" SET SCHEMA "%s"`
 
+	getPublicationsSQL = `SELECT p.pubname, string_agg(pt.schemaname || '.' || pt.tablename, ', ' ORDER BY pt.schemaname, pt.tablename)
+	        FROM pg_publication p
+			JOIN pg_publication_tables pt ON pt.pubname = p.pubname
+			GROUP BY p.pubname;`
+	createPublicationSQL = `CREATE PUBLICATION "%s" FOR TABLE %s WITH (publish = 'insert, update');`
+	alterPublicationSQL  = `ALTER PUBLICATION "%s" SET TABLE %s;`
+
 	globalDefaultPrivilegesSQL = `SET ROLE TO "%s";
 			ALTER DEFAULT PRIVILEGES GRANT USAGE ON SCHEMAS TO "%s","%s";
 			ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO "%s";
@@ -566,6 +573,68 @@ func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doi
 
 	c.logger.Infof("%s %q schema %q", doing, extName, schemaName)
 	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, extName, schemaName)); err != nil {
+		return fmt.Errorf("could not execute %s: %v", operation, err)
+	}
+
+	return nil
+}
+
+// getPublications returns the list of current database publications with tables
+// The caller is responsible for opening and closing the database connection
+func (c *Cluster) getPublications() (publications map[string]string, err error) {
+	var (
+		rows *sql.Rows
+	)
+
+	if rows, err = c.pgDb.Query(getPublicationsSQL); err != nil {
+		return nil, fmt.Errorf("could not query database publications: %v", err)
+	}
+
+	defer func() {
+		if err2 := rows.Close(); err2 != nil {
+			if err != nil {
+				err = fmt.Errorf("error when closing query cursor: %v, previous error: %v", err2, err)
+			} else {
+				err = fmt.Errorf("error when closing query cursor: %v", err2)
+			}
+		}
+	}()
+
+	dbPublications := make(map[string]string)
+
+	for rows.Next() {
+		var (
+			dbPublication       string
+			dbPublicationTables string
+		)
+
+		if err = rows.Scan(&dbPublication, &dbPublicationTables); err != nil {
+			return nil, fmt.Errorf("error when processing row: %v", err)
+		}
+		dbPublications[dbPublication] = dbPublicationTables
+	}
+
+	return dbPublications, err
+}
+
+// executeCreatePublication creates new publication for given tables
+// The caller is responsible for opening and closing the database connection.
+func (c *Cluster) executeCreatePublication(pubName, tableList string) error {
+	return c.execCreateOrAlterPublication(pubName, tableList, createPublicationSQL,
+		"creating publication", "create publication")
+}
+
+// executeAlterExtension changes the table list of the given publication.
+// The caller is responsible for opening and closing the database connection.
+func (c *Cluster) executeAlterPublication(pubName, tableList string) error {
+	return c.execCreateOrAlterPublication(pubName, tableList, alterPublicationSQL,
+		"changing publication", "alter publication tables")
+}
+
+func (c *Cluster) execCreateOrAlterPublication(pubName, tableList, statement, doing, operation string) error {
+
+	c.logger.Debugf("%s %q with table list %q", doing, pubName, tableList)
+	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, pubName, tableList)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}
 

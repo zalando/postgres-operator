@@ -361,6 +361,12 @@ func (c *Cluster) Create() error {
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
 
+	if len(c.Spec.Streams) > 0 {
+		if err = c.syncStreams(); err != nil {
+			c.logger.Errorf("could not create streams: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -861,6 +867,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		updateFailed = true
 	}
 
+	if len(c.Spec.Streams) > 0 {
+		if err := c.syncStreams(); err != nil {
+			c.logger.Errorf("could not sync streams: %v", err)
+			updateFailed = true
+		}
+	}
+
 	if !updateFailed {
 		// Major version upgrade must only fire after success of earlier operations and should stay last
 		if err := c.majorVersionUpgrade(); err != nil {
@@ -895,6 +908,10 @@ func (c *Cluster) Delete() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of new cluster resources")
+
+	if err := c.deleteStreams(); err != nil {
+		c.logger.Warningf("could not delete event streams: %v", err)
+	}
 
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created
@@ -1048,6 +1065,23 @@ func (c *Cluster) initSystemUsers() {
 
 		if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; !exists {
 			c.systemUsers[constants.ConnectionPoolerUserKeyName] = connectionPoolerUser
+		}
+	}
+
+	// replication users for event streams are another exception
+	// the operator will create one replication user for all streams
+	if len(c.Spec.Streams) > 0 {
+		username := constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
+		streamUser := spec.PgUser{
+			Origin:    spec.RoleConnectionPooler,
+			Name:      username,
+			Namespace: c.Namespace,
+			Flags:     []string{constants.RoleFlagLogin, constants.RoleFlagReplication},
+			Password:  util.RandomPassword(constants.PasswordLength),
+		}
+
+		if _, exists := c.pgUsers[username]; !exists {
+			c.pgUsers[username] = streamUser
 		}
 	}
 }

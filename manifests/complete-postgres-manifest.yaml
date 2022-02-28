@@ -3,6 +3,7 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 #  labels:
+#    application: test-app
 #    environment: demo
 #  annotations:
 #    "acid.zalan.do/controller": "second-operator"
@@ -17,7 +18,7 @@ spec:
     - superuser
     - createdb
     foo_user: []
-#    flyway: [] 
+#    flyway: []
 #  usersWithSecretRotation:
 #  - foo_user
 #  usersWithInPlaceSecretRotation:
@@ -203,3 +204,21 @@ spec:
 #              operator: In
 #              values:
 #                - enabled
+
+# Enables change data capture streams for defined database tables
+#  streams:
+#  - applicationId: test-app
+#    database: foo
+#    tables:
+#      data.state_pending_outbox:
+#        eventType: test-app.status-pending
+#      data.state_approved_outbox:
+#        eventType: test-app.status-approved
+#      data.orders_outbox:
+#        eventType: test-app.order-completed
+#        idColumn: o_id
+#        payloadColumn: o_payload
+#    # Optional. Filter ignores events before a certain txnId and lsn. Can be used to skip bad events
+#    filter:
+#      data.orders_outbox: "[?(@.source.txId > 500 && @.source.lsn > 123456)]"
+#    batchSize: 1000

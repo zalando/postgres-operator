@@ -256,7 +256,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		requireMasterRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, tt.pgParams)
+		requireMasterRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
 		assert.NoError(t, err)
 		if requireMasterRestart != tt.restartMaster {
 			t.Errorf("%s - %s: unexpect master restart strategy, got %v, expected %v", testName, tt.subtest, requireMasterRestart, tt.restartMaster)

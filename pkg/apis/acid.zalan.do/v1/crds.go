@@ -716,6 +716,54 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"streams": {
+						Type: "array",
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:     "object",
+								Required: []string{"applicationId", "database", "tables"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"applicationId": {
+										Type: "string",
+									},
+									"batchSize": {
+										Type: "integer",
+									},
+									"database": {
+										Type: "string",
+									},
+									"filter": {
+										Type: "object",
+										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"tables": {
+										Type: "object",
+										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type:     "object",
+												Required: []string{"eventType"},
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"eventType": {
+														Type: "string",
+													},
+													"idColumn": {
+														Type: "string",
+													},
+													"payloadColumn": {
+														Type: "string",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 					"teamId": {
 						Type: "string",
 					},

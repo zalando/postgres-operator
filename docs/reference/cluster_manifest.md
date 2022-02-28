@@ -536,3 +536,54 @@ Those parameters are grouped under the `tls` top-level key.
   relative to the "/tls/", which is mount path of the tls secret.
   If `caSecretName` is defined, the ca.crt path is relative to "/tlsca/",
   otherwise to the same "/tls/".
+
+## Change data capture streams
+
+This sections enables change data capture (CDC) streams via Postgres' 
+[logical decoding](https://www.postgresql.org/docs/14/logicaldecoding.html)
+feature and `pgoutput` plugin. While the Postgres operator takes responsibility
+for providing the setup to publish change events, it relies on external tools
+to consume them. At Zalando, we are using a workflow based on
+[Debezium Connector](https://debezium.io/documentation/reference/stable/connectors/postgresql.html)
+which can feed streams into Zalando’s distributed event broker [Nakadi](https://nakadi.io/)
+among others.
+
+The Postgres Operator creates custom resources for Zalando's internal CDC
+operator which will be used to set up the consumer part. Each stream object
+can have the following properties:
+
+* **applicationId**
+  The application name to which the database and CDC belongs to. For each
+  set of streams with a distinct `applicationId` a separate stream CR as well
+  as a separate logical replication slot will be created. This means there can
+  be different streams in the same database and streams with the same
+  `applicationId` are bundled in one stream CR. The stream CR will be called
+  like the Postgres cluster plus "-<applicationId>" suffix. Required.
+
+* **database**
+  Name of the database from where events will be published via Postgres'
+  logical decoding feature. The operator will take care of updating the
+  database configuration (setting `wal_level: logical`, creating logical
+  replication slots, using output plugin `pgoutput` and creating a dedicated
+  replication user). Required.
+
+* **tables**
+  Defines a map of table names and their properties (`eventType`, `idColumn`
+  and `payloadColumn`). The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
+  The application is responsible for putting events into a (JSON/B or VARCHAR)
+  payload column of the outbox table in the structure of the specified target
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/14/logical-replication-publication.html)
+  in Postgres for all tables specified for one `database` and `applicationId`.
+  The CDC operator will consume from it shortly after transactions are
+  committed to the outbox table. The `idColumn` will be used in telemetry for
+  the CDC operator. The names for `idColumn` and `payloadColumn` can be
+  configured. Defaults are `id` and `payload`. The target `eventType` has to
+  be defined. Required.
+
+* **filter**
+  Streamed events can be filtered by a jsonpath expression for each table.
+  Optional.
+
+* **batchSize**
+  Defines the size of batches in which events are consumed. Optional.
+  Defaults to 1.
