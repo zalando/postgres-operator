@@ -644,7 +644,10 @@ func TestSecretVolume(t *testing.T) {
 const (
 	testPodEnvironmentConfigMapName      = "pod_env_cm"
 	testPodEnvironmentSecretName         = "pod_env_sc"
+	testPodEnvironmentObjectNotExists    = "idonotexist"
 	testPodEnvironmentSecretNameAPIError = "pod_env_sc_apierror"
+	testResourceCheckInterval            = 3
+	testResourceCheckTimeout             = 10
 )
 
 type mockSecret struct {
@@ -729,7 +732,7 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentConfigMap: spec.NamespacedName{
-						Name: "idonotexist",
+						Name: testPodEnvironmentObjectNotExists,
 					},
 				},
 			},
@@ -780,6 +783,7 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 
 // Test if the keys of an existing secret are properly referenced
 func TestPodEnvironmentSecretVariables(t *testing.T) {
+	maxRetries := int(testResourceCheckTimeout / testResourceCheckInterval)
 	testName := "TestPodEnvironmentSecretVariables"
 	tests := []struct {
 		subTest  string
@@ -795,20 +799,20 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			subTest: "Secret referenced by PodEnvironmentSecret does not exist",
 			opConfig: config.Config{
 				Resources: config.Resources{
-					PodEnvironmentSecret:  "idonotexist",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					PodEnvironmentSecret:  testPodEnvironmentObjectNotExists,
+					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
+					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
 			},
-			err: fmt.Errorf(`could not read Secret PodEnvironmentSecretName: still failing after 3 retries: secret.core "idonotexist" not found`),
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: still failing after %d retries: secret.core %q not found", maxRetries, testPodEnvironmentObjectNotExists),
 		},
 		{
 			subTest: "API error during PodEnvironmentSecret retrieval",
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretNameAPIError,
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
+					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
 			},
 			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret API error"),
@@ -818,8 +822,8 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
+					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
 			},
 			envVars: []v1.EnvVar{
