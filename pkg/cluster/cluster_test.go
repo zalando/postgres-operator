@@ -1091,7 +1091,7 @@ func TestValidUsernames(t *testing.T) {
 	}
 }
 
-func TestClusterComparePorts(t *testing.T) {
+func TestComparePorts(t *testing.T) {
 	testCases := []struct {
 		name     string
 		setA     []v1.ContainerPort
