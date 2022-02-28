@@ -523,7 +523,7 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 		newCheck("new statefulset %s's %s (index %d) name does not match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
 		newCheck("new statefulset %s's %s (index %d) ports do not match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
+			func(a, b v1.Container) bool { return !comparePorts(a.Ports, b.Ports) }),
 		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
 		newCheck("new statefulset %s's %s (index %d) environment does not match the current one",
@@ -632,6 +632,46 @@ func compareSpiloConfiguration(configa, configb string) bool {
 	}
 	ob.Bootstrap.DCS = patroniDCS{}
 	return reflect.DeepEqual(oa, ob)
+}
+
+func areProtocolsEqual(a, b v1.Protocol) bool {
+	return a == b ||
+		(a == "" && b == v1.ProtocolTCP) ||
+		(a == v1.ProtocolTCP && b == "")
+}
+
+func comparePorts(a, b []v1.ContainerPort) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	areContainerPortsEqual := func(a, b v1.ContainerPort) bool {
+		return a.Name == b.Name &&
+			a.HostPort == b.HostPort &&
+			areProtocolsEqual(a.Protocol, b.Protocol) &&
+			a.HostIP == b.HostIP
+	}
+
+	findByPortValue := func(portSpecs []v1.ContainerPort, port int32) (v1.ContainerPort, bool) {
+		for _, portSpec := range portSpecs {
+			if portSpec.ContainerPort == port {
+				return portSpec, true
+			}
+		}
+		return v1.ContainerPort{}, false
+	}
+
+	for _, portA := range a {
+		portB, found := findByPortValue(b, portA.ContainerPort)
+		if !found {
+			return false
+		}
+		if !areContainerPortsEqual(portA, portB) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
