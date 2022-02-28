@@ -467,6 +467,7 @@ class EndToEndTestCase(unittest.TestCase):
         the end turn connection pooler off to not interfere with other tests.
         '''
         k8s = self.k8s
+        pooler_label = 'application=db-connection-pooler,cluster-name=acid-minimal-cluster'
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -476,22 +477,29 @@ class EndToEndTestCase(unittest.TestCase):
                 'spec': {
                     'enableConnectionPooler': True,
                     'enableReplicaConnectionPooler': True,
+                    'enableMasterPoolerLoadBalancer': True,
+                    'enableReplicaPoolerLoadBalancer': True,
                 }
             })
 
         self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2,
                              "Deployment replicas is 2 default")
         self.eventuallyEqual(lambda: k8s.count_running_pods(
-                            "connection-pooler=acid-minimal-cluster-pooler"),
-                            2, "No pooler pods found")
+                             "connection-pooler=acid-minimal-cluster-pooler"),
+                             2, "No pooler pods found")
         self.eventuallyEqual(lambda: k8s.count_running_pods(
-                            "connection-pooler=acid-minimal-cluster-pooler-repl"),
-                            2, "No pooler replica pods found")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label(
-                            'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
-                            2, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             "connection-pooler=acid-minimal-cluster-pooler-repl"),
+                             2, "No pooler replica pods found")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
+                             2, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
                              1, "Pooler secret not created")
+        self.eventuallyEqual(lambda: k8s.get_service_type("spilo-role=master,"+pooler_label),
+                             'LoadBalancer',
+                             "Expected LoadBalancer service type for master pooler pod, found {}")
+        self.eventuallyEqual(lambda: k8s.get_service_type("spilo-role=replica,"+pooler_label),
+                             'LoadBalancer',
+                             "Expected LoadBalancer service type for replica pooler pod, found {}")
 
         # Turn off only master connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -514,10 +522,9 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_running_pods(
                              "connection-pooler=acid-minimal-cluster-pooler-repl"),
                              2, "Pooler replica pods not found")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label(
-                             'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              1, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
                              1, "Secret not created")
 
         # Turn off only replica connection pooler
@@ -528,6 +535,7 @@ class EndToEndTestCase(unittest.TestCase):
                 'spec': {
                     'enableConnectionPooler': True,
                     'enableReplicaConnectionPooler': False,
+                    'enableMasterPoolerLoadBalancer': False,
                 }
             })
 
@@ -539,9 +547,12 @@ class EndToEndTestCase(unittest.TestCase):
                              2, "Master pooler pods not found")
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler-repl"),
                              0, "Pooler replica pods not deleted")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              1, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.get_service_type("spilo-role=master,"+pooler_label),
+                             'ClusterIP',
+                             "Expected LoadBalancer service type for master, found {}")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
                              1, "Secret not created")
 
         # scale up connection pooler deployment
@@ -574,9 +585,9 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
                              0, "Pooler pods not scaled down")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              0, "Pooler service not removed")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
                              4, "Secrets not deleted")
 
         # Verify that all the databases have pooler schema installed.

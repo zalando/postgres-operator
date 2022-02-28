@@ -546,10 +546,20 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   toggles service type load balancer pointing to the master pod of the cluster.
   Can be overridden by individual cluster settings. The default is `true`.
 
-* **enable_replica_load_balancer**
-  toggles service type load balancer pointing to the replica pod of the
-  cluster.  Can be overridden by individual cluster settings. The default is
+* **enable_master_pooler_load_balancer**
+  toggles service type load balancer pointing to the master pooler pod of the
+  cluster. Can be overridden by individual cluster settings. The default is
   `false`.
+
+* **enable_replica_load_balancer**
+  toggles service type load balancer pointing to the replica pod(s) of the
+  cluster. Can be overridden by individual cluster settings. The default is
+  `false`.
+
+* **enable_replica_pooler_load_balancer**
+  toggles service type load balancer pointing to the replica pooler pod(s) of
+  the cluster. Can be overridden by individual cluster settings. The default
+  is `false`.
 
 * **external_traffic_policy** defines external traffic policy for load
   balancers. Allowed values are `Cluster` (default) and `Local`.

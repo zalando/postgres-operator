@@ -380,7 +380,13 @@ spec:
                   enable_master_load_balancer:
                     type: boolean
                     default: true
+                  enable_master_pooler_load_balancer:
+                    type: boolean
+                    default: false
                   enable_replica_load_balancer:
+                    type: boolean
+                    default: false
+                  enable_replica_pooler_load_balancer:
                     type: boolean
                     default: false
                   external_traffic_policy:

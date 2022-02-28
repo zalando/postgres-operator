@@ -1469,7 +1469,13 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_master_load_balancer": {
 								Type: "boolean",
 							},
+							"enable_master_pooler_load_balancer": {
+								Type: "boolean",
+							},
 							"enable_replica_load_balancer": {
+								Type: "boolean",
+							},
+							"enable_replica_pooler_load_balancer": {
 								Type: "boolean",
 							},
 							"external_traffic_policy": {

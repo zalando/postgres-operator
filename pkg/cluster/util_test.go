@@ -57,7 +57,7 @@ func TestInheritedAnnotations(t *testing.T) {
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:                    int32ToPointer(1),
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
 				},
 				PodManagementPolicy: "ordered_ready",
 				Resources: config.Resources{
