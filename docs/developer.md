@@ -218,6 +218,13 @@ dlv connect 127.0.0.1:DLV_PORT
 
 ## Unit tests
 
+Prerequisites:
+
+```bash
+make deps
+make mocks
+```
+
 To run all unit tests, you can simply do:
 
 ```bash

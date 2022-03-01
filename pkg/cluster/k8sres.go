@@ -8,11 +8,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -24,6 +26,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -897,12 +900,30 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 		return secretPodEnvVarsList, nil
 	}
 
-	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
-		context.TODO(),
-		c.OpConfig.PodEnvironmentSecret,
-		metav1.GetOptions{})
+	secret := &v1.Secret{}
+	var notFoundErr error
+	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+		func() (bool, error) {
+			var err error
+			secret, err = c.KubeClient.Secrets(c.Namespace).Get(
+				context.TODO(),
+				c.OpConfig.PodEnvironmentSecret,
+				metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					notFoundErr = err
+					return false, nil
+				}
+				return false, err
+			}
+			return true, nil
+		},
+	)
+	if notFoundErr != nil && err != nil {
+		err = errors.Wrap(notFoundErr, err.Error())
+	}
 	if err != nil {
-		return nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
+		return nil, errors.Wrap(err, "could not read Secret PodEnvironmentSecretName")
 	}
 
 	for k := range secret.Data {
