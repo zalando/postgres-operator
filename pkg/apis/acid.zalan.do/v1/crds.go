@@ -302,7 +302,13 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enableMasterLoadBalancer": {
 						Type: "boolean",
 					},
+					"enableMasterPoolerLoadBalancer": {
+						Type: "boolean",
+					},
 					"enableReplicaLoadBalancer": {
+						Type: "boolean",
+					},
+					"enableReplicaPoolerLoadBalancer": {
 						Type: "boolean",
 					},
 					"enableShmVolume": {
