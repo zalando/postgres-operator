@@ -582,7 +582,7 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler pods not scaled down")
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              0, "Pooler service not removed")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
                              4, "Secrets not deleted")
 
         # Verify that all the databases have pooler schema installed.
