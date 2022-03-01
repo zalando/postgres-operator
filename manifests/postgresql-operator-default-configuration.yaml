@@ -107,6 +107,8 @@ configuration:
     # min_cpu_limit: 250m
     # min_memory_limit: 250Mi
   timeouts:
+    patroni_api_check_interval: 1s
+    patroni_api_check_timeout: 5s
     pod_label_wait_timeout: 10m
     pod_deletion_wait_timeout: 10m
     ready_wait_interval: 4s

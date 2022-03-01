@@ -498,6 +498,13 @@ configuration `resource_check_interval` and `resource_check_timeout` have no
 effect, and the parameters are grouped under the `timeouts` key in the
 CRD-based configuration.
 
+* **PatroniAPICheckInterval**
+  the interval between consecutive attempts waiting for the return of 
+  Patroni Api. The default is `1s`.
+
+* **PatroniAPICheckTimeout**
+  the timeout for a response from Patroni Api. The default is `5s`.
+
 * **resource_check_interval**
   interval to wait between consecutive attempts to check for the presence of
   some Kubernetes resource (i.e. `StatefulSet` or `PodDisruptionBudget`). The

@@ -111,12 +111,14 @@ type PostgresPodResourcesDefaults struct {
 
 // OperatorTimeouts defines the timeout of ResourceCheck, PodWait, ReadyWait
 type OperatorTimeouts struct {
-	ResourceCheckInterval  Duration `json:"resource_check_interval,omitempty"`
-	ResourceCheckTimeout   Duration `json:"resource_check_timeout,omitempty"`
-	PodLabelWaitTimeout    Duration `json:"pod_label_wait_timeout,omitempty"`
-	PodDeletionWaitTimeout Duration `json:"pod_deletion_wait_timeout,omitempty"`
-	ReadyWaitInterval      Duration `json:"ready_wait_interval,omitempty"`
-	ReadyWaitTimeout       Duration `json:"ready_wait_timeout,omitempty"`
+	ResourceCheckInterval   Duration `json:"resource_check_interval,omitempty"`
+	ResourceCheckTimeout    Duration `json:"resource_check_timeout,omitempty"`
+	PodLabelWaitTimeout     Duration `json:"pod_label_wait_timeout,omitempty"`
+	PodDeletionWaitTimeout  Duration `json:"pod_deletion_wait_timeout,omitempty"`
+	ReadyWaitInterval       Duration `json:"ready_wait_interval,omitempty"`
+	ReadyWaitTimeout        Duration `json:"ready_wait_timeout,omitempty"`
+	PatroniAPICheckInterval Duration `json:"patroni_api_check_interval,omitempty"`
+	PatroniAPICheckTimeout  Duration `json:"patroni_api_check_timeout,omitempty"`
 }
 
 // LoadBalancerConfiguration defines the LB configuration
