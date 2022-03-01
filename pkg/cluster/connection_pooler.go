@@ -174,7 +174,7 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	return []v1.EnvVar{
 		{
 			Name:  "CONNECTION_POOLER_PORT",
-			Value: fmt.Sprint(pgPort),
+			Value: fmt.Sprint(PgPort),
 		},
 		{
 			Name:  "CONNECTION_POOLER_MODE",
@@ -277,7 +277,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		Resources:       *resources,
 		Ports: []v1.ContainerPort{
 			{
-				ContainerPort: pgPort,
+				ContainerPort: PgPort,
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
@@ -285,7 +285,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		ReadinessProbe: &v1.Probe{
 			Handler: v1.Handler{
 				TCPSocket: &v1.TCPSocketAction{
-					Port: intstr.IntOrString{IntVal: pgPort},
+					Port: intstr.IntOrString{IntVal: PgPort},
 				},
 			},
 		},
@@ -385,7 +385,7 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 		Ports: []v1.ServicePort{
 			{
 				Name:       connectionPooler.Name,
-				Port:       pgPort,
+				Port:       PgPort,
 				TargetPort: intstr.IntOrString{StrVal: c.servicePort(connectionPooler.Role)},
 			},
 		},

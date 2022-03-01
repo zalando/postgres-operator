@@ -8,28 +8,23 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -38,7 +33,7 @@ const (
 	patroniPGHBAConfParameterName  = "pg_hba"
 	localHost                      = "127.0.0.1/32"
 	connectionPoolerContainer      = "connection-pooler"
-	pgPort                         = 5432
+	PgPort                         = 5432
 )
 
 type pgUser struct {
@@ -900,30 +895,12 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 		return secretPodEnvVarsList, nil
 	}
 
-	secret := &v1.Secret{}
-	var notFoundErr error
-	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
-		func() (bool, error) {
-			var err error
-			secret, err = c.KubeClient.Secrets(c.Namespace).Get(
-				context.TODO(),
-				c.OpConfig.PodEnvironmentSecret,
-				metav1.GetOptions{})
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					notFoundErr = err
-					return false, nil
-				}
-				return false, err
-			}
-			return true, nil
-		},
-	)
-	if notFoundErr != nil && err != nil {
-		err = errors.Wrap(notFoundErr, err.Error())
-	}
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
+		context.TODO(),
+		c.OpConfig.PodEnvironmentSecret,
+		metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read Secret PodEnvironmentSecretName")
+		return nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
 	}
 
 	for k := range secret.Data {
@@ -1312,7 +1289,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
-	if volumeClaimTemplate, err = c.generatePersistentVolumeClaimTemplate(spec.Volume.Size,
+	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(spec.Volume.Size,
 		spec.Volume.StorageClass, spec.Volume.Selector); err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
@@ -1561,12 +1538,21 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 	podSpec.Volumes = volumes
 }
 
-func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string,
+func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string,
 	volumeSelector *metav1.LabelSelector) (*v1.PersistentVolumeClaim, error) {
 
 	var storageClassName *string
+
+	metadata := metav1.ObjectMeta{
+		Name: constants.DataVolumeName,
+	}
 	if volumeStorageClass != "" {
+		// TODO: remove the old annotation, switching completely to the StorageClassName field.
+		metadata.Annotations = map[string]string{"volume.beta.kubernetes.io/storage-class": volumeStorageClass}
 		storageClassName = &volumeStorageClass
+	} else {
+		metadata.Annotations = map[string]string{"volume.alpha.kubernetes.io/storage-class": "default"}
+		storageClassName = nil
 	}
 
 	quantity, err := resource.ParseQuantity(volumeSize)
@@ -1576,11 +1562,7 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 
 	volumeMode := v1.PersistentVolumeFilesystem
 	volumeClaim := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        constants.DataVolumeName,
-			Annotations: c.annotationsSet(nil),
-			Labels:      c.labelsSet(true),
-		},
+		ObjectMeta: metadata,
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources: v1.ResourceRequirements{

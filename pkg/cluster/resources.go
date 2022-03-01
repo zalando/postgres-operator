@@ -398,7 +398,7 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	if len(endPointAddresses) > 0 {
 		result = append(result, v1.EndpointSubset{
 			Addresses: endPointAddresses,
-			Ports:     []v1.EndpointPort{{Name: "postgresql", Port: 5432, Protocol: "TCP"}},
+			Ports:     []v1.EndpointPort{{Name: "postgresql", Port: PgPort, Protocol: "TCP"}},
 		})
 	} else if role == Master {
 		c.logger.Warningf("master is not running, generated master endpoint does not contain any addresses")
