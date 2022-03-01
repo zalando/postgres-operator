@@ -247,7 +247,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 		{
 			Name:  "PGPORT",
-			Value: c.servicePort(role),
+			Value: fmt.Sprint(c.servicePort(role)),
 		},
 		{
 			Name: "PGUSER",
@@ -386,7 +386,7 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 			{
 				Name:       connectionPooler.Name,
 				Port:       pgPort,
-				TargetPort: intstr.IntOrString{Type: 1, StrVal: c.servicePort(connectionPooler.Role)},
+				TargetPort: intstr.IntOrString{IntVal: c.servicePort(connectionPooler.Role)},
 			},
 		},
 		Type: v1.ServiceTypeClusterIP,

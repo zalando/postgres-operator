@@ -1479,7 +1479,7 @@ func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPo
 		v1.ServiceSpec{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{Type: 1, StrVal: "5432"}}},
+			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler"},
 			Type:                     serviceType,
 		},
@@ -1493,7 +1493,7 @@ func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPo
 		v1.ServiceSpec{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{Type: 1, StrVal: "5432"}}},
+			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler-repl"},
 			Type:                     serviceType,
 		},

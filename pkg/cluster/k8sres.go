@@ -99,15 +99,15 @@ func (c *Cluster) serviceAddress(role PostgresRole) string {
 	return ""
 }
 
-func (c *Cluster) servicePort(role PostgresRole) string {
+func (c *Cluster) servicePort(role PostgresRole) int32 {
 	service, exist := c.Services[role]
 
 	if exist {
-		return fmt.Sprint(service.Spec.Ports[0].Port)
+		return service.Spec.Ports[0].Port
 	}
 
-	c.logger.Warningf("No service for role %s", role)
-	return ""
+	c.logger.Warningf("No service for role %s - defaulting to port 5432", role)
+	return 5432
 }
 
 func (c *Cluster) podDisruptionBudgetName() string {
