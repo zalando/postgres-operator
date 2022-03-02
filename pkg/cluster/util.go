@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"reflect"
 	"sort"
 	"strings"
@@ -523,10 +522,6 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 		"cluster", clusterName,
 		"tprkind", acidv1.PostgresCRDResourceKind,
 		"tprgroup", acidzalando.GroupName)
-}
-
-func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
-	return replicas[rand.Intn(len(replicas))]
 }
 
 func cloneSpec(from *acidv1.Postgresql) (*acidv1.Postgresql, error) {

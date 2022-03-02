@@ -95,7 +95,9 @@ func NewController(controllerConfig *spec.ControllerConfig, controllerId string)
 	// disabling the sending of events also to the logoutput
 	// the operator currently duplicates a lot of log entries with this setup
 	// eventBroadcaster.StartLogging(logger.Infof)
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: myComponentName})
+	scheme := scheme.Scheme
+	acidv1.AddToScheme(scheme)
+	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: myComponentName})
 
 	c := &Controller{
 		config:           *controllerConfig,
@@ -307,8 +309,10 @@ func (c *Controller) initController() {
 	c.controllerID = os.Getenv("CONTROLLER_ID")
 
 	if configObjectName := os.Getenv("POSTGRES_OPERATOR_CONFIGURATION_OBJECT"); configObjectName != "" {
-		if err := c.createConfigurationCRD(c.opConfig.EnableCRDValidation); err != nil {
-			c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
+		if c.opConfig.EnableCRDRegistration != nil && *c.opConfig.EnableCRDRegistration {
+			if err := c.createConfigurationCRD(); err != nil {
+				c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
+			}
 		}
 		if cfg, err := c.readOperatorConfigurationFromCRD(spec.GetOperatorNamespace(), configObjectName); err != nil {
 			c.logger.Fatalf("unable to read operator configuration: %v", err)
@@ -323,8 +327,10 @@ func (c *Controller) initController() {
 
 	c.modifyConfigFromEnvironment()
 
-	if err := c.createPostgresCRD(c.opConfig.EnableCRDValidation); err != nil {
-		c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
+	if c.opConfig.EnableCRDRegistration != nil && *c.opConfig.EnableCRDRegistration {
+		if err := c.createPostgresCRD(); err != nil {
+			c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
+		}
 	}
 
 	c.initSharedInformers()

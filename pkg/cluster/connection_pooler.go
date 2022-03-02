@@ -309,7 +309,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 	}
 
-	nodeAffinity := nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity)
+	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity)
 	if c.OpConfig.EnablePodAntiAffinity {
 		labelsSet := labels.Set(c.connectionPoolerLabels(role, false).MatchLabels)
 		podTemplate.Spec.Affinity = generatePodAffinity(labelsSet, c.OpConfig.PodAntiAffinityTopologyKey, nodeAffinity)
@@ -712,7 +712,8 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	if (!needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0) &&
 		((!needConnectionPooler(&newSpec.Spec) && (c.ConnectionPooler == nil || !needConnectionPooler(&oldSpec.Spec))) ||
 			(c.ConnectionPooler != nil && needConnectionPooler(&newSpec.Spec) &&
-				(c.ConnectionPooler[Master].LookupFunction || c.ConnectionPooler[Replica].LookupFunction))) {
+				((c.ConnectionPooler[Master] != nil && c.ConnectionPooler[Master].LookupFunction) ||
+					(c.ConnectionPooler[Replica] != nil && c.ConnectionPooler[Replica].LookupFunction)))) {
 		c.logger.Debugln("syncing pooler is not required")
 		return nil, nil
 	}

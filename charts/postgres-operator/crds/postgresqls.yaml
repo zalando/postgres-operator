@@ -4,8 +4,6 @@ metadata:
   name: postgresqls.acid.zalan.do
   labels:
     app.kubernetes.io/name: postgres-operator
-  annotations:
-    "helm.sh/hook": crd-install
 spec:
   group: acid.zalan.do
   names:
@@ -149,7 +147,7 @@ spec:
                       - "transaction"
                   numberOfInstances:
                     type: integer
-                    minimum: 2
+                    minimum: 1
                   resources:
                     type: object
                     required:
@@ -203,8 +201,9 @@ spec:
                 type: boolean
               enableShmVolume:
                 type: boolean
-              init_containers:  # deprecated
+              init_containers:
                 type: array
+                description: deprecated
                 nullable: true
                 items:
                   type: object
@@ -231,8 +230,8 @@ spec:
                     items:
                       type: object
                       required:
-                      - weight
                       - preference
+                      - weight
                       properties:
                         preference:
                           type: object
@@ -344,14 +343,17 @@ spec:
                     type: boolean
                   synchronous_mode_strict:
                     type: boolean
+                  synchronous_node_count:
+                    type: integer
                   ttl:
                     type: integer
               podAnnotations:
                 type: object
                 additionalProperties:
                   type: string
-              pod_priority_class_name:  # deprecated
+              pod_priority_class_name:
                 type: string
+                description: deprecated
               podPriorityClassName:
                 type: string
               postgresql:
@@ -395,8 +397,9 @@ spec:
                             type: boolean
                     secretNamespace:
                       type: string
-              replicaLoadBalancer:  # deprecated
+              replicaLoadBalancer:
                 type: boolean
+                description: deprecated
               resources:
                 type: object
                 required:
@@ -466,11 +469,44 @@ spec:
                 type: integer
               standby:
                 type: object
-                required:
-                  - s3_wal_path
                 properties:
                   s3_wal_path:
                     type: string
+                  gs_wal_path:
+                    type: string
+              streams:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  required:
+                    - applicationId
+                    - database
+                    - tables
+                  properties:
+                    applicationId:
+                      type: string
+                    batchSize:
+                      type: integer
+                    database:
+                      type: string
+                    filter:
+                      type: object
+                      additionalProperties:
+                        type: string
+                    tables:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        required:
+                          - eventType
+                        properties:
+                          eventType:
+                            type: string
+                          idColumn:
+                            type: string
+                          payloadColumn:
+                            type: string
               teamId:
                 type: string
               tls:
@@ -514,14 +550,14 @@ spec:
                         - PreferNoSchedule
                     tolerationSeconds:
                       type: integer
-              useLoadBalancer:  # deprecated
+              useLoadBalancer:
                 type: boolean
+                description: deprecated
               users:
                 type: object
                 additionalProperties:
                   type: array
                   nullable: true
-                  description: "Role flags specified here must not contradict each other"
                   items:
                     type: string
                     enum:
@@ -553,6 +589,16 @@ spec:
                     - SUPERUSER
                     - nosuperuser
                     - NOSUPERUSER
+              usersWithPasswordRotation:
+                type: array
+                nullable: true
+                items:
+                  type: string
+              usersWithInPlacePasswordRotation:
+                type: array
+                nullable: true
+                items:
+                  type: string
               volume:
                 type: object
                 required:

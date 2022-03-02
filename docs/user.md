@@ -141,14 +141,18 @@ other roles.
 
 To define the secrets for the users in a different namespace than that of the
 cluster, one can set `enable_cross_namespace_secret` and declare the namespace
-for the secrets in the manifest in the following manner,
+for the secrets in the manifest in the following manner (note, that it has to
+be reflected in the `database` section, too),
 
 ```yaml
 spec:
   users:
-  #users with secret in dfferent namespace
-   appspace.db_user:
+    # users with secret in different namespace
+    appspace.db_user:
     - createdb
+  databases:
+    # namespace notation is part of user name
+    app_db: appspace.db_user
 ```
 
 Here, anything before the first dot is considered the namespace and the text after
@@ -554,7 +558,8 @@ schema creation. This means they are currently not set when `defaultUsers`
 For all LOGIN roles the operator will create K8s secrets in the namespace
 specified in `secretNamespace`, if `enable_cross_namespace_secret` is set to
 `true` in the config. Otherwise, they are created in the same namespace like
-the Postgres cluster.
+the Postgres cluster. Unlike roles specified with `namespace.username` under
+`users`, the namespace will not be part of the role name here.
 
 ```yaml
 spec:
@@ -598,10 +603,9 @@ spec:
 ```
 
 Some extensions require SUPERUSER rights on creation unless they are not
-whitelisted by the [pgextwlist](https://github.com/dimitri/pgextwlist)
-extension, that is shipped with the Spilo image. To see which extensions are
-on the list check the `extwlist.extension` parameter in the postgresql.conf
-file.
+allowed by the [pgextwlist](https://github.com/dimitri/pgextwlist) extension,
+that is shipped with the Spilo image. To see which extensions are on the list
+check the `extwlist.extension` parameter in the postgresql.conf file.
 
 ```bash
 SHOW extwlist.extensions;
@@ -667,7 +671,9 @@ configured [default requests](reference/operator_parameters.md#kubernetes-resour
 
 To ensure Postgres pods are running on nodes without any other application pods,
 you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
-and configure the required toleration in the manifest.
+and configure the required toleration in the manifest. Tolerations can also be
+defined in the [operator config](administrator.md#use-taints-and-tolerations-for-dedicated-postgresql-nodes)
+to apply for all Postgres clusters.
 
 ```yaml
 spec:
@@ -698,6 +704,9 @@ spec:
           values:
           - pci
 ```
+
+If you need to define a `nodeAffinity` for all your Postgres clusters use the
+`node_readiness_label` [configuration](administrator.md#node-readiness-labels).
 
 ## In-place major version upgrade
 
@@ -794,13 +803,19 @@ different location than its source database. Unlike cloning, the PostgreSQL
 version between source and target cluster has to be the same.
 
 To start a cluster as standby, add the following `standby` section in the YAML
-file and specify the S3 bucket path. An empty path will result in an error and
-no statefulset will be created.
+file. Specify the S3/GS bucket path. Omitting both settings will result in an error
+and no statefulset will be created.
 
 ```yaml
 spec:
   standby:
     s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
+```
+
+```yaml
+spec:
+  standby:
+    gs_wal_path: "gs://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 At the moment, the operator only allows to stream from the WAL archive of the

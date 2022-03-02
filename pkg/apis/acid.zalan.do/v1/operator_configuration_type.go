@@ -37,15 +37,19 @@ type OperatorConfigurationList struct {
 
 // PostgresUsersConfiguration defines the system users of Postgres.
 type PostgresUsersConfiguration struct {
-	SuperUsername       string `json:"super_username,omitempty"`
-	ReplicationUsername string `json:"replication_username,omitempty"`
+	SuperUsername                 string `json:"super_username,omitempty"`
+	ReplicationUsername           string `json:"replication_username,omitempty"`
+	EnablePasswordRotation        bool   `json:"enable_password_rotation,omitempty"`
+	PasswordRotationInterval      uint32 `json:"password_rotation_interval,omitempty"`
+	PasswordRotationUserRetention uint32 `json:"password_rotation_user_retention,omitempty"`
 }
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
 type MajorVersionUpgradeConfiguration struct {
-	MajorVersionUpgradeMode string `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
-	MinimalMajorVersion     string `json:"minimal_major_version" default:"9.6"`
-	TargetMajorVersion      string `json:"target_major_version" default:"14"`
+	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
+	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"9.6"`
+	TargetMajorVersion               string   `json:"target_major_version" default:"14"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
@@ -81,6 +85,7 @@ type KubernetesMetaConfiguration struct {
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
 	DeleteAnnotationNameKey                string                       `json:"delete_annotation_name_key,omitempty"`
 	NodeReadinessLabel                     map[string]string            `json:"node_readiness_label,omitempty"`
+	NodeReadinessLabelMerge                string                       `json:"node_readiness_label_merge,omitempty"`
 	CustomPodAnnotations                   map[string]string            `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration              map[string]string   `json:"toleration,omitempty"`
@@ -214,7 +219,9 @@ type OperatorLogicalBackupConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
+	EnableCRDRegistration      *bool                              `json:"enable_crd_registration,omitempty"`
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
+	CRDCategories              []string                           `json:"crd_categories,omitempty"`
 	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
 	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`

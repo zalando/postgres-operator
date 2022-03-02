@@ -496,18 +496,17 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 
 func (c *Cluster) deleteSecrets() error {
 	c.setProcessName("deleting secrets")
-	var errors []string
-	errorCount := 0
+	errors := make([]string, 0)
+
 	for uid, secret := range c.Secrets {
 		err := c.deleteSecret(uid, *secret)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("%v", err))
-			errorCount++
 		}
 	}
 
-	if errorCount > 0 {
-		return fmt.Errorf("could not delete all secrets: %v", errors)
+	if len(errors) > 0 {
+		return fmt.Errorf("could not delete all secrets: %v", strings.Join(errors, `', '`))
 	}
 
 	return nil

@@ -4,8 +4,9 @@ import time
 import timeout_decorator
 import os
 import yaml
+import base64
 
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from kubernetes import client
 
 from tests.k8s_api import K8s
@@ -203,7 +204,8 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_postgres_team_crd": "true",
                 "enable_team_member_deprecation": "true",
                 "role_deletion_suffix": "_delete_me",
-                "resync_period": "15s"
+                "resync_period": "15s",
+                "repair_period": "15s",
             },
         }
         k8s.update_config(enable_postgres_team_crd)
@@ -286,12 +288,140 @@ class EndToEndTestCase(unittest.TestCase):
         # revert config change
         revert_resync = {
             "data": {
-                "resync_period": "30m",
+                "resync_period": "4m",
+                "repair_period": "1m",
             },
         }
         k8s.update_config(revert_resync)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_config_update(self):
+        '''
+            Change Postgres config under Spec.Postgresql.Parameters and Spec.Patroni
+            and query Patroni config endpoint to check if manifest changes got applied
+            via restarting cluster through Patroni's rest api
+        '''
+        k8s = self.k8s
+        leader = k8s.get_cluster_leader_pod()
+        replica = k8s.get_cluster_replica_pod()
+        masterCreationTimestamp = leader.metadata.creation_timestamp
+        replicaCreationTimestamp = replica.metadata.creation_timestamp
+        new_max_connections_value = "50"
+
+        # adjust Postgres config
+        pg_patch_config = {
+            "spec": {
+                "postgresql": {
+                    "parameters": {
+                        "max_connections": new_max_connections_value
+                     }
+                 },
+                 "patroni": {
+                    "slots": {
+                        "test_slot": {
+                            "type": "physical"
+                        }
+                    },
+                    "ttl": 29,
+                    "loop_wait": 9,
+                    "retry_timeout": 9,
+                    "synchronous_mode": True
+                 }
+            }
+        }
+
+        try:
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_config)
+            
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            def compare_config():
+                effective_config = k8s.patroni_rest(leader.metadata.name, "config")
+                desired_config = pg_patch_config["spec"]["patroni"]
+                desired_parameters = pg_patch_config["spec"]["postgresql"]["parameters"]
+                effective_parameters = effective_config["postgresql"]["parameters"]
+                self.assertEqual(desired_parameters["max_connections"], effective_parameters["max_connections"],
+                            "max_connections not updated")
+                self.assertTrue(effective_config["slots"] is not None, "physical replication slot not added")
+                self.assertEqual(desired_config["ttl"], effective_config["ttl"],
+                            "ttl not updated")
+                self.assertEqual(desired_config["loop_wait"], effective_config["loop_wait"],
+                            "loop_wait not updated")
+                self.assertEqual(desired_config["retry_timeout"], effective_config["retry_timeout"],
+                            "retry_timeout not updated")
+                self.assertEqual(desired_config["synchronous_mode"], effective_config["synchronous_mode"],
+                            "synchronous_mode not updated")
+                return True
+
+            # check if Patroni config has been updated
+            self.eventuallyTrue(compare_config, "Postgres config not applied")
+
+            # make sure that pods were not recreated
+            leader = k8s.get_cluster_leader_pod()
+            replica = k8s.get_cluster_replica_pod()
+            self.assertEqual(masterCreationTimestamp, leader.metadata.creation_timestamp,
+                            "Master pod creation timestamp is updated")
+            self.assertEqual(replicaCreationTimestamp, replica.metadata.creation_timestamp,
+                            "Master pod creation timestamp is updated")
+
+            # query max_connections setting
+            setting_query = """
+               SELECT setting
+                 FROM pg_settings
+                WHERE name = 'max_connections';
+            """
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "New max_connections setting not applied on master", 10, 5)
+            self.eventuallyNotEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "Expected max_connections not to be updated on replica since Postgres was restarted there first", 10, 5)
+
+            # the next sync should restart the replica because it has pending_restart flag set
+            # force next sync by deleting the operator pod
+            k8s.delete_operator_pod()
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "New max_connections setting not applied on replica", 10, 5)
+
+            # decrease max_connections again
+            # this time restart will be correct and new value should appear on both instances
+            lower_max_connections_value = "30"
+            pg_patch_max_connections = {
+                "spec": {
+                    "postgresql": {
+                        "parameters": {
+                            "max_connections": lower_max_connections_value
+                        }
+                    }
+                }
+            }
+
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
+
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            # check Patroni config again
+            pg_patch_config["spec"]["postgresql"]["parameters"]["max_connections"] = lower_max_connections_value
+            self.eventuallyTrue(compare_config, "Postgres config not applied")
+
+            # and query max_connections setting again
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
+                "Previous max_connections setting not applied on master", 10, 5)
+            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
+                "Previous max_connections setting not applied on replica", 10, 5)
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+        # make sure cluster is in a good state for further tests
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
+                             "No 2 pods running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_cross_namespace_secrets(self):
@@ -579,6 +709,7 @@ class EndToEndTestCase(unittest.TestCase):
                             "Parameters": None,
                             "AdminRole": "",
                             "Origin": 2,
+                            "IsDbOwner": False,
                             "Deleted": False
                         })
                         return True
@@ -600,7 +731,6 @@ class EndToEndTestCase(unittest.TestCase):
         but lets pods run with the old image until they are recreated for
         reasons other than operator's activity. That works because the operator
         configures stateful sets to use "onDelete" pod update policy.
-
         The test covers:
         1) enabling lazy upgrade in existing operator deployment
         2) forcing the normal rolling upgrade by changing the operator
@@ -695,7 +825,6 @@ class EndToEndTestCase(unittest.TestCase):
         Ensure we can (a) create the cron job at user request for a specific PG cluster
                       (b) update the cluster-wide image for the logical backup pod
                       (c) delete the job at user request
-
         Limitations:
         (a) Does not run the actual batch job because there is no S3 mock to upload backups to
         (b) Assumes 'acid-minimal-cluster' exists as defined in setUp
@@ -792,7 +921,11 @@ class EndToEndTestCase(unittest.TestCase):
         Lower resource limits below configured minimum and let operator fix it
         '''
         k8s = self.k8s
-        # self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Cluster not healthy at start")
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        # get nodes of master and replica(s) (expected target of new master)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+        self.assertNotEqual(replica_nodes, [])
 
         # configure minimum boundaries for CPU and memory limits
         minCPULimit = '503m'
@@ -825,7 +958,9 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
+        # wait for switched over
+        k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members()), 2, "Postgres status did not enter running")
 
         def verify_pod_limits():
@@ -880,12 +1015,10 @@ class EndToEndTestCase(unittest.TestCase):
 
         # verify we are in good state from potential previous tests
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
         # get nodes of master and replica(s)
-        master_node, replica_nodes = k8s.get_pg_nodes(cluster_label)
-
-        self.assertNotEqual(master_node, [])
+        master_nodes, replica_nodes = k8s.get_cluster_nodes()
+        self.assertNotEqual(master_nodes, [])
         self.assertNotEqual(replica_nodes, [])
 
         # label node with environment=postgres
@@ -898,9 +1031,8 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         try:
-            # patch current master node with the label
-            print('patching master node: {}'.format(master_node))
-            k8s.api.core_v1.patch_node(master_node, node_label_body)
+            # patch master node with the label
+            k8s.api.core_v1.patch_node(master_nodes[0], node_label_body)
 
             # add node affinity to cluster
             patch_node_affinity_config = {
@@ -924,7 +1056,6 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             }
-
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 group="acid.zalan.do",
                 version="v1",
@@ -935,14 +1066,17 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
-            k8s.wait_for_pod_failover(master_node, 'spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            # next master will be switched over and pod needs to be replaced as well to finish the rolling update
+            k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
             for pod in podsList.items:
                 if pod.metadata.labels.get('spilo-role') == 'replica':
-                    self.assertEqual(master_node, pod.spec.node_name,
-                         "Sanity check: expected replica to relocate to master node {}, but found on {}".format(master_node, pod.spec.node_name))
+                    self.assertEqual(master_nodes[0], pod.spec.node_name,
+                         "Sanity check: expected replica to relocate to master node {}, but found on {}".format(master_nodes[0], pod.spec.node_name))
 
                     # check that pod has correct node affinity
                     key = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].key
@@ -967,15 +1101,17 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # node affinity change should cause another rolling update and relocation of replica
-            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
+        # toggle pod anti affinity to make sure replica and master run on separate nodes
+        self.assert_distributed_pods(master_nodes)
+
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    @unittest.skip("Skipping this test until fixed")
     def test_node_readiness_label(self):
         '''
            Remove node readiness label from master node. This must cause a failover.
@@ -985,12 +1121,15 @@ class EndToEndTestCase(unittest.TestCase):
         readiness_label = 'lifecycle-status'
         readiness_value = 'ready'
 
-        try:
-            # get nodes of master and replica(s) (expected target of new master)
-            current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
-            num_replicas = len(current_replica_nodes)
-            failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
+        # verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
 
+        # get nodes of master and replica(s) (expected target of new master)
+        master_nodes, replica_nodes = k8s.get_cluster_nodes()
+        self.assertNotEqual(master_nodes, [])
+        self.assertNotEqual(replica_nodes, [])
+
+        try:
             # add node_readiness_label to potential failover nodes
             patch_readiness_label = {
                 "metadata": {
@@ -999,29 +1138,42 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             }
-            self.assertTrue(len(failover_targets) > 0, "No failover targets available")
-            for failover_target in failover_targets:
-                k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
+            for replica_node in replica_nodes:
+                k8s.api.core_v1.patch_node(replica_node, patch_readiness_label)
 
-            # define node_readiness_label in config map which should trigger a failover of the master
+            # define node_readiness_label in config map which should trigger a rolling update
             patch_readiness_label_config = {
                 "data": {
                     "node_readiness_label": readiness_label + ':' + readiness_value,
+                    "node_readiness_label_merge": "AND",
                 }
             }
             k8s.update_config(patch_readiness_label_config, "setting readiness label")
-            new_master_node, new_replica_nodes = self.assert_failover(
-                current_master_node, num_replicas, failover_targets, cluster_label)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            # first replica will be replaced and get the new affinity
+            # however, it might not start due to a volume node affinity conflict
+            # in this case only if the pvc and pod are deleted it can be scheduled
+            replica = k8s.get_cluster_replica_pod()
+            if replica.status.phase == 'Pending':
+                k8s.api.core_v1.delete_namespaced_persistent_volume_claim('pgdata-' + replica.metadata.name, 'default')
+                k8s.api.core_v1.delete_namespaced_pod(replica.metadata.name, 'default')
+                k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            # next master will be switched over and pod needs to be replaced as well to finish the rolling update
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # patch also node where master ran before
-            k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
-
-            # toggle pod anti affinity to move replica away from master node
-            self.eventuallyTrue(lambda: self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label), "Pods are redistributed")
+            k8s.api.core_v1.patch_node(master_nodes[0], patch_readiness_label)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+        # toggle pod anti affinity to move replica away from master node
+        self.assert_distributed_pods(master_nodes)
+
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_overwrite_pooler_deployment(self):
@@ -1058,131 +1210,120 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler pods not scaled down")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_patroni_config_update(self):
+    def test_password_rotation(self):
         '''
-            Change Postgres config under Spec.Postgresql.Parameters and Spec.Patroni
-            and query Patroni config endpoint to check if manifest changes got applied
-            via restarting cluster through Patroni's rest api
+           Test password rotation and removal of users due to retention policy
         '''
         k8s = self.k8s
         leader = k8s.get_cluster_leader_pod()
-        replica = k8s.get_cluster_replica_pod()
-        masterCreationTimestamp = leader.metadata.creation_timestamp
-        replicaCreationTimestamp = replica.metadata.creation_timestamp
-        new_max_connections_value = "50"
+        today = date.today()
 
-        # adjust Postgres config
-        pg_patch_config = {
+        # enable password rotation for owner of foo database
+        pg_patch_inplace_rotation_for_owner = {
             "spec": {
-                "postgresql": {
-                    "parameters": {
-                        "max_connections": new_max_connections_value
-                     }
-                 },
-                 "patroni": {
-                    "slots": {
-                        "test_slot": {
-                            "type": "physical"
-                        }
-                    },
-                    "ttl": 29,
-                    "loop_wait": 9,
-                    "retry_timeout": 9,
-                    "synchronous_mode": True
-                 }
+                "usersWithInPlaceSecretRotation": [
+                    "zalando"
+                ]
             }
         }
-
-        try:
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_config)
-            
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-            def compare_config():
-                effective_config = k8s.patroni_rest(leader.metadata.name, "config")
-                desired_config = pg_patch_config["spec"]["patroni"]
-                desired_parameters = pg_patch_config["spec"]["postgresql"]["parameters"]
-                effective_parameters = effective_config["postgresql"]["parameters"]
-                self.assertEqual(desired_parameters["max_connections"], effective_parameters["max_connections"],
-                            "max_connections not updated")
-                self.assertTrue(effective_config["slots"] is not None, "physical replication slot not added")
-                self.assertEqual(desired_config["ttl"], effective_config["ttl"],
-                            "ttl not updated")
-                self.assertEqual(desired_config["loop_wait"], effective_config["loop_wait"],
-                            "loop_wait not updated")
-                self.assertEqual(desired_config["retry_timeout"], effective_config["retry_timeout"],
-                            "retry_timeout not updated")
-                self.assertEqual(desired_config["synchronous_mode"], effective_config["synchronous_mode"],
-                            "synchronous_mode not updated")
-                return True
-
-            # check if Patroni config has been updated
-            self.eventuallyTrue(compare_config, "Postgres config not applied")
-
-            # make sure that pods were not recreated
-            leader = k8s.get_cluster_leader_pod()
-            replica = k8s.get_cluster_replica_pod()
-            self.assertEqual(masterCreationTimestamp, leader.metadata.creation_timestamp,
-                            "Master pod creation timestamp is updated")
-            self.assertEqual(replicaCreationTimestamp, replica.metadata.creation_timestamp,
-                            "Master pod creation timestamp is updated")
-
-            # query max_connections setting
-            setting_query = """
-               SELECT setting
-                 FROM pg_settings
-                WHERE name = 'max_connections';
-            """
-            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
-                "New max_connections setting not applied on master", 10, 5)
-            self.eventuallyNotEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
-                "Expected max_connections not to be updated on replica since Postgres was restarted there first", 10, 5)
-
-            # the next sync should restart the replica because it has pending_restart flag set
-            # force next sync by deleting the operator pod
-            k8s.delete_operator_pod()
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
-                "New max_connections setting not applied on replica", 10, 5)
-
-            # decrease max_connections again
-            # this time restart will be correct and new value should appear on both instances
-            lower_max_connections_value = "30"
-            pg_patch_max_connections = {
-                "spec": {
-                    "postgresql": {
-                        "parameters": {
-                            "max_connections": lower_max_connections_value
-                        }
-                    }
-                }
-            }
-
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
-
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-            # check Patroni config again
-            pg_patch_config["spec"]["postgresql"]["parameters"]["max_connections"] = lower_max_connections_value
-            self.eventuallyTrue(compare_config, "Postgres config not applied")
-
-            # and query max_connections setting again
-            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
-                "Previous max_connections setting not applied on master", 10, 5)
-            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
-                "Previous max_connections setting not applied on replica", 10, 5)
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
-
-        # make sure cluster is in a good state for further tests
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_inplace_rotation_for_owner)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
-                             "No 2 pods running")
+
+        # check if next rotation date was set in secret
+        secret_data = k8s.get_secret_data("zalando")
+        next_rotation_timestamp = datetime.strptime(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
+        today90days = today+timedelta(days=90)
+        self.assertEqual(today90days, next_rotation_timestamp.date(),
+                        "Unexpected rotation date in secret of zalando user: expected {}, got {}".format(today90days, next_rotation_timestamp.date()))
+
+        # create fake rotation users that should be removed by operator
+        # but have one that would still fit into the retention period
+        create_fake_rotation_user = """
+            CREATE ROLE foo_user201031 IN ROLE foo_user;
+            CREATE ROLE foo_user211031 IN ROLE foo_user;
+            CREATE ROLE foo_user"""+(today-timedelta(days=40)).strftime("%y%m%d")+""" IN ROLE foo_user;
+        """
+        self.query_database(leader.metadata.name, "postgres", create_fake_rotation_user)
+
+        # patch foo_user secret with outdated rotation date
+        fake_rotation_date = today.isoformat() + 'T00:00:00Z'
+        fake_rotation_date_encoded = base64.b64encode(fake_rotation_date.encode('utf-8'))
+        secret_fake_rotation = {
+            "data": {
+                "nextRotation": str(fake_rotation_date_encoded, 'utf-8'),
+            },
+        }
+        k8s.api.core_v1.patch_namespaced_secret(
+            name="foo-user.acid-minimal-cluster.credentials.postgresql.acid.zalan.do", 
+            namespace="default",
+            body=secret_fake_rotation)
+
+        # enable password rotation for all other users (foo_user)
+        # this will force a sync of secrets for further assertions
+        enable_password_rotation = {
+            "data": {
+                "enable_password_rotation": "true",
+                "password_rotation_interval": "30",
+                "password_rotation_user_retention": "30",  # should be set to 60 
+            },
+        }
+        k8s.update_config(enable_password_rotation)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+
+        # check if next rotation date and username have been replaced
+        secret_data = k8s.get_secret_data("foo_user")
+        secret_username = str(base64.b64decode(secret_data["username"]), 'utf-8')
+        next_rotation_timestamp = datetime.strptime(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
+        rotation_user = "foo_user"+today.strftime("%y%m%d")
+        today30days = today+timedelta(days=30)
+
+        self.assertEqual(rotation_user, secret_username,
+                        "Unexpected username in secret of foo_user: expected {}, got {}".format(rotation_user, secret_username))
+        self.assertEqual(today30days, next_rotation_timestamp.date(),
+                        "Unexpected rotation date in secret of foo_user: expected {}, got {}".format(today30days, next_rotation_timestamp.date()))
+
+        # check if oldest fake rotation users were deleted
+        # there should only be foo_user, foo_user+today and foo_user+today-40days
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname LIKE 'foo_user%';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 3,
+            "Found incorrect number of rotation users", 10, 5)
+
+        # disable password rotation for all other users (foo_user)
+        # and pick smaller intervals to see if the third fake rotation user is dropped 
+        enable_password_rotation = {
+            "data": {
+                "enable_password_rotation": "false",
+                "password_rotation_interval": "15",
+                "password_rotation_user_retention": "30",  # 2 * rotation interval
+            },
+        }
+        k8s.update_config(enable_password_rotation)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+
+        # check if username in foo_user secret is reset
+        secret_data = k8s.get_secret_data("foo_user")
+        secret_username = str(base64.b64decode(secret_data["username"]), 'utf-8')
+        next_rotation_timestamp = str(base64.b64decode(secret_data["nextRotation"]), 'utf-8')
+        self.assertEqual("foo_user", secret_username,
+                        "Unexpected username in secret of foo_user: expected {}, got {}".format("foo_user", secret_username))
+        self.assertEqual('', next_rotation_timestamp,
+                        "Unexpected rotation date in secret of foo_user: expected empty string, got {}".format(next_rotation_timestamp))
+
+        # check roles again, there should only be foo_user and foo_user+today
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname LIKE 'foo_user%';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
+            "Found incorrect number of rotation users", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_rolling_update_flag(self):
@@ -1270,6 +1411,7 @@ class EndToEndTestCase(unittest.TestCase):
             "data": {
                 "pod_label_wait_timeout": "2s",
                 "resync_period": "30s",
+                "repair_period": "30s",
             }
         }
 
@@ -1310,7 +1452,8 @@ class EndToEndTestCase(unittest.TestCase):
             patch_resync_config = {
                 "data": {
                     "pod_label_wait_timeout": "10m",
-                    "resync_period": "30m",
+                    "resync_period": "4m",
+                    "repair_period": "2m",
                 }
             }
             k8s.update_config(patch_resync_config, "revert resync interval and pod_label_wait_timeout")
@@ -1414,7 +1557,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    @unittest.skip("Skipping this test until fixed")
     def test_taint_based_eviction(self):
         '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
@@ -1428,7 +1570,6 @@ class EndToEndTestCase(unittest.TestCase):
 
         # get nodes of master and replica(s) (expected target of new master)
         master_nodes, replica_nodes = k8s.get_cluster_nodes()
-
         self.assertNotEqual(master_nodes, [])
         self.assertNotEqual(replica_nodes, [])
 
@@ -1443,10 +1584,7 @@ class EndToEndTestCase(unittest.TestCase):
                 ]
             }
         }
-
         k8s.api.core_v1.patch_node(master_nodes[0], body)
-        self.eventuallyTrue(lambda: k8s.get_cluster_nodes()[0], replica_nodes)
-        self.assertNotEqual(lambda: k8s.get_cluster_nodes()[0], master_nodes)
 
         # add toleration to pods
         patch_toleration_config = {
@@ -1455,15 +1593,20 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
 
-        k8s.update_config(patch_toleration_config, step="allow tainted nodes")
+        try:
+            k8s.update_config(patch_toleration_config, step="allow tainted nodes")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                        "Operator does not get in sync")
 
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
         # toggle pod anti affinity to move replica away from master node
-        nm, new_replica_nodes = k8s.get_cluster_nodes()
-        new_master_node = nm[0]
-        self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
+        self.assert_distributed_pods(master_nodes)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_cluster_deletion(self):
@@ -1550,39 +1693,6 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_delete_annotations)
 
-    def get_failover_targets(self, master_node, replica_nodes):
-        '''
-           If all pods live on the same node, failover will happen to other worker(s)
-        '''
-        k8s = self.k8s
-        k8s_master_exclusion = 'kubernetes.io/hostname!=postgres-operator-e2e-tests-control-plane'
-
-        failover_targets = [x for x in replica_nodes if x != master_node]
-        if len(failover_targets) == 0:
-            nodes = k8s.api.core_v1.list_node(label_selector=k8s_master_exclusion)
-            for n in nodes.items:
-                if n.metadata.name != master_node:
-                    failover_targets.append(n.metadata.name)
-
-        return failover_targets
-
-    def assert_failover(self, current_master_node, num_replicas, failover_targets, cluster_label):
-        '''
-           Check if master is failing over. The replica should move first to be the switchover target
-        '''
-        k8s = self.k8s
-        k8s.wait_for_pod_failover(failover_targets, 'spilo-role=master,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-
-        new_master_node, new_replica_nodes = k8s.get_pg_nodes(cluster_label)
-        self.assertNotEqual(current_master_node, new_master_node,
-                            "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
-        self.assertEqual(num_replicas, len(new_replica_nodes),
-                         "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
-        self.assert_master_is_unique()
-
-        return new_master_node, new_replica_nodes
-
     def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         '''
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
@@ -1594,14 +1704,23 @@ class EndToEndTestCase(unittest.TestCase):
         num_of_master_pods = k8s.count_pods_with_label(labels, namespace)
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
 
-    def assert_distributed_pods(self, master_node, replica_nodes, cluster_label):
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def assert_distributed_pods(self, target_nodes, cluster_labels='cluster-name=acid-minimal-cluster'):
         '''
            Other tests can lead to the situation that master and replica are on the same node.
            Toggle pod anti affinty to distribute pods accross nodes (replica in particular).
         '''
         k8s = self.k8s
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        failover_targets = self.get_failover_targets(master_node, replica_nodes)
+        cluster_labels = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        # get nodes of master and replica(s)
+        master_nodes, replica_nodes = k8s.get_cluster_nodes()
+        self.assertNotEqual(master_nodes, [])
+        self.assertNotEqual(replica_nodes, [])
+
+        # if nodes are different we can quit here
+        if master_nodes[0] not in replica_nodes:
+            return True             
 
         # enable pod anti affintiy in config map which should trigger movement of replica
         patch_enable_antiaffinity = {
@@ -1609,18 +1728,40 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_pod_antiaffinity": "true"
             }
         }
-        k8s.update_config(patch_enable_antiaffinity, "enable antiaffinity")
-        self.assert_failover(master_node, len(replica_nodes), failover_targets, cluster_label)
 
-        # now disable pod anti affintiy again which will cause yet another failover
-        patch_disable_antiaffinity = {
-            "data": {
-                "enable_pod_antiaffinity": "false"
+        try:
+            k8s.update_config(patch_enable_antiaffinity, "enable antiaffinity")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_labels)
+            k8s.wait_for_running_pods(cluster_labels, 2)
+
+            # now disable pod anti affintiy again which will cause yet another failover
+            patch_disable_antiaffinity = {
+                "data": {
+                    "enable_pod_antiaffinity": "false"
+                }
             }
-        }
-        k8s.update_config(patch_disable_antiaffinity, "disable antiaffinity")
-        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            k8s.update_config(patch_disable_antiaffinity, "disable antiaffinity")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_labels)
+            k8s.wait_for_running_pods(cluster_labels, 2)
+
+            master_nodes, replica_nodes = k8s.get_cluster_nodes()
+            self.assertNotEqual(master_nodes, [])
+            self.assertNotEqual(replica_nodes, [])
+
+            # if nodes are different we can quit here
+            for target_node in target_nodes:
+                if (target_node not in master_nodes or target_node not in replica_nodes) and master_nodes[0] in replica_nodes:
+                    print('Pods run on the same node') 
+                    return False
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
         return True
 
     def list_databases(self, pod_name):
@@ -1636,12 +1777,8 @@ class EndToEndTestCase(unittest.TestCase):
         try:
             q = exec_query.format(db_list_query, "postgres")
             q = "su postgres -c \"{}\"".format(q)
-            print('Get databases: {}'.format(q))
             result = k8s.exec_with_kubectl(pod_name, q)
             db_list = clean_list(result.stdout.split(b'\n'))
-            print('db_list: {}, stdout: {}, stderr {}'.format(
-                db_list, result.stdout, result.stderr
-            ))
         except Exception as ex:
             print('Could not get databases: {}'.format(ex))
             print('Stdout: {}'.format(result.stdout))
@@ -1665,12 +1802,8 @@ class EndToEndTestCase(unittest.TestCase):
         try:
             q = exec_query.format(query, db_name)
             q = "su postgres -c \"{}\"".format(q)
-            print('Send query: {}'.format(q))
             result = k8s.exec_with_kubectl(pod_name, q)
             result_set = clean_list(result.stdout.split(b'\n'))
-            print('result: {}, stdout: {}, stderr {}'.format(
-                result_set, result.stdout, result.stderr
-            ))
         except Exception as ex:
             print('Error on query execution: {}'.format(ex))
             print('Stdout: {}'.format(result.stdout))

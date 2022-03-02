@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
@@ -1086,5 +1088,104 @@ func TestValidUsernames(t *testing.T) {
 		if !isValidUsername(username) {
 			t.Errorf("%s Valid username is not allowed: %s", testName, username)
 		}
+	}
+}
+
+func TestComparePorts(t *testing.T) {
+	testCases := []struct {
+		name     string
+		setA     []v1.ContainerPort
+		setB     []v1.ContainerPort
+		expected bool
+	}{
+		{
+			name: "different ports",
+			setA: []v1.ContainerPort{
+				{
+					Name:          "metrics",
+					ContainerPort: 9187,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+
+			setB: []v1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 80,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "no difference",
+			setA: []v1.ContainerPort{
+				{
+					Name:          "metrics",
+					ContainerPort: 9187,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+			setB: []v1.ContainerPort{
+				{
+					Name:          "metrics",
+					ContainerPort: 9187,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "same ports, different order",
+			setA: []v1.ContainerPort{
+				{
+					Name:          "metrics",
+					ContainerPort: 9187,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					Name:          "http",
+					ContainerPort: 80,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+			setB: []v1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 80,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 9187,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "same ports, but one with default protocol",
+			setA: []v1.ContainerPort{
+				{
+					Name:          "metrics",
+					ContainerPort: 9187,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+			setB: []v1.ContainerPort{
+				{
+					Name:          "metrics",
+					ContainerPort: 9187,
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := comparePorts(testCase.setA, testCase.setB)
+			assert.Equal(t, testCase.expected, got)
+		})
 	}
 }

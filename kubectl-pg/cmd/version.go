@@ -24,10 +24,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"k8s.io/client-go/kubernetes"
 	"log"
 	"strings"
+
+	"github.com/spf13/cobra"
+	"k8s.io/client-go/kubernetes"
 )
 
 var KubectlPgVersion string = "1.0"

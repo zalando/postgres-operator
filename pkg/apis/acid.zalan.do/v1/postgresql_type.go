@@ -53,8 +53,11 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
+	Users                          map[string]UserFlags `json:"users,omitempty"`
+	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
+	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
+
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
-	Users                 map[string]UserFlags        `json:"users,omitempty"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
 	Clone                 *CloneDescription           `json:"clone,omitempty"`
 	ClusterName           string                      `json:"-"`
@@ -74,6 +77,7 @@ type PostgresSpec struct {
 	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
 	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
+	Streams               []Stream                    `json:"streams,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -161,11 +165,13 @@ type Patroni struct {
 	Slots                 map[string]map[string]string `json:"slots,omitempty"`
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
+	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:1`
 }
 
 // StandbyDescription contains s3 wal path
 type StandbyDescription struct {
 	S3WalPath         string `json:"s3_wal_path,omitempty"`
+	GSWalPath         string `json:"gs_wal_path,omitempty"`
 	StandbyHost       string `json:"standby_host,omitempty"`
 	StandbyMethod     string `json:"standby_method,omitempty"`
 	StandbyPort       string `json:"standby_port,omitempty"`
@@ -229,4 +235,18 @@ type ConnectionPooler struct {
 	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
 
 	Resources `json:"resources,omitempty"`
+}
+
+type Stream struct {
+	ApplicationId string                 `json:"applicationId"`
+	Database      string                 `json:"database"`
+	Tables        map[string]StreamTable `json:"tables"`
+	Filter        map[string]string      `json:"filter,omitempty"`
+	BatchSize     uint32                 `json:"batchSize,omitempty"`
+}
+
+type StreamTable struct {
+	EventType     string `json:"eventType"`
+	IdColumn      string `json:"idColumn,omitempty" defaults:"id"`
+	PayloadColumn string `json:"payloadColumn,omitempty" defaults:"payload"`
 }

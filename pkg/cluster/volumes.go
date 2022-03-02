@@ -88,7 +88,7 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 	awsGp3 := aws.String("gp3")
 	awsIo2 := aws.String("io2")
 
-	errors := []string{}
+	errors := make([]string, 0)
 
 	for _, volume := range c.EBSVolumes {
 		var modifyIops *int64
