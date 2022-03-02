@@ -427,7 +427,8 @@ configuration they are grouped under the `kubernetes` key.
 
 This group allows you to configure resource requests for the Postgres pods.
 Those parameters are grouped under the `postgres_pod_resources` key in a
-CRD-based configuration. `0` is the null value for all resource requests. Any limit that's set requires its request counterpart to be set for scheduling.
+CRD-based configuration. `0` is the null value for all resource requests. 
+Any limit that's set requires its request counterpart to be set for scheduling.
 
 * **default_cpu_request**
   CPU request value for the Postgres containers, unless overridden by
