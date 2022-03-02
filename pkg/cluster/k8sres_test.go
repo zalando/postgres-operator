@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
@@ -20,23 +22,31 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
+
+func newFakeK8sTestClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset()
+
+	return k8sutil.KubernetesClient{
+		PodsGetter:         clientSet.CoreV1(),
+		PostgresqlsGetter:  acidClientSet.AcidV1(),
+		StatefulSetsGetter: clientSet.AppsV1(),
+	}, clientSet
+}
 
 // For testing purposes
 type ExpectedValue struct {
 	envIndex       int
 	envVarConstant string
 	envVarValue    string
-}
-
-func toIntStr(val int) *intstr.IntOrString {
-	b := intstr.FromInt(val)
-	return &b
 }
 
 func TestGenerateSpiloJSONConfiguration(t *testing.T) {
@@ -84,11 +94,12 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				MaximumLagOnFailover:  33554432,
 				SynchronousMode:       true,
 				SynchronousModeStrict: true,
+				SynchronousNodeCount:  1,
 				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 			},
 			role:     "zalandos",
 			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -298,7 +309,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
 				Spec: policyv1beta1.PodDisruptionBudgetSpec{
-					MinAvailable: toIntStr(1),
+					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
 					},
@@ -322,7 +333,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
 				Spec: policyv1beta1.PodDisruptionBudgetSpec{
-					MinAvailable: toIntStr(0),
+					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
 					},
@@ -346,7 +357,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
 				Spec: policyv1beta1.PodDisruptionBudgetSpec{
-					MinAvailable: toIntStr(0),
+					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
 					},
@@ -370,7 +381,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
 				Spec: policyv1beta1.PodDisruptionBudgetSpec{
-					MinAvailable: toIntStr(1),
+					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
 					},
@@ -412,6 +423,7 @@ func TestShmVolume(t *testing.T) {
 				Volumes: []v1.Volume{{}},
 				Containers: []v1.Container{
 					{
+						Name: "postgres",
 						VolumeMounts: []v1.VolumeMount{
 							{},
 						},
@@ -423,9 +435,10 @@ func TestShmVolume(t *testing.T) {
 	}
 	for _, tt := range tests {
 		addShmVolume(tt.podSpec)
+		postgresContainer := getPostgresContainer(tt.podSpec)
 
 		volumeName := tt.podSpec.Volumes[tt.shmPos].Name
-		volumeMountName := tt.podSpec.Containers[0].VolumeMounts[tt.shmPos].Name
+		volumeMountName := postgresContainer.VolumeMounts[tt.shmPos].Name
 
 		if volumeName != constants.ShmVolumeName {
 			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
@@ -597,8 +610,9 @@ func TestSecretVolume(t *testing.T) {
 	for _, tt := range tests {
 		additionalSecretMount := "aws-iam-s3-role"
 		additionalSecretMountPath := "/meta/credentials"
+		postgresContainer := getPostgresContainer(tt.podSpec)
 
-		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+		numMounts := len(postgresContainer.VolumeMounts)
 
 		addSecretVolume(tt.podSpec, additionalSecretMount, additionalSecretMountPath)
 
@@ -618,7 +632,8 @@ func TestSecretVolume(t *testing.T) {
 			}
 		}
 
-		numMountsCheck := len(tt.podSpec.Containers[0].VolumeMounts)
+		postgresContainer = getPostgresContainer(tt.podSpec)
+		numMountsCheck := len(postgresContainer.VolumeMounts)
 
 		if numMountsCheck != numMounts+1 {
 			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
@@ -628,8 +643,12 @@ func TestSecretVolume(t *testing.T) {
 }
 
 const (
-	testPodEnvironmentConfigMapName = "pod_env_cm"
-	testPodEnvironmentSecretName    = "pod_env_sc"
+	testPodEnvironmentConfigMapName      = "pod_env_cm"
+	testPodEnvironmentSecretName         = "pod_env_sc"
+	testPodEnvironmentObjectNotExists    = "idonotexist"
+	testPodEnvironmentSecretNameAPIError = "pod_env_sc_apierror"
+	testResourceCheckInterval            = 3
+	testResourceCheckTimeout             = 10
 )
 
 type mockSecret struct {
@@ -641,8 +660,11 @@ type mockConfigMap struct {
 }
 
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
+	if name == testPodEnvironmentSecretNameAPIError {
+		return nil, fmt.Errorf("Secret PodEnvironmentSecret API error")
+	}
 	if name != testPodEnvironmentSecretName {
-		return nil, fmt.Errorf("Secret PodEnvironmentSecret not found")
+		return nil, k8serrors.NewNotFound(schema.GroupResource{Group: "core", Resource: "secret"}, name)
 	}
 	secret := &v1.Secret{}
 	secret.Name = testPodEnvironmentSecretName
@@ -711,7 +733,7 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentConfigMap: spec.NamespacedName{
-						Name: "idonotexist",
+						Name: testPodEnvironmentObjectNotExists,
 					},
 				},
 			},
@@ -762,6 +784,7 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 
 // Test if the keys of an existing secret are properly referenced
 func TestPodEnvironmentSecretVariables(t *testing.T) {
+	maxRetries := int(testResourceCheckTimeout / testResourceCheckInterval)
 	testName := "TestPodEnvironmentSecretVariables"
 	tests := []struct {
 		subTest  string
@@ -777,16 +800,31 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			subTest: "Secret referenced by PodEnvironmentSecret does not exist",
 			opConfig: config.Config{
 				Resources: config.Resources{
-					PodEnvironmentSecret: "idonotexist",
+					PodEnvironmentSecret:  testPodEnvironmentObjectNotExists,
+					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
+					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
 			},
-			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret not found"),
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: still failing after %d retries: secret.core %q not found", maxRetries, testPodEnvironmentObjectNotExists),
+		},
+		{
+			subTest: "API error during PodEnvironmentSecret retrieval",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentSecret:  testPodEnvironmentSecretNameAPIError,
+					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
+					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+				},
+			},
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret API error"),
 		},
 		{
 			subTest: "Pod environment vars reference all keys from secret configured by PodEnvironmentSecret",
 			opConfig: config.Config{
 				Resources: config.Resources{
-					PodEnvironmentSecret: testPodEnvironmentSecretName,
+					PodEnvironmentSecret:  testPodEnvironmentSecretName,
+					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
+					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
 			},
 			envVars: []v1.EnvVar{
@@ -850,7 +888,8 @@ func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) 
 		"CONNECTION_POOLER_PORT": false,
 	}
 
-	envs := podSpec.Spec.Containers[0].Env
+	container := getPostgresContainer(&podSpec.Spec)
+	envs := container.Env
 	for _, env := range envs {
 		required[env.Name] = true
 	}
@@ -930,15 +969,6 @@ func TestNodeAffinity(t *testing.T) {
 	assert.Equal(t, s.Spec.Template.Spec.Affinity.NodeAffinity, nodeAff, "cluster template has correct node affinity")
 }
 
-func testCustomPodTemplate(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
-	if podSpec.ObjectMeta.Name != "test-pod-template" {
-		return fmt.Errorf("Custom pod template is not used, current spec %+v",
-			podSpec)
-	}
-
-	return nil
-}
-
 func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
@@ -962,16 +992,23 @@ func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role Postg
 }
 
 func TestTLS(t *testing.T) {
-	var err error
-	var spec acidv1.PostgresSpec
-	var cluster *Cluster
-	var spiloRunAsUser = int64(101)
-	var spiloRunAsGroup = int64(103)
-	var spiloFSGroup = int64(103)
-	var additionalVolumes = spec.AdditionalVolumes
 
-	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
-		return acidv1.PostgresSpec{
+	client, _ := newFakeK8sTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	tlsSecretName := "my-secret"
+	spiloRunAsUser := int64(101)
+	spiloRunAsGroup := int64(103)
+	spiloFSGroup := int64(103)
+	defaultMode := int32(0640)
+	mountPath := "/tls"
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
 			Resources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
@@ -980,11 +1017,24 @@ func TestTLS(t *testing.T) {
 			Volume: acidv1.Volume{
 				Size: "1G",
 			},
-			TLS: &tls,
-		}
+			TLS: &acidv1.TLSDescription{
+				SecretName: tlsSecretName, CAFile: "ca.crt"},
+			AdditionalVolumes: []acidv1.AdditionalVolume{
+				acidv1.AdditionalVolume{
+					Name:      tlsSecretName,
+					MountPath: mountPath,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  tlsSecretName,
+							DefaultMode: &defaultMode,
+						},
+					},
+				},
+			},
+		},
 	}
 
-	cluster = New(
+	var cluster = New(
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -999,28 +1049,14 @@ func TestTLS(t *testing.T) {
 					SpiloFSGroup:    &spiloFSGroup,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-	spec = makeSpec(acidv1.TLSDescription{SecretName: "my-secret", CAFile: "ca.crt"})
-	s, err := cluster.generateStatefulSet(&spec)
-	if err != nil {
-		assert.NoError(t, err)
-	}
+		}, client, pg, logger, eventRecorder)
+
+	// create a statefulset
+	sts, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
 
 	fsGroup := int64(103)
-	assert.Equal(t, &fsGroup, s.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
-
-	defaultMode := int32(0640)
-	mountPath := "/tls"
-	additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
-		Name:      spec.TLS.SecretName,
-		MountPath: mountPath,
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{
-				SecretName:  spec.TLS.SecretName,
-				DefaultMode: &defaultMode,
-			},
-		},
-	})
+	assert.Equal(t, &fsGroup, sts.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
 
 	volume := v1.Volume{
 		Name: "my-secret",
@@ -1031,182 +1067,134 @@ func TestTLS(t *testing.T) {
 			},
 		},
 	}
-	assert.Contains(t, s.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
+	assert.Contains(t, sts.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
 
-	assert.Contains(t, s.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+	postgresContainer := getPostgresContainer(&sts.Spec.Template.Spec)
+	assert.Contains(t, postgresContainer.VolumeMounts, v1.VolumeMount{
 		MountPath: "/tls",
 		Name:      "my-secret",
 	}, "the volume gets mounted in /tls")
 
-	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
-	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
-	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
+	assert.Contains(t, postgresContainer.Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
+	assert.Contains(t, postgresContainer.Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
+	assert.Contains(t, postgresContainer.Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
 }
 
 func TestAdditionalVolume(t *testing.T) {
 	testName := "TestAdditionalVolume"
-	tests := []struct {
-		subTest   string
-		podSpec   *v1.PodSpec
-		volumePos int
-	}{
+
+	client, _ := newFakeK8sTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	sidecarName := "sidecar"
+	additionalVolumes := []acidv1.AdditionalVolume{
 		{
-			subTest: "empty PodSpec",
-			podSpec: &v1.PodSpec{
-				Volumes: []v1.Volume{},
-				Containers: []v1.Container{
-					{
-						VolumeMounts: []v1.VolumeMount{},
-					},
-				},
+			Name:             "test1",
+			MountPath:        "/test1",
+			TargetContainers: []string{"all"},
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
 			},
-			volumePos: 0,
 		},
 		{
-			subTest: "non empty PodSpec",
-			podSpec: &v1.PodSpec{
-				Volumes: []v1.Volume{{}},
-				Containers: []v1.Container{
-					{
-						Name: "postgres",
-						VolumeMounts: []v1.VolumeMount{
-							{
-								Name:      "data",
-								ReadOnly:  false,
-								MountPath: "/data",
-							},
-						},
-					},
-				},
+			Name:             "test2",
+			MountPath:        "/test2",
+			TargetContainers: []string{sidecarName},
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
 			},
-			volumePos: 1,
 		},
 		{
-			subTest: "non empty PodSpec with sidecar",
-			podSpec: &v1.PodSpec{
-				Volumes: []v1.Volume{{}},
-				Containers: []v1.Container{
-					{
-						Name: "postgres",
-						VolumeMounts: []v1.VolumeMount{
-							{
-								Name:      "data",
-								ReadOnly:  false,
-								MountPath: "/data",
-							},
-						},
-					},
-					{
-						Name: "sidecar",
-						VolumeMounts: []v1.VolumeMount{
-							{
-								Name:      "data",
-								ReadOnly:  false,
-								MountPath: "/data",
-							},
-						},
-					},
+			Name:             "test3",
+			MountPath:        "/test3",
+			TargetContainers: []string{}, // should mount only to postgres
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name:             "test4",
+			MountPath:        "/test4",
+			TargetContainers: nil, // should mount only to postgres
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
+	}
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			Resources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+			AdditionalVolumes: additionalVolumes,
+			Sidecars: []acidv1.Sidecar{
+				{
+					Name: sidecarName,
 				},
 			},
-			volumePos: 1,
 		},
 	}
 
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
-				ProtectedRoles: []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+		}, client, pg, logger, eventRecorder)
 
-	for _, tt := range tests {
-		// Test with additional volume mounted in all containers
-		additionalVolumeMount := []acidv1.AdditionalVolume{
-			{
-				Name:             "test",
-				MountPath:        "/test",
-				TargetContainers: []string{"all"},
-				VolumeSource: v1.VolumeSource{
-					EmptyDir: &v1.EmptyDirVolumeSource{},
-				},
-			},
-		}
+	// create a statefulset
+	sts, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
 
-		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
-
-		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
-		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
-
-		if volumeName != additionalVolumeMount[0].Name {
-			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
-				testName, tt.subTest, additionalVolumeMount, volumeName)
-		}
-
-		for i := range tt.podSpec.Containers {
-			volumeMountName := tt.podSpec.Containers[i].VolumeMounts[tt.volumePos].Name
-
-			if volumeMountName != additionalVolumeMount[0].Name {
-				t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
-					testName, tt.subTest, additionalVolumeMount, volumeMountName)
-			}
-
-		}
-
-		numMountsCheck := len(tt.podSpec.Containers[0].VolumeMounts)
-
-		if numMountsCheck != numMounts+1 {
-			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
-				numMountsCheck, numMounts+1)
-		}
+	tests := []struct {
+		subTest        string
+		container      string
+		expectedMounts []string
+	}{
+		{
+			subTest:        "checking volume mounts of postgres container",
+			container:      constants.PostgresContainerName,
+			expectedMounts: []string{"pgdata", "test1", "test3", "test4"},
+		},
+		{
+			subTest:        "checking volume mounts of sidecar container",
+			container:      "sidecar",
+			expectedMounts: []string{"pgdata", "test1", "test2"},
+		},
 	}
 
 	for _, tt := range tests {
-		// Test with additional volume mounted only in first container
-		additionalVolumeMount := []acidv1.AdditionalVolume{
-			{
-				Name:             "test",
-				MountPath:        "/test",
-				TargetContainers: []string{"postgres"},
-				VolumeSource: v1.VolumeSource{
-					EmptyDir: &v1.EmptyDirVolumeSource{},
-				},
-			},
-		}
+		for _, container := range sts.Spec.Template.Spec.Containers {
+			if container.Name != tt.container {
+				continue
+			}
+			mounts := []string{}
+			for _, volumeMounts := range container.VolumeMounts {
+				mounts = append(mounts, volumeMounts.Name)
+			}
 
-		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
-
-		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
-		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
-
-		if volumeName != additionalVolumeMount[0].Name {
-			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
-				testName, tt.subTest, additionalVolumeMount, volumeName)
-		}
-
-		for _, container := range tt.podSpec.Containers {
-			if container.Name == "postgres" {
-				volumeMountName := container.VolumeMounts[tt.volumePos].Name
-
-				if volumeMountName != additionalVolumeMount[0].Name {
-					t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
-						testName, tt.subTest, additionalVolumeMount, volumeMountName)
-				}
-
-				numMountsCheck := len(container.VolumeMounts)
-				if numMountsCheck != numMounts+1 {
-					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
-						numMountsCheck, numMounts+1)
-				}
-			} else {
-				numMountsCheck := len(container.VolumeMounts)
-				if numMountsCheck == numMounts+1 {
-					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
-						numMountsCheck, numMounts)
-				}
+			if !util.IsEqualIgnoreOrder(mounts, tt.expectedMounts) {
+				t.Errorf("%s %s: different volume mounts: got %v, epxected %v",
+					testName, tt.subTest, mounts, tt.expectedMounts)
 			}
 		}
 	}
@@ -1240,6 +1228,12 @@ func TestSidecars(t *testing.T) {
 	}
 
 	spec = acidv1.PostgresSpec{
+		PostgresqlParam: acidv1.PostgresqlParam{
+			PgVersion: "12.1",
+			Parameters: map[string]string{
+				"max_connections": "100",
+			},
+		},
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: acidv1.Resources{
 			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
@@ -1533,6 +1527,109 @@ func TestGenerateCapabilities(t *testing.T) {
 		if !reflect.DeepEqual(caps, tt.capabilities) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
 				testName, tt.subTest, tt.capabilities, caps)
+		}
+	}
+}
+
+func TestVolumeSelector(t *testing.T) {
+	testName := "TestVolumeSelector"
+	makeSpec := func(volume acidv1.Volume) acidv1.PostgresSpec {
+		return acidv1.PostgresSpec{
+			TeamID:            "myapp",
+			NumberOfInstances: 0,
+			Resources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: volume,
+		}
+	}
+
+	tests := []struct {
+		subTest      string
+		volume       acidv1.Volume
+		wantSelector *metav1.LabelSelector
+	}{
+		{
+			subTest: "PVC template has no selector",
+			volume: acidv1.Volume{
+				Size: "1G",
+			},
+			wantSelector: nil,
+		},
+		{
+			subTest: "PVC template has simple label selector",
+			volume: acidv1.Volume{
+				Size: "1G",
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"environment": "unittest"},
+				},
+			},
+			wantSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"environment": "unittest"},
+			},
+		},
+		{
+			subTest: "PVC template has full selector",
+			volume: acidv1.Volume{
+				Size: "1G",
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"environment": "unittest"},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "flavour",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"banana", "chocolate"},
+						},
+					},
+				},
+			},
+			wantSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"environment": "unittest"},
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "flavour",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"banana", "chocolate"},
+					},
+				},
+			},
+		},
+	}
+
+	cluster := New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	for _, tt := range tests {
+		pgSpec := makeSpec(tt.volume)
+		sts, err := cluster.generateStatefulSet(&pgSpec)
+		if err != nil {
+			t.Fatalf("%s %s: no statefulset created %v", testName, tt.subTest, err)
+		}
+
+		volIdx := len(sts.Spec.VolumeClaimTemplates)
+		for i, ct := range sts.Spec.VolumeClaimTemplates {
+			if ct.ObjectMeta.Name == constants.DataVolumeName {
+				volIdx = i
+				break
+			}
+		}
+		if volIdx == len(sts.Spec.VolumeClaimTemplates) {
+			t.Errorf("%s %s: no datavolume found in sts", testName, tt.subTest)
+		}
+
+		selector := sts.Spec.VolumeClaimTemplates[volIdx].Spec.Selector
+		if !reflect.DeepEqual(selector, tt.wantSelector) {
+			t.Errorf("%s %s: expected: %#v but got: %#v", testName, tt.subTest, tt.wantSelector, selector)
 		}
 	}
 }

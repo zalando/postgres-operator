@@ -3,6 +3,7 @@ apiVersion: "acid.zalan.do/v1"
 kind: OperatorConfiguration
 metadata:
   name: {{ template "postgres-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
     helm.sh/chart: {{ template "postgres-operator.chart" . }}

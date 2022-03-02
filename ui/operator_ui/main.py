@@ -98,7 +98,7 @@ COST_MEMORY = 30.5 * 24 * float(getenv('COST_MEMORY', 0.014375))  # Memory GB m5
 
 WALE_S3_ENDPOINT = getenv(
     'WALE_S3_ENDPOINT',
-    'https+path://s3-eu-central-1.amazonaws.com:443',
+    'https+path://s3.eu-central-1.amazonaws.com:443',
 )
 
 USE_AWS_INSTANCE_PROFILE = (

@@ -37,15 +37,19 @@ type OperatorConfigurationList struct {
 
 // PostgresUsersConfiguration defines the system users of Postgres.
 type PostgresUsersConfiguration struct {
-	SuperUsername       string `json:"super_username,omitempty"`
-	ReplicationUsername string `json:"replication_username,omitempty"`
+	SuperUsername                 string `json:"super_username,omitempty"`
+	ReplicationUsername           string `json:"replication_username,omitempty"`
+	EnablePasswordRotation        bool   `json:"enable_password_rotation,omitempty"`
+	PasswordRotationInterval      uint32 `json:"password_rotation_interval,omitempty"`
+	PasswordRotationUserRetention uint32 `json:"password_rotation_user_retention,omitempty"`
 }
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
 type MajorVersionUpgradeConfiguration struct {
-	MajorVersionUpgradeMode string `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
-	MinimalMajorVersion     string `json:"minimal_major_version" default:"9.5"`
-	TargetMajorVersion      string `json:"target_major_version" default:"13"`
+	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
+	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"9.6"`
+	TargetMajorVersion               string   `json:"target_major_version" default:"14"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
@@ -81,6 +85,7 @@ type KubernetesMetaConfiguration struct {
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
 	DeleteAnnotationNameKey                string                       `json:"delete_annotation_name_key,omitempty"`
 	NodeReadinessLabel                     map[string]string            `json:"node_readiness_label,omitempty"`
+	NodeReadinessLabelMerge                string                       `json:"node_readiness_label_merge,omitempty"`
 	CustomPodAnnotations                   map[string]string            `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration              map[string]string   `json:"toleration,omitempty"`
@@ -91,6 +96,7 @@ type KubernetesMetaConfiguration struct {
 	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
 	PodAntiAffinityTopologyKey string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodManagementPolicy        string              `json:"pod_management_policy,omitempty"`
+	EnableCrossNamespaceSecret bool                `json:"enable_cross_namespace_secret,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -131,6 +137,7 @@ type AWSGCPConfiguration struct {
 	AWSRegion                    string `json:"aws_region,omitempty"`
 	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
 	GCPCredentials               string `json:"gcp_credentials,omitempty"`
+	WALAZStorageAccount          string `json:"wal_az_storage_account,omitempty"`
 	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
 	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
 	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
@@ -159,6 +166,8 @@ type TeamsAPIConfiguration struct {
 	PostgresSuperuserTeams          []string          `json:"postgres_superuser_teams,omitempty"`
 	EnablePostgresTeamCRD           bool              `json:"enable_postgres_team_crd,omitempty"`
 	EnablePostgresTeamCRDSuperusers bool              `json:"enable_postgres_team_crd_superusers,omitempty"`
+	EnableTeamMemberDeprecation     bool              `json:"enable_team_member_deprecation,omitempty"`
+	RoleDeletionSuffix              string            `json:"role_deletion_suffix,omitempty"`
 }
 
 // LoggingRESTAPIConfiguration defines Logging API conf
@@ -204,13 +213,16 @@ type OperatorLogicalBackupConfiguration struct {
 	S3AccessKeyID                string `json:"logical_backup_s3_access_key_id,omitempty"`
 	S3SecretAccessKey            string `json:"logical_backup_s3_secret_access_key,omitempty"`
 	S3SSE                        string `json:"logical_backup_s3_sse,omitempty"`
+	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
+	EnableCRDRegistration      *bool                              `json:"enable_crd_registration,omitempty"`
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
+	CRDCategories              []string                           `json:"crd_categories,omitempty"`
 	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
 	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`

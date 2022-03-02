@@ -59,11 +59,20 @@ spec:
           configuration:
             type: object
             properties:
+              crd_categories:
+                type: array
+                nullable: true
+                items:
+                  type: string
               docker_image:
                 type: string
-                default: "registry.opensource.zalan.do/acid/spilo-13:2.0-p6"
+                default: "registry.opensource.zalan.do/acid/spilo-14:2.1-p3"
+              enable_crd_registration:
+                type: boolean
+                default: true
               enable_crd_validation:
                 type: boolean
+                description: deprecated
                 default: true
               enable_lazy_spilo_upgrade:
                 type: boolean
@@ -85,11 +94,13 @@ spec:
                 default: false
               max_instances:
                 type: integer
-                minimum: -1  # -1 = disabled
+                description: "-1 = disabled"
+                minimum: -1
                 default: -1
               min_instances:
                 type: integer
-                minimum: -1  # -1 = disabled
+                description: "-1 = disabled"
+                minimum: -1
                 default: -1
               resync_period:
                 type: string
@@ -117,6 +128,15 @@ spec:
               users:
                 type: object
                 properties:
+                  enable_password_rotation:
+                    type: boolean
+                    default: false
+                  password_rotation_interval:
+                    type: integer
+                    default: 90
+                  password_rotation_user_retention:
+                    type: integer
+                    default: 180
                   replication_username:
                      type: string
                      default: standby
@@ -129,12 +149,16 @@ spec:
                   major_version_upgrade_mode:
                     type: string
                     default: "off"
+                  major_version_upgrade_team_allow_list:
+                    type: array
+                    items:
+                      type: string
                   minimal_major_version:
                     type: string
-                    default: "9.5"
+                    default: "9.6"
                   target_major_version:
                     type: string
-                    default: "13"
+                    default: "14"
               kubernetes:
                 type: object
                 properties:
@@ -166,6 +190,9 @@ spec:
                     type: array
                     items:
                       type: string
+                  enable_cross_namespace_secret:
+                    type: boolean
+                    default: false
                   enable_init_containers:
                     type: boolean
                     default: true
@@ -221,6 +248,11 @@ spec:
                     type: object
                     additionalProperties:
                       type: string
+                  node_readiness_label_merge:
+                    type: string
+                    enum:
+                      - "AND"
+                      - "OR"
                   oauth_token_secret_name:
                     type: string
                     default: "postgresql-operator"
@@ -386,6 +418,8 @@ spec:
                     type: string
                   log_s3_bucket:
                     type: string
+                  wal_az_storage_account:
+                    type: string
                   wal_gs_bucket:
                     type: string
                   wal_s3_bucket:
@@ -395,7 +429,7 @@ spec:
                 properties:
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
+                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.7.1"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
@@ -415,6 +449,8 @@ spec:
                   logical_backup_s3_secret_access_key:
                     type: string
                   logical_backup_s3_sse:
+                    type: string
+                  logical_backup_s3_retention_time:
                     type: string
                   logical_backup_schedule:
                     type: string
@@ -441,6 +477,9 @@ spec:
                   enable_postgres_team_crd_superusers:
                     type: boolean
                     default: false
+                  enable_team_member_deprecation:
+                    type: boolean
+                    default: false
                   enable_team_superuser:
                     type: boolean
                     default: false
@@ -463,6 +502,9 @@ spec:
                       type: string
                     default:
                     - admin
+                  role_deletion_suffix:
+                    type: string
+                    default: "_deleted"
                   team_admin_role:
                     type: string
                     default: "admin"
@@ -524,7 +566,7 @@ spec:
                     default: "pooler"
                   connection_pooler_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-16"
+                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-19"
                   connection_pooler_max_db_connections:
                     type: integer
                     default: 60

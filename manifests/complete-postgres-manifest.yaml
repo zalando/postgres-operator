@@ -3,19 +3,27 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 #  labels:
+#    application: test-app
 #    environment: demo
 #  annotations:
 #    "acid.zalan.do/controller": "second-operator"
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-13:2.0-p6
+  dockerImage: registry.opensource.zalan.do/acid/spilo-14:2.1-p3
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
     zalando:
     - superuser
     - createdb
+    foo_user: []
+#    flyway: []
+#  usersWithSecretRotation:
+#  - foo_user
+#  usersWithInPlaceSecretRotation:
+#  - flyway
+#  - bar_owner_user
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
   enableConnectionPooler: false # enable/disable connection pooler deployment
@@ -36,7 +44,7 @@ spec:
           defaultRoles: true
           defaultUsers: false
   postgresql:
-    version: "13"
+    version: "14"
     parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
@@ -46,6 +54,12 @@ spec:
 #    storageClass: my-sc
 #    iops: 1000  # for EBS gp3
 #    throughput: 250  # in MB/s for EBS gp3
+#    selector:
+#      matchExpressions:
+#        - { key: flavour, operator: In, values: [ "banana", "chocolate" ] }
+#      matchLabels:
+#        environment: dev
+#        service: postgres
   additionalVolumes:
     - name: empty
       mountPath: /opt/empty
@@ -110,6 +124,7 @@ spec:
     retry_timeout: 10
     synchronous_mode: false
     synchronous_mode_strict: false
+    synchronous_node_count: 1
     maximum_lag_on_failover: 33554432
 
 # restore a Postgres DB with point-in-time-recovery
@@ -151,7 +166,7 @@ spec:
 #   - name: "telegraf-sidecar"
 #     image: "telegraf:latest"
 #     ports:
-#       name: metrics
+#     - name: metrics
 #       containerPort: 8094
 #       protocol: TCP
 #     resources:
@@ -189,3 +204,21 @@ spec:
 #              operator: In
 #              values:
 #                - enabled
+
+# Enables change data capture streams for defined database tables
+#  streams:
+#  - applicationId: test-app
+#    database: foo
+#    tables:
+#      data.state_pending_outbox:
+#        eventType: test-app.status-pending
+#      data.state_approved_outbox:
+#        eventType: test-app.status-approved
+#      data.orders_outbox:
+#        eventType: test-app.order-completed
+#        idColumn: o_id
+#        payloadColumn: o_payload
+#    # Optional. Filter ignores events before a certain txnId and lsn. Can be used to skip bad events
+#    filter:
+#      data.orders_outbox: "[?(@.source.txId > 500 && @.source.lsn > 123456)]"
+#    batchSize: 1000

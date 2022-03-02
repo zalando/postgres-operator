@@ -5,6 +5,7 @@ package cluster
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -74,6 +75,7 @@ type Cluster struct {
 	eventRecorder    record.EventRecorder
 	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
+	pgUsersCache     map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
 	podSubscribers   map[spec.NamespacedName]chan PodEvent
 	podSubscribersMu sync.RWMutex
@@ -129,7 +131,9 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy:    users.DefaultUserSyncStrategy{PasswordEncryption: passwordEncryption},
+		userSyncStrategy: users.DefaultUserSyncStrategy{
+			PasswordEncryption: passwordEncryption,
+			RoleDeletionSuffix: cfg.OpConfig.RoleDeletionSuffix},
 		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
@@ -189,6 +193,17 @@ func (c *Cluster) isNewCluster() bool {
 // initUsers populates c.systemUsers and c.pgUsers maps.
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
+
+	// if team member deprecation is enabled save current state of pgUsers
+	// to check for deleted roles
+	c.pgUsersCache = map[string]spec.PgUser{}
+	if c.OpConfig.EnableTeamMemberDeprecation {
+		for k, v := range c.pgUsers {
+			if v.Origin == spec.RoleOriginTeamsAPI {
+				c.pgUsersCache[k] = v
+			}
+		}
+	}
 
 	// clear our the previous state of the cluster users (in case we are
 	// running a sync).
@@ -346,6 +361,12 @@ func (c *Cluster) Create() error {
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
 
+	if len(c.Spec.Streams) > 0 {
+		if err = c.syncStreams(); err != nil {
+			c.logger.Errorf("could not create streams: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -360,7 +381,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		reasons = append(reasons, "new statefulset's number of replicas does not match the current one")
 	}
 	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
-		match = false
+		needsReplace = true
 		reasons = append(reasons, "new statefulset's annotations do not match the current one")
 	}
 
@@ -390,6 +411,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's pod affinity does not match the current one")
 	}
+	if len(c.Statefulset.Spec.Template.Spec.Tolerations) != len(statefulSet.Spec.Template.Spec.Tolerations) {
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod tolerations does not match the current one")
+	}
 
 	// Some generated fields like creationTimestamp make it not possible to use DeepCompare on Spec.Template.ObjectMeta
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Labels, statefulSet.Spec.Template.Labels) {
@@ -411,13 +437,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	}
 
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations) {
-		match = false
 		needsReplace = true
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's pod template metadata annotations does not match the current one")
 	}
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.SecurityContext, statefulSet.Spec.Template.Spec.SecurityContext) {
-		match = false
 		needsReplace = true
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's pod template security context in spec does not match the current one")
@@ -445,10 +469,14 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		}
 	}
 
+	if len(c.Statefulset.Spec.Template.Spec.Volumes) != len(statefulSet.Spec.Template.Spec.Volumes) {
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's volumes contains different number of volumes to the old one")
+	}
+
 	// we assume any change in priority happens by rolling out a new priority class
 	// changing the priority value in an existing class is not supproted
 	if c.Statefulset.Spec.Template.Spec.PriorityClassName != statefulSet.Spec.Template.Spec.PriorityClassName {
-		match = false
 		needsReplace = true
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's pod priority class in spec does not match the current one")
@@ -456,7 +484,9 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 
 	// lazy Spilo update: modify the image in the statefulset itself but let its pods run with the old image
 	// until they are re-created for other reasons, for example node rotation
-	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Containers[0].Image, statefulSet.Spec.Template.Spec.Containers[0].Image) {
+	effectivePodImage := getPostgresContainer(&c.Statefulset.Spec.Template.Spec).Image
+	desiredImage := getPostgresContainer(&statefulSet.Spec.Template.Spec).Image
+	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(effectivePodImage, desiredImage) {
 		needsReplace = true
 		reasons = append(reasons, "lazy Spilo update: new statefulset's pod image does not match the current one")
 	}
@@ -493,15 +523,17 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 		newCheck("new statefulset %s's %s (index %d) name does not match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
 		newCheck("new statefulset %s's %s (index %d) ports do not match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
+			func(a, b v1.Container) bool { return !comparePorts(a.Ports, b.Ports) }),
 		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
 		newCheck("new statefulset %s's %s (index %d) environment does not match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
+			func(a, b v1.Container) bool { return !compareEnv(a.Env, b.Env) }),
 		newCheck("new statefulset %s's %s (index %d) environment sources do not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 		newCheck("new statefulset %s's %s (index %d) security context does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
+		newCheck("new statefulset %s's %s (index %d) volume mounts do not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.VolumeMounts, b.VolumeMounts) }),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {
@@ -552,6 +584,96 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 
 }
 
+func compareEnv(a, b []v1.EnvVar) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	equal := true
+	for _, enva := range a {
+		hasmatch := false
+		for _, envb := range b {
+			if enva.Name == envb.Name {
+				hasmatch = true
+				if enva.Name == "SPILO_CONFIGURATION" {
+					equal = compareSpiloConfiguration(enva.Value, envb.Value)
+				} else {
+					if enva.Value == "" && envb.Value == "" {
+						equal = reflect.DeepEqual(enva.ValueFrom, envb.ValueFrom)
+					} else {
+						equal = (enva.Value == envb.Value)
+					}
+				}
+				if !equal {
+					return false
+				}
+			}
+		}
+		if !hasmatch {
+			return false
+		}
+	}
+	return true
+}
+
+func compareSpiloConfiguration(configa, configb string) bool {
+	var (
+		oa, ob spiloConfiguration
+	)
+
+	var err error
+	err = json.Unmarshal([]byte(configa), &oa)
+	if err != nil {
+		return false
+	}
+	oa.Bootstrap.DCS = patroniDCS{}
+	err = json.Unmarshal([]byte(configb), &ob)
+	if err != nil {
+		return false
+	}
+	ob.Bootstrap.DCS = patroniDCS{}
+	return reflect.DeepEqual(oa, ob)
+}
+
+func areProtocolsEqual(a, b v1.Protocol) bool {
+	return a == b ||
+		(a == "" && b == v1.ProtocolTCP) ||
+		(a == v1.ProtocolTCP && b == "")
+}
+
+func comparePorts(a, b []v1.ContainerPort) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	areContainerPortsEqual := func(a, b v1.ContainerPort) bool {
+		return a.Name == b.Name &&
+			a.HostPort == b.HostPort &&
+			areProtocolsEqual(a.Protocol, b.Protocol) &&
+			a.HostIP == b.HostIP
+	}
+
+	findByPortValue := func(portSpecs []v1.ContainerPort, port int32) (v1.ContainerPort, bool) {
+		for _, portSpec := range portSpecs {
+			if portSpec.ContainerPort == port {
+				return portSpec, true
+			}
+		}
+		return v1.ContainerPort{}, false
+	}
+
+	for _, portA := range a {
+		portB, found := findByPortValue(b, portA.ContainerPort)
+		if !found {
+			return false
+		}
+		if !areContainerPortsEqual(portA, portB) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 
 	var (
@@ -598,7 +720,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 // for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
-	syncStatetfulSet := false
+	syncStatefulSet := false
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -619,7 +741,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	if IsBiggerPostgresVersion(oldSpec.Spec.PostgresqlParam.PgVersion, c.GetDesiredMajorVersion()) {
 		c.logger.Infof("postgresql version increased (%s -> %s), depending on config manual upgrade needed",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
-		syncStatetfulSet = true
+		syncStatefulSet = true
 	} else {
 		c.logger.Infof("postgresql major version unchanged or smaller, no changes needed")
 		// sticking with old version, this will also advance GetDesiredVersion next time.
@@ -635,14 +757,19 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// connection pooler needs one system user created, which is done in
-	// initUsers. Check if it needs to be called.
+	// check if users need to be synced
 	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
 		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
+	sameRotatedUsers := reflect.DeepEqual(oldSpec.Spec.UsersWithSecretRotation, newSpec.Spec.UsersWithSecretRotation) &&
+		reflect.DeepEqual(oldSpec.Spec.UsersWithInPlaceSecretRotation, newSpec.Spec.UsersWithInPlaceSecretRotation)
+
+	// connection pooler needs one system user created, which is done in
+	// initUsers. Check if it needs to be called.
 	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
 		needReplicaConnectionPoolerWorker(&newSpec.Spec)
-	if !sameUsers || needConnectionPooler {
-		c.logger.Debugf("syncing secrets")
+
+	if !sameUsers || !sameRotatedUsers || needConnectionPooler {
+		c.logger.Debugf("initialize users")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
 			updateFailed = true
@@ -688,9 +815,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			updateFailed = true
 			return
 		}
-		if syncStatetfulSet || !reflect.DeepEqual(oldSs, newSs) || !reflect.DeepEqual(oldSpec.Annotations, newSpec.Annotations) {
+		if syncStatefulSet || !reflect.DeepEqual(oldSs, newSs) || !reflect.DeepEqual(oldSpec.Annotations, newSpec.Annotations) {
 			c.logger.Debugf("syncing statefulsets")
-			syncStatetfulSet = false
+			syncStatefulSet = false
 			// TODO: avoid generating the StatefulSet object twice by passing it to syncStatefulSet
 			if err := c.syncStatefulSet(); err != nil {
 				c.logger.Errorf("could not sync statefulsets: %v", err)
@@ -780,6 +907,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		updateFailed = true
 	}
 
+	if len(c.Spec.Streams) > 0 {
+		if err := c.syncStreams(); err != nil {
+			c.logger.Errorf("could not sync streams: %v", err)
+			updateFailed = true
+		}
+	}
+
 	if !updateFailed {
 		// Major version upgrade must only fire after success of earlier operations and should stay last
 		if err := c.majorVersionUpgrade(); err != nil {
@@ -814,6 +948,10 @@ func (c *Cluster) Delete() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of new cluster resources")
+
+	if err := c.deleteStreams(); err != nil {
+		c.logger.Warningf("could not delete event streams: %v", err)
+	}
 
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created
@@ -916,22 +1054,25 @@ func (c *Cluster) initSystemUsers() {
 	// secrets, therefore, setting flags like SUPERUSER or REPLICATION
 	// is not necessary here
 	c.systemUsers[constants.SuperuserKeyName] = spec.PgUser{
-		Origin:   spec.RoleOriginSystem,
-		Name:     c.OpConfig.SuperUsername,
-		Password: util.RandomPassword(constants.PasswordLength),
+		Origin:    spec.RoleOriginSystem,
+		Name:      c.OpConfig.SuperUsername,
+		Namespace: c.Namespace,
+		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 	c.systemUsers[constants.ReplicationUserKeyName] = spec.PgUser{
-		Origin:   spec.RoleOriginSystem,
-		Name:     c.OpConfig.ReplicationUsername,
-		Password: util.RandomPassword(constants.PasswordLength),
+		Origin:    spec.RoleOriginSystem,
+		Name:      c.OpConfig.ReplicationUsername,
+		Namespace: c.Namespace,
+		Flags:     []string{constants.RoleFlagLogin},
+		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 
 	// Connection pooler user is an exception, if requested it's going to be
 	// created by operator as a normal pgUser
 	if needConnectionPooler(&c.Spec) {
-		// initialize empty connection pooler if not done yet
-		if c.Spec.ConnectionPooler == nil {
-			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
+		connectionPoolerSpec := c.Spec.ConnectionPooler
+		if connectionPoolerSpec == nil {
+			connectionPoolerSpec = &acidv1.ConnectionPooler{}
 		}
 
 		// Using superuser as pooler user is not a good idea. First of all it's
@@ -939,22 +1080,23 @@ func (c *Cluster) initSystemUsers() {
 		// and second it's a bad practice.
 		username := c.OpConfig.ConnectionPooler.User
 
-		isSuperUser := c.Spec.ConnectionPooler.User == c.OpConfig.SuperUsername
+		isSuperUser := connectionPoolerSpec.User == c.OpConfig.SuperUsername
 		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
-			c.Spec.ConnectionPooler.User, "connection pool role")
+			connectionPoolerSpec.User, "connection pool role")
 
 		if !isSuperUser && !isProtectedUser {
 			username = util.Coalesce(
-				c.Spec.ConnectionPooler.User,
+				connectionPoolerSpec.User,
 				c.OpConfig.ConnectionPooler.User)
 		}
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{
-			Origin:   spec.RoleConnectionPooler,
-			Name:     username,
-			Flags:    []string{constants.RoleFlagLogin},
-			Password: util.RandomPassword(constants.PasswordLength),
+			Origin:    spec.RoleConnectionPooler,
+			Name:      username,
+			Namespace: c.Namespace,
+			Flags:     []string{constants.RoleFlagLogin},
+			Password:  util.RandomPassword(constants.PasswordLength),
 		}
 
 		if _, exists := c.pgUsers[username]; !exists {
@@ -963,6 +1105,23 @@ func (c *Cluster) initSystemUsers() {
 
 		if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; !exists {
 			c.systemUsers[constants.ConnectionPoolerUserKeyName] = connectionPoolerUser
+		}
+	}
+
+	// replication users for event streams are another exception
+	// the operator will create one replication user for all streams
+	if len(c.Spec.Streams) > 0 {
+		username := constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
+		streamUser := spec.PgUser{
+			Origin:    spec.RoleConnectionPooler,
+			Name:      username,
+			Namespace: c.Namespace,
+			Flags:     []string{constants.RoleFlagLogin, constants.RoleFlagReplication},
+			Password:  util.RandomPassword(constants.PasswordLength),
+		}
+
+		if _, exists := c.pgUsers[username]; !exists {
+			c.pgUsers[username] = streamUser
 		}
 	}
 }
@@ -999,11 +1158,11 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		}
 
 		// default roles per database
-		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath.String()); err != nil {
+		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath.String(), preparedDB.SecretNamespace); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 		}
 		if preparedDB.DefaultUsers {
-			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath.String()); err != nil {
+			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath.String(), preparedDB.SecretNamespace); err != nil {
 				return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 			}
 		}
@@ -1014,14 +1173,14 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 				if err := c.initDefaultRoles(defaultRoles,
 					preparedDbName+constants.OwnerRoleNameSuffix,
 					preparedDbName+"_"+preparedSchemaName,
-					constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
+					constants.DefaultSearchPath+", "+preparedSchemaName, preparedDB.SecretNamespace); err != nil {
 					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
 				}
 				if preparedSchema.DefaultUsers {
 					if err := c.initDefaultRoles(defaultUsers,
 						preparedDbName+constants.OwnerRoleNameSuffix,
 						preparedDbName+"_"+preparedSchemaName,
-						constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
+						constants.DefaultSearchPath+", "+preparedSchemaName, preparedDB.SecretNamespace); err != nil {
 						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
 					}
 				}
@@ -1031,10 +1190,18 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 	return nil
 }
 
-func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string, searchPath string) error {
+func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix, searchPath, secretNamespace string) error {
 
 	for defaultRole, inherits := range defaultRoles {
-
+		namespace := c.Namespace
+		//if namespaced secrets are allowed
+		if secretNamespace != "" {
+			if c.Config.OpConfig.EnableCrossNamespaceSecret {
+				namespace = secretNamespace
+			} else {
+				c.logger.Warn("secretNamespace ignored because enable_cross_namespace_secret set to false. Creating secrets in cluster namespace.")
+			}
+		}
 		roleName := prefix + defaultRole
 
 		flags := []string{constants.RoleFlagNoLogin}
@@ -1048,8 +1215,10 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		}
 
 		adminRole := ""
+		isOwner := false
 		if strings.Contains(defaultRole, constants.OwnerRoleNameSuffix) {
 			adminRole = admin
+			isOwner = true
 		} else {
 			adminRole = prefix + constants.OwnerRoleNameSuffix
 		}
@@ -1057,11 +1226,13 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		newRole := spec.PgUser{
 			Origin:     spec.RoleOriginBootstrap,
 			Name:       roleName,
+			Namespace:  namespace,
 			Password:   util.RandomPassword(constants.PasswordLength),
 			Flags:      flags,
 			MemberOf:   memberOf,
 			Parameters: map[string]string{"search_path": searchPath},
 			AdminRole:  adminRole,
+			IsDbOwner:  isOwner,
 		}
 		if currentRole, present := c.pgUsers[roleName]; present {
 			c.pgUsers[roleName] = c.resolveNameConflict(&currentRole, &newRole)
@@ -1081,6 +1252,25 @@ func (c *Cluster) initRobotUsers() error {
 		if c.shouldAvoidProtectedOrSystemRole(username, "manifest robot role") {
 			continue
 		}
+		namespace := c.Namespace
+
+		// check if role is specified as database owner
+		isOwner := false
+		for _, owner := range c.Spec.Databases {
+			if username == owner {
+				isOwner = true
+			}
+		}
+
+		//if namespaced secrets are allowed
+		if c.Config.OpConfig.EnableCrossNamespaceSecret {
+			if strings.Contains(username, ".") {
+				splits := strings.Split(username, ".")
+				namespace = splits[0]
+				c.logger.Warningf("enable_cross_namespace_secret is set. Database role name contains the respective namespace i.e. %s is the created user", username)
+			}
+		}
+
 		flags, err := normalizeUserFlags(userFlags)
 		if err != nil {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
@@ -1092,9 +1282,11 @@ func (c *Cluster) initRobotUsers() error {
 		newRole := spec.PgUser{
 			Origin:    spec.RoleOriginManifest,
 			Name:      username,
+			Namespace: namespace,
 			Password:  util.RandomPassword(constants.PasswordLength),
 			Flags:     flags,
 			AdminRole: adminRole,
+			IsDbOwner: isOwner,
 		}
 		if currentRole, present := c.pgUsers[username]; present {
 			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
@@ -1163,7 +1355,7 @@ func (c *Cluster) initHumanUsers() error {
 	for _, superuserTeam := range superuserTeams {
 		err := c.initTeamMembers(superuserTeam, true)
 		if err != nil {
-			return fmt.Errorf("Cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
+			return fmt.Errorf("cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
 		}
 		if superuserTeam == c.Spec.TeamID {
 			clusterIsOwnedBySuperuserTeam = true
@@ -1176,7 +1368,7 @@ func (c *Cluster) initHumanUsers() error {
 			if !(util.SliceContains(superuserTeams, additionalTeam)) {
 				err := c.initTeamMembers(additionalTeam, false)
 				if err != nil {
-					return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+					return fmt.Errorf("cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
 				}
 			}
 		}
@@ -1189,7 +1381,7 @@ func (c *Cluster) initHumanUsers() error {
 
 	err := c.initTeamMembers(c.Spec.TeamID, false)
 	if err != nil {
-		return fmt.Errorf("Cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
+		return fmt.Errorf("cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
 	}
 
 	return nil
@@ -1209,6 +1401,7 @@ func (c *Cluster) initInfrastructureRoles() error {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
 		}
 		newRole.Flags = flags
+		newRole.Namespace = c.Namespace
 
 		if currentRole, present := c.pgUsers[username]; present {
 			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)

@@ -32,7 +32,7 @@ func (c *Cluster) listResources() error {
 	}
 
 	for _, obj := range c.Secrets {
-		c.logger.Infof("found secret: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("found secret: %q (uid: %q) namesapce: %s", util.NameFromMeta(obj.ObjectMeta), obj.UID, obj.ObjectMeta.Namespace)
 	}
 
 	for role, endpoint := range c.Endpoints {
@@ -147,25 +147,6 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 	return nil
 }
 
-func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
-	c.logger.Debugf("patching statefulset annotations")
-	patchData, err := metaAnnotationsPatch(annotations)
-	if err != nil {
-		return nil, fmt.Errorf("could not form patch for the statefulset metadata: %v", err)
-	}
-	result, err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
-		context.TODO(),
-		c.Statefulset.Name,
-		types.MergePatchType,
-		[]byte(patchData),
-		metav1.PatchOptions{},
-		"")
-	if err != nil {
-		return nil, fmt.Errorf("could not patch statefulset annotations %q: %v", patchData, err)
-	}
-	return result, nil
-}
-
 func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
@@ -195,13 +176,6 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 		"")
 	if err != nil {
 		return fmt.Errorf("could not patch statefulset spec %q: %v", statefulSetName, err)
-	}
-
-	if newStatefulSet.Annotations != nil {
-		statefulSet, err = c.updateStatefulSetAnnotations(newStatefulSet.Annotations)
-		if err != nil {
-			return err
-		}
 	}
 
 	c.Statefulset = statefulSet
@@ -522,18 +496,17 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 
 func (c *Cluster) deleteSecrets() error {
 	c.setProcessName("deleting secrets")
-	var errors []string
-	errorCount := 0
+	errors := make([]string, 0)
+
 	for uid, secret := range c.Secrets {
 		err := c.deleteSecret(uid, *secret)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("%v", err))
-			errorCount++
 		}
 	}
 
-	if errorCount > 0 {
-		return fmt.Errorf("could not delete all secrets: %v", errors)
+	if len(errors) > 0 {
+		return fmt.Errorf("could not delete all secrets: %v", strings.Join(errors, `', '`))
 	}
 
 	return nil

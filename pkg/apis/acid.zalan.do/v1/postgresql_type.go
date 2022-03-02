@@ -53,28 +53,32 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
-	NumberOfInstances      int32                       `json:"numberOfInstances"`
-	Users                  map[string]UserFlags        `json:"users,omitempty"`
-	MaintenanceWindows     []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                  *CloneDescription           `json:"clone,omitempty"`
-	ClusterName            string                      `json:"-"`
-	Databases              map[string]string           `json:"databases,omitempty"`
-	PreparedDatabases      map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
-	SchedulerName          *string                     `json:"schedulerName,omitempty"`
-	NodeAffinity           *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
-	Tolerations            []v1.Toleration             `json:"tolerations,omitempty"`
-	Sidecars               []Sidecar                   `json:"sidecars,omitempty"`
-	InitContainers         []v1.Container              `json:"initContainers,omitempty"`
+	Users                          map[string]UserFlags `json:"users,omitempty"`
+	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
+	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
+  
+	NumberOfInstances     int32                       `json:"numberOfInstances"`
+	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
+	Clone                 *CloneDescription           `json:"clone,omitempty"`
+	ClusterName           string                      `json:"-"`
+	Databases             map[string]string           `json:"databases,omitempty"`
+	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
+	SchedulerName         *string                     `json:"schedulerName,omitempty"`
+	NodeAffinity          *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
+	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
+	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
+	InitContainers        []v1.Container              `json:"initContainers,omitempty"`
 	ReadOnlyRootFilesystem *bool                       `json:"readOnlyRootFilesystem,omitempty"`
-	PodPriorityClassName   string                      `json:"podPriorityClassName,omitempty"`
-	ShmVolume              *bool                       `json:"enableShmVolume,omitempty"`
-	EnableLogicalBackup    bool                        `json:"enableLogicalBackup,omitempty"`
-	LogicalBackupSchedule  string                      `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster         *StandbyDescription         `json:"standby,omitempty"`
-	PodAnnotations         map[string]string           `json:"podAnnotations,omitempty"`
-	ServiceAnnotations     map[string]string           `json:"serviceAnnotations,omitempty"`
-	TLS                    *TLSDescription             `json:"tls,omitempty"`
-	AdditionalVolumes      []AdditionalVolume          `json:"additionalVolumes,omitempty"`
+	PodPriorityClassName  string                      `json:"podPriorityClassName,omitempty"`
+	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
+	StandbyCluster        *StandbyDescription         `json:"standby,omitempty"`
+	PodAnnotations        map[string]string           `json:"podAnnotations,omitempty"`
+	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
+	TLS                   *TLSDescription             `json:"tls,omitempty"`
+	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
+	Streams               []Stream                    `json:"streams,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -96,6 +100,7 @@ type PreparedDatabase struct {
 	PreparedSchemas map[string]PreparedSchema `json:"schemas,omitempty"`
 	DefaultUsers    bool                      `json:"defaultUsers,omitempty" defaults:"false"`
 	Extensions      map[string]string         `json:"extensions,omitempty"`
+	SecretNamespace string                    `json:"secretNamespace,omitempty"`
 }
 
 // PreparedSchema describes elements to be bootstrapped per schema
@@ -114,12 +119,13 @@ type MaintenanceWindow struct {
 
 // Volume describes a single volume in the manifest.
 type Volume struct {
-	Size         string `json:"size"`
-	StorageClass string `json:"storageClass,omitempty"`
-	SubPath      string `json:"subPath,omitempty"`
-	Iops         *int64 `json:"iops,omitempty"`
-	Throughput   *int64 `json:"throughput,omitempty"`
-	VolumeType   string `json:"type,omitempty"`
+	Selector     *metav1.LabelSelector `json:"selector,omitempty"`
+	Size         string                `json:"size"`
+	StorageClass string                `json:"storageClass,omitempty"`
+	SubPath      string                `json:"subPath,omitempty"`
+	Iops         *int64                `json:"iops,omitempty"`
+	Throughput   *int64                `json:"throughput,omitempty"`
+	VolumeType   string                `json:"type,omitempty"`
 }
 
 // AdditionalVolume specs additional optional volumes for statefulset
@@ -160,11 +166,13 @@ type Patroni struct {
 	Slots                 map[string]map[string]string `json:"slots,omitempty"`
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
+	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:1`
 }
 
 // StandbyDescription contains s3 wal path
 type StandbyDescription struct {
 	S3WalPath string `json:"s3_wal_path,omitempty"`
+	GSWalPath string `json:"gs_wal_path,omitempty"`
 }
 
 // TLSDescription specs TLS properties
@@ -224,4 +232,18 @@ type ConnectionPooler struct {
 	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
 
 	Resources `json:"resources,omitempty"`
+}
+
+type Stream struct {
+	ApplicationId string                 `json:"applicationId"`
+	Database      string                 `json:"database"`
+	Tables        map[string]StreamTable `json:"tables"`
+	Filter        map[string]string      `json:"filter,omitempty"`
+	BatchSize     uint32                 `json:"batchSize,omitempty"`
+}
+
+type StreamTable struct {
+	EventType     string `json:"eventType"`
+	IdColumn      string `json:"idColumn,omitempty" defaults:"id"`
+	PayloadColumn string `json:"payloadColumn,omitempty" defaults:"payload"`
 }

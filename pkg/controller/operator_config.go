@@ -33,13 +33,15 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result := &config.Config{}
 
 	// general config
+	result.EnableCRDRegistration = util.CoalesceBool(fromCRD.EnableCRDRegistration, util.True())
 	result.EnableCRDValidation = util.CoalesceBool(fromCRD.EnableCRDValidation, util.True())
+	result.CRDCategories = util.CoalesceStrArr(fromCRD.CRDCategories, []string{"all"})
 	result.EnableLazySpiloUpgrade = fromCRD.EnableLazySpiloUpgrade
 	result.EnablePgVersionEnvVar = fromCRD.EnablePgVersionEnvVar
 	result.EnableSpiloWalPathCompat = fromCRD.EnableSpiloWalPathCompat
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
-	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-13:2.0-p6")
+	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-14:2.1-p3")
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
@@ -53,11 +55,15 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// user config
 	result.SuperUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.SuperUsername, "postgres")
 	result.ReplicationUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.ReplicationUsername, "standby")
+	result.EnablePasswordRotation = fromCRD.PostgresUsersConfiguration.EnablePasswordRotation
+	result.PasswordRotationInterval = util.CoalesceUInt32(fromCRD.PostgresUsersConfiguration.PasswordRotationInterval, 90)
+	result.PasswordRotationUserRetention = util.CoalesceUInt32(fromCRD.PostgresUsersConfiguration.DeepCopy().PasswordRotationUserRetention, 180)
 
 	// major version upgrade config
 	result.MajorVersionUpgradeMode = util.Coalesce(fromCRD.MajorVersionUpgrade.MajorVersionUpgradeMode, "off")
-	result.MinimalMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.MinimalMajorVersion, "9.5")
-	result.TargetMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.TargetMajorVersion, "13")
+	result.MajorVersionUpgradeTeamAllowList = fromCRD.MajorVersionUpgrade.MajorVersionUpgradeTeamAllowList
+	result.MinimalMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.MinimalMajorVersion, "9.6")
+	result.TargetMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.TargetMajorVersion, "14")
 
 	// kubernetes config
 	result.CustomPodAnnotations = fromCRD.Kubernetes.CustomPodAnnotations
@@ -82,6 +88,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableSidecars = util.CoalesceBool(fromCRD.Kubernetes.EnableSidecars, util.True())
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
+	result.EnableCrossNamespaceSecret = fromCRD.Kubernetes.EnableCrossNamespaceSecret
 
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
 	if fromCRD.Kubernetes.InfrastructureRolesDefs != nil {
@@ -107,11 +114,13 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.DeleteAnnotationDateKey = fromCRD.Kubernetes.DeleteAnnotationDateKey
 	result.DeleteAnnotationNameKey = fromCRD.Kubernetes.DeleteAnnotationNameKey
 	result.NodeReadinessLabel = fromCRD.Kubernetes.NodeReadinessLabel
+	result.NodeReadinessLabelMerge = fromCRD.Kubernetes.NodeReadinessLabelMerge
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
 	result.PodManagementPolicy = util.Coalesce(fromCRD.Kubernetes.PodManagementPolicy, "ordered_ready")
 	result.MasterPodMoveTimeout = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout), "10m")
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity
 	result.PodAntiAffinityTopologyKey = util.Coalesce(fromCRD.Kubernetes.PodAntiAffinityTopologyKey, "kubernetes.io/hostname")
+	result.PodToleration = fromCRD.Kubernetes.PodToleration
 
 	result.ReadOnlyRootFilesystem = fromCRD.ReadOnlyRootFilesystem
 
@@ -147,6 +156,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.KubeIAMRole = fromCRD.AWSGCP.KubeIAMRole
 	result.WALGSBucket = fromCRD.AWSGCP.WALGSBucket
 	result.GCPCredentials = fromCRD.AWSGCP.GCPCredentials
+	result.WALAZStorageAccount = fromCRD.AWSGCP.WALAZStorageAccount
 	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
 	result.AdditionalSecretMountPath = util.Coalesce(fromCRD.AWSGCP.AdditionalSecretMountPath, "/meta/credentials")
 	result.EnableEBSGp3Migration = fromCRD.AWSGCP.EnableEBSGp3Migration
@@ -154,7 +164,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.6.2")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.7.1")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
 	result.LogicalBackupS3Region = fromCRD.LogicalBackup.S3Region
@@ -162,6 +172,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupS3AccessKeyID = fromCRD.LogicalBackup.S3AccessKeyID
 	result.LogicalBackupS3SecretAccessKey = fromCRD.LogicalBackup.S3SecretAccessKey
 	result.LogicalBackupS3SSE = fromCRD.LogicalBackup.S3SSE
+	result.LogicalBackupS3RetentionTime = fromCRD.LogicalBackup.RetentionTime
 	result.LogicalBackupGoogleApplicationCredentials = fromCRD.LogicalBackup.GoogleApplicationCredentials
 	result.LogicalBackupJobPrefix = util.Coalesce(fromCRD.LogicalBackup.JobPrefix, "logical-backup-")
 
@@ -182,6 +193,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PostgresSuperuserTeams = fromCRD.TeamsAPI.PostgresSuperuserTeams
 	result.EnablePostgresTeamCRD = fromCRD.TeamsAPI.EnablePostgresTeamCRD
 	result.EnablePostgresTeamCRDSuperusers = fromCRD.TeamsAPI.EnablePostgresTeamCRDSuperusers
+	result.EnableTeamMemberDeprecation = fromCRD.TeamsAPI.EnableTeamMemberDeprecation
+	result.RoleDeletionSuffix = util.Coalesce(fromCRD.TeamsAPI.RoleDeletionSuffix, "_deleted")
 
 	// logging REST API config
 	result.APIPort = util.CoalesceInt(fromCRD.LoggingRESTAPI.APIPort, 8080)

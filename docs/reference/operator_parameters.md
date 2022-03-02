@@ -10,12 +10,12 @@ configuration.
   maps. String values containing ':' should be enclosed in quotes. The
   configuration is flat, parameter group names below are not reflected in the
   configuration structure. There is an
-  [example](../../manifests/configmap.yaml)
+  [example](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
 
 * CRD-based configuration. The configuration is stored in a custom YAML
   manifest. The manifest is an instance of the custom resource definition (CRD)
   called `OperatorConfiguration`. The operator registers this CRD during the
-  start and uses it for configuration if the [operator deployment manifest](../../manifests/postgres-operator.yaml#L36)
+  start and uses it for configuration if the [operator deployment manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
   sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty
   value. The variable should point to the `postgresql-operator-configuration`
   object in the operator's namespace.
@@ -24,7 +24,7 @@ configuration.
   simply represented in the usual YAML way. There are no default values built-in
   in the operator, each parameter that is not supplied in the configuration
   receives an empty value. In order to create your own configuration just copy
-  the [default one](../../manifests/postgresql-operator-default-configuration.yaml)
+  the [default one](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
   and change it.
 
   To test the CRD-based configuration locally, use the following
@@ -57,11 +57,11 @@ parameters, those parameters have no effect and are replaced by the
 `CRD_READY_WAIT_INTERVAL` and `CRD_READY_WAIT_TIMEOUT` environment variables.
 They will be deprecated and removed in the future.
 
-For the configmap configuration, the [default parameter values](../../pkg/util/config/config.go#L14)
+For the configmap configuration, the [default parameter values](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go#L14)
 mentioned here are likely to be overwritten in your local operator installation
 via your local version of the operator configmap. In the case you use the
 operator CRD, all the CRD defaults are provided in the
-[operator's default configuration manifest](../../manifests/postgresql-operator-default-configuration.yaml)
+[operator's default configuration manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
 
 Variable names are underscore-separated words.
 
@@ -70,10 +70,17 @@ Variable names are underscore-separated words.
 
 Those are top-level keys, containing both leaf keys and groups.
 
-* **enable_crd_validation**
-  toggles if the operator will create or update CRDs with
-  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
+* **enable_crd_registration**
+  Instruct the operator to create/update the CRDs. If disabled the operator will rely on the CRDs being managed separately.
   The default is `true`.
+
+* **enable_crd_validation**
+  *deprecated*: toggles if the operator will create or update CRDs with
+  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
+  The default is `true`. `false` will be ignored, since `apiextensions.io/v1` requires a structural schema definition.
+
+* **crd_categories**
+  The operator will register CRDs in the `all` category by default so that they will be returned by a `kubectl get all` call. You are free to change categories or leave them empty.
 
 * **enable_lazy_spilo_upgrade**
   Instruct operator to update only the statefulsets with new images (Spilo and InitContainers) without immediately doing the rolling update. The assumption is pods will be re-started later with new images, for example due to the node rotation.
@@ -83,7 +90,7 @@ Those are top-level keys, containing both leaf keys and groups.
   With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `true`.
 
 * **enable_spilo_wal_path_compat**
-  enables backwards compatible path between Spilo 12 and Spilo 13 images. The default is `false`.
+  enables backwards compatible path between Spilo 12 and Spilo 13+ images. The default is `false`.
 
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
@@ -154,7 +161,7 @@ Those are top-level keys, containing both leaf keys and groups.
   cluster nodes. This affects all containers created by the operator (Postgres,
   Scalyr sidecar, and other sidecars except **sidecars** defined in the operator
   configuration); to set resources for the operator's own container, change the
-  [operator deployment manually](../../manifests/postgres-operator.yaml#L20).
+  [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
 * **read_only_root_filesystem**
@@ -174,13 +181,35 @@ under the `users` key.
   Postgres username used for replication between instances. The default is
   `standby`.
 
+* **enable_password_rotation**
+  For all `LOGIN` roles that are not database owners the operator can rotate
+  credentials in the corresponding K8s secrets by replacing the username and
+  password. This means, new users will be added on each rotation inheriting
+  all priviliges from the original roles. The rotation date (in YYMMDD format)
+  is appended to the names of the new user. The timestamp of the next rotation
+  is written to the secret. The default is `false`.
+
+* **password_rotation_interval**
+  If password rotation is enabled (either from config or cluster manifest) the
+  interval can be configured with this parameter. The measure is in days which
+  means daily rotation (`1`) is the most frequent interval possible.
+  Default is `90`.
+
+* **password_rotation_user_retention**
+  To avoid an ever growing amount of new users due to password rotation the
+  operator will remove the created users again after a certain amount of days
+  has passed. The number can be configured with this parameter. However, the
+  operator will check that the retention policy is at least twice as long as
+  the rotation interval and update to this minimum in case it is not.
+  Default is `180`.
+
 ## Major version upgrades
 
-Parameters configuring automatic major version upgrades. In a 
+Parameters configuring automatic major version upgrades. In a
 CRD-configuration, they are grouped under the `major_version_upgrade` key.
 
 * **major_version_upgrade_mode**
-  Postgres Operator supports [in-place major version upgrade](../administrator.md#in-place-major-version-upgrade) 
+  Postgres Operator supports [in-place major version upgrade](../administrator.md#in-place-major-version-upgrade)
   with three different modes:
   `"off"` = no upgrade by the operator,
   `"manual"` = manifest triggers action,
@@ -188,14 +217,18 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
   Note, that with all three modes increasing the version in the manifest will
   trigger a rolling update of the pods. The default is `"off"`.
 
+* **major_version_upgrade_team_allow_list**
+  Upgrades will only be carried out for clusters of listed teams when mode is
+  set to "off". The default is empty.
+
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
-  when `major_version_upgrade_mode` is set to `"full"`. The default is `"9.5"`.
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"9.6"`.
 
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
   which violate the configured allowed `minimal_major_version` when
-  `major_version_upgrade_mode` is set to `"full"`. The default is `"13"`.
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"14"`.
 
 ## Kubernetes resources
 
@@ -221,7 +254,7 @@ configuration they are grouped under the `kubernetes` key.
   sufficient for the pods to start and for Patroni to access K8s endpoints;
   service account on its own lacks any such rights starting with K8s v1.8. If
   not explicitly defined by the user, a simple definition that binds the
-  account to the 'postgres-pod' [cluster role](../../manifests/operator-service-account-rbac.yaml#L198)
+  account to the 'postgres-pod' [cluster role](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml#L198)
   will be used. The default is empty.
 
 * **pod_terminate_grace_period**
@@ -268,6 +301,11 @@ configuration they are grouped under the `kubernetes` key.
   [admin docs](../administrator.md#pod-disruption-budget) for more information.
   Default is true.
 
+* **enable_cross_namespace_secret**
+  To allow secrets in a different namespace other than the Postgres cluster
+  namespace. Once enabled, specify the namespace in the user name under the
+  `users` section in the form `{namespace}.{username}`. The default is `false`.
+
 * **enable_init_containers**
   global option to allow for creating init containers in the cluster manifest to
   run actions before Spilo is started. Default is true.
@@ -279,11 +317,13 @@ configuration they are grouped under the `kubernetes` key.
 
 * **secret_name_template**
   a template for the name of the database user secrets generated by the
-  operator. `{username}` is replaced with name of the secret, `{cluster}` with
-  the name of the cluster, `{tprkind}` with the kind of CRD (formerly known as
-  TPR) and `{tprgroup}` with the group of the CRD. No other placeholders are
-  allowed. The default is
-  `{username}.{cluster}.credentials.{tprkind}.{tprgroup}`.
+  operator. `{namespace}` is replaced with name of the namespace if
+  `enable_cross_namespace_secret` is set, otherwise the
+  secret is in cluster's namespace. `{username}` is replaced with name of the
+  secret, `{cluster}` with the name of the cluster, `{tprkind}` with the kind
+  of CRD (formerly known as TPR) and `{tprgroup}` with the group of the CRD.
+  No other placeholders are allowed. The default is
+  `{namespace}.{username}.{cluster}.credentials.{tprkind}.{tprgroup}`.
 
 * **cluster_domain**
   defines the default DNS domain for the kubernetes cluster the operator is
@@ -333,11 +373,16 @@ configuration they are grouped under the `kubernetes` key.
 
 * **node_readiness_label**
   a set of labels that a running and active node should possess to be
-  considered `ready`. The operator uses values of those labels to detect the
-  start of the Kubernetes cluster upgrade procedure and move master pods off
-  the nodes to be decommissioned. When the set is not empty, the operator also
-  assigns the `Affinity` clause to the Postgres pods to be scheduled only on
-  `ready` nodes. The default is empty.
+  considered `ready`. When the set is not empty, the operator assigns the
+  `nodeAffinity` clause to the Postgres pods to be scheduled only on `ready`
+  nodes. The default is empty.
+
+* **node_readiness_label_merge**
+  If a `nodeAffinity` is also specified in the postgres cluster manifest
+  it will get merged with the `node_readiness_label` affinity on the pods.
+  The merge strategy can be configured - it can either be "AND" or "OR".
+  See [user docs](../user.md#use-taints-tolerations-and-node-affinity-for-dedicated-postgresql-nodes)
+  for more details. Default is "OR".
 
 * **toleration**
   a dictionary that should contain `key`, `operator`, `value` and
@@ -559,6 +604,12 @@ yet officially supported.
   [service accounts](https://cloud.google.com/kubernetes-engine/docs/tutorials/authenticating-to-cloud-platform).
   The default is empty
 
+* **wal_az_storage_account**
+  Azure Storage Account to use for shipping WAL segments with WAL-G. The
+  storage account must exist and be accessible by Postgres pods. Note, only the
+  name of the storage account is required.
+  The default is empty.
+
 * **log_s3_bucket**
   S3 bucket to use for shipping Postgres daily logs. Works only with S3 on AWS.
   The bucket has to be present and accessible by Postgres pods. The default is
@@ -598,11 +649,11 @@ Postgres logical backups. In the CRD-based configuration those parameters are
 grouped under the `logical_backup` key.
 
 * **logical_backup_docker_image**
-  An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
+  An image for pods of the logical backup job. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile)
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.7.1"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -633,6 +684,11 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_sse**
   Specify server side encryption that S3 storage is using. If empty string
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
+
+* **logical_backup_s3_retention_time**
+  Specify a retention time for logical backups stored in S3. Backups older than the specified retention 
+  time will be deleted after a new backup was uploaded. If empty, all backups will be kept. Example values are
+  "3 days", "2 weeks", or "1 month". The default is empty.
 
 * **logical_backup_schedule**
   Backup schedule in the cron format. Please take the
@@ -712,6 +768,19 @@ key.
   List of teams which members need the superuser role in each PG database
   cluster to administer Postgres and maintain infrastructure built around it.
   The default is empty.
+
+* **role_deletion_suffix**
+  defines a suffix that - when `enable_team_member_deprecation` is set to
+  `true` - will be appended to database role names of team members that were
+  removed from either the team in the Teams API or a `PostgresTeam` custom
+  resource (additionalMembers). When re-added, the operator will rename roles
+  with the defined suffix back to the original role name.
+  The default is `_deleted`.
+
+* **enable_team_member_deprecation**
+  if `true` database roles of former team members will be renamed by appending
+  the configured `role_deletion_suffix` and `LOGIN` privilege will be revoked.
+  The default is `false`.
 
 * **enable_postgres_team_crd**
   toggle to make the operator watch for created or updated `PostgresTeam` CRDs
