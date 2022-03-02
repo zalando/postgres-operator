@@ -23,6 +23,7 @@ data:
   # connection_pooler_schema: "pooler"
   # connection_pooler_user: "pooler"
   crd_categories: "all"
+  # cron_admin_username: "cron_admin"
   # custom_service_annotations: "keyx:valuez,keya:valuea"
   # custom_pod_annotations: "keya:valuea,keyb:valueb"
   db_hosted_zone: db.example.com
@@ -109,7 +110,7 @@ data:
   # pod_service_account_role_binding_definition: ""
   pod_terminate_grace_period: 5m
   # postgres_superuser_teams: "postgres_superusers"
-  # protected_role_names: "admin"
+  # protected_role_names: "admin,cron_admin"
   ready_wait_interval: 3s
   ready_wait_timeout: 30s
   repair_period: 5m

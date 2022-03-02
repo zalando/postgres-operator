@@ -177,6 +177,13 @@ under the `users` key.
   Postgres username used for replication between instances. The default is
   `standby`.
 
+* **cron_admin_username**
+  Specifies the role that owns rights to set up cron jobs with `pg_cron`
+  extension inside the `postgres` database. The must be pre-configured in the
+  docker image. In Spilo this role is called `cron_admin`. This role will
+  become a member of all database owners so that they can set up cron jobs
+  e.g. as part of a migration script. Default is `empty`.
+
 * **enable_password_rotation**
   For all `LOGIN` roles that are not database owners the operator can rotate
   credentials in the corresponding K8s secrets by replacing the username and

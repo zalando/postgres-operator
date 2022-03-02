@@ -39,6 +39,7 @@ type OperatorConfigurationList struct {
 type PostgresUsersConfiguration struct {
 	SuperUsername                 string `json:"super_username,omitempty"`
 	ReplicationUsername           string `json:"replication_username,omitempty"`
+	CronAdminUsername             string `json:"cron_admin_username,omitempty"`
 	EnablePasswordRotation        bool   `json:"enable_password_rotation,omitempty"`
 	PasswordRotationInterval      uint32 `json:"password_rotation_interval,omitempty"`
 	PasswordRotationUserRetention uint32 `json:"password_rotation_user_retention,omitempty"`

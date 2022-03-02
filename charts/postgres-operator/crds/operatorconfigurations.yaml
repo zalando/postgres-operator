@@ -130,6 +130,8 @@ spec:
               users:
                 type: object
                 properties:
+                  cron_admin_username:
+                     type: string
                   enable_password_rotation:
                     type: boolean
                     default: false

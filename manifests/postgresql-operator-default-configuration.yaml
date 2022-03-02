@@ -31,6 +31,7 @@ configuration:
     password_rotation_user_retention: 180
     replication_username: standby
     super_username: postgres
+    # cron_admin_username: cron_admin
   major_version_upgrade:
     major_version_upgrade_mode: "off"
     # major_version_upgrade_team_allow_list:
@@ -163,6 +164,7 @@ configuration:
     # - postgres_superusers
     protected_role_names:
     - admin
+    - cron_admin
     role_deletion_suffix: "_deleted"
     team_admin_role: admin
     team_api_role_configuration:
