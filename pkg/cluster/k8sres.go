@@ -107,7 +107,7 @@ func (c *Cluster) servicePort(role PostgresRole) int32 {
 	}
 
 	c.logger.Warningf("No service for role %s - defaulting to port 5432", role)
-	return 5432
+	return pgPort
 }
 
 func (c *Cluster) podDisruptionBudgetName() string {
