@@ -119,7 +119,9 @@ configuration:
     #   keyy: valuey
     # db_hosted_zone: ""
     enable_master_load_balancer: false
+    enable_master_pooler_load_balancer: false
     enable_replica_load_balancer: false
+    enable_replica_pooler_load_balancer: false
     external_traffic_policy: "Cluster"
     master_dns_name_format: "{cluster}.{team}.{hostedzone}"
     replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"

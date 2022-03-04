@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -1482,6 +1483,188 @@ func TestGenerateService(t *testing.T) {
 	service = cluster.generateService(Master, &spec)
 	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
 
+}
+
+func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	clientSet := fake.NewSimpleClientset()
+
+	return k8sutil.KubernetesClient{
+		DeploymentsGetter: clientSet.AppsV1(),
+		ServicesGetter:    clientSet.CoreV1(),
+	}, clientSet
+}
+
+func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPolicy, clusterName string) []v1.ServiceSpec {
+	return []v1.ServiceSpec{
+		v1.ServiceSpec{
+			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
+			LoadBalancerSourceRanges: sourceRanges,
+			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			Type:                     serviceType,
+		},
+		v1.ServiceSpec{
+			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
+			LoadBalancerSourceRanges: sourceRanges,
+			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler"},
+			Type:                     serviceType,
+		},
+		v1.ServiceSpec{
+			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
+			LoadBalancerSourceRanges: sourceRanges,
+			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			Selector:                 map[string]string{"spilo-role": "replica", "application": "spilo", "cluster-name": clusterName},
+			Type:                     serviceType,
+		},
+		v1.ServiceSpec{
+			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
+			LoadBalancerSourceRanges: sourceRanges,
+			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler-repl"},
+			Type:                     serviceType,
+		},
+	}
+}
+
+func TestEnableLoadBalancers(t *testing.T) {
+	testName := "Test enabling LoadBalancers"
+	client, _ := newLBFakeClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	clusterNameLabel := "cluster-name"
+	roleLabel := "spilo-role"
+	roles := []PostgresRole{Master, Replica}
+	sourceRanges := []string{"192.186.1.2/22"}
+	extTrafficPolicy := "Cluster"
+
+	tests := []struct {
+		subTest          string
+		config           config.Config
+		pgSpec           acidv1.Postgresql
+		expectedServices []v1.ServiceSpec
+	}{
+		{
+			subTest: "LBs enabled in config, disabled in manifest",
+			config: config.Config{
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
+				},
+				EnableMasterLoadBalancer:        true,
+				EnableMasterPoolerLoadBalancer:  true,
+				EnableReplicaLoadBalancer:       true,
+				EnableReplicaPoolerLoadBalancer: true,
+				ExternalTrafficPolicy:           extTrafficPolicy,
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: clusterNameLabel,
+					PodRoleLabel:     roleLabel,
+				},
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					AllowedSourceRanges:             sourceRanges,
+					EnableConnectionPooler:          util.True(),
+					EnableReplicaConnectionPooler:   util.True(),
+					EnableMasterLoadBalancer:        util.False(),
+					EnableMasterPoolerLoadBalancer:  util.False(),
+					EnableReplicaLoadBalancer:       util.False(),
+					EnableReplicaPoolerLoadBalancer: util.False(),
+					NumberOfInstances:               1,
+					Resources: acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedServices: getServices(v1.ServiceTypeClusterIP, nil, "", clusterName),
+		},
+		{
+			subTest: "LBs enabled in manifest, disabled in config",
+			config: config.Config{
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
+				},
+				EnableMasterLoadBalancer:        false,
+				EnableMasterPoolerLoadBalancer:  false,
+				EnableReplicaLoadBalancer:       false,
+				EnableReplicaPoolerLoadBalancer: false,
+				ExternalTrafficPolicy:           extTrafficPolicy,
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: clusterNameLabel,
+					PodRoleLabel:     roleLabel,
+				},
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					AllowedSourceRanges:             sourceRanges,
+					EnableConnectionPooler:          util.True(),
+					EnableReplicaConnectionPooler:   util.True(),
+					EnableMasterLoadBalancer:        util.True(),
+					EnableMasterPoolerLoadBalancer:  util.True(),
+					EnableReplicaLoadBalancer:       util.True(),
+					EnableReplicaPoolerLoadBalancer: util.True(),
+					NumberOfInstances:               1,
+					Resources: acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedServices: getServices(v1.ServiceTypeLoadBalancer, sourceRanges, extTrafficPolicy, clusterName),
+		},
+	}
+
+	for _, tt := range tests {
+		var cluster = New(
+			Config{
+				OpConfig: tt.config,
+			}, client, tt.pgSpec, logger, eventRecorder)
+
+		cluster.Name = clusterName
+		cluster.Namespace = namespace
+		cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
+		generatedServices := make([]v1.ServiceSpec, 0)
+		for _, role := range roles {
+			cluster.syncService(role)
+			cluster.ConnectionPooler[role] = &ConnectionPoolerObjects{
+				Name:        cluster.connectionPoolerName(role),
+				ClusterName: cluster.ClusterName,
+				Namespace:   cluster.Namespace,
+				Role:        role,
+			}
+			cluster.syncConnectionPoolerWorker(&tt.pgSpec, &tt.pgSpec, role)
+			generatedServices = append(generatedServices, cluster.Services[role].Spec)
+			generatedServices = append(generatedServices, cluster.ConnectionPooler[role].Service.Spec)
+		}
+		if !reflect.DeepEqual(tt.expectedServices, generatedServices) {
+			t.Errorf("%s %s: expected %#v but got %#v", testName, tt.subTest, tt.expectedServices, generatedServices)
+		}
+	}
 }
 
 func TestGenerateCapabilities(t *testing.T) {

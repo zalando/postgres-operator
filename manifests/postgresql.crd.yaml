@@ -195,7 +195,11 @@ spec:
                 type: boolean
               enableMasterLoadBalancer:
                 type: boolean
+              enableMasterPoolerLoadBalancer:
+                type: boolean
               enableReplicaLoadBalancer:
+                type: boolean
+              enableReplicaPoolerLoadBalancer:
                 type: boolean
               enableShmVolume:
                 type: boolean

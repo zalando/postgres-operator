@@ -174,9 +174,11 @@ func (c *Cluster) syncService(role PostgresRole) error {
 		desiredSvc := c.generateService(role, &c.Spec)
 		if match, reason := k8sutil.SameService(svc, desiredSvc); !match {
 			c.logServiceChanges(role, svc, desiredSvc, false, reason)
-			if err = c.updateService(role, desiredSvc); err != nil {
+			updatedSvc, err := c.updateService(role, svc, desiredSvc)
+			if err != nil {
 				return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 			}
+			c.Services[role] = updatedSvc
 			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		}
 		return nil

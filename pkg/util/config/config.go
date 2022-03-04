@@ -190,7 +190,9 @@ type Config struct {
 	EnablePostgresTeamCRD                  bool              `name:"enable_postgres_team_crd" default:"false"`
 	EnablePostgresTeamCRDSuperusers        bool              `name:"enable_postgres_team_crd_superusers" default:"false"`
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
+	EnableMasterPoolerLoadBalancer         bool              `name:"enable_master_pooler_load_balancer" default:"false"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
+	EnableReplicaPoolerLoadBalancer        bool              `name:"enable_replica_pooler_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`

@@ -102,15 +102,15 @@ func (c *Cluster) serviceAddress(role PostgresRole) string {
 	return ""
 }
 
-func (c *Cluster) servicePort(role PostgresRole) string {
+func (c *Cluster) servicePort(role PostgresRole) int32 {
 	service, exist := c.Services[role]
 
 	if exist {
-		return fmt.Sprint(service.Spec.Ports[0].Port)
+		return service.Spec.Ports[0].Port
 	}
 
-	c.logger.Warningf("No service for role %s", role)
-	return ""
+	c.logger.Warningf("No service for role %s - defaulting to port 5432", role)
+	return pgPort
 }
 
 func (c *Cluster) podDisruptionBudgetName() string {
@@ -1699,23 +1699,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	}
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
-
-		// spec.AllowedSourceRanges evaluates to the empty slice of zero length
-		// when omitted or set to 'null'/empty sequence in the PG manifest
-		if len(spec.AllowedSourceRanges) > 0 {
-			serviceSpec.LoadBalancerSourceRanges = spec.AllowedSourceRanges
-		} else {
-			// safe default value: lock a load balancer only to the local address unless overridden explicitly
-			serviceSpec.LoadBalancerSourceRanges = []string{localHost}
-		}
-
-		c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
-		serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy)
-		serviceSpec.Type = v1.ServiceTypeLoadBalancer
-	} else if role == Replica {
-		// before PR #258, the replica service was only created if allocated a LB
-		// now we always create the service but warn if the LB is absent
-		c.logger.Debugf("No load balancer created for the replica service")
+		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
 	service := &v1.Service{
@@ -1729,6 +1713,21 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	}
 
 	return service
+}
+
+func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourceRanges []string) {
+	// spec.AllowedSourceRanges evaluates to the empty slice of zero length
+	// when omitted or set to 'null'/empty sequence in the PG manifest
+	if len(sourceRanges) > 0 {
+		serviceSpec.LoadBalancerSourceRanges = sourceRanges
+	} else {
+		// safe default value: lock a load balancer only to the local address unless overridden explicitly
+		serviceSpec.LoadBalancerSourceRanges = []string{localHost}
+	}
+
+	c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
+	serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy)
+	serviceSpec.Type = v1.ServiceTypeLoadBalancer
 }
 
 func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {

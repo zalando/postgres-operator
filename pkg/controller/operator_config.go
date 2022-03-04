@@ -10,6 +10,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,10 +23,6 @@ func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, con
 	}
 
 	return config, nil
-}
-
-func int32ToPointer(value int32) *int32 {
-	return &value
 }
 
 // importConfigurationFromCRD is a transitional function that converts CRD configuration to the one based on the configmap
@@ -141,7 +138,9 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// load balancer config
 	result.DbHostedZone = util.Coalesce(fromCRD.LoadBalancer.DbHostedZone, "db.example.com")
 	result.EnableMasterLoadBalancer = fromCRD.LoadBalancer.EnableMasterLoadBalancer
+	result.EnableMasterPoolerLoadBalancer = fromCRD.LoadBalancer.EnableMasterPoolerLoadBalancer
 	result.EnableReplicaLoadBalancer = fromCRD.LoadBalancer.EnableReplicaLoadBalancer
+	result.EnableReplicaPoolerLoadBalancer = fromCRD.LoadBalancer.EnableReplicaPoolerLoadBalancer
 	result.CustomServiceAnnotations = fromCRD.LoadBalancer.CustomServiceAnnotations
 	result.MasterDNSNameFormat = fromCRD.LoadBalancer.MasterDNSNameFormat
 	result.ReplicaDNSNameFormat = fromCRD.LoadBalancer.ReplicaDNSNameFormat
@@ -212,11 +211,11 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// so ensure default values here.
 	result.ConnectionPooler.NumberOfInstances = util.CoalesceInt32(
 		fromCRD.ConnectionPooler.NumberOfInstances,
-		int32ToPointer(2))
+		k8sutil.Int32ToPointer(2))
 
 	result.ConnectionPooler.NumberOfInstances = util.MaxInt32(
 		result.ConnectionPooler.NumberOfInstances,
-		int32ToPointer(2))
+		k8sutil.Int32ToPointer(2))
 
 	result.ConnectionPooler.Schema = util.Coalesce(
 		fromCRD.ConnectionPooler.Schema,
@@ -257,7 +256,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	result.ConnectionPooler.MaxDBConnections = util.CoalesceInt32(
 		fromCRD.ConnectionPooler.MaxDBConnections,
-		int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
+		k8sutil.Int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
 
 	return result
 }

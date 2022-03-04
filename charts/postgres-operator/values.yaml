@@ -228,8 +228,12 @@ configLoadBalancer:
 
   # toggles service type load balancer pointing to the master pod of the cluster
   enable_master_load_balancer: false
+  # toggles service type load balancer pointing to the master pooler pod of the cluster
+  enable_master_pooler_load_balancer: false
   # toggles service type load balancer pointing to the replica pod of the cluster
   enable_replica_load_balancer: false
+  # toggles service type load balancer pointing to the replica pooler pod of the cluster
+  enable_replica_pooler_load_balancer: false
   # define external traffic policy for the load balancer
   external_traffic_policy: "Cluster"
   # defines the DNS name string template for the master load balancer cluster

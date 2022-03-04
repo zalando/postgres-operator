@@ -27,10 +27,6 @@ func boolToPointer(value bool) *bool {
 	return &value
 }
 
-func int32ToPointer(value int32) *int32 {
-	return &value
-}
-
 func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
 	for _, role := range [2]PostgresRole{Master, Replica} {
 
@@ -294,7 +290,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:                    int32ToPointer(1),
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
 				},
 				PodManagementPolicy: "ordered_ready",
 				Resources: config.Resources{
@@ -401,7 +397,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:                    int32ToPointer(1),
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
 				},
 				PodManagementPolicy: "ordered_ready",
 				Resources: config.Resources{
@@ -639,7 +635,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 	for _, tt := range tests {
 		tt.cluster.OpConfig.ConnectionPooler.Image = tt.defaultImage
 		tt.cluster.OpConfig.ConnectionPooler.NumberOfInstances =
-			int32ToPointer(tt.defaultInstances)
+			k8sutil.Int32ToPointer(tt.defaultInstances)
 
 		t.Logf("running test for %s [%s]", testName, tt.subTest)
 
@@ -664,7 +660,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 				ConnectionPooler: config.ConnectionPooler{
-					MaxDBConnections:                     int32ToPointer(60),
+					MaxDBConnections:                     k8sutil.Int32ToPointer(60),
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
