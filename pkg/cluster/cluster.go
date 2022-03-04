@@ -1300,7 +1300,7 @@ func (c *Cluster) initRobotUsers() error {
 }
 
 func (c *Cluster) initAdditionalOwnerRoles() {
-	for _, additionalOwner := range c.OpConfig.AddtionalOwnerRoles {
+	for _, additionalOwner := range c.OpConfig.AdditionalOwnerRoles {
 		// fetch all database owners the additional should become a member of
 		memberOf := make([]string, 0)
 		for username, pgUser := range c.pgUsers {

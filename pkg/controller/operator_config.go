@@ -55,7 +55,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// user config
 	result.SuperUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.SuperUsername, "postgres")
 	result.ReplicationUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.ReplicationUsername, "standby")
-	result.CronAdminUsername = fromCRD.PostgresUsersConfiguration.CronAdminUsername
+	result.AdditionalOwnerRoles = fromCRD.PostgresUsersConfiguration.AdditionalOwnerRoles
 	result.EnablePasswordRotation = fromCRD.PostgresUsersConfiguration.EnablePasswordRotation
 	result.PasswordRotationInterval = util.CoalesceUInt32(fromCRD.PostgresUsersConfiguration.PasswordRotationInterval, 90)
 	result.PasswordRotationUserRetention = util.CoalesceUInt32(fromCRD.PostgresUsersConfiguration.DeepCopy().PasswordRotationUserRetention, 180)
