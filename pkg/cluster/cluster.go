@@ -228,7 +228,7 @@ func (c *Cluster) initUsers() error {
 		return fmt.Errorf("could not init human users: %v", err)
 	}
 
-	c.initCronAdmin()
+	c.initAdditionalOwnerRoles()
 
 	return nil
 }
@@ -1299,36 +1299,29 @@ func (c *Cluster) initRobotUsers() error {
 	return nil
 }
 
-func (c *Cluster) initCronAdmin() {
-	cronAdminName := c.OpConfig.CronAdminUsername
-	if cronAdminName == "" {
-		return
-	}
-	memberOf := make([]string, 0)
-	for username, pgUser := range c.pgUsers {
-		if pgUser.IsDbOwner {
-			memberOf = append(memberOf, username)
+func (c *Cluster) initAdditionalOwnerRoles() {
+	for _, additionalOwner := range c.OpConfig.AddtionalOwnerRoles {
+		// fetch all database owners the additional should become a member of
+		memberOf := make([]string, 0)
+		for username, pgUser := range c.pgUsers {
+			if pgUser.IsDbOwner {
+				memberOf = append(memberOf, username)
+			}
 		}
-	}
 
-	if len(memberOf) > 1 {
-		namespace := c.Namespace
-		adminRole := ""
-		if c.OpConfig.EnableAdminRoleForUsers && cronAdminName != c.OpConfig.TeamAdminRole {
-			adminRole = c.OpConfig.TeamAdminRole
-		}
-		cronAdmin := spec.PgUser{
-			Origin:    spec.RoleOriginSpilo,
-			MemberOf:  memberOf,
-			Name:      cronAdminName,
-			Namespace: namespace,
-			Flags:     []string{constants.RoleFlagNoLogin},
-			AdminRole: adminRole,
-		}
-		if currentRole, present := c.pgUsers[cronAdminName]; present {
-			c.pgUsers[cronAdminName] = c.resolveNameConflict(&currentRole, &cronAdmin)
-		} else {
-			c.pgUsers[cronAdminName] = cronAdmin
+		if len(memberOf) > 1 {
+			namespace := c.Namespace
+			additionalOwnerPgUser := spec.PgUser{
+				Origin:    spec.RoleOriginSpilo,
+				MemberOf:  memberOf,
+				Name:      additionalOwner,
+				Namespace: namespace,
+			}
+			if currentRole, present := c.pgUsers[additionalOwner]; present {
+				c.pgUsers[additionalOwner] = c.resolveNameConflict(&currentRole, &additionalOwnerPgUser)
+			} else {
+				c.pgUsers[additionalOwner] = additionalOwnerPgUser
+			}
 		}
 	}
 }

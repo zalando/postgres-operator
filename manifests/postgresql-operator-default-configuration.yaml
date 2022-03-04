@@ -26,12 +26,13 @@ configuration:
   #     protocol: TCP
   workers: 8
   users:
+    # additional_owner_roles: 
+    # - cron_admin
     enable_password_rotation: false
     password_rotation_interval: 90
     password_rotation_user_retention: 180
     replication_username: standby
     super_username: postgres
-    # cron_admin_username: cron_admin
   major_version_upgrade:
     major_version_upgrade_mode: "off"
     # major_version_upgrade_team_allow_list:

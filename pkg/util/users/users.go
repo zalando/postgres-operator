@@ -53,25 +53,31 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 			}
 		} else {
 			r := spec.PgSyncUserRequest{}
+			r.User = dbUser
 			newMD5Password := util.NewEncryptor(strategy.PasswordEncryption).PGUserPassword(newUser)
 
-			if dbUser.Password != newMD5Password {
-				r.User.Password = newMD5Password
-				r.Kind = spec.PGsyncUserAlter
+			// do not compare for roles coming from docker image
+			if newUser.Origin != spec.RoleOriginSpilo {
+				if dbUser.Password != newMD5Password {
+					r.User.Password = newMD5Password
+					r.Kind = spec.PGsyncUserAlter
+				}
+				if addNewFlags, equal := util.SubstractStringSlices(newUser.Flags, dbUser.Flags); !equal {
+					r.User.Flags = addNewFlags
+					r.Kind = spec.PGsyncUserAlter
+				}
 			}
 			if addNewRoles, equal := util.SubstractStringSlices(newUser.MemberOf, dbUser.MemberOf); !equal {
 				r.User.MemberOf = addNewRoles
-				r.Kind = spec.PGsyncUserAlter
-			}
-			if addNewFlags, equal := util.SubstractStringSlices(newUser.Flags, dbUser.Flags); !equal {
-				r.User.Flags = addNewFlags
 				r.Kind = spec.PGsyncUserAlter
 			}
 			if r.Kind == spec.PGsyncUserAlter {
 				r.User.Name = newUser.Name
 				reqs = append(reqs, r)
 			}
-			if len(newUser.Parameters) > 0 && !reflect.DeepEqual(dbUser.Parameters, newUser.Parameters) {
+			if newUser.Origin != spec.RoleOriginSpilo &&
+				len(newUser.Parameters) > 0 &&
+				!reflect.DeepEqual(dbUser.Parameters, newUser.Parameters) {
 				reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncAlterSet, User: newUser})
 			}
 		}

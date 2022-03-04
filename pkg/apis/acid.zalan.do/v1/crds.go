@@ -1142,8 +1142,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"users": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
-							"cron_admin_username": {
-								Type: "string",
+							"additional_owner_roles": {
+								Type:     "array",
+								Nullable: true,
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
 							},
 							"enable_password_rotation": {
 								Type: "boolean",

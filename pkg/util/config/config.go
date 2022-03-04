@@ -101,7 +101,7 @@ type Auth struct {
 	InfrastructureRolesDefs       string                `name:"infrastructure_roles_secrets"`
 	SuperUsername                 string                `name:"super_username" default:"postgres"`
 	ReplicationUsername           string                `name:"replication_username" default:"standby"`
-	CronAdminUsername             string                `name:"cron_admin_username" default:""`
+	AddtionalOwnerRoles           []string              `name:"additional_owner_roles" default:""`
 	EnablePasswordRotation        bool                  `name:"enable_password_rotation" default:"false"`
 	PasswordRotationInterval      uint32                `name:"password_rotation_interval" default:"90"`
 	PasswordRotationUserRetention uint32                `name:"password_rotation_user_retention" default:"180"`

@@ -128,8 +128,11 @@ spec:
               users:
                 type: object
                 properties:
-                  cron_admin_username:
-                     type: string
+                  additional_owner_roles:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
                   enable_password_rotation:
                     type: boolean
                     default: false
@@ -500,6 +503,7 @@ spec:
                       type: string
                     default:
                     - admin
+                    - cron_admin
                   role_deletion_suffix:
                     type: string
                     default: "_deleted"
