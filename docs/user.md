@@ -818,6 +818,48 @@ spec:
     gs_wal_path: "gs://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
+In case you are using AWS, please make sure that the AWS user you provided its credentials with `STANDBY_AWS_ACCESS_KEY_ID`, `STANDBY_AWS_SECRET_ACCESS_KEY` and `STANDBY_AWS_REGION` has permissions to deal with s3, and that you have created a role with following policies:
+
+Policy:
+
+```json
+{
+    "Statement": [
+        {
+            "Action": [
+                "ec2:Describe*",
+                "ec2:Describe*",
+                "ec2:ModifyVolumeAttribute"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        }
+    ],
+    "Version": "2012-10-17"
+}
+```
+
+Role:
+
+```json
+{
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Sid    = ""
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      },
+    ]
+  }
+```
+
+Then, add the name of the role name to `kube_iam_role` [param](https://github.com/zalando/postgres-operator/blob/c10d30903e049bc75ce29e0a9342ff45434deeb5/manifests/configmap.yaml#L52) or the annotation `iam.amazonaws.com/role: "postgres-operator-role"` to the operator deployment.
+
+
 At the moment, the operator only allows to stream from the WAL archive of the
 master. Thus, it is recommended to deploy standby clusters with only [one pod](https://github.com/zalando/postgres-operator/blob/master/manifests/standby-manifest.yaml#L10).
 You can raise the instance count when detaching. Note, that the same pod role
