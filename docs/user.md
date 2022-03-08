@@ -841,7 +841,7 @@ Policy:
 
 Role:
 
-```json
+```
 {
     Version = "2012-10-17"
     Statement = [
@@ -854,10 +854,10 @@ Role:
         }
       },
     ]
-  }
+}
 ```
 
-Then, add the name of the role name to `kube_iam_role` [param](https://github.com/zalando/postgres-operator/blob/c10d30903e049bc75ce29e0a9342ff45434deeb5/manifests/configmap.yaml#L52) or the annotation `iam.amazonaws.com/role: "postgres-operator-role"` to the operator deployment.
+Then, add the role name to `kube_iam_role` [param](https://github.com/zalando/postgres-operator/blob/c10d30903e049bc75ce29e0a9342ff45434deeb5/manifests/configmap.yaml#L52) or the annotation `iam.amazonaws.com/role: "postgres-operator-role"` to the operator deployment.
 
 
 At the moment, the operator only allows to stream from the WAL archive of the
