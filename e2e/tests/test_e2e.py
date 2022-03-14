@@ -479,8 +479,6 @@ class EndToEndTestCase(unittest.TestCase):
                 'spec': {
                     'enableConnectionPooler': True,
                     'enableReplicaConnectionPooler': True,
-                    'enableMasterPoolerLoadBalancer': True,
-                    'enableReplicaPoolerLoadBalancer': True,
                 }
             })
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
@@ -490,6 +488,17 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_running_pods(replica_pooler_label), 2, "No pooler replica pods found")
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label), 2, "No pooler service found")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label), 1, "Pooler secret not created")
+
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableMasterPoolerLoadBalancer': True,
+                    'enableReplicaPoolerLoadBalancer': True,
+                }
+            })
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: k8s.get_service_type(master_pooler_label+","+pooler_label),
                              'LoadBalancer',
                              "Expected LoadBalancer service type for master pooler pod, found {}")

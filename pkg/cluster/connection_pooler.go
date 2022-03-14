@@ -818,7 +818,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 	var (
 		deployment    *appsv1.Deployment
 		newDeployment *appsv1.Deployment
-		svc           *v1.Service
+		service       *v1.Service
 		newService    *v1.Service
 		err           error
 	)
@@ -907,13 +907,13 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		c.ConnectionPooler[role].Deployment = deployment
 	}
 
-	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
-		c.ConnectionPooler[role].Service = svc
+	if service, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
+		c.ConnectionPooler[role].Service = service
 		desiredSvc := c.generateConnectionPoolerService(c.ConnectionPooler[role])
-		if match, reason := k8sutil.SameService(svc, desiredSvc); !match {
+		if match, reason := k8sutil.SameService(service, desiredSvc); !match {
 			syncReason = append(syncReason, reason)
-			c.logServiceChanges(role, svc, desiredSvc, false, reason)
-			newService, err = c.updateService(role, svc, desiredSvc)
+			c.logServiceChanges(role, service, desiredSvc, false, reason)
+			newService, err = c.updateService(role, service, desiredSvc)
 			if err != nil {
 				return syncReason, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 			}
