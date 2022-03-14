@@ -343,7 +343,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 	}
 
 	if *numberOfInstances < constants.ConnectionPoolerMinInstances {
-		msg := "Adjusted number of connection pooler instances from %d to %d"
+		msg := "adjusted number of connection pooler instances from %d to %d"
 		c.logger.Warningf(msg, *numberOfInstances, constants.ConnectionPoolerMinInstances)
 
 		*numberOfInstances = constants.ConnectionPoolerMinInstances
@@ -613,7 +613,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		*deployment.Spec.Replicas != *config.NumberOfInstances {
 
 		sync = true
-		msg := fmt.Sprintf("NumberOfInstances is different (having %d, required %d)",
+		msg := fmt.Sprintf("numberOfInstances is different (having %d, required %d)",
 			*deployment.Spec.Replicas, *config.NumberOfInstances)
 		reasons = append(reasons, msg)
 	}
@@ -622,7 +622,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		poolerContainer.Image != config.Image {
 
 		sync = true
-		msg := fmt.Sprintf("DockerImage is different (having %s, required %s)",
+		msg := fmt.Sprintf("dockerImage is different (having %s, required %s)",
 			poolerContainer.Image, config.Image)
 		reasons = append(reasons, msg)
 	}
@@ -636,7 +636,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 	// updates for new resource values).
 	if err == nil && syncResources(&poolerContainer.Resources, expectedResources) {
 		sync = true
-		msg := fmt.Sprintf("Resources are different (having %+v, required %+v)",
+		msg := fmt.Sprintf("resources are different (having %+v, required %+v)",
 			poolerContainer.Resources, expectedResources)
 		reasons = append(reasons, msg)
 	}

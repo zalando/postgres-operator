@@ -1100,7 +1100,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// backward compatible check for InitContainers
 	if spec.InitContainersOld != nil {
-		msg := "Manifest parameter init_containers is deprecated."
+		msg := "manifest parameter init_containers is deprecated."
 		if spec.InitContainers == nil {
 			c.logger.Warningf("%s Consider using initContainers instead.", msg)
 			spec.InitContainers = spec.InitContainersOld
@@ -1111,7 +1111,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// backward compatible check for PodPriorityClassName
 	if spec.PodPriorityClassNameOld != "" {
-		msg := "Manifest parameter pod_priority_class_name is deprecated."
+		msg := "manifest parameter pod_priority_class_name is deprecated."
 		if spec.PodPriorityClassName == "" {
 			c.logger.Warningf("%s Consider using podPriorityClassName instead.", msg)
 			spec.PodPriorityClassName = spec.PodPriorityClassNameOld
@@ -1504,13 +1504,13 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 	mountPaths := map[string]acidv1.AdditionalVolume{}
 	for i, additionalVolume := range additionalVolumes {
 		if previousVolume, exist := mountPaths[additionalVolume.MountPath]; exist {
-			msg := "Volume %+v cannot be mounted to the same path as %+v"
+			msg := "volume %+v cannot be mounted to the same path as %+v"
 			c.logger.Warningf(msg, additionalVolume, previousVolume)
 			continue
 		}
 
 		if additionalVolume.MountPath == constants.PostgresDataMount {
-			msg := "Cannot mount volume on postgresql data directory, %+v"
+			msg := "cannot mount volume on postgresql data directory, %+v"
 			c.logger.Warningf(msg, additionalVolume)
 			continue
 		}
@@ -1523,7 +1523,7 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 
 		for _, target := range additionalVolume.TargetContainers {
 			if target == "all" && len(additionalVolume.TargetContainers) != 1 {
-				msg := `Target containers could be either "all" or a list
+				msg := `target containers could be either "all" or a list
 						of containers, mixing those is not allowed, %+v`
 				c.logger.Warningf(msg, additionalVolume)
 				continue
@@ -1813,11 +1813,11 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			})
 	} else {
 		// cloning with S3, find out the bucket to clone
-		msg := "Clone from S3 bucket"
+		msg := "clone from S3 bucket"
 		c.logger.Info(msg, description.S3WalPath)
 
 		if description.S3WalPath == "" {
-			msg := "Figure out which S3 bucket to use from env"
+			msg := "figure out which S3 bucket to use from env"
 			c.logger.Info(msg, description.S3WalPath)
 
 			if c.OpConfig.WALES3Bucket != "" {
@@ -1861,7 +1861,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 
 			result = append(result, envs...)
 		} else {
-			msg := "Use custom parsed S3WalPath %s from the manifest"
+			msg := "use custom parsed S3WalPath %s from the manifest"
 			c.logger.Warningf(msg, description.S3WalPath)
 
 			result = append(result, v1.EnvVar{
@@ -1910,7 +1910,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 
 	if description.S3WalPath != "" {
 		// standby with S3, find out the bucket to setup standby
-		msg := "Standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
+		msg := "standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
 		c.logger.Infof(msg, description.S3WalPath)
 
 		result = append(result, v1.EnvVar{
@@ -1918,7 +1918,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 			Value: description.S3WalPath,
 		})
 	} else if description.GSWalPath != "" {
-		msg := "Standby from GS bucket using custom parsed GSWalPath from the manifest %s "
+		msg := "standby from GS bucket using custom parsed GSWalPath from the manifest %s "
 		c.logger.Infof(msg, description.GSWalPath)
 
 		envs := []v1.EnvVar{
