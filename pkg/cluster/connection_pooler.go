@@ -721,6 +721,8 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	var err error
 	var connectionPoolerNeeded bool
 
+	logPoolerEssentials(c.logger, oldSpec, newSpec)
+
 	// Check and perform the sync requirements for each of the roles.
 	for _, role := range [2]PostgresRole{Master, Replica} {
 
@@ -922,13 +924,11 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 	}
 
 	if !k8sutil.ResourceNotFound(err) {
-		msg := "could not get connection pooler service to sync: %v"
-		return NoSync, fmt.Errorf(msg, err)
+		return NoSync, fmt.Errorf("could not get connection pooler service to sync: %v", err)
 	}
 
 	c.ConnectionPooler[role].Service = nil
-	msg := "Service %s for connection pooler synchronization is not found, create it"
-	c.logger.Warningf(msg, c.connectionPoolerName(role))
+	c.logger.Warningf("service %s for connection pooler synchronization is not found, create it", c.connectionPoolerName(role))
 
 	serviceSpec := c.generateConnectionPoolerService(c.ConnectionPooler[role])
 	newService, err = c.KubeClient.
