@@ -67,7 +67,7 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 		return fmt.Errorf("could not form patch for pod's rolling update flag: %v", err)
 	}
 
-	err = retryutil.Retry(1*time.Second, 5*time.Second,
+	err = retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
 		func() (bool, error) {
 			_, err2 := c.KubeClient.Pods(pod.Namespace).Patch(
 				context.TODO(),
@@ -356,7 +356,7 @@ func (c *Cluster) getPatroniConfig(pod *v1.Pod) (acidv1.Patroni, map[string]stri
 		pgParameters  map[string]string
 	)
 	podName := util.NameFromMeta(pod.ObjectMeta)
-	err := retryutil.Retry(1*time.Second, 5*time.Second,
+	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
 		func() (bool, error) {
 			var err error
 			patroniConfig, pgParameters, err = c.patroni.GetConfig(pod)
@@ -377,7 +377,7 @@ func (c *Cluster) getPatroniConfig(pod *v1.Pod) (acidv1.Patroni, map[string]stri
 
 func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) {
 	var memberData patroni.MemberData
-	err := retryutil.Retry(1*time.Second, 5*time.Second,
+	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
 		func() (bool, error) {
 			var err error
 			memberData, err = c.patroni.GetMemberData(pod)
@@ -403,7 +403,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	defer c.unregisterPodSubscriber(podName)
 	stopChan := make(chan struct{})
 
-	err := retryutil.Retry(1*time.Second, 5*time.Second,
+	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
 		func() (bool, error) {
 			err2 := c.KubeClient.Pods(podName.Namespace).Delete(
 				context.TODO(),
@@ -492,7 +492,7 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 	candidates := make([]patroni.ClusterMember, 0)
 	syncCandidates := make([]patroni.ClusterMember, 0)
 
-	err := retryutil.Retry(1*time.Second, 5*time.Second,
+	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
 		func() (bool, error) {
 			var err error
 			members, err = c.patroni.GetClusterMembers(master)

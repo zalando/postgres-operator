@@ -96,6 +96,8 @@ data:
   # pam_configuration: |
   #  https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
   # pam_role_name: zalandos
+  patroni_api_check_interval: "1s"
+  patroni_api_check_timeout: "5s"
   # password_rotation_interval: "90"
   # password_rotation_user_retention: "180"
   pdb_name_format: "postgres-{cluster}-pdb"

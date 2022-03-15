@@ -347,6 +347,12 @@ spec:
               timeouts:
                 type: object
                 properties:
+                  patroni_api_check_interval:
+                    type: string
+                    default: "1s"
+                  patroni_api_check_timeout:
+                    type: string
+                    default: "5s"
                   pod_label_wait_timeout:
                     type: string
                     default: "10m"

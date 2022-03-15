@@ -224,6 +224,8 @@ type Config struct {
 	MajorVersionUpgradeTeamAllowList       []string          `name:"major_version_upgrade_team_allow_list" default:""`
 	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.6"`
 	TargetMajorVersion                     string            `name:"target_major_version" default:"14"`
+	PatroniAPICheckInterval                time.Duration     `name:"patroni_api_check_interval" default:"1s"`
+	PatroniAPICheckTimeout                 time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 }
 
 // MustMarshal marshals the config or panics

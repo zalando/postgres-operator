@@ -1438,6 +1438,12 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"timeouts": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"patroni_api_check_interval": {
+								Type: "string",
+							},
+							"patroni_api_check_timeout": {
+								Type: "string",
+							},
 							"pod_label_wait_timeout": {
 								Type: "string",
 							},

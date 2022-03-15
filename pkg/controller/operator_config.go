@@ -134,6 +134,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodDeletionWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PodDeletionWaitTimeout), "10m")
 	result.ReadyWaitInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ReadyWaitInterval), "4s")
 	result.ReadyWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ReadyWaitTimeout), "30s")
+	result.PatroniAPICheckInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PatroniAPICheckInterval), "1s")
+	result.PatroniAPICheckTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PatroniAPICheckTimeout), "5s")
 
 	// load balancer config
 	result.DbHostedZone = util.Coalesce(fromCRD.LoadBalancer.DbHostedZone, "db.example.com")

@@ -204,6 +204,10 @@ configPostgresPodResources:
 
 # timeouts related to some operator actions
 configTimeouts:
+  # interval between consecutive attempts of operator calling the Patroni API
+  patroni_api_check_interval: 1s
+  # timeout when waiting for successful response from Patroni API
+  patroni_api_check_timeout: 5s
   # timeout when waiting for the Postgres pods to be deleted
   pod_deletion_wait_timeout: 10m
   # timeout when waiting for pod role and cluster labels
