@@ -70,7 +70,7 @@ type EventStreamTable struct {
 type Connection struct {
 	Url             string `json:"jdbcUrl"`
 	SlotName        string `json:"slotName"`
-	PluginType      string `json:"pluginType,omitempty" defaults:"wal2json"`
+	PluginType      string `json:"pluginType,omitempty" defaults:"pgoutput"`
 	PublicationName string `json:"publicationName,omitempty"`
 	DBAuth          DBAuth `json:"databaseAuthentication"`
 }

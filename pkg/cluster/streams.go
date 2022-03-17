@@ -205,6 +205,11 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName, idColumn
 }
 
 func getEventStreamFlow(stream acidv1.Stream, payloadColumn string) zalandov1.EventStreamFlow {
+	if payloadColumn == "" {
+		return zalandov1.EventStreamFlow{
+			Type: constants.EventStreamFlowPgGenericType,
+		}
+	}
 	return zalandov1.EventStreamFlow{
 		Type:          constants.EventStreamFlowPgGenericType,
 		PayloadColumn: payloadColumn,
@@ -212,6 +217,12 @@ func getEventStreamFlow(stream acidv1.Stream, payloadColumn string) zalandov1.Ev
 }
 
 func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1.EventStreamSink {
+	if stream.BatchSize == 0 {
+		return zalandov1.EventStreamSink{
+			Type:      constants.EventStreamSinkNakadiType,
+			EventType: eventType,
+		}
+	}
 	return zalandov1.EventStreamSink{
 		Type:         constants.EventStreamSinkNakadiType,
 		EventType:    eventType,
@@ -231,6 +242,11 @@ func getTableSchema(fullTableName string) (tableName, schemaName string) {
 }
 
 func getOutboxTable(tableName, idColumn string) zalandov1.EventStreamTable {
+	if idColumn == "" {
+		return zalandov1.EventStreamTable{
+			Name: tableName,
+		}
+	}
 	return zalandov1.EventStreamTable{
 		Name:     tableName,
 		IDColumn: idColumn,
@@ -347,8 +363,8 @@ func (c *Cluster) createOrUpdateStreams() error {
 			c.logger.Infof("event stream %q has been successfully created", fesName)
 		} else {
 			desiredStreams := c.generateFabricEventStream(appId)
-			if !reflect.DeepEqual(effectiveStreams.Spec, desiredStreams.Spec) {
-				c.logger.Debug("updating event streams")
+			if match, reason := sameStreams(effectiveStreams.Spec.EventStreams, desiredStreams.Spec.EventStreams); !match {
+				c.logger.Debugf("updating event streams: %s", reason)
 				desiredStreams.ObjectMeta.ResourceVersion = effectiveStreams.ObjectMeta.ResourceVersion
 				err = c.updateStreams(desiredStreams)
 				if err != nil {
@@ -360,4 +376,28 @@ func (c *Cluster) createOrUpdateStreams() error {
 	}
 
 	return nil
+}
+
+func sameStreams(curEventStreams, newEventStreams []zalandov1.EventStream) (match bool, reason string) {
+	if len(newEventStreams) != len(curEventStreams) {
+		return false, "number of defined streams is different"
+	}
+
+	for _, newStream := range newEventStreams {
+		match = false
+		reason = "event stream specs differ"
+		for _, curStream := range curEventStreams {
+			if reflect.DeepEqual(newStream.EventStreamSource, curStream.EventStreamSource) &&
+				reflect.DeepEqual(newStream.EventStreamFlow, curStream.EventStreamFlow) &&
+				reflect.DeepEqual(newStream.EventStreamSink, curStream.EventStreamSink) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return false, reason
+		}
+	}
+
+	return true, ""
 }
