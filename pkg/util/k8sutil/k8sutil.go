@@ -41,7 +41,7 @@ func UInt32ToPointer(value uint32) *uint32 {
 	return &value
 }
 
-func StringPointer(str string) *string {
+func StringToPointer(str string) *string {
 	return &str
 }
 

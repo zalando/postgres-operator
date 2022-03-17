@@ -64,15 +64,15 @@ var (
 					Tables: map[string]acidv1.StreamTable{
 						"data.bar": acidv1.StreamTable{
 							EventType:     "stream-type-a",
-							IdColumn:      k8sutil.StringPointer("b_id"),
-							PayloadColumn: k8sutil.StringPointer("b_payload"),
+							IdColumn:      k8sutil.StringToPointer("b_id"),
+							PayloadColumn: k8sutil.StringToPointer("b_payload"),
 						},
 						"data.foobar": acidv1.StreamTable{
 							EventType: "stream-type-b",
 						},
 					},
 					Filter: map[string]*string{
-						"data.bar": k8sutil.StringPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
+						"data.bar": k8sutil.StringToPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
 					},
 					BatchSize: k8sutil.UInt32ToPointer(uint32(100)),
 				},
@@ -105,7 +105,7 @@ var (
 			EventStreams: []zalandov1.EventStream{
 				zalandov1.EventStream{
 					EventStreamFlow: zalandov1.EventStreamFlow{
-						PayloadColumn: k8sutil.StringPointer("b_payload"),
+						PayloadColumn: k8sutil.StringToPointer("b_payload"),
 						Type:          constants.EventStreamFlowPgGenericType,
 					},
 					EventStreamSink: zalandov1.EventStreamSink{
@@ -114,7 +114,7 @@ var (
 						Type:         constants.EventStreamSinkNakadiType,
 					},
 					EventStreamSource: zalandov1.EventStreamSource{
-						Filter: k8sutil.StringPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
+						Filter: k8sutil.StringToPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
 						Connection: zalandov1.Connection{
 							DBAuth: zalandov1.DBAuth{
 								Name:        fmt.Sprintf("fes-user.%s.credentials.postgresql.acid.zalan.do", clusterName),
@@ -128,7 +128,7 @@ var (
 						},
 						Schema: "data",
 						EventStreamTable: zalandov1.EventStreamTable{
-							IDColumn: k8sutil.StringPointer("b_id"),
+							IDColumn: k8sutil.StringToPointer("b_id"),
 							Name:     "bar",
 						},
 						Type: constants.EventStreamSourcePGType,
@@ -338,8 +338,8 @@ func TestUpdateFabricEventStream(t *testing.T) {
 			Tables: map[string]acidv1.StreamTable{
 				"data.bar": acidv1.StreamTable{
 					EventType:     "stream-type-c",
-					IdColumn:      k8sutil.StringPointer("b_id"),
-					PayloadColumn: k8sutil.StringPointer("b_payload"),
+					IdColumn:      k8sutil.StringToPointer("b_id"),
+					PayloadColumn: k8sutil.StringToPointer("b_payload"),
 				},
 			},
 			BatchSize: k8sutil.UInt32ToPointer(uint32(250)),
