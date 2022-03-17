@@ -228,7 +228,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		constants.ConnectionPoolerUserName)
 
 	if result.ConnectionPooler.User == result.SuperUsername {
-		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		msg := "connection pool user is not allowed to be the same as super user, username: %s"
 		panic(fmt.Errorf(msg, result.ConnectionPooler.User))
 	}
 

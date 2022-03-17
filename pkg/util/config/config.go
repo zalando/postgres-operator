@@ -292,7 +292,7 @@ func validate(cfg *Config) (err error) {
 	}
 
 	if cfg.ConnectionPooler.User == cfg.SuperUsername {
-		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		msg := "connection pool user is not allowed to be the same as super user, username: %s"
 		err = fmt.Errorf(msg, cfg.ConnectionPooler.User)
 	}
 
