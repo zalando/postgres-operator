@@ -64,17 +64,17 @@ var (
 					Tables: map[string]acidv1.StreamTable{
 						"data.bar": acidv1.StreamTable{
 							EventType:     "stream-type-a",
-							IdColumn:      "b_id",
-							PayloadColumn: "b_payload",
+							IdColumn:      k8sutil.StringPointer("b_id"),
+							PayloadColumn: k8sutil.StringPointer("b_payload"),
 						},
 						"data.foobar": acidv1.StreamTable{
 							EventType: "stream-type-b",
 						},
 					},
-					Filter: map[string]string{
-						"data.bar": "[?(@.source.txId > 500 && @.source.lsn > 123456)]",
+					Filter: map[string]*string{
+						"data.bar": k8sutil.StringPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
 					},
-					BatchSize: uint32(100),
+					BatchSize: k8sutil.UInt32ToPointer(uint32(100)),
 				},
 			},
 			Volume: acidv1.Volume{
@@ -105,16 +105,16 @@ var (
 			EventStreams: []zalandov1.EventStream{
 				zalandov1.EventStream{
 					EventStreamFlow: zalandov1.EventStreamFlow{
-						PayloadColumn: "b_payload",
+						PayloadColumn: k8sutil.StringPointer("b_payload"),
 						Type:          constants.EventStreamFlowPgGenericType,
 					},
 					EventStreamSink: zalandov1.EventStreamSink{
 						EventType:    "stream-type-a",
-						MaxBatchSize: uint32(100),
+						MaxBatchSize: k8sutil.UInt32ToPointer(uint32(100)),
 						Type:         constants.EventStreamSinkNakadiType,
 					},
 					EventStreamSource: zalandov1.EventStreamSource{
-						Filter: "[?(@.source.txId > 500 && @.source.lsn > 123456)]",
+						Filter: k8sutil.StringPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
 						Connection: zalandov1.Connection{
 							DBAuth: zalandov1.DBAuth{
 								Name:        fmt.Sprintf("fes-user.%s.credentials.postgresql.acid.zalan.do", clusterName),
@@ -128,7 +128,7 @@ var (
 						},
 						Schema: "data",
 						EventStreamTable: zalandov1.EventStreamTable{
-							IDColumn: "b_id",
+							IDColumn: k8sutil.StringPointer("b_id"),
 							Name:     "bar",
 						},
 						Type: constants.EventStreamSourcePGType,
@@ -140,7 +140,7 @@ var (
 					},
 					EventStreamSink: zalandov1.EventStreamSink{
 						EventType:    "stream-type-b",
-						MaxBatchSize: uint32(100),
+						MaxBatchSize: k8sutil.UInt32ToPointer(uint32(100)),
 						Type:         constants.EventStreamSinkNakadiType,
 					},
 					EventStreamSource: zalandov1.EventStreamSource{
@@ -202,7 +202,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 
 	// compare generated stream with expected stream
 	result := cluster.generateFabricEventStream(appId)
-	if !reflect.DeepEqual(result, fes) {
+	if match, _ := sameStreams(result.Spec.EventStreams, fes.Spec.EventStreams); !match {
 		t.Errorf("malformed FabricEventStream, expected %#v, got %#v", fes, result)
 	}
 
@@ -261,8 +261,8 @@ func TestSameStreams(t *testing.T) {
 	}{
 		{
 			subTest:  "identical streams",
-			streamsA: fes.Spec.EventStreams,
-			streamsB: fes.Spec.EventStreams,
+			streamsA: []zalandov1.EventStream{stream1, stream2},
+			streamsB: []zalandov1.EventStream{stream1, stream2},
 			match:    true,
 			reason:   "",
 		},
@@ -338,11 +338,11 @@ func TestUpdateFabricEventStream(t *testing.T) {
 			Tables: map[string]acidv1.StreamTable{
 				"data.bar": acidv1.StreamTable{
 					EventType:     "stream-type-c",
-					IdColumn:      "b_id",
-					PayloadColumn: "b_payload",
+					IdColumn:      k8sutil.StringPointer("b_id"),
+					PayloadColumn: k8sutil.StringPointer("b_payload"),
 				},
 			},
-			BatchSize: uint32(250),
+			BatchSize: k8sutil.UInt32ToPointer(uint32(250)),
 		},
 	}
 	patch, err := json.Marshal(struct {

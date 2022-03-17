@@ -189,7 +189,7 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 	}
 }
 
-func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName, idColumn string) zalandov1.EventStreamSource {
+func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName string, idColumn *string) zalandov1.EventStreamSource {
 	table, schema := getTableSchema(tableName)
 	streamFilter := stream.Filter[tableName]
 	return zalandov1.EventStreamSource{
@@ -204,12 +204,7 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName, idColumn
 	}
 }
 
-func getEventStreamFlow(stream acidv1.Stream, payloadColumn string) zalandov1.EventStreamFlow {
-	if payloadColumn == "" {
-		return zalandov1.EventStreamFlow{
-			Type: constants.EventStreamFlowPgGenericType,
-		}
-	}
+func getEventStreamFlow(stream acidv1.Stream, payloadColumn *string) zalandov1.EventStreamFlow {
 	return zalandov1.EventStreamFlow{
 		Type:          constants.EventStreamFlowPgGenericType,
 		PayloadColumn: payloadColumn,
@@ -217,12 +212,6 @@ func getEventStreamFlow(stream acidv1.Stream, payloadColumn string) zalandov1.Ev
 }
 
 func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1.EventStreamSink {
-	if stream.BatchSize == 0 {
-		return zalandov1.EventStreamSink{
-			Type:      constants.EventStreamSinkNakadiType,
-			EventType: eventType,
-		}
-	}
 	return zalandov1.EventStreamSink{
 		Type:         constants.EventStreamSinkNakadiType,
 		EventType:    eventType,
@@ -241,12 +230,7 @@ func getTableSchema(fullTableName string) (tableName, schemaName string) {
 	return tableName, schemaName
 }
 
-func getOutboxTable(tableName, idColumn string) zalandov1.EventStreamTable {
-	if idColumn == "" {
-		return zalandov1.EventStreamTable{
-			Name: tableName,
-		}
-	}
+func getOutboxTable(tableName string, idColumn *string) zalandov1.EventStreamTable {
 	return zalandov1.EventStreamTable{
 		Name:     tableName,
 		IDColumn: idColumn,

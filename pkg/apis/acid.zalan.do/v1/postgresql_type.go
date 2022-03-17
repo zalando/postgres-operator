@@ -239,12 +239,12 @@ type Stream struct {
 	ApplicationId string                 `json:"applicationId"`
 	Database      string                 `json:"database"`
 	Tables        map[string]StreamTable `json:"tables"`
-	Filter        map[string]string      `json:"filter,omitempty"`
-	BatchSize     uint32                 `json:"batchSize,omitempty"`
+	Filter        map[string]*string     `json:"filter,omitempty"`
+	BatchSize     *uint32                `json:"batchSize,omitempty"`
 }
 
 type StreamTable struct {
-	EventType     string `json:"eventType"`
-	IdColumn      string `json:"idColumn,omitempty" defaults:"id"`
-	PayloadColumn string `json:"payloadColumn,omitempty" defaults:"payload"`
+	EventType     string  `json:"eventType"`
+	IdColumn      *string `json:"idColumn,omitempty"`
+	PayloadColumn *string `json:"payloadColumn,omitempty"`
 }
