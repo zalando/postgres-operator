@@ -75,9 +75,12 @@ Those are top-level keys, containing both leaf keys and groups.
   The default is `true`.
 
 * **enable_crd_validation**
-  toggles if the operator will create or update CRDs with
+  *deprecated*: toggles if the operator will create or update CRDs with
   [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
-  The default is `true`.
+  The default is `true`. `false` will be ignored, since `apiextensions.io/v1` requires a structural schema definition.
+
+* **crd_categories**
+  The operator will register CRDs in the `all` category by default so that they will be returned by a `kubectl get all` call. You are free to change categories or leave them empty.
 
 * **enable_lazy_spilo_upgrade**
   Instruct operator to update only the statefulsets with new images (Spilo and InitContainers) without immediately doing the rolling update. The assumption is pods will be re-started later with new images, for example due to the node rotation.
@@ -173,6 +176,28 @@ under the `users` key.
 * **replication_username**
   Postgres username used for replication between instances. The default is
   `standby`.
+
+* **enable_password_rotation**
+  For all `LOGIN` roles that are not database owners the operator can rotate
+  credentials in the corresponding K8s secrets by replacing the username and
+  password. This means, new users will be added on each rotation inheriting
+  all priviliges from the original roles. The rotation date (in YYMMDD format)
+  is appended to the names of the new user. The timestamp of the next rotation
+  is written to the secret. The default is `false`.
+
+* **password_rotation_interval**
+  If password rotation is enabled (either from config or cluster manifest) the
+  interval can be configured with this parameter. The measure is in days which
+  means daily rotation (`1`) is the most frequent interval possible.
+  Default is `90`.
+
+* **password_rotation_user_retention**
+  To avoid an ever growing amount of new users due to password rotation the
+  operator will remove the created users again after a certain amount of days
+  has passed. The number can be configured with this parameter. However, the
+  operator will check that the retention policy is at least twice as long as
+  the rotation interval and update to this minimum in case it is not.
+  Default is `180`.
 
 ## Major version upgrades
 
@@ -473,6 +498,13 @@ configuration `resource_check_interval` and `resource_check_timeout` have no
 effect, and the parameters are grouped under the `timeouts` key in the
 CRD-based configuration.
 
+* **PatroniAPICheckInterval**
+  the interval between consecutive attempts waiting for the return of 
+  Patroni Api. The default is `1s`.
+
+* **PatroniAPICheckTimeout**
+  the timeout for a response from Patroni Api. The default is `5s`.
+
 * **resource_check_interval**
   interval to wait between consecutive attempts to check for the presence of
   some Kubernetes resource (i.e. `StatefulSet` or `PodDisruptionBudget`). The
@@ -521,10 +553,20 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   toggles service type load balancer pointing to the master pod of the cluster.
   Can be overridden by individual cluster settings. The default is `true`.
 
-* **enable_replica_load_balancer**
-  toggles service type load balancer pointing to the replica pod of the
-  cluster.  Can be overridden by individual cluster settings. The default is
+* **enable_master_pooler_load_balancer**
+  toggles service type load balancer pointing to the master pooler pod of the
+  cluster. Can be overridden by individual cluster settings. The default is
   `false`.
+
+* **enable_replica_load_balancer**
+  toggles service type load balancer pointing to the replica pod(s) of the
+  cluster. Can be overridden by individual cluster settings. The default is
+  `false`.
+
+* **enable_replica_pooler_load_balancer**
+  toggles service type load balancer pointing to the replica pooler pod(s) of
+  the cluster. Can be overridden by individual cluster settings. The default
+  is `false`.
 
 * **external_traffic_policy** defines external traffic policy for load
   balancers. Allowed values are `Cluster` (default) and `Local`.
@@ -650,6 +692,11 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_sse**
   Specify server side encryption that S3 storage is using. If empty string
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
+
+* **logical_backup_s3_retention_time**
+  Specify a retention time for logical backups stored in S3. Backups older than the specified retention 
+  time will be deleted after a new backup was uploaded. If empty, all backups will be kept. Example values are
+  "3 days", "2 weeks", or "1 month". The default is empty.
 
 * **logical_backup_schedule**
   Backup schedule in the cron format. Please take the

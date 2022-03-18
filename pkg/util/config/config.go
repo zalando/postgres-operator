@@ -20,6 +20,7 @@ type CRD struct {
 	RepairPeriod          time.Duration `name:"repair_period" default:"5m"`
 	EnableCRDRegistration *bool         `name:"enable_crd_registration" default:"true"`
 	EnableCRDValidation   *bool         `name:"enable_crd_validation" default:"true"`
+	CRDCategories         []string      `name:"crd_categories" default:"all"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
@@ -100,6 +101,9 @@ type Auth struct {
 	InfrastructureRolesDefs       string                `name:"infrastructure_roles_secrets"`
 	SuperUsername                 string                `name:"super_username" default:"postgres"`
 	ReplicationUsername           string                `name:"replication_username" default:"standby"`
+	EnablePasswordRotation        bool                  `name:"enable_password_rotation" default:"false"`
+	PasswordRotationInterval      uint32                `name:"password_rotation_interval" default:"90"`
+	PasswordRotationUserRetention uint32                `name:"password_rotation_user_retention" default:"180"`
 }
 
 // Scalyr holds the configuration for the Scalyr Agent sidecar for log shipping:
@@ -124,6 +128,7 @@ type LogicalBackup struct {
 	LogicalBackupS3AccessKeyID                string `name:"logical_backup_s3_access_key_id" default:""`
 	LogicalBackupS3SecretAccessKey            string `name:"logical_backup_s3_secret_access_key" default:""`
 	LogicalBackupS3SSE                        string `name:"logical_backup_s3_sse" default:""`
+	LogicalBackupS3RetentionTime              string `name:"logical_backup_s3_retention_time" default:""`
 	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
 }
@@ -185,7 +190,9 @@ type Config struct {
 	EnablePostgresTeamCRD                  bool              `name:"enable_postgres_team_crd" default:"false"`
 	EnablePostgresTeamCRDSuperusers        bool              `name:"enable_postgres_team_crd_superusers" default:"false"`
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
+	EnableMasterPoolerLoadBalancer         bool              `name:"enable_master_pooler_load_balancer" default:"false"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
+	EnableReplicaPoolerLoadBalancer        bool              `name:"enable_replica_pooler_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
@@ -217,6 +224,8 @@ type Config struct {
 	MajorVersionUpgradeTeamAllowList       []string          `name:"major_version_upgrade_team_allow_list" default:""`
 	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.6"`
 	TargetMajorVersion                     string            `name:"target_major_version" default:"14"`
+	PatroniAPICheckInterval                time.Duration     `name:"patroni_api_check_interval" default:"1s"`
+	PatroniAPICheckTimeout                 time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 }
 
 // MustMarshal marshals the config or panics
@@ -283,7 +292,7 @@ func validate(cfg *Config) (err error) {
 	}
 
 	if cfg.ConnectionPooler.User == cfg.SuperUsername {
-		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		msg := "connection pool user is not allowed to be the same as super user, username: %s"
 		err = fmt.Errorf(msg, cfg.ConnectionPooler.User)
 	}
 

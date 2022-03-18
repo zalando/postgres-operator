@@ -6,11 +6,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/zalando/postgres-operator/mocks"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 )
@@ -22,7 +24,13 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	var cluster = New(Config{}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PatroniAPICheckInterval: time.Duration(1),
+				PatroniAPICheckTimeout:  time.Duration(5),
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	// simulate different member scenarios
 	tests := []struct {

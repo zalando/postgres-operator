@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/r3labs/diff"
@@ -247,7 +246,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 		{
 			Name:  "PGPORT",
-			Value: c.servicePort(role),
+			Value: fmt.Sprint(c.servicePort(role)),
 		},
 		{
 			Name: "PGUSER",
@@ -344,7 +343,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 	}
 
 	if *numberOfInstances < constants.ConnectionPoolerMinInstances {
-		msg := "Adjusted number of connection pooler instances from %d to %d"
+		msg := "adjusted number of connection pooler instances from %d to %d"
 		c.logger.Warningf(msg, *numberOfInstances, constants.ConnectionPoolerMinInstances)
 
 		*numberOfInstances = constants.ConnectionPoolerMinInstances
@@ -386,13 +385,17 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 			{
 				Name:       connectionPooler.Name,
 				Port:       pgPort,
-				TargetPort: intstr.IntOrString{StrVal: c.servicePort(connectionPooler.Role)},
+				TargetPort: intstr.IntOrString{IntVal: c.servicePort(connectionPooler.Role)},
 			},
 		},
 		Type: v1.ServiceTypeClusterIP,
 		Selector: map[string]string{
 			"connection-pooler": c.connectionPoolerName(connectionPooler.Role),
 		},
+	}
+
+	if c.shouldCreateLoadBalancerForPoolerService(connectionPooler.Role, spec) {
+		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
 	service := &v1.Service{
@@ -413,6 +416,29 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 	}
 
 	return service
+}
+
+func (c *Cluster) shouldCreateLoadBalancerForPoolerService(role PostgresRole, spec *acidv1.PostgresSpec) bool {
+
+	switch role {
+
+	case Replica:
+		// if the value is explicitly set in a Postgresql manifest, follow this setting
+		if spec.EnableReplicaPoolerLoadBalancer != nil {
+			return *spec.EnableReplicaPoolerLoadBalancer
+		}
+		// otherwise, follow the operator configuration
+		return c.OpConfig.EnableReplicaPoolerLoadBalancer
+
+	case Master:
+		if spec.EnableMasterPoolerLoadBalancer != nil {
+			return *spec.EnableMasterPoolerLoadBalancer
+		}
+		return c.OpConfig.EnableMasterPoolerLoadBalancer
+
+	default:
+		panic(fmt.Sprintf("Unknown role %v", role))
+	}
 }
 
 //delete connection pooler
@@ -587,7 +613,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		*deployment.Spec.Replicas != *config.NumberOfInstances {
 
 		sync = true
-		msg := fmt.Sprintf("NumberOfInstances is different (having %d, required %d)",
+		msg := fmt.Sprintf("numberOfInstances is different (having %d, required %d)",
 			*deployment.Spec.Replicas, *config.NumberOfInstances)
 		reasons = append(reasons, msg)
 	}
@@ -596,7 +622,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		poolerContainer.Image != config.Image {
 
 		sync = true
-		msg := fmt.Sprintf("DockerImage is different (having %s, required %s)",
+		msg := fmt.Sprintf("dockerImage is different (having %s, required %s)",
 			poolerContainer.Image, config.Image)
 		reasons = append(reasons, msg)
 	}
@@ -610,7 +636,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 	// updates for new resource values).
 	if err == nil && syncResources(&poolerContainer.Resources, expectedResources) {
 		sync = true
-		msg := fmt.Sprintf("Resources are different (having %+v, required %+v)",
+		msg := fmt.Sprintf("resources are different (having %+v, required %+v)",
 			poolerContainer.Resources, expectedResources)
 		reasons = append(reasons, msg)
 	}
@@ -695,29 +721,6 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	var err error
 	var connectionPoolerNeeded bool
 
-	needSync := !reflect.DeepEqual(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler)
-	masterChanges, err := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
-	if err != nil {
-		c.logger.Error("Error in getting diff of master connection pooler changes")
-	}
-	replicaChanges, err := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
-	if err != nil {
-		c.logger.Error("Error in getting diff of replica connection pooler changes")
-	}
-
-	// skip pooler sync when theres no diff or it's deactivated
-	// but, handling the case when connectionPooler is not there but it is required
-	// as per spec, hence do not skip syncing in that case, even though there
-	// is no diff in specs
-	if (!needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0) &&
-		((!needConnectionPooler(&newSpec.Spec) && (c.ConnectionPooler == nil || !needConnectionPooler(&oldSpec.Spec))) ||
-			(c.ConnectionPooler != nil && needConnectionPooler(&newSpec.Spec) &&
-				((c.ConnectionPooler[Master] != nil && c.ConnectionPooler[Master].LookupFunction) ||
-					(c.ConnectionPooler[Replica] != nil && c.ConnectionPooler[Replica].LookupFunction)))) {
-		c.logger.Debugln("syncing pooler is not required")
-		return nil, nil
-	}
-
 	logPoolerEssentials(c.logger, oldSpec, newSpec)
 
 	// Check and perform the sync requirements for each of the roles.
@@ -754,7 +757,8 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 			// in between
 
 			// in this case also do not forget to install lookup function
-			if !c.ConnectionPooler[role].LookupFunction {
+			// skip installation in standby clusters, since they are read-only
+			if !c.ConnectionPooler[role].LookupFunction && c.Spec.StandbyCluster == nil {
 				connectionPooler := c.Spec.ConnectionPooler
 				specSchema := ""
 				specUser := ""
@@ -811,31 +815,37 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql, role PostgresRole) (
 	SyncReason, error) {
 
-	deployment, err := c.KubeClient.
+	var (
+		deployment    *appsv1.Deployment
+		newDeployment *appsv1.Deployment
+		service       *v1.Service
+		newService    *v1.Service
+		err           error
+	)
+
+	syncReason := make([]string, 0)
+	deployment, err = c.KubeClient.
 		Deployments(c.Namespace).
 		Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{})
 
 	if err != nil && k8sutil.ResourceNotFound(err) {
-		msg := "deployment %s for connection pooler synchronization is not found, create it"
-		c.logger.Warningf(msg, c.connectionPoolerName(role))
+		c.logger.Warningf("deployment %s for connection pooler synchronization is not found, create it", c.connectionPoolerName(role))
 
-		deploymentSpec, err := c.generateConnectionPoolerDeployment(c.ConnectionPooler[role])
+		newDeployment, err = c.generateConnectionPoolerDeployment(c.ConnectionPooler[role])
 		if err != nil {
-			msg = "could not generate deployment for connection pooler: %v"
-			return NoSync, fmt.Errorf(msg, err)
+			return NoSync, fmt.Errorf("could not generate deployment for connection pooler: %v", err)
 		}
 
-		deployment, err := c.KubeClient.
-			Deployments(deploymentSpec.Namespace).
-			Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+		deployment, err = c.KubeClient.
+			Deployments(newDeployment.Namespace).
+			Create(context.TODO(), newDeployment, metav1.CreateOptions{})
 
 		if err != nil {
 			return NoSync, err
 		}
 		c.ConnectionPooler[role].Deployment = deployment
 	} else if err != nil {
-		msg := "could not get connection pooler deployment to sync: %v"
-		return NoSync, fmt.Errorf(msg, err)
+		return NoSync, fmt.Errorf("could not get connection pooler deployment to sync: %v", err)
 	} else {
 		c.ConnectionPooler[role].Deployment = deployment
 		// actual synchronization
@@ -865,25 +875,24 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 
 		if oldSpec != nil {
 			specSync, specReason = needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler, c.logger)
+			syncReason = append(syncReason, specReason...)
 		}
 
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
-		reason := append(specReason, defaultsReason...)
+		syncReason = append(syncReason, defaultsReason...)
 
 		if specSync || defaultsSync {
-			c.logger.Infof("Update connection pooler deployment %s, reason: %+v",
-				c.connectionPoolerName(role), reason)
-			newDeploymentSpec, err := c.generateConnectionPoolerDeployment(c.ConnectionPooler[role])
+			c.logger.Infof("update connection pooler deployment %s, reason: %+v",
+				c.connectionPoolerName(role), syncReason)
+			newDeployment, err = c.generateConnectionPoolerDeployment(c.ConnectionPooler[role])
 			if err != nil {
-				msg := "could not generate deployment for connection pooler: %v"
-				return reason, fmt.Errorf(msg, err)
+				return syncReason, fmt.Errorf("could not generate deployment for connection pooler: %v", err)
 			}
 
-			deployment, err := updateConnectionPoolerDeployment(c.KubeClient,
-				newDeploymentSpec)
+			deployment, err = updateConnectionPoolerDeployment(c.KubeClient, newDeployment)
 
 			if err != nil {
-				return reason, err
+				return syncReason, err
 			}
 			c.ConnectionPooler[role].Deployment = deployment
 		}
@@ -898,31 +907,38 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		c.ConnectionPooler[role].Deployment = deployment
 	}
 
-	service, err := c.KubeClient.
-		Services(c.Namespace).
-		Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{})
-
-	if err != nil && k8sutil.ResourceNotFound(err) {
-		msg := "Service %s for connection pooler synchronization is not found, create it"
-		c.logger.Warningf(msg, c.connectionPoolerName(role))
-
-		serviceSpec := c.generateConnectionPoolerService(c.ConnectionPooler[role])
-		service, err := c.KubeClient.
-			Services(serviceSpec.Namespace).
-			Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
-
-		if err != nil {
-			return NoSync, err
+	if service, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
+		c.ConnectionPooler[role].Service = service
+		desiredSvc := c.generateConnectionPoolerService(c.ConnectionPooler[role])
+		if match, reason := k8sutil.SameService(service, desiredSvc); !match {
+			syncReason = append(syncReason, reason)
+			c.logServiceChanges(role, service, desiredSvc, false, reason)
+			newService, err = c.updateService(role, service, desiredSvc)
+			if err != nil {
+				return syncReason, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
+			}
+			c.ConnectionPooler[role].Service = newService
+			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		}
-		c.ConnectionPooler[role].Service = service
-
-	} else if err != nil {
-		msg := "could not get connection pooler service to sync: %v"
-		return NoSync, fmt.Errorf(msg, err)
-	} else {
-		// Service updates are not supported and probably not that useful anyway
-		c.ConnectionPooler[role].Service = service
+		return NoSync, nil
 	}
+
+	if !k8sutil.ResourceNotFound(err) {
+		return NoSync, fmt.Errorf("could not get connection pooler service to sync: %v", err)
+	}
+
+	c.ConnectionPooler[role].Service = nil
+	c.logger.Warningf("service %s for connection pooler synchronization is not found, create it", c.connectionPoolerName(role))
+
+	serviceSpec := c.generateConnectionPoolerService(c.ConnectionPooler[role])
+	newService, err = c.KubeClient.
+		Services(serviceSpec.Namespace).
+		Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
+
+	if err != nil {
+		return NoSync, err
+	}
+	c.ConnectionPooler[role].Service = newService
 
 	return NoSync, nil
 }

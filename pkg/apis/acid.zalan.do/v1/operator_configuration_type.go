@@ -37,8 +37,11 @@ type OperatorConfigurationList struct {
 
 // PostgresUsersConfiguration defines the system users of Postgres.
 type PostgresUsersConfiguration struct {
-	SuperUsername       string `json:"super_username,omitempty"`
-	ReplicationUsername string `json:"replication_username,omitempty"`
+	SuperUsername                 string `json:"super_username,omitempty"`
+	ReplicationUsername           string `json:"replication_username,omitempty"`
+	EnablePasswordRotation        bool   `json:"enable_password_rotation,omitempty"`
+	PasswordRotationInterval      uint32 `json:"password_rotation_interval,omitempty"`
+	PasswordRotationUserRetention uint32 `json:"password_rotation_user_retention,omitempty"`
 }
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
@@ -108,23 +111,27 @@ type PostgresPodResourcesDefaults struct {
 
 // OperatorTimeouts defines the timeout of ResourceCheck, PodWait, ReadyWait
 type OperatorTimeouts struct {
-	ResourceCheckInterval  Duration `json:"resource_check_interval,omitempty"`
-	ResourceCheckTimeout   Duration `json:"resource_check_timeout,omitempty"`
-	PodLabelWaitTimeout    Duration `json:"pod_label_wait_timeout,omitempty"`
-	PodDeletionWaitTimeout Duration `json:"pod_deletion_wait_timeout,omitempty"`
-	ReadyWaitInterval      Duration `json:"ready_wait_interval,omitempty"`
-	ReadyWaitTimeout       Duration `json:"ready_wait_timeout,omitempty"`
+	ResourceCheckInterval   Duration `json:"resource_check_interval,omitempty"`
+	ResourceCheckTimeout    Duration `json:"resource_check_timeout,omitempty"`
+	PodLabelWaitTimeout     Duration `json:"pod_label_wait_timeout,omitempty"`
+	PodDeletionWaitTimeout  Duration `json:"pod_deletion_wait_timeout,omitempty"`
+	ReadyWaitInterval       Duration `json:"ready_wait_interval,omitempty"`
+	ReadyWaitTimeout        Duration `json:"ready_wait_timeout,omitempty"`
+	PatroniAPICheckInterval Duration `json:"patroni_api_check_interval,omitempty"`
+	PatroniAPICheckTimeout  Duration `json:"patroni_api_check_timeout,omitempty"`
 }
 
 // LoadBalancerConfiguration defines the LB configuration
 type LoadBalancerConfiguration struct {
-	DbHostedZone              string                `json:"db_hosted_zone,omitempty"`
-	EnableMasterLoadBalancer  bool                  `json:"enable_master_load_balancer,omitempty"`
-	EnableReplicaLoadBalancer bool                  `json:"enable_replica_load_balancer,omitempty"`
-	CustomServiceAnnotations  map[string]string     `json:"custom_service_annotations,omitempty"`
-	MasterDNSNameFormat       config.StringTemplate `json:"master_dns_name_format,omitempty"`
-	ReplicaDNSNameFormat      config.StringTemplate `json:"replica_dns_name_format,omitempty"`
-	ExternalTrafficPolicy     string                `json:"external_traffic_policy" default:"Cluster"`
+	DbHostedZone                    string                `json:"db_hosted_zone,omitempty"`
+	EnableMasterLoadBalancer        bool                  `json:"enable_master_load_balancer,omitempty"`
+	EnableMasterPoolerLoadBalancer  bool                  `json:"enable_master_pooler_load_balancer,omitempty"`
+	EnableReplicaLoadBalancer       bool                  `json:"enable_replica_load_balancer,omitempty"`
+	EnableReplicaPoolerLoadBalancer bool                  `json:"enable_replica_pooler_load_balancer,omitempty"`
+	CustomServiceAnnotations        map[string]string     `json:"custom_service_annotations,omitempty"`
+	MasterDNSNameFormat             config.StringTemplate `json:"master_dns_name_format,omitempty"`
+	ReplicaDNSNameFormat            config.StringTemplate `json:"replica_dns_name_format,omitempty"`
+	ExternalTrafficPolicy           string                `json:"external_traffic_policy" default:"Cluster"`
 }
 
 // AWSGCPConfiguration defines the configuration for AWS
@@ -210,6 +217,7 @@ type OperatorLogicalBackupConfiguration struct {
 	S3AccessKeyID                string `json:"logical_backup_s3_access_key_id,omitempty"`
 	S3SecretAccessKey            string `json:"logical_backup_s3_secret_access_key,omitempty"`
 	S3SSE                        string `json:"logical_backup_s3_sse,omitempty"`
+	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
 }
@@ -218,6 +226,7 @@ type OperatorLogicalBackupConfiguration struct {
 type OperatorConfigurationData struct {
 	EnableCRDRegistration      *bool                              `json:"enable_crd_registration,omitempty"`
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
+	CRDCategories              []string                           `json:"crd_categories,omitempty"`
 	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
 	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
