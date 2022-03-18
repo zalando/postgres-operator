@@ -177,6 +177,15 @@ under the `users` key.
   Postgres username used for replication between instances. The default is
   `standby`.
 
+* **additional_owner_roles**
+  Specifies database roles that will become members of all database owners.
+  Then owners can use `SET ROLE` to obtain privileges of these roles to e.g.
+  create/update functionality from extensions as part of a migration script.
+  Note, that roles listed here should be preconfigured in the docker image
+  and already exist in the database cluster on startup. One such role can be
+  `cron_admin` which is provided by the Spilo docker image to set up cron
+  jobs inside the `postgres` database. Default is `empty`.
+
 * **enable_password_rotation**
   For all `LOGIN` roles that are not database owners the operator can rotate
   credentials in the corresponding K8s secrets by replacing the username and
@@ -770,7 +779,7 @@ key.
 
 * **protected_role_names**
   List of roles that cannot be overwritten by an application, team or
-  infrastructure role. The default is `admin`.
+  infrastructure role. The default list is `admin` and `cron_admin`.
 
 * **postgres_superuser_teams**
   List of teams which members need the superuser role in each PG database

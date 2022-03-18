@@ -26,6 +26,8 @@ configuration:
   #     protocol: TCP
   workers: 8
   users:
+    # additional_owner_roles: 
+    # - cron_admin
     enable_password_rotation: false
     password_rotation_interval: 90
     password_rotation_user_retention: 180
@@ -168,6 +170,7 @@ configuration:
     # - postgres_superusers
     protected_role_names:
     - admin
+    - cron_admin
     role_deletion_suffix: "_deleted"
     team_admin_role: admin
     team_api_role_configuration:

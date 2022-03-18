@@ -228,6 +228,8 @@ func (c *Cluster) initUsers() error {
 		return fmt.Errorf("could not init human users: %v", err)
 	}
 
+	c.initAdditionalOwnerRoles()
+
 	return nil
 }
 
@@ -1295,6 +1297,33 @@ func (c *Cluster) initRobotUsers() error {
 		}
 	}
 	return nil
+}
+
+func (c *Cluster) initAdditionalOwnerRoles() {
+	for _, additionalOwner := range c.OpConfig.AdditionalOwnerRoles {
+		// fetch all database owners the additional should become a member of
+		memberOf := make([]string, 0)
+		for username, pgUser := range c.pgUsers {
+			if pgUser.IsDbOwner {
+				memberOf = append(memberOf, username)
+			}
+		}
+
+		if len(memberOf) > 1 {
+			namespace := c.Namespace
+			additionalOwnerPgUser := spec.PgUser{
+				Origin:    spec.RoleOriginSpilo,
+				MemberOf:  memberOf,
+				Name:      additionalOwner,
+				Namespace: namespace,
+			}
+			if currentRole, present := c.pgUsers[additionalOwner]; present {
+				c.pgUsers[additionalOwner] = c.resolveNameConflict(&currentRole, &additionalOwnerPgUser)
+			} else {
+				c.pgUsers[additionalOwner] = additionalOwnerPgUser
+			}
+		}
+	}
 }
 
 func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) error {

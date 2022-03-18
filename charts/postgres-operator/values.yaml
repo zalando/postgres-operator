@@ -59,6 +59,16 @@ configGeneral:
 
 # parameters describing Postgres users
 configUsers:
+  # roles to be granted to database owners
+  # additional_owner_roles:
+  # - cron_admin
+
+  # enable password rotation for app users that are not database owners
+  enable_password_rotation: false
+  # rotation interval for updating credentials in K8s secrets of app users
+  password_rotation_interval: 90
+  # retention interval to keep rotation users
+  password_rotation_user_retention: 180
   # postgres username used for replication between instances
   replication_username: standby
   # postgres superuser name to be created by initdb
@@ -348,6 +358,7 @@ configTeamsApi:
   # List of roles that cannot be overwritten by an application, team or infrastructure role
   protected_role_names:
     - admin
+    - cron_admin
   # Suffix to add if members are removed from TeamsAPI or PostgresTeam CRD
   role_deletion_suffix: "_deleted"
   # role name to grant to team members created from the Teams API

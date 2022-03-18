@@ -101,6 +101,7 @@ type Auth struct {
 	InfrastructureRolesDefs       string                `name:"infrastructure_roles_secrets"`
 	SuperUsername                 string                `name:"super_username" default:"postgres"`
 	ReplicationUsername           string                `name:"replication_username" default:"standby"`
+	AdditionalOwnerRoles          []string              `name:"additional_owner_roles" default:""`
 	EnablePasswordRotation        bool                  `name:"enable_password_rotation" default:"false"`
 	PasswordRotationInterval      uint32                `name:"password_rotation_interval" default:"90"`
 	PasswordRotationUserRetention uint32                `name:"password_rotation_user_retention" default:"180"`
@@ -213,7 +214,7 @@ type Config struct {
 	TeamAPIRoleConfiguration               map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
 	PodTerminateGracePeriod                time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	PodManagementPolicy                    string            `name:"pod_management_policy" default:"ordered_ready"`
-	ProtectedRoles                         []string          `name:"protected_role_names" default:"admin"`
+	ProtectedRoles                         []string          `name:"protected_role_names" default:"admin,cron_admin"`
 	PostgresSuperuserTeams                 []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`

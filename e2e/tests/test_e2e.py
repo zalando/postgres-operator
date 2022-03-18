@@ -159,6 +159,37 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_additional_owner_roles(self):
+        '''
+           Test adding additional member roles to existing database owner roles
+        '''
+        k8s = self.k8s
+
+        # enable PostgresTeam CRD and lower resync
+        owner_roles = {
+            "data": {
+                "additional_owner_roles": "cron_admin",
+            },
+        }
+        k8s.update_config(owner_roles)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+
+        leader = k8s.get_cluster_leader_pod()
+        owner_query = """
+            SELECT a2.rolname
+              FROM pg_catalog.pg_authid a
+              JOIN pg_catalog.pg_auth_members am
+                ON a.oid = am.member
+               AND a.rolname = 'cron_admin'
+              JOIN pg_catalog.pg_authid a2
+                ON a2.oid = am.roleid
+             WHERE a2.rolname IN ('zalando', 'bar_owner', 'bar_data_owner');
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", owner_query)), 3,
+            "Not all additional users found in database", 10, 5)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_pod_capabilities(self):
         '''
            Extend postgres container capabilities

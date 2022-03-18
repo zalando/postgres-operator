@@ -33,10 +33,11 @@ var cl = New(
 	Config{
 		OpConfig: config.Config{
 			PodManagementPolicy: "ordered_ready",
-			ProtectedRoles:      []string{"admin"},
+			ProtectedRoles:      []string{"admin", "cron_admin", "part_man"},
 			Auth: config.Auth{
-				SuperUsername:       superUserName,
-				ReplicationUsername: replicationUserName,
+				SuperUsername:        superUserName,
+				ReplicationUsername:  replicationUserName,
+				AdditionalOwnerRoles: []string{"cron_admin", "part_man"},
 			},
 			Resources: config.Resources{
 				DownscalerAnnotations: []string{"downscaler/*"},
@@ -44,7 +45,13 @@ var cl = New(
 		},
 	},
 	k8sutil.NewMockKubernetesClient(),
-	acidv1.Postgresql{ObjectMeta: metav1.ObjectMeta{Name: "acid-test", Namespace: "test", Annotations: map[string]string{"downscaler/downtime_replicas": "0"}}},
+	acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "acid-test",
+			Namespace:   "test",
+			Annotations: map[string]string{"downscaler/downtime_replicas": "0"},
+		},
+	},
 	logger,
 	eventRecorder,
 )
@@ -129,6 +136,39 @@ func TestInitRobotUsers(t *testing.T) {
 				t.Errorf("%s expected: %#v, got %#v", testName, tt.result, cl.pgUsers)
 			}
 		}
+	}
+}
+
+func TestInitAdditionalOwnerRoles(t *testing.T) {
+	testName := "TestInitAdditionalOwnerRoles"
+
+	manifestUsers := map[string]acidv1.UserFlags{"foo_owner": {}, "bar_owner": {}, "app_user": {}}
+	expectedUsers := map[string]spec.PgUser{
+		"foo_owner":  {Origin: spec.RoleOriginManifest, Name: "foo_owner", Namespace: cl.Namespace, Password: "f123", Flags: []string{"LOGIN"}, IsDbOwner: true},
+		"bar_owner":  {Origin: spec.RoleOriginManifest, Name: "bar_owner", Namespace: cl.Namespace, Password: "b123", Flags: []string{"LOGIN"}, IsDbOwner: true},
+		"app_user":   {Origin: spec.RoleOriginManifest, Name: "app_user", Namespace: cl.Namespace, Password: "a123", Flags: []string{"LOGIN"}, IsDbOwner: false},
+		"cron_admin": {Origin: spec.RoleOriginSpilo, Name: "cron_admin", Namespace: cl.Namespace, MemberOf: []string{"foo_owner", "bar_owner"}},
+		"part_man":   {Origin: spec.RoleOriginSpilo, Name: "part_man", Namespace: cl.Namespace, MemberOf: []string{"foo_owner", "bar_owner"}},
+	}
+
+	cl.Spec.Databases = map[string]string{"foo_db": "foo_owner", "bar_db": "bar_owner"}
+	cl.Spec.Users = manifestUsers
+
+	// this should set IsDbOwner field for manifest users
+	if err := cl.initRobotUsers(); err != nil {
+		t.Errorf("%s could not init manifest users", testName)
+	}
+
+	// update passwords to compare with result
+	for manifestUser := range manifestUsers {
+		pgUser := cl.pgUsers[manifestUser]
+		pgUser.Password = manifestUser[0:1] + "123"
+		cl.pgUsers[manifestUser] = pgUser
+	}
+
+	cl.initAdditionalOwnerRoles()
+	if !reflect.DeepEqual(cl.pgUsers, expectedUsers) {
+		t.Errorf("%s expected: %#v, got %#v", testName, expectedUsers, cl.pgUsers)
 	}
 }
 
