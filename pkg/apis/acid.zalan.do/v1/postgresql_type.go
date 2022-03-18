@@ -58,7 +58,7 @@ type PostgresSpec struct {
 	Users                          map[string]UserFlags `json:"users,omitempty"`
 	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
 	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
-
+  
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
 	Clone                 *CloneDescription           `json:"clone,omitempty"`
@@ -70,6 +70,7 @@ type PostgresSpec struct {
 	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
 	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
 	InitContainers        []v1.Container              `json:"initContainers,omitempty"`
+	ReadOnlyRootFilesystem *bool                       `json:"readOnlyRootFilesystem,omitempty"`
 	PodPriorityClassName  string                      `json:"podPriorityClassName,omitempty"`
 	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
 	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`

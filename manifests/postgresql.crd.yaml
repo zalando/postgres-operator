@@ -399,6 +399,8 @@ spec:
                             type: boolean
                     secretNamespace:
                       type: string
+              readOnlyRootFilesystem:
+                type: boolean
               replicaLoadBalancer:
                 type: boolean
                 description: deprecated
