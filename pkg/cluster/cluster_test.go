@@ -11,6 +11,7 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -167,8 +168,17 @@ func TestInitAdditionalOwnerRoles(t *testing.T) {
 	}
 
 	cl.initAdditionalOwnerRoles()
-	if !reflect.DeepEqual(cl.pgUsers, expectedUsers) {
-		t.Errorf("%s expected: %#v, got %#v", testName, expectedUsers, cl.pgUsers)
+
+	for _, additionalOwnerRole := range cl.Config.OpConfig.AdditionalOwnerRoles {
+		expectedPgUser := expectedUsers[additionalOwnerRole]
+		existingPgUser, exists := cl.pgUsers[additionalOwnerRole]
+		if !exists {
+			t.Errorf("%s additional owner role %q not initilaized", testName, additionalOwnerRole)
+		}
+		if !util.IsEqualIgnoreOrder(expectedPgUser.MemberOf, existingPgUser.MemberOf) {
+			t.Errorf("%s unexpected membership of additional owner role %q: expected member of %#v, got member of %#v",
+				testName, additionalOwnerRole, expectedPgUser.MemberOf, existingPgUser.MemberOf)
+		}
 	}
 }
 
