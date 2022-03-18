@@ -1007,14 +1007,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 		// controller adjusts the default memory request at operator startup
 
-		request := spec.Resources.ResourceRequests.Memory
-		if request == "" {
-			request = c.OpConfig.Resources.DefaultMemoryRequest
-		}
+		var request, limit string
 
-		limit := spec.Resources.ResourceLimits.Memory
-		if limit == "" {
+		if spec.Resources == nil {
+			request = c.OpConfig.Resources.DefaultMemoryRequest
 			limit = c.OpConfig.Resources.DefaultMemoryLimit
+		} else {
+			request = spec.Resources.ResourceRequests.Memory
+			limit = spec.Resources.ResourceRequests.Memory
 		}
 
 		isSmaller, err := util.IsSmallerQuantity(request, limit)
@@ -1034,14 +1034,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		for _, sidecar := range spec.Sidecars {
 
 			// TODO #413
-			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
-			if request == "" {
-				request = c.OpConfig.Resources.DefaultMemoryRequest
-			}
+			var sidecarRequest, sidecarLimit string
 
-			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
-			if limit == "" {
-				limit = c.OpConfig.Resources.DefaultMemoryLimit
+			if sidecar.Resources == nil {
+				sidecarRequest = c.OpConfig.Resources.DefaultMemoryRequest
+				sidecarLimit = c.OpConfig.Resources.DefaultMemoryLimit
+			} else {
+				sidecarRequest = sidecar.Resources.ResourceRequests.Memory
+				sidecarLimit = sidecar.Resources.ResourceRequests.Memory
 			}
 
 			isSmaller, err := util.IsSmallerQuantity(sidecarRequest, sidecarLimit)

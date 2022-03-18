@@ -683,12 +683,17 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 		err       error
 	)
 
+	if spec.Resources == nil {
+		return nil
+	}
+
 	// setting limits too low can cause unnecessary evictions / OOM kills
 	minCPULimit := c.OpConfig.MinCPULimit
 	minMemoryLimit := c.OpConfig.MinMemoryLimit
 
 	cpuLimit := spec.Resources.ResourceLimits.CPU
 	if cpuLimit != "" {
+		cpuLimit := spec.Resources.ResourceLimits.CPU
 		isSmaller, err = util.IsSmallerQuantity(cpuLimit, minCPULimit)
 		if err != nil {
 			return fmt.Errorf("could not compare defined CPU limit %s with configured minimum value %s: %v", cpuLimit, minCPULimit, err)
