@@ -213,6 +213,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
             self.eventuallyEqual(lambda: k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
                                 2, "Container capabilities not updated")
 
