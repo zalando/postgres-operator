@@ -37,6 +37,14 @@ func Int32ToPointer(value int32) *int32 {
 	return &value
 }
 
+func UInt32ToPointer(value uint32) *uint32 {
+	return &value
+}
+
+func StringToPointer(str string) *string {
+	return &str
+}
+
 // KubernetesClient describes getters for Kubernetes objects
 type KubernetesClient struct {
 	corev1.SecretsGetter

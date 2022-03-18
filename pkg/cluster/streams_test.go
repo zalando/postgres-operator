@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	v1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	zalandov1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
 	fakezalandov1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
@@ -63,15 +63,18 @@ var (
 					Database:      "foo",
 					Tables: map[string]acidv1.StreamTable{
 						"data.bar": acidv1.StreamTable{
-							EventType:     "stream_type_a",
-							IdColumn:      "b_id",
-							PayloadColumn: "b_payload",
+							EventType:     "stream-type-a",
+							IdColumn:      k8sutil.StringToPointer("b_id"),
+							PayloadColumn: k8sutil.StringToPointer("b_payload"),
+						},
+						"data.foobar": acidv1.StreamTable{
+							EventType: "stream-type-b",
 						},
 					},
-					Filter: map[string]string{
-						"data.bar": "[?(@.source.txId > 500 && @.source.lsn > 123456)]",
+					Filter: map[string]*string{
+						"data.bar": k8sutil.StringToPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
 					},
-					BatchSize: uint32(100),
+					BatchSize: k8sutil.UInt32ToPointer(uint32(100)),
 				},
 			},
 			Volume: acidv1.Volume{
@@ -80,7 +83,7 @@ var (
 		},
 	}
 
-	fes = &v1.FabricEventStream{
+	fes = &zalandov1.FabricEventStream{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: constants.EventStreamCRDApiVersion,
 			Kind:       constants.EventStreamCRDKind,
@@ -97,23 +100,23 @@ var (
 				},
 			},
 		},
-		Spec: v1.FabricEventStreamSpec{
+		Spec: zalandov1.FabricEventStreamSpec{
 			ApplicationId: appId,
-			EventStreams: []v1.EventStream{
-				{
-					EventStreamFlow: v1.EventStreamFlow{
-						PayloadColumn: "b_payload",
+			EventStreams: []zalandov1.EventStream{
+				zalandov1.EventStream{
+					EventStreamFlow: zalandov1.EventStreamFlow{
+						PayloadColumn: k8sutil.StringToPointer("b_payload"),
 						Type:          constants.EventStreamFlowPgGenericType,
 					},
-					EventStreamSink: v1.EventStreamSink{
-						EventType:    "stream_type_a",
-						MaxBatchSize: uint32(100),
+					EventStreamSink: zalandov1.EventStreamSink{
+						EventType:    "stream-type-a",
+						MaxBatchSize: k8sutil.UInt32ToPointer(uint32(100)),
 						Type:         constants.EventStreamSinkNakadiType,
 					},
-					EventStreamSource: v1.EventStreamSource{
-						Filter: "[?(@.source.txId > 500 && @.source.lsn > 123456)]",
-						Connection: v1.Connection{
-							DBAuth: v1.DBAuth{
+					EventStreamSource: zalandov1.EventStreamSource{
+						Filter: k8sutil.StringToPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
+						Connection: zalandov1.Connection{
+							DBAuth: zalandov1.DBAuth{
 								Name:        fmt.Sprintf("fes-user.%s.credentials.postgresql.acid.zalan.do", clusterName),
 								PasswordKey: "password",
 								Type:        constants.EventStreamSourceAuthType,
@@ -124,9 +127,37 @@ var (
 							PluginType: constants.EventStreamSourcePluginType,
 						},
 						Schema: "data",
-						EventStreamTable: v1.EventStreamTable{
-							IDColumn: "b_id",
+						EventStreamTable: zalandov1.EventStreamTable{
+							IDColumn: k8sutil.StringToPointer("b_id"),
 							Name:     "bar",
+						},
+						Type: constants.EventStreamSourcePGType,
+					},
+				},
+				zalandov1.EventStream{
+					EventStreamFlow: zalandov1.EventStreamFlow{
+						Type: constants.EventStreamFlowPgGenericType,
+					},
+					EventStreamSink: zalandov1.EventStreamSink{
+						EventType:    "stream-type-b",
+						MaxBatchSize: k8sutil.UInt32ToPointer(uint32(100)),
+						Type:         constants.EventStreamSinkNakadiType,
+					},
+					EventStreamSource: zalandov1.EventStreamSource{
+						Connection: zalandov1.Connection{
+							DBAuth: zalandov1.DBAuth{
+								Name:        fmt.Sprintf("fes-user.%s.credentials.postgresql.acid.zalan.do", clusterName),
+								PasswordKey: "password",
+								Type:        constants.EventStreamSourceAuthType,
+								UserKey:     "username",
+							},
+							Url:        fmt.Sprintf("jdbc:postgresql://%s.%s/foo?user=%s&ssl=true&sslmode=require", clusterName, namespace, fesUser),
+							SlotName:   slotName,
+							PluginType: constants.EventStreamSourcePluginType,
+						},
+						Schema: "data",
+						EventStreamTable: zalandov1.EventStreamTable{
+							Name: "foobar",
 						},
 						Type: constants.EventStreamSourcePGType,
 					},
@@ -161,23 +192,116 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
 
+	// create statefulset to have ownerReference for streams
 	_, err := cluster.createStatefulSet()
 	assert.NoError(t, err)
 
+	// create the streams
 	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
+	// compare generated stream with expected stream
 	result := cluster.generateFabricEventStream(appId)
-
-	if !reflect.DeepEqual(result, fes) {
-		t.Errorf("Malformed FabricEventStream, expected %#v, got %#v", fes, result)
+	if match, _ := sameStreams(result.Spec.EventStreams, fes.Spec.EventStreams); !match {
+		t.Errorf("malformed FabricEventStream, expected %#v, got %#v", fes, result)
 	}
 
+	// compare stream resturned from API with expected stream
 	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
 	assert.NoError(t, err)
+	if match, _ := sameStreams(streamCRD.Spec.EventStreams, fes.Spec.EventStreams); !match {
+		t.Errorf("malformed FabricEventStream returned from API, expected %#v, got %#v", fes, streamCRD)
+	}
 
-	if !reflect.DeepEqual(streamCRD, fes) {
-		t.Errorf("Malformed FabricEventStream, expected %#v, got %#v", fes, streamCRD)
+	// sync streams once again
+	err = cluster.createOrUpdateStreams()
+	assert.NoError(t, err)
+
+	// compare stream resturned from API with generated stream
+	streamCRD, err = cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
+	assert.NoError(t, err)
+	if match, _ := sameStreams(streamCRD.Spec.EventStreams, result.Spec.EventStreams); !match {
+		t.Errorf("returned FabricEventStream differs from generated one, expected %#v, got %#v", result, streamCRD)
+	}
+}
+
+func TestSameStreams(t *testing.T) {
+	testName := "TestSameStreams"
+
+	stream1 := zalandov1.EventStream{
+		EventStreamFlow: zalandov1.EventStreamFlow{},
+		EventStreamSink: zalandov1.EventStreamSink{
+			EventType: "stream-type-a",
+		},
+		EventStreamSource: zalandov1.EventStreamSource{
+			EventStreamTable: zalandov1.EventStreamTable{
+				Name: "foo",
+			},
+		},
+	}
+
+	stream2 := zalandov1.EventStream{
+		EventStreamFlow: zalandov1.EventStreamFlow{},
+		EventStreamSink: zalandov1.EventStreamSink{
+			EventType: "stream-type-b",
+		},
+		EventStreamSource: zalandov1.EventStreamSource{
+			EventStreamTable: zalandov1.EventStreamTable{
+				Name: "bar",
+			},
+		},
+	}
+
+	tests := []struct {
+		subTest  string
+		streamsA []zalandov1.EventStream
+		streamsB []zalandov1.EventStream
+		match    bool
+		reason   string
+	}{
+		{
+			subTest:  "identical streams",
+			streamsA: []zalandov1.EventStream{stream1, stream2},
+			streamsB: []zalandov1.EventStream{stream1, stream2},
+			match:    true,
+			reason:   "",
+		},
+		{
+			subTest:  "same streams different order",
+			streamsA: []zalandov1.EventStream{stream1, stream2},
+			streamsB: []zalandov1.EventStream{stream2, stream1},
+			match:    true,
+			reason:   "",
+		},
+		{
+			subTest:  "same streams different order",
+			streamsA: []zalandov1.EventStream{stream1},
+			streamsB: []zalandov1.EventStream{stream1, stream2},
+			match:    false,
+			reason:   "number of defined streams is different",
+		},
+		{
+			subTest:  "different number of streams",
+			streamsA: []zalandov1.EventStream{stream1},
+			streamsB: []zalandov1.EventStream{stream1, stream2},
+			match:    false,
+			reason:   "number of defined streams is different",
+		},
+		{
+			subTest:  "event stream specs differ",
+			streamsA: []zalandov1.EventStream{stream1, stream2},
+			streamsB: fes.Spec.EventStreams,
+			match:    false,
+			reason:   "number of defined streams is different",
+		},
+	}
+
+	for _, tt := range tests {
+		streamsMatch, matchReason := sameStreams(tt.streamsA, tt.streamsB)
+		if streamsMatch != tt.match {
+			t.Errorf("%s %s: unexpected match result when comparing streams: got %s, epxected %s",
+				testName, tt.subTest, matchReason, tt.reason)
+		}
 	}
 }
 
@@ -213,12 +337,12 @@ func TestUpdateFabricEventStream(t *testing.T) {
 			Database:      dbName,
 			Tables: map[string]acidv1.StreamTable{
 				"data.bar": acidv1.StreamTable{
-					EventType:     "stream_type_b",
-					IdColumn:      "b_id",
-					PayloadColumn: "b_payload",
+					EventType:     "stream-type-c",
+					IdColumn:      k8sutil.StringToPointer("b_id"),
+					PayloadColumn: k8sutil.StringToPointer("b_payload"),
 				},
 			},
-			BatchSize: uint32(250),
+			BatchSize: k8sutil.UInt32ToPointer(uint32(250)),
 		},
 	}
 	patch, err := json.Marshal(struct {
