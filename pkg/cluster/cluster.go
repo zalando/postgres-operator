@@ -693,7 +693,6 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 
 	cpuLimit := spec.Resources.ResourceLimits.CPU
 	if cpuLimit != "" {
-		cpuLimit := spec.Resources.ResourceLimits.CPU
 		isSmaller, err = util.IsSmallerQuantity(cpuLimit, minCPULimit)
 		if err != nil {
 			return fmt.Errorf("could not compare defined CPU limit %s with configured minimum value %s: %v", cpuLimit, minCPULimit, err)
