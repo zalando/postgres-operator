@@ -27,7 +27,7 @@ type PostgresSpec struct {
 	PostgresqlParam `json:"postgresql"`
 	Volume          `json:"volume,omitempty"`
 	Patroni         `json:"patroni,omitempty"`
-	Resources       `json:"resources,omitempty"`
+	*Resources      `json:"resources,omitempty"`
 
 	EnableConnectionPooler        *bool             `json:"enableConnectionPooler,omitempty"`
 	EnableReplicaConnectionPooler *bool             `json:"enableReplicaConnectionPooler,omitempty"`
@@ -199,7 +199,7 @@ type CloneDescription struct {
 
 // Sidecar defines a container to be run in the same pod as the Postgres container.
 type Sidecar struct {
-	Resources   `json:"resources,omitempty"`
+	*Resources  `json:"resources,omitempty"`
 	Name        string             `json:"name,omitempty"`
 	DockerImage string             `json:"image,omitempty"`
 	Ports       []v1.ContainerPort `json:"ports,omitempty"`
@@ -232,7 +232,7 @@ type ConnectionPooler struct {
 	DockerImage       string `json:"dockerImage,omitempty"`
 	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
 
-	Resources `json:"resources,omitempty"`
+	*Resources `json:"resources,omitempty"`
 }
 
 type Stream struct {

@@ -60,7 +60,7 @@ func TestStatefulSetAnnotations(t *testing.T) {
 	testName := "CheckStatefulsetAnnotations"
 	spec := acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
-		Resources: acidv1.Resources{
+		Resources: &acidv1.Resources{
 			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 		},
