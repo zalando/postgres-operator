@@ -238,8 +238,6 @@ class EndToEndTestCase(unittest.TestCase):
             },
         }
         k8s.update_config(enable_postgres_team_crd)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
-                             "Operator does not get in sync")
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
