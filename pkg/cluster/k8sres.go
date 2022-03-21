@@ -139,8 +139,8 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 func generateResourceRequirements(resources *acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
 	var err error
 
-	var specRequests acidv1.ResourceDescription
-	var specLimits acidv1.ResourceDescription
+	var specRequests, specLimits acidv1.ResourceDescription
+
 	if resources == nil {
 		specRequests = acidv1.ResourceDescription{}
 		specLimits = acidv1.ResourceDescription{}
@@ -1007,14 +1007,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 		// controller adjusts the default memory request at operator startup
 
-		request := spec.Resources.ResourceRequests.Memory
-		if request == "" {
-			request = c.OpConfig.Resources.DefaultMemoryRequest
-		}
+		var request, limit string
 
-		limit := spec.Resources.ResourceLimits.Memory
-		if limit == "" {
+		if spec.Resources == nil {
+			request = c.OpConfig.Resources.DefaultMemoryRequest
 			limit = c.OpConfig.Resources.DefaultMemoryLimit
+		} else {
+			request = spec.Resources.ResourceRequests.Memory
+			limit = spec.Resources.ResourceRequests.Memory
 		}
 
 		isSmaller, err := util.IsSmallerQuantity(request, limit)
@@ -1024,7 +1024,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		if isSmaller {
 			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
 			spec.Resources.ResourceRequests.Memory = limit
-
 		}
 
 		// controller adjusts the Scalyr sidecar request at operator startup
@@ -1034,14 +1033,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		for _, sidecar := range spec.Sidecars {
 
 			// TODO #413
-			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
-			if request == "" {
-				request = c.OpConfig.Resources.DefaultMemoryRequest
-			}
+			var sidecarRequest, sidecarLimit string
 
-			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
-			if limit == "" {
-				limit = c.OpConfig.Resources.DefaultMemoryLimit
+			if sidecar.Resources == nil {
+				sidecarRequest = c.OpConfig.Resources.DefaultMemoryRequest
+				sidecarLimit = c.OpConfig.Resources.DefaultMemoryLimit
+			} else {
+				sidecarRequest = sidecar.Resources.ResourceRequests.Memory
+				sidecarLimit = sidecar.Resources.ResourceRequests.Memory
 			}
 
 			isSmaller, err := util.IsSmallerQuantity(sidecarRequest, sidecarLimit)
@@ -1057,7 +1056,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	defaultResources := c.makeDefaultResources()
-
 	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)

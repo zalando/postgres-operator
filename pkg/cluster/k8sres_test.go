@@ -1578,7 +1578,7 @@ func TestEnableLoadBalancers(t *testing.T) {
 					EnableReplicaLoadBalancer:       util.False(),
 					EnableReplicaPoolerLoadBalancer: util.False(),
 					NumberOfInstances:               1,
-					Resources: acidv1.Resources{
+					Resources: &acidv1.Resources{
 						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 						ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 					},
@@ -1625,7 +1625,7 @@ func TestEnableLoadBalancers(t *testing.T) {
 					EnableReplicaLoadBalancer:       util.True(),
 					EnableReplicaPoolerLoadBalancer: util.True(),
 					NumberOfInstances:               1,
-					Resources: acidv1.Resources{
+					Resources: &acidv1.Resources{
 						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 						ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 					},
@@ -1720,7 +1720,7 @@ func TestVolumeSelector(t *testing.T) {
 		return acidv1.PostgresSpec{
 			TeamID:            "myapp",
 			NumberOfInstances: 0,
-			Resources: acidv1.Resources{
+			Resources: &acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			},
