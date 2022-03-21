@@ -1,3 +1,0 @@
-recursive-include operator_ui/static *
-recursive-include operator_ui/templates *
-include *.rst

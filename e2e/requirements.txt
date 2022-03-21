@@ -1,3 +1,0 @@
-kubernetes==11.0.0
-timeout_decorator==0.4.1
-pyyaml==5.4.1
