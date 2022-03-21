@@ -28,6 +28,8 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/users"
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingApiV1 "k8s.io/api/autoscaling/v1"
+	autoscalingApiV2 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -62,6 +64,8 @@ type kubeResources struct {
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
+	HorizontalPodAutoscalerV1 *autoscalingApiV1.HorizontalPodAutoscaler
+	HorizontalPodAutoscalerV2 *autoscalingApiV2.HorizontalPodAutoscaler
 	//Pods are treated separately
 	//PVCs are treated separately
 }
@@ -228,8 +232,6 @@ func (c *Cluster) initUsers() error {
 		return fmt.Errorf("could not init human users: %v", err)
 	}
 
-	c.initAdditionalOwnerRoles()
-
 	return nil
 }
 
@@ -319,6 +321,25 @@ func (c *Cluster) Create() error {
 
 	c.logger.Info("waiting for the cluster being ready")
 
+	
+	hpav1, err := c.createHorizontalPodAutoscalerV1()
+	if err != nil {
+		return fmt.Errorf("could not create HPAV1: %v", err)
+	}
+
+	if hpav1 != nil {
+		c.logger.Info("Created Horizontal Pod Autoscaler V1: %q ", util.NameFromMeta(hpav1.ObjectMeta))
+	}
+
+	hpav2, err := c.createHorizontalPodAutoscalerV2()
+	if err != nil {
+		return fmt.Errorf("could not create HPAV2: %v", err)
+	}
+	if hpav2 != nil {
+		c.logger.Info("Created Horizontal Pod Autoscaler V2 : %q ", util.NameFromMeta(hpav2.ObjectMeta))
+	}
+
+
 	if err = c.waitStatefulsetPodsReady(); err != nil {
 		c.logger.Errorf("failed to create cluster: %v", err)
 		return err
@@ -362,12 +383,6 @@ func (c *Cluster) Create() error {
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
-
-	if len(c.Spec.Streams) > 0 {
-		if err = c.syncStreams(); err != nil {
-			c.logger.Errorf("could not create streams: %v", err)
-		}
-	}
 
 	return nil
 }
@@ -525,7 +540,7 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 		newCheck("new statefulset %s's %s (index %d) name does not match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
 		newCheck("new statefulset %s's %s (index %d) ports do not match the current one",
-			func(a, b v1.Container) bool { return !comparePorts(a.Ports, b.Ports) }),
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
 		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
 		newCheck("new statefulset %s's %s (index %d) environment does not match the current one",
@@ -636,56 +651,12 @@ func compareSpiloConfiguration(configa, configb string) bool {
 	return reflect.DeepEqual(oa, ob)
 }
 
-func areProtocolsEqual(a, b v1.Protocol) bool {
-	return a == b ||
-		(a == "" && b == v1.ProtocolTCP) ||
-		(a == v1.ProtocolTCP && b == "")
-}
-
-func comparePorts(a, b []v1.ContainerPort) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	areContainerPortsEqual := func(a, b v1.ContainerPort) bool {
-		return a.Name == b.Name &&
-			a.HostPort == b.HostPort &&
-			areProtocolsEqual(a.Protocol, b.Protocol) &&
-			a.HostIP == b.HostIP
-	}
-
-	findByPortValue := func(portSpecs []v1.ContainerPort, port int32) (v1.ContainerPort, bool) {
-		for _, portSpec := range portSpecs {
-			if portSpec.ContainerPort == port {
-				return portSpec, true
-			}
-		}
-		return v1.ContainerPort{}, false
-	}
-
-	for _, portA := range a {
-		portB, found := findByPortValue(b, portA.ContainerPort)
-		if !found {
-			return false
-		}
-		if !areContainerPortsEqual(portA, portB) {
-			return false
-		}
-	}
-
-	return true
-}
-
 func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 
 	var (
 		isSmaller bool
 		err       error
 	)
-
-	if spec.Resources == nil {
-		return nil
-	}
 
 	// setting limits too low can cause unnecessary evictions / OOM kills
 	minCPULimit := c.OpConfig.MinCPULimit
@@ -763,18 +734,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// check if users need to be synced
-	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
-		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
-	sameRotatedUsers := reflect.DeepEqual(oldSpec.Spec.UsersWithSecretRotation, newSpec.Spec.UsersWithSecretRotation) &&
-		reflect.DeepEqual(oldSpec.Spec.UsersWithInPlaceSecretRotation, newSpec.Spec.UsersWithInPlaceSecretRotation)
-
 	// connection pooler needs one system user created, which is done in
 	// initUsers. Check if it needs to be called.
+	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
+		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
 	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
 		needReplicaConnectionPoolerWorker(&newSpec.Spec)
-
-	if !sameUsers || !sameRotatedUsers || needConnectionPooler {
+	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("initialize users")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
@@ -837,6 +803,22 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		c.logger.Debug("syncing pod disruption budgets")
 		if err := c.syncPodDisruptionBudget(true); err != nil {
 			c.logger.Errorf("could not sync pod disruption budget: %v", err)
+			updateFailed = true
+		}
+	}
+
+	if oldSpec.Spec.HorizontalPodAutoscalerV1 != newSpec.Spec.HorizontalPodAutoscalerV1 {
+		c.logger.Debug("syncing horizontal pod autoscaler v1")
+		if err := c.syncHorizontalPodAutoscalerV1(newSpec); err != nil {
+			c.logger.Errorf("could not sync horizontal pod autoscaler v1: %v", err)
+			updateFailed = true
+		}
+	}
+
+	if oldSpec.Spec.HorizontalPodAutoscalerV2 != newSpec.Spec.HorizontalPodAutoscalerV2 {
+		c.logger.Debug("syncing horizontal pod autoscaler v2")
+		if err := c.syncHorizontalPodAutoscalerV2(newSpec); err != nil {
+			c.logger.Errorf("could not sync horizontal pod autoscaler v2: %v", err)
 			updateFailed = true
 		}
 	}
@@ -913,13 +895,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		updateFailed = true
 	}
 
-	if len(c.Spec.Streams) > 0 {
-		if err := c.syncStreams(); err != nil {
-			c.logger.Errorf("could not sync streams: %v", err)
-			updateFailed = true
-		}
-	}
-
 	if !updateFailed {
 		// Major version upgrade must only fire after success of earlier operations and should stay last
 		if err := c.majorVersionUpgrade(); err != nil {
@@ -955,10 +930,6 @@ func (c *Cluster) Delete() {
 	defer c.mu.Unlock()
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of new cluster resources")
 
-	if err := c.deleteStreams(); err != nil {
-		c.logger.Warningf("could not delete event streams: %v", err)
-	}
-
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created
 	if err := c.deleteLogicalBackupJob(); err != nil {
@@ -975,6 +946,14 @@ func (c *Cluster) Delete() {
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
 		c.logger.Warningf("could not delete pod disruption budget: %v", err)
+	}
+
+	if err := c.deleteHorizontalPodAutoscalerV1(); err != nil {
+		c.logger.Warningf("could not delete horizontal pod autoscaler v1: %v", err)
+	}
+
+	if err := c.deleteHorizontalPodAutoscalerV2(); err != nil {
+		c.logger.Warningf("could not delete horizontal pod autoscaler v1: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -1069,7 +1048,6 @@ func (c *Cluster) initSystemUsers() {
 		Origin:    spec.RoleOriginSystem,
 		Name:      c.OpConfig.ReplicationUsername,
 		Namespace: c.Namespace,
-		Flags:     []string{constants.RoleFlagLogin},
 		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 
@@ -1111,23 +1089,6 @@ func (c *Cluster) initSystemUsers() {
 
 		if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; !exists {
 			c.systemUsers[constants.ConnectionPoolerUserKeyName] = connectionPoolerUser
-		}
-	}
-
-	// replication users for event streams are another exception
-	// the operator will create one replication user for all streams
-	if len(c.Spec.Streams) > 0 {
-		username := constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
-		streamUser := spec.PgUser{
-			Origin:    spec.RoleConnectionPooler,
-			Name:      username,
-			Namespace: c.Namespace,
-			Flags:     []string{constants.RoleFlagLogin, constants.RoleFlagReplication},
-			Password:  util.RandomPassword(constants.PasswordLength),
-		}
-
-		if _, exists := c.pgUsers[username]; !exists {
-			c.pgUsers[username] = streamUser
 		}
 	}
 }
@@ -1199,6 +1160,7 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix, searchPath, secretNamespace string) error {
 
 	for defaultRole, inherits := range defaultRoles {
+
 		namespace := c.Namespace
 		//if namespaced secrets are allowed
 		if secretNamespace != "" {
@@ -1221,10 +1183,8 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		}
 
 		adminRole := ""
-		isOwner := false
 		if strings.Contains(defaultRole, constants.OwnerRoleNameSuffix) {
 			adminRole = admin
-			isOwner = true
 		} else {
 			adminRole = prefix + constants.OwnerRoleNameSuffix
 		}
@@ -1238,7 +1198,6 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 			MemberOf:   memberOf,
 			Parameters: map[string]string{"search_path": searchPath},
 			AdminRole:  adminRole,
-			IsDbOwner:  isOwner,
 		}
 		if currentRole, present := c.pgUsers[roleName]; present {
 			c.pgUsers[roleName] = c.resolveNameConflict(&currentRole, &newRole)
@@ -1259,14 +1218,6 @@ func (c *Cluster) initRobotUsers() error {
 			continue
 		}
 		namespace := c.Namespace
-
-		// check if role is specified as database owner
-		isOwner := false
-		for _, owner := range c.Spec.Databases {
-			if username == owner {
-				isOwner = true
-			}
-		}
 
 		//if namespaced secrets are allowed
 		if c.Config.OpConfig.EnableCrossNamespaceSecret {
@@ -1292,7 +1243,6 @@ func (c *Cluster) initRobotUsers() error {
 			Password:  util.RandomPassword(constants.PasswordLength),
 			Flags:     flags,
 			AdminRole: adminRole,
-			IsDbOwner: isOwner,
 		}
 		if currentRole, present := c.pgUsers[username]; present {
 			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
@@ -1301,33 +1251,6 @@ func (c *Cluster) initRobotUsers() error {
 		}
 	}
 	return nil
-}
-
-func (c *Cluster) initAdditionalOwnerRoles() {
-	for _, additionalOwner := range c.OpConfig.AdditionalOwnerRoles {
-		// fetch all database owners the additional should become a member of
-		memberOf := make([]string, 0)
-		for username, pgUser := range c.pgUsers {
-			if pgUser.IsDbOwner {
-				memberOf = append(memberOf, username)
-			}
-		}
-
-		if len(memberOf) > 1 {
-			namespace := c.Namespace
-			additionalOwnerPgUser := spec.PgUser{
-				Origin:    spec.RoleOriginSpilo,
-				MemberOf:  memberOf,
-				Name:      additionalOwner,
-				Namespace: namespace,
-			}
-			if currentRole, present := c.pgUsers[additionalOwner]; present {
-				c.pgUsers[additionalOwner] = c.resolveNameConflict(&currentRole, &additionalOwnerPgUser)
-			} else {
-				c.pgUsers[additionalOwner] = additionalOwnerPgUser
-			}
-		}
-	}
 }
 
 func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) error {

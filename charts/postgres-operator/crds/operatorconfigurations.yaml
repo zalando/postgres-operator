@@ -61,11 +61,6 @@ spec:
           configuration:
             type: object
             properties:
-              crd_categories:
-                type: array
-                nullable: true
-                items:
-                  type: string
               docker_image:
                 type: string
                 default: "registry.opensource.zalan.do/acid/spilo-14:2.1-p3"
@@ -74,7 +69,6 @@ spec:
                 default: true
               enable_crd_validation:
                 type: boolean
-                description: deprecated
                 default: true
               enable_lazy_spilo_upgrade:
                 type: boolean
@@ -96,13 +90,11 @@ spec:
                 default: false
               max_instances:
                 type: integer
-                description: "-1 = disabled"
-                minimum: -1
+                minimum: -1  # -1 = disabled
                 default: -1
               min_instances:
                 type: integer
-                description: "-1 = disabled"
-                minimum: -1
+                minimum: -1  # -1 = disabled
                 default: -1
               resync_period:
                 type: string
@@ -130,20 +122,6 @@ spec:
               users:
                 type: object
                 properties:
-                  additional_owner_roles:
-                    type: array
-                    nullable: true
-                    items:
-                      type: string
-                  enable_password_rotation:
-                    type: boolean
-                    default: false
-                  password_rotation_interval:
-                    type: integer
-                    default: 90
-                  password_rotation_user_retention:
-                    type: integer
-                    default: 180
                   replication_username:
                      type: string
                      default: standby
@@ -197,12 +175,12 @@ spec:
                     type: array
                     items:
                       type: string
-                  enable_cross_namespace_secret:
-                    type: boolean
-                    default: false
                   enable_init_containers:
                     type: boolean
                     default: true
+                  enable_cross_namespace_secret:
+                    type: boolean
+                    default: false
                   enable_pod_antiaffinity:
                     type: boolean
                     default: false
@@ -354,12 +332,6 @@ spec:
               timeouts:
                 type: object
                 properties:
-                  patroni_api_check_interval:
-                    type: string
-                    default: "1s"
-                  patroni_api_check_timeout:
-                    type: string
-                    default: "5s"
                   pod_label_wait_timeout:
                     type: string
                     default: "10m"
@@ -391,13 +363,7 @@ spec:
                   enable_master_load_balancer:
                     type: boolean
                     default: true
-                  enable_master_pooler_load_balancer:
-                    type: boolean
-                    default: false
                   enable_replica_load_balancer:
-                    type: boolean
-                    default: false
-                  enable_replica_pooler_load_balancer:
                     type: boolean
                     default: false
                   external_traffic_policy:
@@ -435,11 +401,11 @@ spec:
                     type: string
                   log_s3_bucket:
                     type: string
-                  wal_az_storage_account:
-                    type: string
                   wal_gs_bucket:
                     type: string
                   wal_s3_bucket:
+                    type: string
+                  wal_az_storage_account:
                     type: string
               logical_backup:
                 type: object
@@ -466,8 +432,6 @@ spec:
                   logical_backup_s3_secret_access_key:
                     type: string
                   logical_backup_s3_sse:
-                    type: string
-                  logical_backup_s3_retention_time:
                     type: string
                   logical_backup_schedule:
                     type: string
@@ -519,7 +483,6 @@ spec:
                       type: string
                     default:
                     - admin
-                    - cron_admin
                   role_deletion_suffix:
                     type: string
                     default: "_deleted"

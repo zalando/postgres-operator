@@ -3,7 +3,6 @@ kind: ConfigMap
 metadata:
   name: postgres-operator
 data:
-  # additional_owner_roles: "cron_admin"
   # additional_pod_capabilities: "SYS_NICE"
   # additional_secret_mount: "some-secret-name"
   # additional_secret_mount_path: "/some/dir"
@@ -23,7 +22,6 @@ data:
   # connection_pooler_number_of_instances: 2
   # connection_pooler_schema: "pooler"
   # connection_pooler_user: "pooler"
-  crd_categories: "all"
   # custom_service_annotations: "keyx:valuez,keya:valuea"
   # custom_pod_annotations: "keya:valuea,keyb:valueb"
   db_hosted_zone: db.example.com
@@ -38,6 +36,7 @@ data:
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_registration: "true"
+  # enable_crd_validation: "true"
   # enable_cross_namespace_secret: "false"
   # enable_database_access: "true"
   enable_ebs_gp3_migration: "false"
@@ -45,15 +44,12 @@ data:
   # enable_init_containers: "true"
   # enable_lazy_spilo_upgrade: "false"
   enable_master_load_balancer: "false"
-  enable_master_pooler_load_balancer: "false"
-  enable_password_rotation: "false"
   enable_pgversion_env_var: "true"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
   # enable_postgres_team_crd: "false"
   # enable_postgres_team_crd_superusers: "false"
   enable_replica_load_balancer: "false"
-  enable_replica_pooler_load_balancer: "false"
   # enable_shm_volume: "true"
   # enable_sidecars: "true"
   enable_spilo_wal_path_compat: "true"
@@ -80,7 +76,6 @@ data:
   # logical_backup_s3_endpoint: ""
   # logical_backup_s3_secret_access_key: ""
   logical_backup_s3_sse: "AES256"
-  # logical_backup_s3_retention_time: ""
   logical_backup_schedule: "30 00 * * *"
   major_version_upgrade_mode: "manual"
   # major_version_upgrade_team_allow_list: ""
@@ -97,10 +92,6 @@ data:
   # pam_configuration: |
   #  https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
   # pam_role_name: zalandos
-  patroni_api_check_interval: "1s"
-  patroni_api_check_timeout: "5s"
-  # password_rotation_interval: "90"
-  # password_rotation_user_retention: "180"
   pdb_name_format: "postgres-{cluster}-pdb"
   # pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   pod_deletion_wait_timeout: 10m
@@ -115,7 +106,7 @@ data:
   # pod_service_account_role_binding_definition: ""
   pod_terminate_grace_period: 5m
   # postgres_superuser_teams: "postgres_superusers"
-  # protected_role_names: "admin,cron_admin"
+  # protected_role_names: "admin"
   ready_wait_interval: 3s
   ready_wait_timeout: 30s
   repair_period: 5m

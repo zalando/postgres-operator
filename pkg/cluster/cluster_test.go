@@ -5,13 +5,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -34,11 +31,10 @@ var cl = New(
 	Config{
 		OpConfig: config.Config{
 			PodManagementPolicy: "ordered_ready",
-			ProtectedRoles:      []string{"admin", "cron_admin", "part_man"},
+			ProtectedRoles:      []string{"admin"},
 			Auth: config.Auth{
-				SuperUsername:        superUserName,
-				ReplicationUsername:  replicationUserName,
-				AdditionalOwnerRoles: []string{"cron_admin", "part_man"},
+				SuperUsername:       superUserName,
+				ReplicationUsername: replicationUserName,
 			},
 			Resources: config.Resources{
 				DownscalerAnnotations: []string{"downscaler/*"},
@@ -46,13 +42,7 @@ var cl = New(
 		},
 	},
 	k8sutil.NewMockKubernetesClient(),
-	acidv1.Postgresql{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "acid-test",
-			Namespace:   "test",
-			Annotations: map[string]string{"downscaler/downtime_replicas": "0"},
-		},
-	},
+	acidv1.Postgresql{ObjectMeta: metav1.ObjectMeta{Name: "acid-test", Namespace: "test", Annotations: map[string]string{"downscaler/downtime_replicas": "0"}}},
 	logger,
 	eventRecorder,
 )
@@ -61,7 +51,7 @@ func TestStatefulSetAnnotations(t *testing.T) {
 	testName := "CheckStatefulsetAnnotations"
 	spec := acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
-		Resources: &acidv1.Resources{
+		Resources: acidv1.Resources{
 			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 		},
@@ -136,48 +126,6 @@ func TestInitRobotUsers(t *testing.T) {
 			if !reflect.DeepEqual(cl.pgUsers, tt.result) {
 				t.Errorf("%s expected: %#v, got %#v", testName, tt.result, cl.pgUsers)
 			}
-		}
-	}
-}
-
-func TestInitAdditionalOwnerRoles(t *testing.T) {
-	testName := "TestInitAdditionalOwnerRoles"
-
-	manifestUsers := map[string]acidv1.UserFlags{"foo_owner": {}, "bar_owner": {}, "app_user": {}}
-	expectedUsers := map[string]spec.PgUser{
-		"foo_owner":  {Origin: spec.RoleOriginManifest, Name: "foo_owner", Namespace: cl.Namespace, Password: "f123", Flags: []string{"LOGIN"}, IsDbOwner: true},
-		"bar_owner":  {Origin: spec.RoleOriginManifest, Name: "bar_owner", Namespace: cl.Namespace, Password: "b123", Flags: []string{"LOGIN"}, IsDbOwner: true},
-		"app_user":   {Origin: spec.RoleOriginManifest, Name: "app_user", Namespace: cl.Namespace, Password: "a123", Flags: []string{"LOGIN"}, IsDbOwner: false},
-		"cron_admin": {Origin: spec.RoleOriginSpilo, Name: "cron_admin", Namespace: cl.Namespace, MemberOf: []string{"foo_owner", "bar_owner"}},
-		"part_man":   {Origin: spec.RoleOriginSpilo, Name: "part_man", Namespace: cl.Namespace, MemberOf: []string{"foo_owner", "bar_owner"}},
-	}
-
-	cl.Spec.Databases = map[string]string{"foo_db": "foo_owner", "bar_db": "bar_owner"}
-	cl.Spec.Users = manifestUsers
-
-	// this should set IsDbOwner field for manifest users
-	if err := cl.initRobotUsers(); err != nil {
-		t.Errorf("%s could not init manifest users", testName)
-	}
-
-	// update passwords to compare with result
-	for manifestUser := range manifestUsers {
-		pgUser := cl.pgUsers[manifestUser]
-		pgUser.Password = manifestUser[0:1] + "123"
-		cl.pgUsers[manifestUser] = pgUser
-	}
-
-	cl.initAdditionalOwnerRoles()
-
-	for _, additionalOwnerRole := range cl.Config.OpConfig.AdditionalOwnerRoles {
-		expectedPgUser := expectedUsers[additionalOwnerRole]
-		existingPgUser, exists := cl.pgUsers[additionalOwnerRole]
-		if !exists {
-			t.Errorf("%s additional owner role %q not initilaized", testName, additionalOwnerRole)
-		}
-		if !util.IsEqualIgnoreOrder(expectedPgUser.MemberOf, existingPgUser.MemberOf) {
-			t.Errorf("%s unexpected membership of additional owner role %q: expected member of %#v, got member of %#v",
-				testName, additionalOwnerRole, expectedPgUser.MemberOf, existingPgUser.MemberOf)
 		}
 	}
 }
@@ -1091,7 +1039,7 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
+					NumberOfInstances:                    int32ToPointer(1),
 				},
 				PodManagementPolicy: "ordered_ready",
 				Resources: config.Resources{
@@ -1138,104 +1086,5 @@ func TestValidUsernames(t *testing.T) {
 		if !isValidUsername(username) {
 			t.Errorf("%s Valid username is not allowed: %s", testName, username)
 		}
-	}
-}
-
-func TestComparePorts(t *testing.T) {
-	testCases := []struct {
-		name     string
-		setA     []v1.ContainerPort
-		setB     []v1.ContainerPort
-		expected bool
-	}{
-		{
-			name: "different ports",
-			setA: []v1.ContainerPort{
-				{
-					Name:          "metrics",
-					ContainerPort: 9187,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-
-			setB: []v1.ContainerPort{
-				{
-					Name:          "http",
-					ContainerPort: 80,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "no difference",
-			setA: []v1.ContainerPort{
-				{
-					Name:          "metrics",
-					ContainerPort: 9187,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-			setB: []v1.ContainerPort{
-				{
-					Name:          "metrics",
-					ContainerPort: 9187,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "same ports, different order",
-			setA: []v1.ContainerPort{
-				{
-					Name:          "metrics",
-					ContainerPort: 9187,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					Name:          "http",
-					ContainerPort: 80,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-			setB: []v1.ContainerPort{
-				{
-					Name:          "http",
-					ContainerPort: 80,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					Name:          "metrics",
-					ContainerPort: 9187,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "same ports, but one with default protocol",
-			setA: []v1.ContainerPort{
-				{
-					Name:          "metrics",
-					ContainerPort: 9187,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-			setB: []v1.ContainerPort{
-				{
-					Name:          "metrics",
-					ContainerPort: 9187,
-				},
-			},
-			expected: true,
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			got := comparePorts(testCase.setA, testCase.setB)
-			assert.Equal(t, testCase.expected, got)
-		})
 	}
 }

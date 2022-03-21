@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"time"
 
 	"testing"
 
@@ -22,12 +21,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -95,12 +91,11 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				MaximumLagOnFailover:  33554432,
 				SynchronousMode:       true,
 				SynchronousModeStrict: true,
-				SynchronousNodeCount:  1,
 				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 			},
 			role:     "zalandos",
 			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -644,12 +639,8 @@ func TestSecretVolume(t *testing.T) {
 }
 
 const (
-	testPodEnvironmentConfigMapName      = "pod_env_cm"
-	testPodEnvironmentSecretName         = "pod_env_sc"
-	testPodEnvironmentObjectNotExists    = "idonotexist"
-	testPodEnvironmentSecretNameAPIError = "pod_env_sc_apierror"
-	testResourceCheckInterval            = 3
-	testResourceCheckTimeout             = 10
+	testPodEnvironmentConfigMapName = "pod_env_cm"
+	testPodEnvironmentSecretName    = "pod_env_sc"
 )
 
 type mockSecret struct {
@@ -661,11 +652,8 @@ type mockConfigMap struct {
 }
 
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
-	if name == testPodEnvironmentSecretNameAPIError {
-		return nil, fmt.Errorf("Secret PodEnvironmentSecret API error")
-	}
 	if name != testPodEnvironmentSecretName {
-		return nil, k8serrors.NewNotFound(schema.GroupResource{Group: "core", Resource: "secret"}, name)
+		return nil, fmt.Errorf("Secret PodEnvironmentSecret not found")
 	}
 	secret := &v1.Secret{}
 	secret.Name = testPodEnvironmentSecretName
@@ -734,7 +722,7 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentConfigMap: spec.NamespacedName{
-						Name: testPodEnvironmentObjectNotExists,
+						Name: "idonotexist",
 					},
 				},
 			},
@@ -785,7 +773,6 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 
 // Test if the keys of an existing secret are properly referenced
 func TestPodEnvironmentSecretVariables(t *testing.T) {
-	maxRetries := int(testResourceCheckTimeout / testResourceCheckInterval)
 	testName := "TestPodEnvironmentSecretVariables"
 	tests := []struct {
 		subTest  string
@@ -801,31 +788,16 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			subTest: "Secret referenced by PodEnvironmentSecret does not exist",
 			opConfig: config.Config{
 				Resources: config.Resources{
-					PodEnvironmentSecret:  testPodEnvironmentObjectNotExists,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					PodEnvironmentSecret: "idonotexist",
 				},
 			},
-			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: still failing after %d retries: secret.core %q not found", maxRetries, testPodEnvironmentObjectNotExists),
-		},
-		{
-			subTest: "API error during PodEnvironmentSecret retrieval",
-			opConfig: config.Config{
-				Resources: config.Resources{
-					PodEnvironmentSecret:  testPodEnvironmentSecretNameAPIError,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
-				},
-			},
-			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret API error"),
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret not found"),
 		},
 		{
 			subTest: "Pod environment vars reference all keys from secret configured by PodEnvironmentSecret",
 			opConfig: config.Config{
 				Resources: config.Resources{
-					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					PodEnvironmentSecret: testPodEnvironmentSecretName,
 				},
 			},
 			envVars: []v1.EnvVar{
@@ -915,7 +887,7 @@ func TestNodeAffinity(t *testing.T) {
 	makeSpec := func(nodeAffinity *v1.NodeAffinity) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
-			Resources: &acidv1.Resources{
+			Resources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			},
@@ -1011,7 +983,7 @@ func TestTLS(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
-			Resources: &acidv1.Resources{
+			Resources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			},
@@ -1130,7 +1102,7 @@ func TestAdditionalVolume(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
-			Resources: &acidv1.Resources{
+			Resources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			},
@@ -1236,7 +1208,7 @@ func TestSidecars(t *testing.T) {
 			},
 		},
 		TeamID: "myapp", NumberOfInstances: 1,
-		Resources: &acidv1.Resources{
+		Resources: acidv1.Resources{
 			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 		},
@@ -1249,7 +1221,7 @@ func TestSidecars(t *testing.T) {
 			},
 			acidv1.Sidecar{
 				Name: "cluster-specific-sidecar-with-resources",
-				Resources: &acidv1.Resources{
+				Resources: acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
@@ -1411,7 +1383,7 @@ func TestGenerateService(t *testing.T) {
 	var enableLB bool = true
 	spec = acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
-		Resources: &acidv1.Resources{
+		Resources: acidv1.Resources{
 			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 		},
@@ -1424,7 +1396,7 @@ func TestGenerateService(t *testing.T) {
 			},
 			acidv1.Sidecar{
 				Name: "cluster-specific-sidecar-with-resources",
-				Resources: &acidv1.Resources{
+				Resources: acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
@@ -1485,188 +1457,6 @@ func TestGenerateService(t *testing.T) {
 
 }
 
-func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
-	clientSet := fake.NewSimpleClientset()
-
-	return k8sutil.KubernetesClient{
-		DeploymentsGetter: clientSet.AppsV1(),
-		ServicesGetter:    clientSet.CoreV1(),
-	}, clientSet
-}
-
-func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPolicy, clusterName string) []v1.ServiceSpec {
-	return []v1.ServiceSpec{
-		v1.ServiceSpec{
-			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
-			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
-			Type:                     serviceType,
-		},
-		v1.ServiceSpec{
-			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
-			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
-			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler"},
-			Type:                     serviceType,
-		},
-		v1.ServiceSpec{
-			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
-			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
-			Selector:                 map[string]string{"spilo-role": "replica", "application": "spilo", "cluster-name": clusterName},
-			Type:                     serviceType,
-		},
-		v1.ServiceSpec{
-			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
-			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
-			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler-repl"},
-			Type:                     serviceType,
-		},
-	}
-}
-
-func TestEnableLoadBalancers(t *testing.T) {
-	testName := "Test enabling LoadBalancers"
-	client, _ := newLBFakeClient()
-	clusterName := "acid-test-cluster"
-	namespace := "default"
-	clusterNameLabel := "cluster-name"
-	roleLabel := "spilo-role"
-	roles := []PostgresRole{Master, Replica}
-	sourceRanges := []string{"192.186.1.2/22"}
-	extTrafficPolicy := "Cluster"
-
-	tests := []struct {
-		subTest          string
-		config           config.Config
-		pgSpec           acidv1.Postgresql
-		expectedServices []v1.ServiceSpec
-	}{
-		{
-			subTest: "LBs enabled in config, disabled in manifest",
-			config: config.Config{
-				ConnectionPooler: config.ConnectionPooler{
-					ConnectionPoolerDefaultCPURequest:    "100m",
-					ConnectionPoolerDefaultCPULimit:      "100m",
-					ConnectionPoolerDefaultMemoryRequest: "100Mi",
-					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
-				},
-				EnableMasterLoadBalancer:        true,
-				EnableMasterPoolerLoadBalancer:  true,
-				EnableReplicaLoadBalancer:       true,
-				EnableReplicaPoolerLoadBalancer: true,
-				ExternalTrafficPolicy:           extTrafficPolicy,
-				Resources: config.Resources{
-					ClusterLabels:    map[string]string{"application": "spilo"},
-					ClusterNameLabel: clusterNameLabel,
-					PodRoleLabel:     roleLabel,
-				},
-			},
-			pgSpec: acidv1.Postgresql{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      clusterName,
-					Namespace: namespace,
-				},
-				Spec: acidv1.PostgresSpec{
-					AllowedSourceRanges:             sourceRanges,
-					EnableConnectionPooler:          util.True(),
-					EnableReplicaConnectionPooler:   util.True(),
-					EnableMasterLoadBalancer:        util.False(),
-					EnableMasterPoolerLoadBalancer:  util.False(),
-					EnableReplicaLoadBalancer:       util.False(),
-					EnableReplicaPoolerLoadBalancer: util.False(),
-					NumberOfInstances:               1,
-					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-						ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-					},
-					TeamID: "acid",
-					Volume: acidv1.Volume{
-						Size: "1G",
-					},
-				},
-			},
-			expectedServices: getServices(v1.ServiceTypeClusterIP, nil, "", clusterName),
-		},
-		{
-			subTest: "LBs enabled in manifest, disabled in config",
-			config: config.Config{
-				ConnectionPooler: config.ConnectionPooler{
-					ConnectionPoolerDefaultCPURequest:    "100m",
-					ConnectionPoolerDefaultCPULimit:      "100m",
-					ConnectionPoolerDefaultMemoryRequest: "100Mi",
-					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
-				},
-				EnableMasterLoadBalancer:        false,
-				EnableMasterPoolerLoadBalancer:  false,
-				EnableReplicaLoadBalancer:       false,
-				EnableReplicaPoolerLoadBalancer: false,
-				ExternalTrafficPolicy:           extTrafficPolicy,
-				Resources: config.Resources{
-					ClusterLabels:    map[string]string{"application": "spilo"},
-					ClusterNameLabel: clusterNameLabel,
-					PodRoleLabel:     roleLabel,
-				},
-			},
-			pgSpec: acidv1.Postgresql{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      clusterName,
-					Namespace: namespace,
-				},
-				Spec: acidv1.PostgresSpec{
-					AllowedSourceRanges:             sourceRanges,
-					EnableConnectionPooler:          util.True(),
-					EnableReplicaConnectionPooler:   util.True(),
-					EnableMasterLoadBalancer:        util.True(),
-					EnableMasterPoolerLoadBalancer:  util.True(),
-					EnableReplicaLoadBalancer:       util.True(),
-					EnableReplicaPoolerLoadBalancer: util.True(),
-					NumberOfInstances:               1,
-					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-						ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-					},
-					TeamID: "acid",
-					Volume: acidv1.Volume{
-						Size: "1G",
-					},
-				},
-			},
-			expectedServices: getServices(v1.ServiceTypeLoadBalancer, sourceRanges, extTrafficPolicy, clusterName),
-		},
-	}
-
-	for _, tt := range tests {
-		var cluster = New(
-			Config{
-				OpConfig: tt.config,
-			}, client, tt.pgSpec, logger, eventRecorder)
-
-		cluster.Name = clusterName
-		cluster.Namespace = namespace
-		cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
-		generatedServices := make([]v1.ServiceSpec, 0)
-		for _, role := range roles {
-			cluster.syncService(role)
-			cluster.ConnectionPooler[role] = &ConnectionPoolerObjects{
-				Name:        cluster.connectionPoolerName(role),
-				ClusterName: cluster.ClusterName,
-				Namespace:   cluster.Namespace,
-				Role:        role,
-			}
-			cluster.syncConnectionPoolerWorker(&tt.pgSpec, &tt.pgSpec, role)
-			generatedServices = append(generatedServices, cluster.Services[role].Spec)
-			generatedServices = append(generatedServices, cluster.ConnectionPooler[role].Service.Spec)
-		}
-		if !reflect.DeepEqual(tt.expectedServices, generatedServices) {
-			t.Errorf("%s %s: expected %#v but got %#v", testName, tt.subTest, tt.expectedServices, generatedServices)
-		}
-	}
-}
-
 func TestGenerateCapabilities(t *testing.T) {
 
 	testName := "TestGenerateCapabilities"
@@ -1720,7 +1510,7 @@ func TestVolumeSelector(t *testing.T) {
 		return acidv1.PostgresSpec{
 			TeamID:            "myapp",
 			NumberOfInstances: 0,
-			Resources: &acidv1.Resources{
+			Resources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			},

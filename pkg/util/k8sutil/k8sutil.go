@@ -12,9 +12,8 @@ import (
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
 	apiacidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	zalandoclient "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
+	acidv1client "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	zalandov1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/zalando.org/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -26,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	autoscalingV1 "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
+	autoscalingV2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
@@ -35,14 +36,6 @@ import (
 
 func Int32ToPointer(value int32) *int32 {
 	return &value
-}
-
-func UInt32ToPointer(value uint32) *uint32 {
-	return &value
-}
-
-func StringToPointer(str string) *string {
-	return &str
 }
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -67,11 +60,12 @@ type KubernetesClient struct {
 	acidv1.OperatorConfigurationsGetter
 	acidv1.PostgresTeamsGetter
 	acidv1.PostgresqlsGetter
-	zalandov1.FabricEventStreamsGetter
+	HorizontalPodAutoscalersGetterV1 autoscalingV1.HorizontalPodAutoscalersGetter
+	HorizontalPodAutoscalersGetterV2 autoscalingV2.HorizontalPodAutoscalersGetter
 
-	RESTClient         rest.Interface
-	AcidV1ClientSet    *zalandoclient.Clientset
-	Zalandov1ClientSet *zalandoclient.Clientset
+
+	RESTClient      rest.Interface
+	AcidV1ClientSet *acidv1client.Clientset
 }
 
 type mockSecret struct {
@@ -161,6 +155,8 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.RoleBindingsGetter = client.RbacV1()
 	kubeClient.CronJobsGetter = client.BatchV1beta1()
 	kubeClient.EventsGetter = client.CoreV1()
+	kubeClient.HorizontalPodAutoscalersGetterV1 = client.AutoscalingV1();
+	kubeClient.HorizontalPodAutoscalersGetterV2 = client.AutoscalingV2beta1();
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {
@@ -169,19 +165,14 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 
 	kubeClient.CustomResourceDefinitionsGetter = apiextClient.ApiextensionsV1()
 
-	kubeClient.AcidV1ClientSet = zalandoclient.NewForConfigOrDie(cfg)
+	kubeClient.AcidV1ClientSet = acidv1client.NewForConfigOrDie(cfg)
 	if err != nil {
 		return kubeClient, fmt.Errorf("could not create acid.zalan.do clientset: %v", err)
-	}
-	kubeClient.Zalandov1ClientSet = zalandoclient.NewForConfigOrDie(cfg)
-	if err != nil {
-		return kubeClient, fmt.Errorf("could not create zalando.org clientset: %v", err)
 	}
 
 	kubeClient.OperatorConfigurationsGetter = kubeClient.AcidV1ClientSet.AcidV1()
 	kubeClient.PostgresTeamsGetter = kubeClient.AcidV1ClientSet.AcidV1()
 	kubeClient.PostgresqlsGetter = kubeClient.AcidV1ClientSet.AcidV1()
-	kubeClient.FabricEventStreamsGetter = kubeClient.Zalandov1ClientSet.ZalandoV1()
 
 	return kubeClient, nil
 }

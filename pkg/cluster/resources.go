@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingApiV1 "k8s.io/api/autoscaling/v1"
+	autoscalingApiV2 "k8s.io/api/autoscaling/v2beta1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -262,6 +264,162 @@ func (c *Cluster) deleteStatefulSet() error {
 	return nil
 }
 
+func (c *Cluster) createHorizontalPodAutoscalerV1() (*autoscalingApiV1.HorizontalPodAutoscaler, error){
+	c.setProcessName("creating HorizontalPodAutoscalerV1")
+
+	hpa, err :=  c.generateHorizontalPodAutoscalerV1(&c.Spec)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if hpa == nil {
+		return nil, nil
+	}
+
+	hpa, err = c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(hpa.ObjectMeta.Namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create HPA V1: %v", err)
+	}
+
+	c.HorizontalPodAutoscalerV1 = hpa
+
+	return hpa, err
+
+}
+
+func (c *Cluster) updateHorizontalPodAutoscalerV1(hpa *autoscalingApiV1.HorizontalPodAutoscaler) error {
+	// The HPA V1 was not defined and we need to create one
+	if c.HorizontalPodAutoscalerV1 == nil && hpa != nil {
+		newHpa, err := c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(hpa.Namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("could not create horizontal pod autoscaler v1: %v", err)
+		}
+		
+		c.HorizontalPodAutoscalerV1 = newHpa
+		return nil
+	}
+
+	// The HPA V1 was defined but we need to delete it
+	if c.HorizontalPodAutoscalerV1 != nil && hpa == nil {
+		err := c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(c.HorizontalPodAutoscalerV1.Namespace).Delete(context.TODO(), c.HorizontalPodAutoscalerV1.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("could not delete horizontal pod autoscaler v1: %v", err)
+		}
+
+		c.HorizontalPodAutoscalerV1 = nil
+		return nil
+	}
+
+	// The HPA V1 was defined and we need to update it with the new info.
+	newHpa, err := c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(hpa.Namespace).Update(context.TODO(), hpa, metav1.UpdateOptions{})
+
+	if err != nil {
+		return fmt.Errorf("could not update horizontal pod autoscaler v1: %v", err)
+	}
+
+	c.HorizontalPodAutoscalerV1 = newHpa
+
+	return nil
+}
+
+func (c *Cluster) deleteHorizontalPodAutoscalerV1() error {
+	c.setProcessName("deleting horizontalpodautoscalerv1")
+	c.logger.Debugln("deleting horizontalpodautoscalerv1")
+
+	if c.HorizontalPodAutoscalerV1 == nil {
+		return fmt.Errorf("there is no horizontalpodautoscalerv1 in the cluster")
+	}
+
+	err := c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(c.HorizontalPodAutoscalerV1.Namespace).Delete(context.TODO(), c.HorizontalPodAutoscalerV1.Name, c.deleteOptions)
+	if err != nil {
+		return err
+	}
+	c.logger.Infof("horizontalpodautoscalerv1 %q has been deleted", util.NameFromMeta(c.HorizontalPodAutoscalerV1.ObjectMeta))
+	c.HorizontalPodAutoscalerV1 = nil
+
+	return nil
+}
+
+
+func (c *Cluster) createHorizontalPodAutoscalerV2() (*autoscalingApiV2.HorizontalPodAutoscaler, error){
+	c.setProcessName("creating HorizontalPodAutoscalerV2")
+
+	hpa, err :=  c.generateHorizontalPodAutoscalerV2(&c.Spec)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if hpa == nil {
+		return nil, nil
+	}
+	
+	hpa, err = c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(hpa.ObjectMeta.Namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create HPA V2: %v", err)
+	}
+
+	c.HorizontalPodAutoscalerV2 = hpa
+
+	return hpa, err
+}
+
+func (c *Cluster) updateHorizontalPodAutoscalerV2(hpa *autoscalingApiV2.HorizontalPodAutoscaler) error {
+	// The HPA V2 was not defined and we need to create one
+	if c.HorizontalPodAutoscalerV2 == nil && hpa != nil {
+		newHpa, err := c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(hpa.Namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("could not create horizontal pod autoscaler v2: %v", err)
+		}
+		
+		c.HorizontalPodAutoscalerV2 = newHpa
+		return nil
+	}
+
+	// The HPA V2 was defined but we need to delete it
+	if c.HorizontalPodAutoscalerV2 != nil && hpa == nil {
+		err := c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(c.HorizontalPodAutoscalerV2.Namespace).Delete(context.TODO(), c.HorizontalPodAutoscalerV2.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("could not delete horizontal pod autoscaler v2: %v", err)
+		}
+
+		c.HorizontalPodAutoscalerV2 = nil
+		return nil
+	}
+
+	// The HPA V2 was defined and we need to update it with the new info.
+	newHpa, err := c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(hpa.Namespace).Update(context.TODO(), hpa, metav1.UpdateOptions{})
+
+	if err != nil {
+		return fmt.Errorf("could not update horizontal pod autoscaler v2: %v", err)
+	}
+
+	c.HorizontalPodAutoscalerV2 = newHpa
+
+	return nil
+}
+
+func (c *Cluster) deleteHorizontalPodAutoscalerV2() error {
+	c.setProcessName("deleting horizontalpodautoscalerv2")
+	c.logger.Debugln("deleting horizontalpodautoscalerv2")
+
+	if c.HorizontalPodAutoscalerV2 == nil {
+		return fmt.Errorf("there is no horizontalpodautoscalerv2 in the cluster")
+	}
+
+	err := c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(c.HorizontalPodAutoscalerV2.Namespace).Delete(context.TODO(), c.HorizontalPodAutoscalerV2.Name, c.deleteOptions)
+	if err != nil {
+		return err
+	}
+	c.logger.Infof("horizontalpodautoscalerv2 %q has been deleted", util.NameFromMeta(c.HorizontalPodAutoscalerV2.ObjectMeta))
+	c.HorizontalPodAutoscalerV2 = nil
+
+	return nil
+}
+
 func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 	c.setProcessName("creating %v service", role)
 
@@ -275,7 +433,7 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 	return service, nil
 }
 
-func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newService *v1.Service) (*v1.Service, error) {
+func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error {
 	var (
 		svc *v1.Service
 		err error
@@ -283,7 +441,11 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 
 	c.setProcessName("updating %v service", role)
 
-	serviceName := util.NameFromMeta(oldService.ObjectMeta)
+	if c.Services[role] == nil {
+		return fmt.Errorf("there is no service in the cluster")
+	}
+
+	serviceName := util.NameFromMeta(c.Services[role].ObjectMeta)
 
 	// update the service annotation in order to propagate ELB notation.
 	if len(newService.ObjectMeta.Annotations) > 0 {
@@ -297,38 +459,39 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 				"")
 
 			if err != nil {
-				return nil, fmt.Errorf("could not replace annotations for the service %q: %v", serviceName, err)
+				return fmt.Errorf("could not replace annotations for the service %q: %v", serviceName, err)
 			}
 		} else {
-			return nil, fmt.Errorf("could not form patch for the service metadata: %v", err)
+			return fmt.Errorf("could not form patch for the service metadata: %v", err)
 		}
 	}
 
 	// now, patch the service spec, but when disabling LoadBalancers do update instead
 	// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
-	oldServiceType := oldService.Spec.Type
+	oldServiceType := c.Services[role].Spec.Type
 	newServiceType := newService.Spec.Type
 	if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
-		newService.ResourceVersion = oldService.ResourceVersion
-		newService.Spec.ClusterIP = oldService.Spec.ClusterIP
+		newService.ResourceVersion = c.Services[role].ResourceVersion
+		newService.Spec.ClusterIP = c.Services[role].Spec.ClusterIP
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("could not update service %q: %v", serviceName, err)
+			return fmt.Errorf("could not update service %q: %v", serviceName, err)
 		}
 	} else {
 		patchData, err := specPatch(newService.Spec)
 		if err != nil {
-			return nil, fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
+			return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
 		}
 
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(
 			context.TODO(), serviceName.Name, types.MergePatchType, patchData, metav1.PatchOptions{}, "")
 		if err != nil {
-			return nil, fmt.Errorf("could not patch service %q: %v", serviceName, err)
+			return fmt.Errorf("could not patch service %q: %v", serviceName, err)
 		}
 	}
+	c.Services[role] = svc
 
-	return svc, nil
+	return nil
 }
 
 func (c *Cluster) deleteService(role PostgresRole) error {
