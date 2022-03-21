@@ -1,0 +1,208 @@
+app
+
+  nav.navbar.navbar-inverse.navbar-fixed-top
+    .container
+
+      .navbar-header
+        a.navbar-brand(href='/')
+          | PostgreSQL Operator UI
+
+      #navbar.navbar-collapse.collapse
+        ul.nav.navbar-nav
+
+          li(class='{ active: ["EDIT", "LIST", "LOGS", "STATUS"].includes(activenav) }')
+            a(href='/#/list') PostgreSQL clusters
+
+          li(class='{ active: "BACKUPS" === activenav }')
+            a(href='/#/backups') Backups
+
+          li(class='{ active: "OPERATOR" === activenav }')
+            a(href='/#/operator') Status
+
+          li(class='{ active: "NEW" === activenav }')
+            a(href='/#/new') New cluster
+
+          li(if='{ config }')
+            a(href='{ config.docs_link }' target='_blank') Documentation
+
+  .container-fluid
+
+    .alert.alert-warning.alert-dismissible(
+      if='{ config && config.kubernetes_in_maintenance }'
+      role='alert'
+    )
+      button.close(
+        aria-label='Close'
+        data-dismiss='alert'
+        type='button'
+      )
+        span.glyphicon.glyphicon-remove(aria-hidden='true')
+
+      p.lead
+        span.glyphicon.glyphicon-exclamation-sign(aria-hidden='true')
+        span.sr-only Warning:
+        |
+        | This Kubernetes cluster appears to be undergoing maintenance.  You may experience delays in database cluster creation and changes.
+
+    .sk-spinner-pulse(
+      if='{ config !== null && teams !== null && (config === undefined || teams === undefined) }'
+    )
+
+    p(if='{ config === null || teams === null }')
+      | Error loading UI configuration.  Please
+      |
+      a(onclick="window.location.reload(true);") try again
+      |
+      | or
+      |
+      a(href="/") start over
+      | .
+
+    div(if='{ config }')
+
+      edit(
+        if='{ activenav === "EDIT" }'
+        clustername='{ clustername }'
+        config='{ config }'
+        namespace='{ namespace }'
+        opts='{ opts }'
+        read_write='{ read_write }'
+        teams='{ teams }'
+      )
+
+      logs(
+        if='{ activenav === "LOGS"}'
+        clustername='{ clustername }'
+        config='{ config }'
+        namespace='{ namespace }'
+        opts='{ opts }'
+        read_write='{ read_write }'
+        teams='{ teams }'
+      )
+
+      new(
+        if='{ activenav === "NEW" }'
+        backup_name='{ backup_name }'
+        backup_timestamp='{ backup_timestamp }'
+        backup_uid='{ backup_uid }'
+        config='{ config }'
+        opts='{ opts }'
+        read_write='{ read_write }'
+        teams='{ teams }'
+      )
+
+      postgresql(
+        if='{ activenav === "STATUS" }'
+        clustername='{ clustername }'
+        config='{ config }'
+        namespace='{ namespace }'
+        opts='{ opts }'
+        read_write='{ read_write }'
+        teams='{ teams }'
+      )
+
+      postgresqls(
+        if='{ activenav === "LIST" }'
+        config='{ config }'
+        opts='{ opts }'
+        read_write='{ read_write }'
+        teams='{ teams }'
+      )
+
+      restore(
+        if='{ activenav === "BACKUPS" }'
+        config='{ config }'
+        opts='{ opts }'
+        read_write='{ read_write }'
+        teams='{ teams }'
+      )
+
+      status(
+        if='{ activenav === "OPERATOR" }'
+        config='{ config }'
+        opts='{ opts }'
+        read_write='{ read_write }'
+        teams='{ teams }'
+      )
+
+  script.
+
+    this.config = undefined
+    this.teams = undefined
+
+    this.activenav = 'INIT'
+    this.read_write = false
+
+    const nav = (path, page, parameters, f) => {
+      route(path, (...args) => {
+        parameters && parameters.forEach((parameter, index) =>
+          this[parameter] = args[index]
+        )
+        this.activenav = page
+        this.update()
+        f && f(...args)
+      })
+    }
+
+    const navs = (paths, ...args) => (
+      paths.forEach(path =>
+        nav(path, ...args)
+      )
+    )
+
+    ;(
+      jQuery
+      .get('/config')
+      .done(config => {
+        this.config = config
+        ;(
+          jQuery
+          .get('/teams')
+          .done(teams => {
+            this.teams = teams.sort()
+            this.team = this.teams[0]
+
+            this.read_write = (
+              this.config
+              && (
+                !this.config.read_only_mode
+                || this.teams.includes(this.config.superuser_team)
+              )
+            )
+
+            nav('/backups', 'BACKUPS')
+            nav('/edit/*/*', 'EDIT', ['namespace', 'clustername'])
+            nav('/list', 'LIST')
+            nav('/logs/*/*', 'LOGS', ['namespace', 'clustername'])
+            nav('/operator..', 'OPERATOR')
+            nav('/status/*/*', 'STATUS', ['namespace', 'clustername'])
+
+            nav(
+              '/new',
+              'NEW',
+              ['backup_name', 'backup_uid', 'backup_timestamp'],
+              () => this.tags['new'].reset_form(),
+            )
+
+            navs(
+              [
+                '/clone/*/*',
+                '/clone/*/*/*',
+              ],
+              'NEW',
+              ['backup_name', 'backup_uid', 'backup_timestamp']
+            )
+
+            route.start(true)
+
+            if (this.activenav === 'INIT') {
+              route(this.read_write ? '/new' : '/list')
+            }
+          })
+          .fail(() => this.teams = null)
+          .always(() => this.update())
+        )
+      })
+      .fail(() => this.config = null)
+      .always(() => this.update())
+    )

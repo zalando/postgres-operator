@@ -1,0 +1,10 @@
+*#
+*.pyc
+*~
+.*.sw?
+.git
+__pycache__
+
+app/node_modules
+operator_ui/static/build/*.hot-update.js
+operator_ui/static/build/*.hot-update.json

@@ -1,0 +1,19 @@
+apiVersion: "networking.k8s.io/v1"
+kind: "Ingress"
+metadata:
+  name: "postgres-operator-ui"
+  namespace: "default"
+  labels:
+    application: "postgres-operator-ui"
+spec:
+  rules:
+    - host: "ui.example.org"
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: "postgres-operator-ui"
+                port:
+                  number: 80

@@ -1,0 +1,165 @@
+apiVersion: v1
+entries:
+  postgres-operator-ui:
+  - apiVersion: v1
+    appVersion: 1.7.1
+    created: "2021-11-03T11:44:00.75040818+01:00"
+    description: Postgres Operator UI provides a graphical interface for a convenient
+      database-as-a-service user experience
+    digest: 97aed1a1d37cd5f8441eea9522f38e56cc829786ad2134c437a5e6a15c995869
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - ui
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator-ui
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-ui-1.7.1.tgz
+    version: 1.7.1
+  - apiVersion: v1
+    appVersion: 1.7.0
+    created: "2021-11-03T11:44:00.748544296+01:00"
+    description: Postgres Operator UI provides a graphical interface for a convenient
+      database-as-a-service user experience
+    digest: 37fba1968347daad393dbd1c6ee6e5b6a24d1095f972c0102197531c62dcada8
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - ui
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator-ui
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-ui-1.7.0.tgz
+    version: 1.7.0
+  - apiVersion: v1
+    appVersion: 1.6.3
+    created: "2021-11-03T11:44:00.745261041+01:00"
+    description: Postgres Operator UI provides a graphical interface for a convenient
+      database-as-a-service user experience
+    digest: 08b810aa632dcc719e4785ef184e391267f7c460caa99677f2d00719075aac78
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - ui
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator-ui
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-ui-1.6.3.tgz
+    version: 1.6.3
+  - apiVersion: v1
+    appVersion: 1.6.2
+    created: "2021-11-03T11:44:00.743617168+01:00"
+    description: Postgres Operator UI provides a graphical interface for a convenient
+      database-as-a-service user experience
+    digest: 14d1559bb0bd1e1e828f2daaaa6f6ac9ffc268d79824592c3589b55dd39241f6
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - ui
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator-ui
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-ui-1.6.2.tgz
+    version: 1.6.2
+  - apiVersion: v1
+    appVersion: 1.6.1
+    created: "2021-11-03T11:44:00.741913772+01:00"
+    description: Postgres Operator UI provides a graphical interface for a convenient
+      database-as-a-service user experience
+    digest: 3d321352f2f1e7bb7450aa8876e3d818aa9f9da9bd4250507386f0490f2c1969
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - ui
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator-ui
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-ui-1.6.1.tgz
+    version: 1.6.1
+  - apiVersion: v1
+    appVersion: 1.6.0
+    created: "2021-11-03T11:44:00.740290409+01:00"
+    description: Postgres Operator UI provides a graphical interface for a convenient
+      database-as-a-service user experience
+    digest: 1e0aa1e7db3c1daa96927ffbf6fdbcdb434562f961833cb5241ddbe132220ee4
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - ui
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator-ui
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-ui-1.6.0.tgz
+    version: 1.6.0
+  - apiVersion: v1
+    appVersion: 1.5.0
+    created: "2021-11-03T11:44:00.738607341+01:00"
+    description: Postgres Operator UI provides a graphical interface for a convenient
+      database-as-a-service user experience
+    digest: c91ea39e6d51d57f4048fb1b6ec53b40823f2690eb88e4e4f1a036367b9fdd61
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - ui
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator-ui
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-ui-1.5.0.tgz
+    version: 1.5.0
+generated: "2021-11-03T11:44:00.736383918+01:00"

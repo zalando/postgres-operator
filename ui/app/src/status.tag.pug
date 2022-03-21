@@ -1,0 +1,149 @@
+status
+  .container-fluid
+
+    h1.page-header
+      nav(aria-label="breadcrumb")
+        ol.breadcrumb
+
+          li.breadcrumb-item
+            a(href='/#/operator')
+              | Workers
+
+          virtual(if='{ operatorShowLogs && logs }')
+            li.breadcrumb-item { worker_id }
+            li.breadcrumb-item
+              a(href='/#/operator/worker/{ worker_id }/logs')
+                | Logs
+
+          virtual(if='{ operatorShowQueue && queue }')
+            li.breadcrumb-item { worker_id }
+            li.breadcrumb-item
+              a(href='/#/operator/worker/{ worker_id }/queue')
+                | Queue
+
+    div(if='{ status }')
+
+      div(if='{ !operatorShowLogs && !operatorShowQueue }')
+
+        table.table.table-hover
+
+          thead
+            tr
+              td Worker ID
+              td Queue size
+              td Actions
+
+          tr(each='{ queue_size, worker_id in status.WorkerQueueSize}')
+            td { worker_id }
+            td { queue_size }
+
+            td
+              .btn-group(
+                aria-label="Worker { worker_id} actions"
+                role="group"
+              )
+
+                a.btn.btn-info(
+                  href='/#/operator/worker/{ worker_id }/logs'
+                )
+                  | Logs
+
+                a.btn.btn-info(
+                  href='/#/operator/worker/{ worker_id }/queue'
+                )
+                  | Queue
+
+      div(if='{ operatorShowLogs && logs }')
+        table.table.table-hover
+          tr(each='{ logs }')
+
+            td
+              span.label.label-font-size(class='{ levels[Level].class }')
+                | { levels[Level].label }
+
+            td(style='white-space: pre')
+              | { Time }
+
+            td(style='white-space: pre')
+              | { ClusterName }
+
+            td { Message }
+
+      div(if='{ operatorShowQueue && queue }')
+        table.table.table-hover
+          tr(each='{ queue }')
+
+            td(style='white-space: pre')
+              | { EventTime }
+
+            td(style='white-space: pre')
+              | { EventType }
+
+  script.
+
+    this.levels = {
+      0: { class: '', label: 'Panic' },
+      1: { class: '', label: 'Fatal'},
+      2: { class: 'label-danger', label: 'Error'},
+      3: { class: 'label-warning', label: 'Warning'},
+      4: { class: 'label-primary', label: 'Info'},
+      5: { class: 'label-info', label: 'Debug'},
+    }
+
+    this.status = {
+      'Clusters': 0,
+    }
+
+    this.pollStatus = () => {
+      jQuery.get(
+        '/operator/status',
+      ).done(data => {
+        this.update({status: data})
+      })
+    }
+
+    this.logs = []
+    this.queue = []
+
+    this.on('mount', () => {
+      route.exec()
+    })
+
+    this.pollLogs = id => {
+      jQuery.get(
+        '/operator/workers/' + id + '/logs',
+      ).done(data => {
+        data.reverse()
+        this.update({logs: data})
+      })
+    }
+
+    this.pollQueue = id => {
+      jQuery.get(
+        '/operator/workers/' + id + '/queue',
+      ).done(data =>
+        this.update({queue: data.List})
+      )
+    }
+
+    var subRoute = route.create()
+
+    subRoute('/operator/worker/*/logs', id => {
+      this.worker_id = id
+      this.operatorShowLogs = true
+      this.operatorShowQueue = false
+      this.pollLogs(this.worker_id)
+    })
+
+    subRoute('/operator/worker/*/queue', id => {
+      this.worker_id = id
+      this.operatorShowLogs = false
+      this.operatorShowQueue = true
+      this.pollQueue(this.worker_id)
+    })
+
+    subRoute('/operator', () => {
+      this.operatorShowLogs = false
+      this.operatorShowQueue = false
+      this.pollStatus()
+    })

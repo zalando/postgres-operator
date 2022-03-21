@@ -1,0 +1,15 @@
+site_name: Postgres Operator
+repo_url: https://github.com/zalando/postgres-operator
+theme: readthedocs
+
+nav:
+  - Concepts: 'index.md'
+  - Quickstart: 'quickstart.md'
+  - Postgres Operator UI: 'operator-ui.md'
+  - Admin guide: 'administrator.md'
+  - User guide: 'user.md'
+  - Developer guide: 'developer.md'
+  - Reference:
+    - Config parameters: 'reference/operator_parameters.md'
+    - Manifest parameters: 'reference/cluster_manifest.md'
+    - CLI options and environment: 'reference/command_line_and_environment.md'
