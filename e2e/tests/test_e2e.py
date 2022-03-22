@@ -204,7 +204,7 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         # get node and replica (expected target of new master)
-        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+        master_nodes, replica_nodes = k8s.get_pg_nodes(cluster_label)
 
         try:
             k8s.update_config(patch_capabilities)
@@ -703,6 +703,43 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_ignored_annotations(self):
+        '''
+           Test if injected annotation does not cause failover when listed under ignored_annotations
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        # get node of current master
+        master_node, _ = k8s.get_pg_nodes(cluster_label)
+
+        patch_config_ignored_annotations = {
+            "data": {
+                "ignored_annotations": "deployment-time",
+            }
+        }
+        k8s.update_config(patch_config_ignored_annotations)
+
+        pg_crd_annotation = {
+            "metadata": {
+                "annotations": {
+                    "deployment-time": "2022-04-01 12:00:00"
+                },
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_crd_annotation)
+
+        annotations = {
+            "deployment-time": "2022-04-01 12:00:00",
+        }
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
+
+        current_master_node, _ = k8s.get_pg_nodes(cluster_label)
+        self.eventuallyEqual(lambda: master_node, current_master_node, "unexpected rolling update happened")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_infrastructure_roles(self):

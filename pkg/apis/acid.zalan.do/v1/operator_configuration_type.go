@@ -82,6 +82,7 @@ type KubernetesMetaConfiguration struct {
 	InheritedLabels                        []string                     `json:"inherited_labels,omitempty"`
 	InheritedAnnotations                   []string                     `json:"inherited_annotations,omitempty"`
 	DownscalerAnnotations                  []string                     `json:"downscaler_annotations,omitempty"`
+	IgnoredAnnotations                     []string                     `json:"ignored_annotations,omitempty"`
 	ClusterNameLabel                       string                       `json:"cluster_name_label,omitempty"`
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
 	DeleteAnnotationNameKey                string                       `json:"delete_annotation_name_key,omitempty"`

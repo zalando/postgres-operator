@@ -124,6 +124,13 @@ configKubernetes:
   enable_pod_disruption_budget: true
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
+
+  # annotations to be ignored when comparing statefulsets, services etc.
+  # ignored_annotations:
+  # - "deployment-time"
+  # - "k8s.v1.cni.cncf.io/network-status"
+
+
   # namespaced name of the secret containing infrastructure roles names and passwords
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 

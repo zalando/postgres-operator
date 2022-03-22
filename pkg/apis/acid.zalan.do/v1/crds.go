@@ -1258,6 +1258,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_sidecars": {
 								Type: "boolean",
 							},
+							"ignored_annotations": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
 							"infrastructure_roles_secret_name": {
 								Type: "string",
 							},

@@ -287,6 +287,12 @@ configuration they are grouped under the `kubernetes` key.
   Regular expressions like `downscaler/*` etc. are also accepted. Can be used
   with [kube-downscaler](https://github.com/hjacobs/kube-downscaler).
 
+* **ignored_annotations**
+  Some K8s tools inject and update annotations out of the Postgres Operator
+  control. This can cause rolling updates on each sync cycle of clusters.
+  With this option you can sepecify an array of annotations keys that should
+  be ignored when comparing K8s resources. The default is empty.
+
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not
   specified, the value is taken from the operator namespace. A special `*`

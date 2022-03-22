@@ -10,9 +10,9 @@ spec:
     plural: operatorconfigurations
     singular: operatorconfiguration
     shortNames:
-    - opconfig
+      - opconfig
     categories:
-    - all
+      - all
   scope: Namespaced
   versions:
   - name: v1
@@ -115,10 +115,46 @@ spec:
                 type: object
                 additionalProperties:
                   type: string
-              sidecars:
-                type: array
-                nullable: true
-                items:
+                  default: "registry.opensource.zalan.do/acid/spilo-13:2.0-p6"
+                enable_crd_validation:
+                  type: boolean
+                  default: true
+                enable_lazy_spilo_upgrade:
+                  type: boolean
+                  default: false
+                enable_pgversion_env_var:
+                  type: boolean
+                  default: true
+                enable_shm_volume:
+                  type: boolean
+                  default: true
+                enable_spilo_wal_path_compat:
+                  type: boolean
+                  default: false
+                etcd_host:
+                  type: string
+                  default: ""
+                kubernetes_use_configmaps:
+                  type: boolean
+                  default: false
+                max_instances:
+                  type: integer
+                  minimum: -1 # -1 = disabled
+                  default: -1
+                min_instances:
+                  type: integer
+                  minimum: -1 # -1 = disabled
+                  default: -1
+                resync_period:
+                  type: string
+                  default: "30m"
+                repair_period:
+                  type: string
+                  default: "5m"
+                set_memory_request_to_limit:
+                  type: boolean
+                  default: false
+                sidecar_docker_images:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
               workers:
@@ -173,19 +209,23 @@ spec:
                       type: string
                   cluster_domain:
                     type: string
-                    default: "cluster.local"
-                  cluster_labels:
+                sidecars:
+                  type: array
+                  nullable: true
+                  items:
                     type: object
-                    additionalProperties:
+                    x-kubernetes-preserve-unknown-fields: true
+                workers:
+                  type: integer
+                  minimum: 1
+                  default: 8
+                users:
+                  type: object
+                  properties:
+                    replication_username:
                       type: string
-                    default:
-                      application: spilo
-                  cluster_name_label:
-                    type: string
-                    default: "cluster-name"
-                  custom_pod_annotations:
-                    type: object
-                    additionalProperties:
+                      default: standby
+                    super_username:
                       type: string
                   delete_annotation_date_key:
                     type: string
@@ -210,6 +250,10 @@ spec:
                   enable_sidecars:
                     type: boolean
                     default: true
+                  ignored_annotations:
+                    type: array
+                    items:
+                      type: string
                   infrastructure_roles_secret_name:
                     type: string
                   infrastructure_roles_secrets:
@@ -217,41 +261,11 @@ spec:
                     nullable: true
                     items:
                       type: object
-                      required:
-                        - secretname
-                        - userkey
-                        - passwordkey
-                      properties:
-                        secretname:
-                          type: string
-                        userkey:
-                          type: string
-                        passwordkey:
-                          type: string
-                        rolekey:
-                          type: string
-                        defaultuservalue:
-                          type: string
-                        defaultrolevalue:
-                          type: string
-                        details:
-                          type: string
-                        template:
-                          type: boolean
-                  inherited_annotations:
-                    type: array
-                    items:
-                      type: string
-                  inherited_labels:
-                    type: array
-                    items:
-                      type: string
-                  master_pod_move_timeout:
-                    type: string
-                    default: "20m"
-                  node_readiness_label:
-                    type: object
-                    additionalProperties:
+                      additionalProperties:
+                        type: string
+                      default:
+                        application: spilo
+                    cluster_name_label:
                       type: string
                   node_readiness_label_merge:
                     type: string

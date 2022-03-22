@@ -108,6 +108,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.InheritedLabels = fromCRD.Kubernetes.InheritedLabels
 	result.InheritedAnnotations = fromCRD.Kubernetes.InheritedAnnotations
 	result.DownscalerAnnotations = fromCRD.Kubernetes.DownscalerAnnotations
+	result.IgnoredAnnotations = fromCRD.Kubernetes.IgnoredAnnotations
 	result.ClusterNameLabel = util.Coalesce(fromCRD.Kubernetes.ClusterNameLabel, "cluster-name")
 	result.DeleteAnnotationDateKey = fromCRD.Kubernetes.DeleteAnnotationDateKey
 	result.DeleteAnnotationNameKey = fromCRD.Kubernetes.DeleteAnnotationNameKey

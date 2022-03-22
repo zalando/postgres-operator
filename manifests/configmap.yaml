@@ -64,6 +64,7 @@ data:
   external_traffic_policy: "Cluster"
   # gcp_credentials: ""
   # kubernetes_use_configmaps: "false"
+  # ignored_annotations: ""
   # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
   # infrastructure_roles_secrets: "secretname:monitoring-roles,userkey:user,passwordkey:password,rolekey:inrole"
   # inherited_annotations: owned-by
