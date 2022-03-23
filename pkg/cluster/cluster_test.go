@@ -1055,14 +1055,6 @@ func TestCompareEnv(t *testing.T) {
 	}
 }
 
-func newFakeK8sServiceClient() (k8sutil.KubernetesClient, *fake.Clientset) {
-	clientSet := fake.NewSimpleClientset()
-
-	return k8sutil.KubernetesClient{
-		ServicesGetter: clientSet.CoreV1(),
-	}, clientSet
-}
-
 func newService(ann map[string]string, svcT v1.ServiceType, lbSr []string) *v1.Service {
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
