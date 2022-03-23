@@ -289,9 +289,9 @@ configuration they are grouped under the `kubernetes` key.
 
 * **ignored_annotations**
   Some K8s tools inject and update annotations out of the Postgres Operator
-  control. This can cause rolling updates on each sync cycle of clusters.
-  With this option you can sepecify an array of annotations keys that should
-  be ignored when comparing K8s resources. The default is empty.
+  control. This can cause rolling updates on each cluster sync cycle. With
+  this option you can specify an array of annotation keys that should be
+  ignored when comparing K8s resources on sync. The default is empty.
 
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not

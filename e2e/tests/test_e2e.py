@@ -204,7 +204,7 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         # get node and replica (expected target of new master)
-        master_nodes, replica_nodes = k8s.get_pg_nodes(cluster_label)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
 
         try:
             k8s.update_config(patch_capabilities)
