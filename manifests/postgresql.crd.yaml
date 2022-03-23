@@ -148,15 +148,9 @@ spec:
                     minimum: 1
                   resources:
                     type: object
-                    required:
-                      - requests
-                      - limits
                     properties:
                       limits:
                         type: object
-                        required:
-                          - cpu
-                          - memory
                         properties:
                           cpu:
                             type: string
@@ -166,9 +160,6 @@ spec:
                             pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                       requests:
                         type: object
-                        required:
-                          - cpu
-                          - memory
                         properties:
                           cpu:
                             type: string
@@ -404,15 +395,9 @@ spec:
                 description: deprecated
               resources:
                 type: object
-                required:
-                  - requests
-                  - limits
                 properties:
                   limits:
                     type: object
-                    required:
-                      - cpu
-                      - memory
                     properties:
                       cpu:
                         type: string
@@ -441,9 +426,6 @@ spec:
                         # than the corresponding limit.
                   requests:
                     type: object
-                    required:
-                      - cpu
-                      - memory
                     properties:
                       cpu:
                         type: string

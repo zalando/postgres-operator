@@ -238,12 +238,10 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Minimum: &min1,
 							},
 							"resources": {
-								Type:     "object",
-								Required: []string{"requests", "limits"},
+								Type: "object",
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"limits": {
-										Type:     "object",
-										Required: []string{"cpu", "memory"},
+										Type: "object",
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"cpu": {
 												Type:    "string",
@@ -256,8 +254,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										},
 									},
 									"requests": {
-										Type:     "object",
-										Required: []string{"cpu", "memory"},
+										Type: "object",
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"cpu": {
 												Type:    "string",
@@ -648,12 +645,10 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Description: "deprecated",
 					},
 					"resources": {
-						Type:     "object",
-						Required: []string{"requests", "limits"},
+						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
 							"limits": {
-								Type:     "object",
-								Required: []string{"cpu", "memory"},
+								Type: "object",
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"cpu": {
 										Type:    "string",
@@ -666,8 +661,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								},
 							},
 							"requests": {
-								Type:     "object",
-								Required: []string{"cpu", "memory"},
+								Type: "object",
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"cpu": {
 										Type:    "string",

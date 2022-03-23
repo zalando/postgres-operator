@@ -28,7 +28,9 @@ const (
 )
 
 var logger = logrus.New().WithField("test", "cluster")
-var eventRecorder = record.NewFakeRecorder(1)
+
+// bufferSize might have to be increased when unit test cover functions emitting events
+var eventRecorder = record.NewFakeRecorder(5)
 
 var cl = New(
 	Config{

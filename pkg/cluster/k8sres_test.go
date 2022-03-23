@@ -1667,6 +1667,315 @@ func TestEnableLoadBalancers(t *testing.T) {
 	}
 }
 
+func TestGenerateResourceRequirements(t *testing.T) {
+	testName := "TestGenerateResourceRequirements"
+	client, _ := newFakeK8sTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	clusterNameLabel := "cluster-name"
+	roleLabel := "spilo-role"
+	sidecarName := "postgres-exporter"
+
+	configResources := config.Resources{
+		ClusterLabels:        map[string]string{"application": "spilo"},
+		ClusterNameLabel:     clusterNameLabel,
+		DefaultCPURequest:    "100m",
+		DefaultCPULimit:      "1",
+		DefaultMemoryRequest: "100Mi",
+		DefaultMemoryLimit:   "500Mi",
+		MinCPULimit:          "250m",
+		MinMemoryLimit:       "250Mi",
+		PodRoleLabel:         roleLabel,
+	}
+
+	tests := []struct {
+		subTest           string
+		config            config.Config
+		pgSpec            acidv1.Postgresql
+		expectedResources acidv1.Resources
+	}{
+		{
+			subTest: "test generation of default resources when empty in manifest",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+		},
+		{
+			subTest: "test generation of default resources for sidecar",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Sidecars: []acidv1.Sidecar{
+						acidv1.Sidecar{
+							Name: sidecarName,
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+		},
+		{
+			subTest: "test generation of resources when only requests are defined in manifest",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: "50m", Memory: "50Mi"},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "50m", Memory: "50Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+		},
+		{
+			subTest: "test generation of resources when only memory is defined in manifest",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{Memory: "100Mi"},
+						ResourceLimits:   acidv1.ResourceDescription{Memory: "1Gi"},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "1Gi"},
+			},
+		},
+		{
+			subTest: "test SetMemoryRequestToLimit flag",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: true,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "500Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+		},
+		{
+			subTest: "test SetMemoryRequestToLimit flag for sidecar container, too",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: true,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Sidecars: []acidv1.Sidecar{
+						acidv1.Sidecar{
+							Name: sidecarName,
+							Resources: &acidv1.Resources{
+								ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "10Mi"},
+								ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+							},
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+			},
+		},
+		{
+			subTest: "test generating resources from manifest",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "250Mi"},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: "400m", Memory: "800Mi"},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "250Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "400m", Memory: "800Mi"},
+			},
+		},
+		{
+			subTest: "test enforcing min cpu and memory limit",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: "200m", Memory: "200Mi"},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "250m", Memory: "250Mi"},
+			},
+		},
+		{
+			subTest: "test min cpu and memory limit are not enforced on sidecar",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Sidecars: []acidv1.Sidecar{
+						acidv1.Sidecar{
+							Name: sidecarName,
+							Resources: &acidv1.Resources{
+								ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "10Mi"},
+								ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+							},
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "10Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		var cluster = New(
+			Config{
+				OpConfig: tt.config,
+			}, client, tt.pgSpec, logger, eventRecorder)
+
+		cluster.Name = clusterName
+		cluster.Namespace = namespace
+		_, err := cluster.createStatefulSet()
+		if k8sutil.ResourceAlreadyExists(err) {
+			err = cluster.syncStatefulSet()
+		}
+		assert.NoError(t, err)
+
+		containers := cluster.Statefulset.Spec.Template.Spec.Containers
+		clusterResources, err := parseResourceRequirements(containers[0].Resources)
+		if len(containers) > 1 {
+			clusterResources, err = parseResourceRequirements(containers[1].Resources)
+		}
+		assert.NoError(t, err)
+		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
+			t.Errorf("%s - %s: expected %#v but got %#v", testName, tt.subTest, tt.expectedResources, clusterResources)
+		}
+	}
+}
+
 func TestGenerateCapabilities(t *testing.T) {
 
 	testName := "TestGenerateCapabilities"
