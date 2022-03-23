@@ -1074,27 +1074,10 @@ func newService(ann map[string]string, svcT v1.ServiceType, lbSr []string) *v1.S
 	return svc
 }
 
-func TestSameService(t *testing.T) {
-	testName := "test comparing services"
-	client, _ := newFakeK8sServiceClient()
-	namespace := "default"
-
-	pg := acidv1.Postgresql{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "acid-fake-cluster",
-			Namespace: namespace,
-			Annotations: map[string]string{
-				"deployment-time": "2022-02-02 12:00:00",
-			},
-		},
-		Spec: acidv1.PostgresSpec{
-			Volume: acidv1.Volume{
-				Size: "1Gi",
-			},
-		},
-	}
-	var cluster = New(
-		Config{
+func TestCompareServices(t *testing.T) {
+	testName := "TestCompareServices"
+	cluster := Cluster{
+		Config: Config{
 			OpConfig: config.Config{
 				Resources: config.Resources{
 					IgnoredAnnotations: []string{
@@ -1102,7 +1085,8 @@ func TestSameService(t *testing.T) {
 					},
 				},
 			},
-		}, client, pg, logger, eventRecorder)
+		},
+	}
 
 	tests := []struct {
 		about   string
@@ -1386,6 +1370,7 @@ func TestSameService(t *testing.T) {
 			match: true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.about, func(t *testing.T) {
 			match, reason := cluster.compareServices(tt.current, tt.new)
