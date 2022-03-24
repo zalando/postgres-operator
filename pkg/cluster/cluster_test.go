@@ -1179,7 +1179,7 @@ func TestCompareServices(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations does not match the current one: 'external-dns.alpha.kubernetes.io/hostname' changed from 'clstr.acid.zalan.do' to 'new_clstr.acid.zalan.do'.`,
+			reason: `new service's annotations does not match the current one: "external-dns.alpha.kubernetes.io/hostname" changed from "clstr.acid.zalan.do" to "new_clstr.acid.zalan.do".`,
 		},
 		{
 			about: "services differ on AWS ELB annotation",
@@ -1198,7 +1198,7 @@ func TestCompareServices(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations does not match the current one: 'service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout' changed from '3600' to '1800'.`,
+			reason: `new service's annotations does not match the current one: "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout" changed from "3600" to "1800".`,
 		},
 		{
 			about: "service changes existing annotation",
@@ -1219,7 +1219,7 @@ func TestCompareServices(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations does not match the current one: 'foo' changed from 'bar' to 'baz'.`,
+			reason: `new service's annotations does not match the current one: "foo" changed from "bar" to "baz".`,
 		},
 		{
 			about: "service changes multiple existing annotations",
@@ -1263,7 +1263,7 @@ func TestCompareServices(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations does not match the current one: Added 'foo' with value 'bar'.`,
+			reason: `new service's annotations does not match the current one: Added "foo" with value "bar".`,
 		},
 		{
 			about: "service removes a custom annotation",
@@ -1283,7 +1283,7 @@ func TestCompareServices(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations does not match the current one: Removed 'foo'.`,
+			reason: `new service's annotations does not match the current one: Removed "foo".`,
 		},
 		{
 			about: "service removes a custom annotation and adds a new one",
@@ -1304,7 +1304,7 @@ func TestCompareServices(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations does not match the current one: Removed 'foo'. Added 'bar' with value 'foo'.`,
+			reason: `new service's annotations does not match the current one: Removed "foo". Added "bar" with value "foo".`,
 		},
 		{
 			about: "service removes a custom annotation, adds a new one and change another",
@@ -1328,7 +1328,7 @@ func TestCompareServices(t *testing.T) {
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match: false,
 			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations does not match the current one: Removed 'foo'.`,
+			reason: `new service's annotations does not match the current one: Removed "foo".`,
 		},
 		{
 			about: "service add annotations",
@@ -1368,16 +1368,16 @@ func TestCompareServices(t *testing.T) {
 			match, reason := cluster.compareServices(tt.current, tt.new)
 			if match && !tt.match {
 				t.Logf("match=%v current=%v, old=%v reason=%s", match, tt.current.Annotations, tt.new.Annotations, reason)
-				t.Errorf("%s - expected services to do not match: '%q' and '%q'", testName, tt.current, tt.new)
+				t.Errorf("%s - expected services to do not match: %q and %q", testName, tt.current, tt.new)
 				return
 			}
 			if !match && tt.match {
-				t.Errorf("%s - expected services to be the same: '%q' and '%q'", testName, tt.current, tt.new)
+				t.Errorf("%s - expected services to be the same: %q and %q", testName, tt.current, tt.new)
 				return
 			}
 			if !match && !tt.match {
 				if !strings.HasPrefix(reason, tt.reason) {
-					t.Errorf("%s - expected reason prefix '%s', found '%s'", testName, tt.reason, reason)
+					t.Errorf("%s - expected reason prefix %s, found %s", testName, tt.reason, reason)
 					return
 				}
 			}
