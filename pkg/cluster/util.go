@@ -274,7 +274,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
 	if err != nil {
-		c.logger.Debugf("could not get team info for team %q: %v", teamID, err)
+		c.logger.Warningf("could not get team info for team %q: %v", teamID, err)
 	} else {
 		for _, member := range teamInfo.Members {
 			if !(util.SliceContains(members, member)) {
