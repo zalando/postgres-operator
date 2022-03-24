@@ -723,16 +723,14 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 }
 
 func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) {
-	ignored := make(map[string]bool)
+	reason := ""
+	ignoredAnnotations := make(map[string]bool)
 	for _, ignore := range c.OpConfig.IgnoredAnnotations {
-		ignored[ignore] = true
+		ignoredAnnotations[ignore] = true
 	}
 
-	// changed := false
-	reason := ""
-
 	for key := range old {
-		if _, ok := ignored[key]; ok {
+		if _, ok := ignoredAnnotations[key]; ok {
 			continue
 		}
 		if _, ok := new[key]; !ok {
@@ -741,10 +739,9 @@ func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) 
 	}
 
 	for key := range new {
-		if _, ok := ignored[key]; ok {
+		if _, ok := ignoredAnnotations[key]; ok {
 			continue
 		}
-
 		v, ok := old[key]
 		if !ok {
 			reason += fmt.Sprintf(" Added '%s' with value '%s'.", key, new[key])
@@ -753,16 +750,11 @@ func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) 
 		}
 	}
 
-	if reason != "" {
-		return true, reason
-	}
-	return false, ""
+	return reason != "", reason
 
 }
 
-// SameService compares the Services
 func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
-	//TODO: improve comparison
 	if old.Spec.Type != new.Spec.Type {
 		return false, fmt.Sprintf("new service's type %q does not match the current one %q",
 			new.Spec.Type, old.Spec.Type)
@@ -783,7 +775,6 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	}
 
 	return true, ""
-
 }
 
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
