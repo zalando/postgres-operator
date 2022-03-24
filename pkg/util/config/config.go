@@ -42,6 +42,7 @@ type Resources struct {
 	InheritedLabels               []string            `name:"inherited_labels" default:""`
 	InheritedAnnotations          []string            `name:"inherited_annotations" default:""`
 	DownscalerAnnotations         []string            `name:"downscaler_annotations"`
+	IgnoredAnnotations            []string            `name:"ignored_annotations"`
 	ClusterNameLabel              string              `name:"cluster_name_label" default:"cluster-name"`
 	DeleteAnnotationDateKey       string              `name:"delete_annotation_date_key"`
 	DeleteAnnotationNameKey       string              `name:"delete_annotation_name_key"`

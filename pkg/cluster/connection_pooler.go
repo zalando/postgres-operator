@@ -912,7 +912,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 	if service, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
 		c.ConnectionPooler[role].Service = service
 		desiredSvc := c.generateConnectionPoolerService(c.ConnectionPooler[role])
-		if match, reason := k8sutil.SameService(service, desiredSvc); !match {
+		if match, reason := c.compareServices(service, desiredSvc); !match {
 			syncReason = append(syncReason, reason)
 			c.logServiceChanges(role, service, desiredSvc, false, reason)
 			newService, err = c.updateService(role, service, desiredSvc)

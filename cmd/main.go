@@ -2,12 +2,13 @@ package main
 
 import (
 	"flag"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/zalando/postgres-operator/pkg/controller"
 	"github.com/zalando/postgres-operator/pkg/spec"

@@ -378,9 +378,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		match = false
 		reasons = append(reasons, "new statefulset's number of replicas does not match the current one")
 	}
-	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
+	if changed, reason := c.compareAnnotations(c.Statefulset.Annotations, statefulSet.Annotations); changed {
+		match = false
 		needsReplace = true
-		reasons = append(reasons, "new statefulset's annotations do not match the current one")
+		reasons = append(reasons, "new statefulset's annotations do not match: "+reason)
 	}
 
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
@@ -434,10 +435,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		}
 	}
 
-	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations) {
+	if changed, reason := c.compareAnnotations(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations); changed {
+		match = false
 		needsReplace = true
 		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's pod template metadata annotations does not match the current one")
+		reasons = append(reasons, "new statefulset's pod template metadata annotations does not match "+reason)
 	}
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.SecurityContext, statefulSet.Spec.Template.Spec.SecurityContext) {
 		needsReplace = true
@@ -672,6 +674,61 @@ func comparePorts(a, b []v1.ContainerPort) bool {
 	return true
 }
 
+func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) {
+	reason := ""
+	ignoredAnnotations := make(map[string]bool)
+	for _, ignore := range c.OpConfig.IgnoredAnnotations {
+		ignoredAnnotations[ignore] = true
+	}
+
+	for key := range old {
+		if _, ok := ignoredAnnotations[key]; ok {
+			continue
+		}
+		if _, ok := new[key]; !ok {
+			reason += fmt.Sprintf(" Removed %q.", key)
+		}
+	}
+
+	for key := range new {
+		if _, ok := ignoredAnnotations[key]; ok {
+			continue
+		}
+		v, ok := old[key]
+		if !ok {
+			reason += fmt.Sprintf(" Added %q with value %q.", key, new[key])
+		} else if v != new[key] {
+			reason += fmt.Sprintf(" %q changed from %q to %q.", key, v, new[key])
+		}
+	}
+
+	return reason != "", reason
+
+}
+
+func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
+	if old.Spec.Type != new.Spec.Type {
+		return false, fmt.Sprintf("new service's type %q does not match the current one %q",
+			new.Spec.Type, old.Spec.Type)
+	}
+
+	oldSourceRanges := old.Spec.LoadBalancerSourceRanges
+	newSourceRanges := new.Spec.LoadBalancerSourceRanges
+
+	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
+	if (len(oldSourceRanges) != 0) || (len(newSourceRanges) != 0) {
+		if !util.IsEqualIgnoreOrder(oldSourceRanges, newSourceRanges) {
+			return false, "new service's LoadBalancerSourceRange does not match the current one"
+		}
+	}
+
+	if changed, reason := c.compareAnnotations(old.Annotations, new.Annotations); changed {
+		return !changed, "new service's annotations does not match the current one:" + reason
+	}
+
+	return true, ""
+}
+
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
 // (i.e. service) is treated as an error
 // logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
@@ -764,7 +821,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			updateFailed = true
 			return
 		}
-		if syncStatefulSet || !reflect.DeepEqual(oldSs, newSs) || !reflect.DeepEqual(oldSpec.Annotations, newSpec.Annotations) {
+		if syncStatefulSet || !reflect.DeepEqual(oldSs, newSs) {
 			c.logger.Debugf("syncing statefulsets")
 			syncStatefulSet = false
 			// TODO: avoid generating the StatefulSet object twice by passing it to syncStatefulSet

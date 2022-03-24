@@ -210,6 +210,10 @@ spec:
                   enable_sidecars:
                     type: boolean
                     default: true
+                  ignored_annotations:
+                    type: array
+                    items:
+                      type: string
                   infrastructure_roles_secret_name:
                     type: string
                   infrastructure_roles_secrets:

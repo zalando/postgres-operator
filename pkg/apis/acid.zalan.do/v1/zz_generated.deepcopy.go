@@ -228,6 +228,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.IgnoredAnnotations != nil {
+		in, out := &in.IgnoredAnnotations, &out.IgnoredAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.NodeReadinessLabel != nil {
 		in, out := &in.NodeReadinessLabel, &out.NodeReadinessLabel
 		*out = make(map[string]string, len(*in))
