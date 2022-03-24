@@ -266,6 +266,37 @@ new
                   )
                   .input-group-addon
                     .input-units Gi
+            tr
+              td 
+              td Specify Iops and Throughput only if you need more than the default 3000 Iops and 125Mb/s EBS provides.
+
+            tr
+              td Iops
+              td
+                .input-group
+                  input.form-control(
+                    ref='iops'
+                    type='number'
+                    value='{ iops }'
+                    onchange='{ iopsChange }'
+                    onkeyup='{ iopsChange }'
+                  )
+                  .input-group-addon
+                    .input-units
+
+            tr
+              td Througput
+              td
+                .input-group
+                  input.form-control(
+                    ref='throughput'
+                    type='number'
+                    value='{ throughput }'
+                    onchange='{ throughputChange }'
+                    onkeyup='{ throughputChange }'
+                  )
+                  .input-group-addon
+                    .input-units MB/s
 
             tr(if='{ config.users_visible }')
               td
@@ -509,7 +540,9 @@ new
         enableConnectionPooler: true
         {{/if}}
         volume:
-          size: "{{ volumeSize }}Gi"
+          size: "{{ volumeSize }}Gi"{{#if iops}}
+          iops: {{ iops }}{{/if}}{{#if throughput}}
+          throughput: {{ throughput }}{{/if}}
         {{#if users}}
         users:{{#each users}}
           {{ state }}: []{{/each}}{{/if}}
@@ -560,6 +593,8 @@ new
         enableReplicaLoadBalancer: this.enableReplicaLoadBalancer,
         enableConnectionPooler: this.enableConnectionPooler,
         volumeSize: this.volumeSize,
+        iops: this.iops,
+        throughput: this.throughput,
         users: this.users.valids,
         databases: this.databases.valids,
         ranges: this.ranges,
@@ -622,6 +657,14 @@ new
 
     this.volumeChange = e => {
       this.volumeSize = +e.target.value
+    }
+
+    this.iopsChange = e => {
+      this.iops = +e.target.value
+    }
+
+    this.throughputChange = e => {
+      this.throughput = +e.target.value
     }
 
     this.updateDNSName = () => {
