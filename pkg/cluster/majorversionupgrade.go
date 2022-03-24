@@ -117,27 +117,23 @@ func (c *Cluster) majorVersionUpgrade() error {
 			}
 
 			resultIdCheck = strings.TrimSuffix(resultIdCheck, "\n")
-
+            result, err := c.ExecCommand(podName, "/bin/bash")
 			if resultIdCheck != "0" {
 				c.logger.Infof("User id was identified as: %s, hence default user is non-root already", resultIdCheck)
-				result, err := c.ExecCommand(podName, "/bin/bash", "-c", upgradeCommand)
-				if err != nil {
-					c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
-					return err
-				}
-				c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
+				result, err = c.ExecCommand(podName, "/bin/bash", "-c", upgradeCommand)
 			} else {
 				c.logger.Infof("User id was identified as: %s, using su to reach the postgres user", resultIdCheck)
-				result, err := c.ExecCommand(podName, "/bin/su", "postgres", "-c", upgradeCommand)
-				if err != nil {
-					c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
-					return err
-				}
-				c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
+				result, err = c.ExecCommand(podName, "/bin/su", "postgres", "-c", upgradeCommand)
 			}
+			if err != nil {
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
+				return err
+			}
+			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
 
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d finished", c.currentMajorVersion, desiredVersion)
 		}
+
 	}
 
 	return nil
