@@ -740,8 +740,8 @@ class EndToEndTestCase(unittest.TestCase):
             svc = k8s.api.core_v1.read_namespaced_service('acid-minimal-cluster', 'default')
             new_svc_creation_timestamp = svc.metadata.creation_timestamp
 
-            self.eventuallyEqual(old_sts_creation_timestamp, new_sts_creation_timestamp, "unexpected replacement of statefulset on sync")
-            self.eventuallyEqual(old_svc_creation_timestamp, new_svc_creation_timestamp, "unexpected replacement of master service on sync")
+            self.assertEqual(old_sts_creation_timestamp, new_sts_creation_timestamp, "unexpected replacement of statefulset on sync")
+            self.assertEqual(old_svc_creation_timestamp, new_svc_creation_timestamp, "unexpected replacement of master service on sync")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
