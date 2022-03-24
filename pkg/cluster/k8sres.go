@@ -228,18 +228,14 @@ func (c *Cluster) generateResourceRequirements(
 	defaultResources acidv1.Resources,
 	containerName string) (*v1.ResourceRequirements, error) {
 	var err error
+	specRequests := acidv1.ResourceDescription{}
+	specLimits := acidv1.ResourceDescription{}
+	result := v1.ResourceRequirements{}
 
-	var specRequests, specLimits acidv1.ResourceDescription
-
-	if resources == nil {
-		specRequests = acidv1.ResourceDescription{}
-		specLimits = acidv1.ResourceDescription{}
-	} else {
+	if resources != nil {
 		specRequests = resources.ResourceRequests
 		specLimits = resources.ResourceLimits
 	}
-
-	result := v1.ResourceRequirements{}
 
 	result.Requests, err = fillResourceList(specRequests, defaultResources.ResourceRequests)
 	if err != nil {

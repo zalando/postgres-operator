@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 func newFakeK8sTestClient() (k8sutil.KubernetesClient, *fake.Clientset) {
@@ -1676,6 +1677,10 @@ func TestGenerateResourceRequirements(t *testing.T) {
 	roleLabel := "spilo-role"
 	sidecarName := "postgres-exporter"
 
+	// two test cases will call enforceMinResourceLimits which emits 2 events per call
+	// hence bufferSize of 4 is required
+	newEventRecorder := record.NewFakeRecorder(4)
+
 	configResources := config.Resources{
 		ClusterLabels:        map[string]string{"application": "spilo"},
 		ClusterNameLabel:     clusterNameLabel,
@@ -1954,7 +1959,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		var cluster = New(
 			Config{
 				OpConfig: tt.config,
-			}, client, tt.pgSpec, logger, eventRecorder)
+			}, client, tt.pgSpec, logger, newEventRecorder)
 
 		cluster.Name = clusterName
 		cluster.Namespace = namespace
