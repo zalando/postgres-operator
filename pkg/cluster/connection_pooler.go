@@ -210,9 +210,10 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		connectionPoolerSpec = &acidv1.ConnectionPooler{}
 	}
 	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
-	resources, err := generateResourceRequirements(
+	resources, err := c.generateResourceRequirements(
 		connectionPoolerSpec.Resources,
-		makeDefaultConnectionPoolerResources(&c.OpConfig))
+		makeDefaultConnectionPoolerResources(&c.OpConfig),
+		connectionPoolerContainer)
 
 	effectiveDockerImage := util.Coalesce(
 		connectionPoolerSpec.DockerImage,
@@ -627,8 +628,9 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		reasons = append(reasons, msg)
 	}
 
-	expectedResources, err := generateResourceRequirements(spec.Resources,
-		makeDefaultConnectionPoolerResources(&Config.OpConfig))
+	expectedResources, err := c.generateResourceRequirements(spec.Resources,
+		makeDefaultConnectionPoolerResources(&Config.OpConfig),
+		connectionPoolerContainer)
 
 	// An error to generate expected resources means something is not quite
 	// right, but for the purpose of robustness do not panic here, just report

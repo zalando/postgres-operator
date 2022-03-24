@@ -76,11 +76,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
-		err = fmt.Errorf("could not enforce minimum resource limits: %v", err)
-		return err
-	}
-
 	c.logger.Debug("syncing statefulsets")
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
