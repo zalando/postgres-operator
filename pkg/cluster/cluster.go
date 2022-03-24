@@ -256,10 +256,6 @@ func (c *Cluster) Create() error {
 	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
-	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
-		return fmt.Errorf("could not enforce minimum resource limits: %v", err)
-	}
-
 	for _, role := range []PostgresRole{Master, Replica} {
 
 		if c.Endpoints[role] != nil {
@@ -676,50 +672,6 @@ func comparePorts(a, b []v1.ContainerPort) bool {
 	return true
 }
 
-func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
-
-	var (
-		isSmaller bool
-		err       error
-	)
-
-	if spec.Resources == nil {
-		return nil
-	}
-
-	// setting limits too low can cause unnecessary evictions / OOM kills
-	minCPULimit := c.OpConfig.MinCPULimit
-	minMemoryLimit := c.OpConfig.MinMemoryLimit
-
-	cpuLimit := spec.Resources.ResourceLimits.CPU
-	if cpuLimit != "" {
-		isSmaller, err = util.IsSmallerQuantity(cpuLimit, minCPULimit)
-		if err != nil {
-			return fmt.Errorf("could not compare defined CPU limit %s with configured minimum value %s: %v", cpuLimit, minCPULimit, err)
-		}
-		if isSmaller {
-			c.logger.Warningf("defined CPU limit %s is below required minimum %s and will be increased", cpuLimit, minCPULimit)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", "defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
-			spec.Resources.ResourceLimits.CPU = minCPULimit
-		}
-	}
-
-	memoryLimit := spec.Resources.ResourceLimits.Memory
-	if memoryLimit != "" {
-		isSmaller, err = util.IsSmallerQuantity(memoryLimit, minMemoryLimit)
-		if err != nil {
-			return fmt.Errorf("could not compare defined memory limit %s with configured minimum value %s: %v", memoryLimit, minMemoryLimit, err)
-		}
-		if isSmaller {
-			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be increased", memoryLimit, minMemoryLimit)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", "defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
-			spec.Resources.ResourceLimits.Memory = minMemoryLimit
-		}
-	}
-
-	return nil
-}
-
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
 // (i.e. service) is treated as an error
 // logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
@@ -799,21 +751,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// Statefulset
 	func() {
-		if err := c.enforceMinResourceLimits(&c.Spec); err != nil {
-			c.logger.Errorf("could not sync resources: %v", err)
-			updateFailed = true
-			return
-		}
-
 		oldSs, err := c.generateStatefulSet(&oldSpec.Spec)
 		if err != nil {
 			c.logger.Errorf("could not generate old statefulset spec: %v", err)
 			updateFailed = true
 			return
 		}
-
-		// update newSpec to for latter comparison with oldSpec
-		c.enforceMinResourceLimits(&newSpec.Spec)
 
 		newSs, err := c.generateStatefulSet(&newSpec.Spec)
 		if err != nil {

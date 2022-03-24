@@ -594,3 +594,15 @@ func trimCronjobName(name string) string {
 	}
 	return name
 }
+
+func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (acidv1.Resources, error) {
+	var resources acidv1.Resources
+	resourcesJSON, err := json.Marshal(resourcesRequirement)
+	if err != nil {
+		return acidv1.Resources{}, fmt.Errorf("could not marshal K8s resources requirements")
+	}
+	if err = json.Unmarshal(resourcesJSON, &resources); err != nil {
+		return acidv1.Resources{}, fmt.Errorf("could not unmarshal K8s resources requirements into acidv1.Resources struct")
+	}
+	return resources, nil
+}

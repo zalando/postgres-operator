@@ -159,9 +159,9 @@ Those are top-level keys, containing both leaf keys and groups.
   at the cost of overprovisioning memory and potential scheduling problems for
   containers with high memory limits due to the lack of memory on Kubernetes
   cluster nodes. This affects all containers created by the operator (Postgres,
-  Scalyr sidecar, and other sidecars except **sidecars** defined in the operator
-  configuration); to set resources for the operator's own container, change the
-  [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
+  connection pooler, logical backup, scalyr sidecar, and other sidecars except 
+  **sidecars** defined in the operator configuration); to set resources for the
+  operator's own container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
 ## Postgres users

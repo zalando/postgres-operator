@@ -322,9 +322,7 @@ explanation of `ttl` and `loop_wait` parameters.
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the Postgres container. They are grouped under the `resources` top-level
-key with subgroups `requests` and `limits`. The whole section is optional,
-however if you specify a request or limit you have to define everything
-(unless you are not modifying the default CRD schema validation). 
+key with subgroups `requests` and `limits`. 
 
 ### Requests
 
