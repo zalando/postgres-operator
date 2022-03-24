@@ -60,8 +60,7 @@ configuration:
     enable_pod_disruption_budget: true
     enable_sidecars: true
     # ignored_annotations:
-    # - "deployment-time"
-    # - "k8s.v1.cni.cncf.io/network-status"
+    # - k8s.v1.cni.cncf.io/network-status
     # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
     # infrastructure_roles_secrets:
     # - secretname: "monitoring-roles"

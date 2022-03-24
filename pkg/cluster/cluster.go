@@ -385,7 +385,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	if changed, reason := c.compareAnnotations(c.Statefulset.Annotations, statefulSet.Annotations); changed {
 		match = false
 		needsReplace = true
-		reasons = append(reasons, "new statefulset's annotations do not match "+reason)
+		reasons = append(reasons, "new statefulset's annotations do not match: "+reason)
 	}
 
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
@@ -734,7 +734,7 @@ func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) 
 			continue
 		}
 		if _, ok := new[key]; !ok {
-			reason += fmt.Sprintf(" Removed '%s'.", key)
+			reason += fmt.Sprintf(" Removed %q.", key)
 		}
 	}
 
@@ -744,9 +744,9 @@ func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) 
 		}
 		v, ok := old[key]
 		if !ok {
-			reason += fmt.Sprintf(" Added '%s' with value '%s'.", key, new[key])
+			reason += fmt.Sprintf(" Added %q with value %q.", key, new[key])
 		} else if v != new[key] {
-			reason += fmt.Sprintf(" '%s' changed from '%s' to '%s'.", key, v, new[key])
+			reason += fmt.Sprintf(" %q changed from %q to %q.", key, v, new[key])
 		}
 	}
 
