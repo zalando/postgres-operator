@@ -126,6 +126,7 @@ edit
         if (i.metadata.selfLink) { delete i.metadata.selfLink }
         if (i.metadata.uid) { delete i.metadata.uid }
         if (i.metadata.resourceVersion) { delete i.metadata.resourceVersion }
+        if (i.metadata.managedFields) { delete i.metadata.managedFields }
 
         this.update()
         this.refs.yamlNice.innerHTML = yamlParser.safeDump(i.postgresql, {sortKeys: true})
@@ -138,7 +139,15 @@ edit
         o.spec.enableMasterLoadBalancer = i.spec.enableMasterLoadBalancer || false
         o.spec.enableReplicaLoadBalancer = i.spec.enableReplicaLoadBalancer || false
         o.spec.enableConnectionPooler = i.spec.enableConnectionPooler || false
-        o.spec.volume = { size: i.spec.volume.size }
+
+        o.spec.volume = {
+          size: i.spec.volume.size,
+          throughput: i.spec.volume.throughput || 125,
+          iops: i.spec.volume.iops || 3000
+        }
+
+        o.spec.postgresql = {}
+        o.spec.postgresql.version = i.spec.postgresql.version
 
         if ('users' in i.spec && typeof i.spec.users === 'object') {
           o.spec.users = Object.mapValues(i.spec.users, roleFlags =>
@@ -166,7 +175,7 @@ edit
               ].forEach(resourceType => {
                 if (resourceType in resources) {
                   const resourceClaim = resources[resourceType]
-                  if (typeof resourceClaim === '') {
+                  if (typeof resourceClaim === 'string') {
                     o.spec.resources[section][resourceType] = resources[resourceType]
                   }
                 }
