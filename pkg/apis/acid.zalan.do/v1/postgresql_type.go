@@ -80,6 +80,7 @@ type PostgresSpec struct {
 	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 	Streams               []Stream                    `json:"streams,omitempty"`
+	Env                   []v1.EnvVar                 `json:"env,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
