@@ -121,6 +121,8 @@ type ControllerConfig struct {
 	Namespace            string
 	IgnoredAnnotations   []string
 
+	MetricsContext       string
+
 	EnableJsonLogging bool
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"github.com/prometheus/client_golang/prometheus"
 	"regexp"
 	"strconv"
 	"strings"
@@ -27,6 +28,19 @@ var requireMasterRestartWhenDecreased = []string{
 	"max_locks_per_transaction",
 	"max_worker_processes",
 	"max_wal_senders",
+
+var(
+	pgStatus = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "pg_sync_status",
+			Help: "Postgres sync status (1 = ok, 0 = error).",
+		},
+		[]string{"namespace", "clusterName"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(pgStatus)
 }
 
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
@@ -40,7 +54,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.setSpec(newSpec)
 
 	defer func() {
+		labels := prometheus.Labels{"namespace":c.clusterName().Namespace,"clusterName":c.clusterName().Name}
+		pgStatus.With(labels).Set(1)
 		if err != nil {
+			pgStatus.With(labels).Set(0)
 			c.logger.Warningf("error while syncing cluster state: %v", err)
 			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
 		} else if !c.Status.Running() {
