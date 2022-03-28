@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	autoscalingV1 "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
+	autoscalingV2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1"
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
 	apiacidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -68,6 +70,8 @@ type KubernetesClient struct {
 	acidv1.PostgresTeamsGetter
 	acidv1.PostgresqlsGetter
 	zalandov1.FabricEventStreamsGetter
+	HorizontalPodAutoscalersGetterV1 autoscalingV1.HorizontalPodAutoscalersGetter
+	HorizontalPodAutoscalersGetterV2 autoscalingV2.HorizontalPodAutoscalersGetter
 
 	RESTClient         rest.Interface
 	AcidV1ClientSet    *zalandoclient.Clientset
@@ -161,6 +165,8 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.RoleBindingsGetter = client.RbacV1()
 	kubeClient.CronJobsGetter = client.BatchV1beta1()
 	kubeClient.EventsGetter = client.CoreV1()
+	kubeClient.HorizontalPodAutoscalersGetterV1 = client.AutoscalingV1();
+	kubeClient.HorizontalPodAutoscalersGetterV2 = client.AutoscalingV2beta1();
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {
