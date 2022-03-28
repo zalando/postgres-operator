@@ -1256,11 +1256,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
 	)
 
-	// if kubernetes_use_configmaps define a readinessProbe since the master service has a selector
 	// Patroni responds 200 to probe only if it either owns the leader lock or postgres is running and DCS is accessible
-	if c.patroniKubernetesUseConfigMaps() {
-		spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
-	}
+	spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
 
 	// generate container specs for sidecars specified in the cluster manifest
 	clusterSpecificSidecars := []v1.Container{}
