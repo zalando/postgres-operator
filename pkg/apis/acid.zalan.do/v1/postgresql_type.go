@@ -47,6 +47,8 @@ type PostgresSpec struct {
 	EnableReplicaLoadBalancer       *bool `json:"enableReplicaLoadBalancer,omitempty"`
 	EnableReplicaPoolerLoadBalancer *bool `json:"enableReplicaPoolerLoadBalancer,omitempty"`
 
+	// User nodeport as service type
+	ServiceNodePort *int32 `json:"serviceNodePort,omitempty"`
 	// deprecated load balancer settings maintained for backward compatibility
 	// see "Load balancers" operator docs
 	UseLoadBalancer     *bool `json:"useLoadBalancer,omitempty"`
