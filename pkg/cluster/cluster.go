@@ -258,6 +258,8 @@ func (c *Cluster) Create() error {
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
+		// if kubernetes_use_configmaps is set Patroni will create configmaps
+		// otherwise it will use endpoints
 		if !c.patroniKubernetesUseConfigMaps() {
 			if c.Endpoints[role] != nil {
 				return fmt.Errorf("%s endpoint already exists in the cluster", role)
@@ -1576,10 +1578,10 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
 
-	if !c.patroniKubernetesUseConfigMaps() {
-		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
-	} else {
+	if c.patroniKubernetesUseConfigMaps() {
 		actionsList = append(actionsList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
+	} else {
+		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
 	}
 
 	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
