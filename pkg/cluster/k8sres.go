@@ -77,7 +77,15 @@ func (c *Cluster) statefulSetName() string {
 }
 
 func (c *Cluster) configMapName(role PostgresRole) string {
-	return c.serviceName(role)
+	name := c.Name
+	if role == Master {
+		name = name + "-leader"
+	}
+	if role == Replica {
+		name = name + "-repl"
+	}
+
+	return name
 }
 
 func (c *Cluster) endpointName(role PostgresRole) string {
