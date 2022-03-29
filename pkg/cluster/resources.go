@@ -35,8 +35,14 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found secret: %q (uid: %q) namesapce: %s", util.NameFromMeta(obj.ObjectMeta), obj.UID, obj.ObjectMeta.Namespace)
 	}
 
-	for role, endpoint := range c.Endpoints {
-		c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+	if c.patroniKubernetesUseConfigMaps() {
+		for role, configMap := range c.ConfigMaps {
+			c.logger.Infof("found %s config map: %q (uid: %q)", role, util.NameFromMeta(configMap.ObjectMeta), configMap.UID)
+		}
+	} else {
+		for role, endpoint := range c.Endpoints {
+			c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+		}
 	}
 
 	for role, service := range c.Services {
@@ -402,6 +408,20 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	return result
 }
 
+func (c *Cluster) createConfigMap(role PostgresRole) (*v1.ConfigMap, error) {
+	c.setProcessName("creating config map")
+	configMapSpec := c.generateConfigMap(role)
+
+	configMap, err := c.KubeClient.ConfigMaps(configMapSpec.Namespace).Create(context.TODO(), configMapSpec, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not create %s config map: %v", role, err)
+	}
+
+	c.ConfigMaps[role] = configMap
+
+	return configMap, nil
+}
+
 func (c *Cluster) createPodDisruptionBudget() (*policybeta1.PodDisruptionBudget, error) {
 	podDisruptionBudgetSpec := c.generatePodDisruptionBudget()
 	podDisruptionBudget, err := c.KubeClient.
@@ -589,9 +609,19 @@ func (c *Cluster) GetEndpointMaster() *v1.Endpoints {
 	return c.Endpoints[Master]
 }
 
-// GetEndpointReplica returns cluster's kubernetes master Endpoint
+// GetEndpointReplica returns cluster's kubernetes replica Endpoint
 func (c *Cluster) GetEndpointReplica() *v1.Endpoints {
 	return c.Endpoints[Replica]
+}
+
+// GetConfigMapMaster returns cluster's kubernetes master ConfigMap
+func (c *Cluster) GetConfigMapMaster() *v1.ConfigMap {
+	return c.ConfigMaps[Master]
+}
+
+// GetConfigMapReplica returns cluster's kubernetes replica ConfigMap
+func (c *Cluster) GetConfigMapReplica() *v1.ConfigMap {
+	return c.ConfigMaps[Replica]
 }
 
 // GetStatefulSet returns cluster's kubernetes StatefulSet

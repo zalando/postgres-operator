@@ -59,6 +59,7 @@ type Config struct {
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
 	Endpoints           map[PostgresRole]*v1.Endpoints
+	ConfigMaps          map[PostgresRole]*v1.ConfigMap
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
@@ -1484,22 +1485,29 @@ func (c *Cluster) GetCurrentProcess() Process {
 
 // GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() *ClusterStatus {
-	return &ClusterStatus{
-		Cluster: c.Spec.ClusterName,
-		Team:    c.Spec.TeamID,
-		Status:  c.Status,
-		Spec:    c.Spec,
-
+	status := &ClusterStatus{
+		Cluster:             c.Spec.ClusterName,
+		Team:                c.Spec.TeamID,
+		Status:              c.Status,
+		Spec:                c.Spec,
 		MasterService:       c.GetServiceMaster(),
 		ReplicaService:      c.GetServiceReplica(),
-		MasterEndpoint:      c.GetEndpointMaster(),
-		ReplicaEndpoint:     c.GetEndpointReplica(),
 		StatefulSet:         c.GetStatefulSet(),
 		PodDisruptionBudget: c.GetPodDisruptionBudget(),
 		CurrentProcess:      c.GetCurrentProcess(),
 
 		Error: fmt.Errorf("error: %s", c.Error),
 	}
+
+	if c.patroniKubernetesUseConfigMaps() {
+		status.MasterEndpoint = c.GetEndpointMaster()
+		status.ReplicaEndpoint = c.GetEndpointReplica()
+	} else {
+		status.MasterConfigMap = c.GetConfigMapMaster()
+		status.ReplicaConfigMap = c.GetConfigMapReplica()
+	}
+
+	return status
 }
 
 // Switchover does a switchover (via Patroni) to a candidate pod
@@ -1579,10 +1587,11 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 	}
 
 	if c.patroniKubernetesUseConfigMaps() {
-		actionsList = append(actionsList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
+		actionsList = append(actionsList, c.deletePatroniClusterConfigMaps)
 	} else {
 		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
 	}
+	actionsList = append(actionsList, c.deletePatroniClusterServices)
 
 	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
 	for _, deleter := range actionsList {
