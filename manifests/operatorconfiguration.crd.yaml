@@ -128,6 +128,11 @@ spec:
               users:
                 type: object
                 properties:
+                  additional_owner_roles:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
                   enable_password_rotation:
                     type: boolean
                     default: false
@@ -205,6 +210,10 @@ spec:
                   enable_sidecars:
                     type: boolean
                     default: true
+                  ignored_annotations:
+                    type: array
+                    items:
+                      type: string
                   infrastructure_roles_secret_name:
                     type: string
                   infrastructure_roles_secrets:
@@ -347,6 +356,12 @@ spec:
               timeouts:
                 type: object
                 properties:
+                  patroni_api_check_interval:
+                    type: string
+                    default: "1s"
+                  patroni_api_check_timeout:
+                    type: string
+                    default: "5s"
                   pod_label_wait_timeout:
                     type: string
                     default: "10m"
@@ -378,7 +393,13 @@ spec:
                   enable_master_load_balancer:
                     type: boolean
                     default: true
+                  enable_master_pooler_load_balancer:
+                    type: boolean
+                    default: false
                   enable_replica_load_balancer:
+                    type: boolean
+                    default: false
+                  enable_replica_pooler_load_balancer:
                     type: boolean
                     default: false
                   external_traffic_policy:
@@ -448,6 +469,8 @@ spec:
                     type: string
                   logical_backup_s3_sse:
                     type: string
+                  logical_backup_s3_retention_time:
+                    type: string
                   logical_backup_schedule:
                     type: string
                     pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
@@ -498,6 +521,7 @@ spec:
                       type: string
                     default:
                     - admin
+                    - cron_admin
                   role_deletion_suffix:
                     type: string
                     default: "_deleted"

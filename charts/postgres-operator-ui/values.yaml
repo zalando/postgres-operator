@@ -93,6 +93,7 @@ ingress:
     {}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
+  ingressClassName: ""
   hosts:
     - host: ui.example.org
       paths: [""]

@@ -26,6 +26,8 @@ configuration:
   #     protocol: TCP
   workers: 8
   users:
+    # additional_owner_roles: 
+    # - cron_admin
     enable_password_rotation: false
     password_rotation_interval: 90
     password_rotation_user_retention: 180
@@ -57,6 +59,8 @@ configuration:
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
     enable_sidecars: true
+    # ignored_annotations:
+    # - k8s.v1.cni.cncf.io/network-status
     # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
     # infrastructure_roles_secrets:
     # - secretname: "monitoring-roles"
@@ -107,6 +111,8 @@ configuration:
     # min_cpu_limit: 250m
     # min_memory_limit: 250Mi
   timeouts:
+    patroni_api_check_interval: 1s
+    patroni_api_check_timeout: 5s
     pod_label_wait_timeout: 10m
     pod_deletion_wait_timeout: 10m
     ready_wait_interval: 4s
@@ -119,7 +125,9 @@ configuration:
     #   keyy: valuey
     # db_hosted_zone: ""
     enable_master_load_balancer: false
+    enable_master_pooler_load_balancer: false
     enable_replica_load_balancer: false
+    enable_replica_pooler_load_balancer: false
     external_traffic_policy: "Cluster"
     master_dns_name_format: "{cluster}.{team}.{hostedzone}"
     replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
@@ -146,6 +154,7 @@ configuration:
     # logical_backup_s3_region: ""
     # logical_backup_s3_secret_access_key: ""
     logical_backup_s3_sse: "AES256"
+    # logical_backup_s3_retention_time: ""
     logical_backup_schedule: "30 00 * * *"
   debug:
     debug_logging: true
@@ -163,6 +172,7 @@ configuration:
     # - postgres_superusers
     protected_role_names:
     - admin
+    - cron_admin
     role_deletion_suffix: "_deleted"
     team_admin_role: admin
     team_api_role_configuration:

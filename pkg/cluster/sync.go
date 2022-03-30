@@ -76,11 +76,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
-		err = fmt.Errorf("could not enforce minimum resource limits: %v", err)
-		return err
-	}
-
 	c.logger.Debug("syncing statefulsets")
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
@@ -172,11 +167,13 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		if match, reason := k8sutil.SameService(svc, desiredSvc); !match {
+		if match, reason := c.compareServices(svc, desiredSvc); !match {
 			c.logServiceChanges(role, svc, desiredSvc, false, reason)
-			if err = c.updateService(role, desiredSvc); err != nil {
+			updatedSvc, err := c.updateService(role, svc, desiredSvc)
+			if err != nil {
 				return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 			}
+			c.Services[role] = updatedSvc
 			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		}
 		return nil

@@ -159,9 +159,9 @@ Those are top-level keys, containing both leaf keys and groups.
   at the cost of overprovisioning memory and potential scheduling problems for
   containers with high memory limits due to the lack of memory on Kubernetes
   cluster nodes. This affects all containers created by the operator (Postgres,
-  Scalyr sidecar, and other sidecars except **sidecars** defined in the operator
-  configuration); to set resources for the operator's own container, change the
-  [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
+  connection pooler, logical backup, scalyr sidecar, and other sidecars except 
+  **sidecars** defined in the operator configuration); to set resources for the
+  operator's own container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
 ## Postgres users
@@ -176,6 +176,15 @@ under the `users` key.
 * **replication_username**
   Postgres username used for replication between instances. The default is
   `standby`.
+
+* **additional_owner_roles**
+  Specifies database roles that will become members of all database owners.
+  Then owners can use `SET ROLE` to obtain privileges of these roles to e.g.
+  create/update functionality from extensions as part of a migration script.
+  Note, that roles listed here should be preconfigured in the docker image
+  and already exist in the database cluster on startup. One such role can be
+  `cron_admin` which is provided by the Spilo docker image to set up cron
+  jobs inside the `postgres` database. Default is `empty`.
 
 * **enable_password_rotation**
   For all `LOGIN` roles that are not database owners the operator can rotate
@@ -277,6 +286,12 @@ configuration they are grouped under the `kubernetes` key.
   statefulset and, if exists, to the connection pooler deployment as well.
   Regular expressions like `downscaler/*` etc. are also accepted. Can be used
   with [kube-downscaler](https://github.com/hjacobs/kube-downscaler).
+
+* **ignored_annotations**
+  Some K8s tools inject and update annotations out of the Postgres Operator
+  control. This can cause rolling updates on each cluster sync cycle. With
+  this option you can specify an array of annotation keys that should be
+  ignored when comparing K8s resources on sync. The default is empty.
 
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not
@@ -498,6 +513,13 @@ configuration `resource_check_interval` and `resource_check_timeout` have no
 effect, and the parameters are grouped under the `timeouts` key in the
 CRD-based configuration.
 
+* **PatroniAPICheckInterval**
+  the interval between consecutive attempts waiting for the return of 
+  Patroni Api. The default is `1s`.
+
+* **PatroniAPICheckTimeout**
+  the timeout for a response from Patroni Api. The default is `5s`.
+
 * **resource_check_interval**
   interval to wait between consecutive attempts to check for the presence of
   some Kubernetes resource (i.e. `StatefulSet` or `PodDisruptionBudget`). The
@@ -546,10 +568,20 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   toggles service type load balancer pointing to the master pod of the cluster.
   Can be overridden by individual cluster settings. The default is `true`.
 
-* **enable_replica_load_balancer**
-  toggles service type load balancer pointing to the replica pod of the
-  cluster.  Can be overridden by individual cluster settings. The default is
+* **enable_master_pooler_load_balancer**
+  toggles service type load balancer pointing to the master pooler pod of the
+  cluster. Can be overridden by individual cluster settings. The default is
   `false`.
+
+* **enable_replica_load_balancer**
+  toggles service type load balancer pointing to the replica pod(s) of the
+  cluster. Can be overridden by individual cluster settings. The default is
+  `false`.
+
+* **enable_replica_pooler_load_balancer**
+  toggles service type load balancer pointing to the replica pooler pod(s) of
+  the cluster. Can be overridden by individual cluster settings. The default
+  is `false`.
 
 * **external_traffic_policy** defines external traffic policy for load
   balancers. Allowed values are `Cluster` (default) and `Local`.
@@ -676,6 +708,11 @@ grouped under the `logical_backup` key.
   Specify server side encryption that S3 storage is using. If empty string
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
 
+* **logical_backup_s3_retention_time**
+  Specify a retention time for logical backups stored in S3. Backups older than the specified retention 
+  time will be deleted after a new backup was uploaded. If empty, all backups will be kept. Example values are
+  "3 days", "2 weeks", or "1 month". The default is empty.
+
 * **logical_backup_schedule**
   Backup schedule in the cron format. Please take the
   [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
@@ -748,7 +785,7 @@ key.
 
 * **protected_role_names**
   List of roles that cannot be overwritten by an application, team or
-  infrastructure role. The default is `admin`.
+  infrastructure role. The default list is `admin` and `cron_admin`.
 
 * **postgres_superuser_teams**
   List of teams which members need the superuser role in each PG database

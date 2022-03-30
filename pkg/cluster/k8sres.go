@@ -37,6 +37,8 @@ const (
 	patroniPGBinariesParameterName = "bin_dir"
 	patroniPGHBAConfParameterName  = "pg_hba"
 	localHost                      = "127.0.0.1/32"
+	scalyrSidecarName              = "scalyr-sidecar"
+	logicalBackupContainerName     = "logical-backup"
 	connectionPoolerContainer      = "connection-pooler"
 	pgPort                         = 5432
 )
@@ -102,24 +104,22 @@ func (c *Cluster) serviceAddress(role PostgresRole) string {
 	return ""
 }
 
-func (c *Cluster) servicePort(role PostgresRole) string {
+func (c *Cluster) servicePort(role PostgresRole) int32 {
 	service, exist := c.Services[role]
 
 	if exist {
-		return fmt.Sprint(service.Spec.Ports[0].Port)
+		return service.Spec.Ports[0].Port
 	}
 
-	c.logger.Warningf("No service for role %s", role)
-	return ""
+	c.logger.Warningf("No service for role %s - defaulting to port 5432", role)
+	return pgPort
 }
 
 func (c *Cluster) podDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
 
-func (c *Cluster) makeDefaultResources() acidv1.Resources {
-
-	config := c.OpConfig
+func makeDefaultResources(config *config.Config) acidv1.Resources {
 
 	defaultRequests := acidv1.ResourceDescription{
 		CPU:    config.Resources.DefaultCPURequest,
@@ -136,25 +136,61 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 	}
 }
 
-func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
-	var err error
+func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) error {
+	var (
+		isSmaller bool
+		err       error
+		msg       string
+	)
 
-	specRequests := resources.ResourceRequests
-	specLimits := resources.ResourceLimits
-
-	result := v1.ResourceRequirements{}
-
-	result.Requests, err = fillResourceList(specRequests, defaultResources.ResourceRequests)
-	if err != nil {
-		return nil, fmt.Errorf("could not fill resource requests: %v", err)
+	// setting limits too low can cause unnecessary evictions / OOM kills
+	cpuLimit := resources.Limits[v1.ResourceCPU]
+	minCPULimit := c.OpConfig.MinCPULimit
+	if minCPULimit != "" {
+		isSmaller, err = util.IsSmallerQuantity(cpuLimit.String(), minCPULimit)
+		if err != nil {
+			return fmt.Errorf("could not compare defined CPU limit %s for %q container with configured minimum value %s: %v",
+				cpuLimit.String(), constants.PostgresContainerName, minCPULimit, err)
+		}
+		if isSmaller {
+			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required minimum %s and will be increased",
+				cpuLimit.String(), constants.PostgresContainerName, minCPULimit)
+			c.logger.Warningf(msg)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+			resources.Limits[v1.ResourceCPU], _ = resource.ParseQuantity(minCPULimit)
+		}
 	}
 
-	result.Limits, err = fillResourceList(specLimits, defaultResources.ResourceLimits)
-	if err != nil {
-		return nil, fmt.Errorf("could not fill resource limits: %v", err)
+	memoryLimit := resources.Limits[v1.ResourceMemory]
+	minMemoryLimit := c.OpConfig.MinMemoryLimit
+	if minMemoryLimit != "" {
+		isSmaller, err = util.IsSmallerQuantity(memoryLimit.String(), minMemoryLimit)
+		if err != nil {
+			return fmt.Errorf("could not compare defined memory limit %s for %q container with configured minimum value %s: %v",
+				memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit, err)
+		}
+		if isSmaller {
+			msg = fmt.Sprintf("defined memory limit %s for %q container is below required minimum %s and will be increased",
+				memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit)
+			c.logger.Warningf(msg)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+			resources.Limits[v1.ResourceMemory], _ = resource.ParseQuantity(minMemoryLimit)
+		}
 	}
 
-	return &result, nil
+	return nil
+}
+
+func setMemoryRequestToLimit(resources *v1.ResourceRequirements, containerName string, logger *logrus.Entry) {
+
+	requests := resources.Requests[v1.ResourceMemory]
+	limits := resources.Limits[v1.ResourceMemory]
+	isSmaller := requests.Cmp(limits) == -1
+	if isSmaller {
+		logger.Warningf("memory request of %s for %q container is increased to match memory limit of %s",
+			requests.String(), containerName, limits.String())
+		resources.Requests[v1.ResourceMemory] = limits
+	}
 }
 
 func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceDescription) (v1.ResourceList, error) {
@@ -185,6 +221,44 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 	}
 
 	return requests, nil
+}
+
+func (c *Cluster) generateResourceRequirements(
+	resources *acidv1.Resources,
+	defaultResources acidv1.Resources,
+	containerName string) (*v1.ResourceRequirements, error) {
+	var err error
+	specRequests := acidv1.ResourceDescription{}
+	specLimits := acidv1.ResourceDescription{}
+	result := v1.ResourceRequirements{}
+
+	if resources != nil {
+		specRequests = resources.ResourceRequests
+		specLimits = resources.ResourceLimits
+	}
+
+	result.Requests, err = fillResourceList(specRequests, defaultResources.ResourceRequests)
+	if err != nil {
+		return nil, fmt.Errorf("could not fill resource requests: %v", err)
+	}
+
+	result.Limits, err = fillResourceList(specLimits, defaultResources.ResourceLimits)
+	if err != nil {
+		return nil, fmt.Errorf("could not fill resource limits: %v", err)
+	}
+
+	// enforce minimum cpu and memory limits for Postgres containers only
+	if containerName == constants.PostgresContainerName {
+		if err = c.enforceMinResourceLimits(&result); err != nil {
+			return nil, fmt.Errorf("could not enforce minimum resource limits: %v", err)
+		}
+	}
+
+	if c.OpConfig.SetMemoryRequestToLimit {
+		setMemoryRequestToLimit(&result, containerName, c.logger)
+	}
+
+	return &result, nil
 }
 
 func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, EnablePgVersionEnvVar bool, logger *logrus.Entry) (string, error) {
@@ -507,22 +581,20 @@ func generateContainer(
 	}
 }
 
-func generateSidecarContainers(sidecars []acidv1.Sidecar,
-	defaultResources acidv1.Resources, startIndex int, logger *logrus.Entry) ([]v1.Container, error) {
+func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar,
+	defaultResources acidv1.Resources, startIndex int) ([]v1.Container, error) {
 
 	if len(sidecars) > 0 {
 		result := make([]v1.Container, 0)
 		for index, sidecar := range sidecars {
+			var resourcesSpec acidv1.Resources
+			if sidecar.Resources == nil {
+				resourcesSpec = acidv1.Resources{}
+			} else {
+				sidecar.Resources.DeepCopyInto(&resourcesSpec)
+			}
 
-			resources, err := generateResourceRequirements(
-				makeResources(
-					sidecar.Resources.ResourceRequests.CPU,
-					sidecar.Resources.ResourceRequests.Memory,
-					sidecar.Resources.ResourceLimits.CPU,
-					sidecar.Resources.ResourceLimits.Memory,
-				),
-				defaultResources,
-			)
+			resources, err := c.generateResourceRequirements(&resourcesSpec, defaultResources, sidecar.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -997,63 +1069,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		additionalVolumes   = spec.AdditionalVolumes
 	)
 
-	// Improve me. Please.
-	if c.OpConfig.SetMemoryRequestToLimit {
-
-		// controller adjusts the default memory request at operator startup
-
-		request := spec.Resources.ResourceRequests.Memory
-		if request == "" {
-			request = c.OpConfig.Resources.DefaultMemoryRequest
-		}
-
-		limit := spec.Resources.ResourceLimits.Memory
-		if limit == "" {
-			limit = c.OpConfig.Resources.DefaultMemoryLimit
-		}
-
-		isSmaller, err := util.IsSmallerQuantity(request, limit)
-		if err != nil {
-			return nil, err
-		}
-		if isSmaller {
-			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
-			spec.Resources.ResourceRequests.Memory = limit
-
-		}
-
-		// controller adjusts the Scalyr sidecar request at operator startup
-		// as this sidecar is managed separately
-
-		// adjust sidecar containers defined for that particular cluster
-		for _, sidecar := range spec.Sidecars {
-
-			// TODO #413
-			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
-			if request == "" {
-				request = c.OpConfig.Resources.DefaultMemoryRequest
-			}
-
-			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
-			if limit == "" {
-				limit = c.OpConfig.Resources.DefaultMemoryLimit
-			}
-
-			isSmaller, err := util.IsSmallerQuantity(sidecarRequest, sidecarLimit)
-			if err != nil {
-				return nil, err
-			}
-			if isSmaller {
-				c.logger.Warningf("The memory request of %v for the %v sidecar container is increased to match the memory limit of %v.", sidecar.Resources.ResourceRequests.Memory, sidecar.Name, sidecar.Resources.ResourceLimits.Memory)
-				sidecar.Resources.ResourceRequests.Memory = sidecar.Resources.ResourceLimits.Memory
-			}
-		}
-
-	}
-
-	defaultResources := c.makeDefaultResources()
-
-	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
+	defaultResources := makeDefaultResources(&c.OpConfig)
+	resourceRequirements, err := c.generateResourceRequirements(
+		spec.Resources, defaultResources, constants.PostgresContainerName)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
@@ -1101,7 +1119,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// backward compatible check for InitContainers
 	if spec.InitContainersOld != nil {
-		msg := "Manifest parameter init_containers is deprecated."
+		msg := "manifest parameter init_containers is deprecated."
 		if spec.InitContainers == nil {
 			c.logger.Warningf("%s Consider using initContainers instead.", msg)
 			spec.InitContainers = spec.InitContainersOld
@@ -1112,7 +1130,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// backward compatible check for PodPriorityClassName
 	if spec.PodPriorityClassNameOld != "" {
-		msg := "Manifest parameter pod_priority_class_name is deprecated."
+		msg := "manifest parameter pod_priority_class_name is deprecated."
 		if spec.PodPriorityClassName == "" {
 			c.logger.Warningf("%s Consider using podPriorityClassName instead.", msg)
 			spec.PodPriorityClassName = spec.PodPriorityClassNameOld
@@ -1230,7 +1248,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			c.logger.Warningf("sidecars specified but disabled in configuration - next statefulset creation would fail")
 		}
 
-		if clusterSpecificSidecars, err = generateSidecarContainers(spec.Sidecars, defaultResources, 0, c.logger); err != nil {
+		if clusterSpecificSidecars, err = c.generateSidecarContainers(spec.Sidecars, defaultResources, 0); err != nil {
 			return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
 		}
 	}
@@ -1241,7 +1259,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	for name, dockerImage := range c.OpConfig.SidecarImages {
 		globalSidecarsByDockerImage = append(globalSidecarsByDockerImage, acidv1.Sidecar{Name: name, DockerImage: dockerImage})
 	}
-	if globalSidecarContainersByDockerImage, err = generateSidecarContainers(globalSidecarsByDockerImage, defaultResources, len(clusterSpecificSidecars), c.logger); err != nil {
+	if globalSidecarContainersByDockerImage, err = c.generateSidecarContainers(globalSidecarsByDockerImage, defaultResources, len(clusterSpecificSidecars)); err != nil {
 		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
 	}
 	// make the resulting list reproducible
@@ -1254,7 +1272,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	// generate scalyr sidecar container
 	var scalyrSidecars []v1.Container
 	if scalyrSidecar, err :=
-		generateScalyrSidecarSpec(c.Name,
+		c.generateScalyrSidecarSpec(c.Name,
 			c.OpConfig.ScalyrAPIKey,
 			c.OpConfig.ScalyrServerURL,
 			c.OpConfig.ScalyrImage,
@@ -1262,8 +1280,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			c.OpConfig.ScalyrMemoryRequest,
 			c.OpConfig.ScalyrCPULimit,
 			c.OpConfig.ScalyrMemoryLimit,
-			defaultResources,
-			c.logger); err != nil {
+			defaultResources); err != nil {
 		return nil, fmt.Errorf("could not generate Scalyr sidecar: %v", err)
 	} else {
 		if scalyrSidecar != nil {
@@ -1373,12 +1390,12 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 	return annotations
 }
 
-func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
+func (c *Cluster) generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
 	scalyrCPURequest string, scalyrMemoryRequest string, scalyrCPULimit string, scalyrMemoryLimit string,
-	defaultResources acidv1.Resources, logger *logrus.Entry) (*v1.Container, error) {
+	defaultResources acidv1.Resources) (*v1.Container, error) {
 	if APIKey == "" || dockerImage == "" {
 		if APIKey == "" && dockerImage != "" {
-			logger.Warning("Not running Scalyr sidecar: SCALYR_API_KEY must be defined")
+			c.logger.Warning("Not running Scalyr sidecar: SCALYR_API_KEY must be defined")
 		}
 		return nil, nil
 	}
@@ -1388,7 +1405,8 @@ func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage strin
 		scalyrCPULimit,
 		scalyrMemoryLimit,
 	)
-	resourceRequirementsScalyrSidecar, err := generateResourceRequirements(resourcesScalyrSidecar, defaultResources)
+	resourceRequirementsScalyrSidecar, err := c.generateResourceRequirements(
+		&resourcesScalyrSidecar, defaultResources, scalyrSidecarName)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resources for Scalyr sidecar: %v", err)
 	}
@@ -1406,7 +1424,7 @@ func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage strin
 		env = append(env, v1.EnvVar{Name: "SCALYR_SERVER_URL", Value: serverURL})
 	}
 	return &v1.Container{
-		Name:            "scalyr-sidecar",
+		Name:            scalyrSidecarName,
 		Image:           dockerImage,
 		Env:             env,
 		ImagePullPolicy: v1.PullIfNotPresent,
@@ -1505,13 +1523,13 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 	mountPaths := map[string]acidv1.AdditionalVolume{}
 	for i, additionalVolume := range additionalVolumes {
 		if previousVolume, exist := mountPaths[additionalVolume.MountPath]; exist {
-			msg := "Volume %+v cannot be mounted to the same path as %+v"
+			msg := "volume %+v cannot be mounted to the same path as %+v"
 			c.logger.Warningf(msg, additionalVolume, previousVolume)
 			continue
 		}
 
 		if additionalVolume.MountPath == constants.PostgresDataMount {
-			msg := "Cannot mount volume on postgresql data directory, %+v"
+			msg := "cannot mount volume on postgresql data directory, %+v"
 			c.logger.Warningf(msg, additionalVolume)
 			continue
 		}
@@ -1524,7 +1542,7 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 
 		for _, target := range additionalVolume.TargetContainers {
 			if target == "all" && len(additionalVolume.TargetContainers) != 1 {
-				msg := `Target containers could be either "all" or a list
+				msg := `target containers could be either "all" or a list
 						of containers, mixing those is not allowed, %+v`
 				c.logger.Warningf(msg, additionalVolume)
 				continue
@@ -1623,7 +1641,7 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
-		if pgUser.Origin != spec.RoleOriginTeamsAPI {
+		if pgUser.Origin != spec.RoleOriginTeamsAPI && pgUser.Origin != spec.RoleOriginSpilo {
 			c.logger.Warningf("could not generate secret for a non-teamsAPI role %q: role has no password",
 				pgUser.Name)
 		}
@@ -1700,23 +1718,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	}
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
-
-		// spec.AllowedSourceRanges evaluates to the empty slice of zero length
-		// when omitted or set to 'null'/empty sequence in the PG manifest
-		if len(spec.AllowedSourceRanges) > 0 {
-			serviceSpec.LoadBalancerSourceRanges = spec.AllowedSourceRanges
-		} else {
-			// safe default value: lock a load balancer only to the local address unless overridden explicitly
-			serviceSpec.LoadBalancerSourceRanges = []string{localHost}
-		}
-
-		c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
-		serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy)
-		serviceSpec.Type = v1.ServiceTypeLoadBalancer
-	} else if role == Replica {
-		// before PR #258, the replica service was only created if allocated a LB
-		// now we always create the service but warn if the LB is absent
-		c.logger.Debugf("No load balancer created for the replica service")
+		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
 	service := &v1.Service{
@@ -1730,6 +1732,21 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	}
 
 	return service
+}
+
+func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourceRanges []string) {
+	// spec.AllowedSourceRanges evaluates to the empty slice of zero length
+	// when omitted or set to 'null'/empty sequence in the PG manifest
+	if len(sourceRanges) > 0 {
+		serviceSpec.LoadBalancerSourceRanges = sourceRanges
+	} else {
+		// safe default value: lock a load balancer only to the local address unless overridden explicitly
+		serviceSpec.LoadBalancerSourceRanges = []string{localHost}
+	}
+
+	c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
+	serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy)
+	serviceSpec.Type = v1.ServiceTypeLoadBalancer
 }
 
 func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
@@ -1815,11 +1832,11 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			})
 	} else {
 		// cloning with S3, find out the bucket to clone
-		msg := "Clone from S3 bucket"
+		msg := "clone from S3 bucket"
 		c.logger.Info(msg, description.S3WalPath)
 
 		if description.S3WalPath == "" {
-			msg := "Figure out which S3 bucket to use from env"
+			msg := "figure out which S3 bucket to use from env"
 			c.logger.Info(msg, description.S3WalPath)
 
 			if c.OpConfig.WALES3Bucket != "" {
@@ -1863,7 +1880,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 
 			result = append(result, envs...)
 		} else {
-			msg := "Use custom parsed S3WalPath %s from the manifest"
+			msg := "use custom parsed S3WalPath %s from the manifest"
 			c.logger.Warningf(msg, description.S3WalPath)
 
 			result = append(result, v1.EnvVar{
@@ -2000,15 +2017,15 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	c.logger.Debug("Generating logical backup pod template")
 
 	// allocate for the backup pod the same amount of resources as for normal DB pods
-	defaultResources := c.makeDefaultResources()
-	resourceRequirements, err = generateResourceRequirements(c.Spec.Resources, defaultResources)
+	resourceRequirements, err = c.generateResourceRequirements(
+		c.Spec.Resources, makeDefaultResources(&c.OpConfig), logicalBackupContainerName)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
 	}
 
 	envVars := c.generateLogicalBackupPodEnvVars()
 	logicalBackupContainer := generateContainer(
-		"logical-backup",
+		logicalBackupContainerName,
 		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
 		resourceRequirements,
 		envVars,
@@ -2144,6 +2161,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		{
 			Name:  "LOGICAL_BACKUP_S3_SSE",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_RETENTION_TIME",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3RetentionTime,
 		},
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",

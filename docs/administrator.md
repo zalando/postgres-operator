@@ -750,6 +750,11 @@ lead to K8s removing this field from the manifest due to its
 Then the resultant manifest will not contain the necessary change, and the
 operator will respectively do nothing with the existing source ranges.
 
+Load balancer services can also be enabled for the [connection pooler](user.md#connection-pooler)
+pods with manifest flags `enableMasterPoolerLoadBalancer` and/or
+`enableReplicaPoolerLoadBalancer` or in the operator configuration with
+`enable_master_pooler_load_balancer` and/or `enable_replica_pooler_load_balancer`.
+
 ## Running periodic 'autorepair' scans of K8s objects
 
 The Postgres Operator periodically scans all K8s objects belonging to each

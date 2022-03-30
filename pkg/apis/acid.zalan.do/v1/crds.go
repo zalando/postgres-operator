@@ -238,12 +238,10 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Minimum: &min1,
 							},
 							"resources": {
-								Type:     "object",
-								Required: []string{"requests", "limits"},
+								Type: "object",
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"limits": {
-										Type:     "object",
-										Required: []string{"cpu", "memory"},
+										Type: "object",
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"cpu": {
 												Type:    "string",
@@ -256,8 +254,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										},
 									},
 									"requests": {
-										Type:     "object",
-										Required: []string{"cpu", "memory"},
+										Type: "object",
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"cpu": {
 												Type:    "string",
@@ -302,7 +299,13 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enableMasterLoadBalancer": {
 						Type: "boolean",
 					},
+					"enableMasterPoolerLoadBalancer": {
+						Type: "boolean",
+					},
 					"enableReplicaLoadBalancer": {
+						Type: "boolean",
+					},
+					"enableReplicaPoolerLoadBalancer": {
 						Type: "boolean",
 					},
 					"enableShmVolume": {
@@ -642,12 +645,10 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Description: "deprecated",
 					},
 					"resources": {
-						Type:     "object",
-						Required: []string{"requests", "limits"},
+						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
 							"limits": {
-								Type:     "object",
-								Required: []string{"cpu", "memory"},
+								Type: "object",
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"cpu": {
 										Type:    "string",
@@ -660,8 +661,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								},
 							},
 							"requests": {
-								Type:     "object",
-								Required: []string{"cpu", "memory"},
+								Type: "object",
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"cpu": {
 										Type:    "string",
@@ -798,8 +798,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "array",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type:     "object",
-								Required: []string{"key", "operator", "effect"},
+								Type: "object",
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"key": {
 										Type: "string",
@@ -1148,6 +1147,24 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"users": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"additional_owner_roles": {
+								Type:     "array",
+								Nullable: true,
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
+							"enable_password_rotation": {
+								Type: "boolean",
+							},
+							"password_rotation_interval": {
+								Type: "integer",
+							},
+							"password_rotation_user_retention": {
+								Type: "integer",
+							},
 							"replication_username": {
 								Type: "string",
 							},
@@ -1239,6 +1256,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"enable_sidecars": {
 								Type: "boolean",
+							},
+							"ignored_annotations": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
 							},
 							"infrastructure_roles_secret_name": {
 								Type: "string",
@@ -1438,6 +1463,12 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"timeouts": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"patroni_api_check_interval": {
+								Type: "string",
+							},
+							"patroni_api_check_timeout": {
+								Type: "string",
+							},
 							"pod_label_wait_timeout": {
 								Type: "string",
 							},
@@ -1475,7 +1506,13 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_master_load_balancer": {
 								Type: "boolean",
 							},
+							"enable_master_pooler_load_balancer": {
+								Type: "boolean",
+							},
 							"enable_replica_load_balancer": {
+								Type: "boolean",
+							},
+							"enable_replica_pooler_load_balancer": {
 								Type: "boolean",
 							},
 							"external_traffic_policy": {
@@ -1560,6 +1597,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 							},
 							"logical_backup_s3_sse": {
+								Type: "string",
+							},
+							"logical_backup_s3_retention_time": {
 								Type: "string",
 							},
 							"logical_backup_schedule": {

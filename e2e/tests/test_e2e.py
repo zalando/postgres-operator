@@ -159,6 +159,37 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_additional_owner_roles(self):
+        '''
+           Test adding additional member roles to existing database owner roles
+        '''
+        k8s = self.k8s
+
+        # enable PostgresTeam CRD and lower resync
+        owner_roles = {
+            "data": {
+                "additional_owner_roles": "cron_admin",
+            },
+        }
+        k8s.update_config(owner_roles)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+
+        leader = k8s.get_cluster_leader_pod()
+        owner_query = """
+            SELECT a2.rolname
+              FROM pg_catalog.pg_authid a
+              JOIN pg_catalog.pg_auth_members am
+                ON a.oid = am.member
+               AND a.rolname = 'cron_admin'
+              JOIN pg_catalog.pg_authid a2
+                ON a2.oid = am.roleid
+             WHERE a2.rolname IN ('zalando', 'bar_owner', 'bar_data_owner');
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", owner_query)), 3,
+            "Not all additional users found in database", 10, 5)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_pod_capabilities(self):
         '''
            Extend postgres container capabilities
@@ -177,13 +208,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             k8s.update_config(patch_capabilities)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
-                                "Operator does not get in sync")
 
             # changed security context of postgres container should trigger a rolling update
             k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
             self.eventuallyEqual(lambda: k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
                                 2, "Container capabilities not updated")
 
@@ -209,8 +239,6 @@ class EndToEndTestCase(unittest.TestCase):
             },
         }
         k8s.update_config(enable_postgres_team_crd)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
-                             "Operator does not get in sync")
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
@@ -335,7 +363,7 @@ class EndToEndTestCase(unittest.TestCase):
         try:
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_config)
-            
+
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             def compare_config():
@@ -452,7 +480,7 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             })
-        
+
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", self.test_namespace),
@@ -467,6 +495,9 @@ class EndToEndTestCase(unittest.TestCase):
         the end turn connection pooler off to not interfere with other tests.
         '''
         k8s = self.k8s
+        pooler_label = 'application=db-connection-pooler,cluster-name=acid-minimal-cluster'
+        master_pooler_label = 'connection-pooler=acid-minimal-cluster-pooler'
+        replica_pooler_label = master_pooler_label + '-repl'
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -478,20 +509,30 @@ class EndToEndTestCase(unittest.TestCase):
                     'enableReplicaConnectionPooler': True,
                 }
             })
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2,
-                             "Deployment replicas is 2 default")
-        self.eventuallyEqual(lambda: k8s.count_running_pods(
-                            "connection-pooler=acid-minimal-cluster-pooler"),
-                            2, "No pooler pods found")
-        self.eventuallyEqual(lambda: k8s.count_running_pods(
-                            "connection-pooler=acid-minimal-cluster-pooler-repl"),
-                            2, "No pooler replica pods found")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label(
-                            'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
-                            2, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
-                             1, "Pooler secret not created")
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2, "Deployment replicas is 2 default")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(master_pooler_label), 2, "No pooler pods found")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(replica_pooler_label), 2, "No pooler replica pods found")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label), 2, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label), 1, "Pooler secret not created")
+
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableMasterPoolerLoadBalancer': True,
+                    'enableReplicaPoolerLoadBalancer': True,
+                }
+            })
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_service_type(master_pooler_label+","+pooler_label),
+                             'LoadBalancer',
+                             "Expected LoadBalancer service type for master pooler pod, found {}")
+        self.eventuallyEqual(lambda: k8s.get_service_type(replica_pooler_label+","+pooler_label),
+                             'LoadBalancer',
+                             "Expected LoadBalancer service type for replica pooler pod, found {}")
 
         # Turn off only master connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -504,20 +545,17 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             })
 
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
-                             "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
         self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler-repl"), 2,
                              "Deployment replicas is 2 default")
-        self.eventuallyEqual(lambda: k8s.count_running_pods(
-                             "connection-pooler=acid-minimal-cluster-pooler"),
+        self.eventuallyEqual(lambda: k8s.count_running_pods(master_pooler_label),
                              0, "Master pooler pods not deleted")
-        self.eventuallyEqual(lambda: k8s.count_running_pods(
-                             "connection-pooler=acid-minimal-cluster-pooler-repl"),
+        self.eventuallyEqual(lambda: k8s.count_running_pods(replica_pooler_label),
                              2, "Pooler replica pods not found")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label(
-                             'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              1, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
                              1, "Secret not created")
 
         # Turn off only replica connection pooler
@@ -528,20 +566,24 @@ class EndToEndTestCase(unittest.TestCase):
                 'spec': {
                     'enableConnectionPooler': True,
                     'enableReplicaConnectionPooler': False,
+                    'enableMasterPoolerLoadBalancer': False,
                 }
             })
 
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
-                             "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
         self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2,
                              "Deployment replicas is 2 default")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+        self.eventuallyEqual(lambda: k8s.count_running_pods(master_pooler_label),
                              2, "Master pooler pods not found")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler-repl"),
+        self.eventuallyEqual(lambda: k8s.count_running_pods(replica_pooler_label),
                              0, "Pooler replica pods not deleted")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              1, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.get_service_type(master_pooler_label+","+pooler_label),
+                             'ClusterIP',
+                             "Expected LoadBalancer service type for master, found {}")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
                              1, "Secret not created")
 
         # scale up connection pooler deployment
@@ -558,7 +600,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3,
                              "Deployment replicas is scaled to 3")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+        self.eventuallyEqual(lambda: k8s.count_running_pods(master_pooler_label),
                              3, "Scale up of pooler pods does not work")
 
         # turn it off, keeping config should be overwritten by false
@@ -569,12 +611,13 @@ class EndToEndTestCase(unittest.TestCase):
                 'spec': {
                     'enableConnectionPooler': False,
                     'enableReplicaConnectionPooler': False,
+                    'enableReplicaPoolerLoadBalancer': False,
                 }
             })
 
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+        self.eventuallyEqual(lambda: k8s.count_running_pods(master_pooler_label),
                              0, "Pooler pods not scaled down")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              0, "Pooler service not removed")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
                              4, "Secrets not deleted")
@@ -656,6 +699,49 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("replica")),
                                  'ClusterIP',
                                  "Expected LoadBalancer service type for master, found {}")
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_ignored_annotations(self):
+        '''
+           Test if injected annotation does not cause replacement of resources when listed under ignored_annotations
+        '''
+        k8s = self.k8s
+
+        annotation_patch = {
+            "metadata": {
+                "annotations": {
+                    "k8s-status": "healthy"
+                },
+            }
+        }
+
+        try:
+            sts = k8s.api.apps_v1.read_namespaced_stateful_set('acid-minimal-cluster', 'default')
+            old_sts_creation_timestamp = sts.metadata.creation_timestamp
+            k8s.api.apps_v1.patch_namespaced_stateful_set(sts.metadata.name, sts.metadata.namespace, annotation_patch)
+            svc = k8s.api.core_v1.read_namespaced_service('acid-minimal-cluster', 'default')
+            old_svc_creation_timestamp = svc.metadata.creation_timestamp
+            k8s.api.core_v1.patch_namespaced_service(svc.metadata.name, svc.metadata.namespace, annotation_patch)
+
+            patch_config_ignored_annotations = {
+                "data": {
+                    "ignored_annotations": "k8s-status",
+                }
+            }
+            k8s.update_config(patch_config_ignored_annotations)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            sts = k8s.api.apps_v1.read_namespaced_stateful_set('acid-minimal-cluster', 'default')
+            new_sts_creation_timestamp = sts.metadata.creation_timestamp
+            svc = k8s.api.core_v1.read_namespaced_service('acid-minimal-cluster', 'default')
+            new_svc_creation_timestamp = svc.metadata.creation_timestamp
+
+            self.assertEqual(old_sts_creation_timestamp, new_sts_creation_timestamp, "unexpected replacement of statefulset on sync")
+            self.assertEqual(old_svc_creation_timestamp, new_svc_creation_timestamp, "unexpected replacement of master service on sync")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -956,12 +1042,12 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
 
         # wait for switched over
         k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members()), 2, "Postgres status did not enter running")
 
         def verify_pod_limits():
             pods = k8s.api.core_v1.list_namespaced_pod('default', label_selector="cluster-name=acid-minimal-cluster,application=spilo").items
@@ -1063,7 +1149,8 @@ class EndToEndTestCase(unittest.TestCase):
                 plural="postgresqls",
                 name="acid-minimal-cluster",
                 body=patch_node_affinity_config)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                                 "Operator does not get in sync")
 
             # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
             k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
@@ -1177,10 +1264,11 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_overwrite_pooler_deployment(self):
+        pooler_name = 'acid-minimal-cluster-pooler'
         k8s = self.k8s
         k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(name=pooler_name), 1,
                              "Initial broken deployment not rolled out")
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -1193,7 +1281,7 @@ class EndToEndTestCase(unittest.TestCase):
         })
 
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 2,
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(name=pooler_name), 2,
                              "Operator did not succeed in overwriting labels")
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -1206,7 +1294,7 @@ class EndToEndTestCase(unittest.TestCase):
         })
 
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler="+pooler_name),
                              0, "Pooler pods not scaled down")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)

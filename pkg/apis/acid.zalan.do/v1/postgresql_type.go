@@ -27,7 +27,7 @@ type PostgresSpec struct {
 	PostgresqlParam `json:"postgresql"`
 	Volume          `json:"volume,omitempty"`
 	Patroni         `json:"patroni,omitempty"`
-	Resources       `json:"resources,omitempty"`
+	*Resources      `json:"resources,omitempty"`
 
 	EnableConnectionPooler        *bool             `json:"enableConnectionPooler,omitempty"`
 	EnableReplicaConnectionPooler *bool             `json:"enableReplicaConnectionPooler,omitempty"`
@@ -42,8 +42,10 @@ type PostgresSpec struct {
 
 	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
 	// in that case the var evaluates to nil and the value is taken from the operator config
-	EnableMasterLoadBalancer  *bool `json:"enableMasterLoadBalancer,omitempty"`
-	EnableReplicaLoadBalancer *bool `json:"enableReplicaLoadBalancer,omitempty"`
+	EnableMasterLoadBalancer        *bool `json:"enableMasterLoadBalancer,omitempty"`
+	EnableMasterPoolerLoadBalancer  *bool `json:"enableMasterPoolerLoadBalancer,omitempty"`
+	EnableReplicaLoadBalancer       *bool `json:"enableReplicaLoadBalancer,omitempty"`
+	EnableReplicaPoolerLoadBalancer *bool `json:"enableReplicaPoolerLoadBalancer,omitempty"`
 
 	// deprecated load balancer settings maintained for backward compatibility
 	// see "Load balancers" operator docs
@@ -165,7 +167,7 @@ type Patroni struct {
 	Slots                 map[string]map[string]string `json:"slots,omitempty"`
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
-	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:1`
+	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:"1"`
 }
 
 // StandbyDescription contains remote primary config or s3 wal path
@@ -199,7 +201,7 @@ type CloneDescription struct {
 
 // Sidecar defines a container to be run in the same pod as the Postgres container.
 type Sidecar struct {
-	Resources   `json:"resources,omitempty"`
+	*Resources  `json:"resources,omitempty"`
 	Name        string             `json:"name,omitempty"`
 	DockerImage string             `json:"image,omitempty"`
 	Ports       []v1.ContainerPort `json:"ports,omitempty"`
@@ -232,19 +234,19 @@ type ConnectionPooler struct {
 	DockerImage       string `json:"dockerImage,omitempty"`
 	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
 
-	Resources `json:"resources,omitempty"`
+	*Resources `json:"resources,omitempty"`
 }
 
 type Stream struct {
 	ApplicationId string                 `json:"applicationId"`
 	Database      string                 `json:"database"`
 	Tables        map[string]StreamTable `json:"tables"`
-	Filter        map[string]string      `json:"filter,omitempty"`
-	BatchSize     uint32                 `json:"batchSize,omitempty"`
+	Filter        map[string]*string     `json:"filter,omitempty"`
+	BatchSize     *uint32                `json:"batchSize,omitempty"`
 }
 
 type StreamTable struct {
-	EventType     string `json:"eventType"`
-	IdColumn      string `json:"idColumn,omitempty" defaults:"id"`
-	PayloadColumn string `json:"payloadColumn,omitempty" defaults:"payload"`
+	EventType     string  `json:"eventType"`
+	IdColumn      *string `json:"idColumn,omitempty"`
+	PayloadColumn *string `json:"payloadColumn,omitempty"`
 }

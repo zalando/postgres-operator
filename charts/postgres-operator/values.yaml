@@ -59,6 +59,16 @@ configGeneral:
 
 # parameters describing Postgres users
 configUsers:
+  # roles to be granted to database owners
+  # additional_owner_roles:
+  # - cron_admin
+
+  # enable password rotation for app users that are not database owners
+  enable_password_rotation: false
+  # rotation interval for updating credentials in K8s secrets of app users
+  password_rotation_interval: 90
+  # retention interval to keep rotation users
+  password_rotation_user_retention: 180
   # postgres username used for replication between instances
   replication_username: standby
   # postgres superuser name to be created by initdb
@@ -114,6 +124,11 @@ configKubernetes:
   enable_pod_disruption_budget: true
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
+
+  # annotations to be ignored when comparing statefulsets, services etc.
+  # ignored_annotations:
+  # - k8s.v1.cni.cncf.io/network-status
+
   # namespaced name of the secret containing infrastructure roles names and passwords
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 
@@ -204,6 +219,10 @@ configPostgresPodResources:
 
 # timeouts related to some operator actions
 configTimeouts:
+  # interval between consecutive attempts of operator calling the Patroni API
+  patroni_api_check_interval: 1s
+  # timeout when waiting for successful response from Patroni API
+  patroni_api_check_timeout: 5s
   # timeout when waiting for the Postgres pods to be deleted
   pod_deletion_wait_timeout: 10m
   # timeout when waiting for pod role and cluster labels
@@ -228,8 +247,12 @@ configLoadBalancer:
 
   # toggles service type load balancer pointing to the master pod of the cluster
   enable_master_load_balancer: false
+  # toggles service type load balancer pointing to the master pooler pod of the cluster
+  enable_master_pooler_load_balancer: false
   # toggles service type load balancer pointing to the replica pod of the cluster
   enable_replica_load_balancer: false
+  # toggles service type load balancer pointing to the replica pooler pod of the cluster
+  enable_replica_pooler_load_balancer: false
   # define external traffic policy for the load balancer
   external_traffic_policy: "Cluster"
   # defines the DNS name string template for the master load balancer cluster
@@ -310,6 +333,8 @@ configLogicalBackup:
   logical_backup_s3_secret_access_key: ""
   # S3 server side encryption
   logical_backup_s3_sse: "AES256"
+  # S3 retention time for stored backups for example "2 week" or "7 days"
+  logical_backup_s3_retention_time: ""
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
 
@@ -338,6 +363,7 @@ configTeamsApi:
   # List of roles that cannot be overwritten by an application, team or infrastructure role
   protected_role_names:
     - admin
+    - cron_admin
   # Suffix to add if members are removed from TeamsAPI or PostgresTeam CRD
   role_deletion_suffix: "_deleted"
   # role name to grant to team members created from the Teams API

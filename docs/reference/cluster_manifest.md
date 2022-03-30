@@ -91,10 +91,22 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   `enable_master_load_balancer` parameter) to define whether to enable the load
   balancer pointing to the Postgres primary. Optional.
 
+* **enableMasterPoolerLoadBalancer**
+  boolean flag to override the operator defaults (set by the
+  `enable_master_pooler_load_balancer` parameter) to define whether to enable
+  the load balancer for master pooler pods pointing to the Postgres primary.
+  Optional.
+
 * **enableReplicaLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_replica_load_balancer` parameter) to define whether to enable the
   load balancer pointing to the Postgres standby instances. Optional.
+
+* **enableReplicaPoolerLoadBalancer**
+  boolean flag to override the operator defaults (set by the
+  `enable_replica_pooler_load_balancer` parameter) to define whether to enable
+  the load balancer for replica pooler pods pointing to the Postgres standby
+  instances. Optional.
 
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter
@@ -310,9 +322,7 @@ explanation of `ttl` and `loop_wait` parameters.
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the Postgres container. They are grouped under the `resources` top-level
-key with subgroups `requests` and `limits`. The whole section is optional,
-however if you specify a request or limit you have to define everything
-(unless you are not modifying the default CRD schema validation). 
+key with subgroups `requests` and `limits`. 
 
 ### Requests
 
