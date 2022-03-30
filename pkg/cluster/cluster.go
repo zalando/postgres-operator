@@ -43,7 +43,7 @@ var (
 	alphaNumericRegexp    = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
 	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
-	patroniObjectSuffixes = []string{"config", "failover", "sync", "leader"}
+	patroniObjectSuffixes = []string{"leader", "config", "sync", "failover"}
 )
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
@@ -1582,12 +1582,12 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
 
+	actionsList = append(actionsList, c.deletePatroniClusterServices)
 	if c.patroniKubernetesUseConfigMaps() {
 		actionsList = append(actionsList, c.deletePatroniClusterConfigMaps)
 	} else {
 		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
 	}
-	actionsList = append(actionsList, c.deletePatroniClusterServices)
 
 	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
 	for _, deleter := range actionsList {
