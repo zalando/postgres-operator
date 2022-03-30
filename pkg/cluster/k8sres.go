@@ -26,6 +26,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -111,7 +112,7 @@ func (c *Cluster) servicePort(role PostgresRole) int32 {
 		return service.Spec.Ports[0].Port
 	}
 
-	c.logger.Warningf("No service for role %s - defaulting to port 5432", role)
+	c.logger.Warningf("No service for role %s - defaulting to port %d", role, pgPort)
 	return pgPort
 }
 
@@ -558,15 +559,15 @@ func generateContainer(
 		Resources:       *resourceRequirements,
 		Ports: []v1.ContainerPort{
 			{
-				ContainerPort: 8008,
+				ContainerPort: patroni.ApiPort,
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				ContainerPort: 5432,
+				ContainerPort: pgPort,
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				ContainerPort: 8080,
+				ContainerPort: patroni.ApiPort,
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
@@ -1058,6 +1059,22 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 	return fmt.Sprintf("%v", pgVersion), nil
 }
 
+func generateSpiloReadinessProbe() *v1.Probe {
+	return &v1.Probe{
+		Handler: v1.Handler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/readiness",
+				Port: intstr.IntOrString{IntVal: patroni.ApiPort},
+			},
+		},
+		InitialDelaySeconds: 6,
+		PeriodSeconds:       10,
+		TimeoutSeconds:      5,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+	}
+}
+
 func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
 
 	var (
@@ -1238,6 +1255,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
 	)
+
+	// Patroni responds 200 to probe only if it either owns the leader lock or postgres is running and DCS is accessible
+	spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
 
 	// generate container specs for sidecars specified in the cluster manifest
 	clusterSpecificSidecars := []v1.Container{}
@@ -1708,10 +1728,12 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 
 func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) *v1.Service {
 	serviceSpec := v1.ServiceSpec{
-		Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+		Ports: []v1.ServicePort{{Name: "postgresql", Port: pgPort, TargetPort: intstr.IntOrString{IntVal: pgPort}}},
 		Type:  v1.ServiceTypeClusterIP,
 	}
 
+	// no selector for master, see https://github.com/zalando/postgres-operator/issues/340
+	// if kubernetes_use_configmaps is set master service needs a selector
 	if role == Replica || c.patroniKubernetesUseConfigMaps() {
 		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
@@ -1989,7 +2011,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 // TODO: handle clusters in different namespaces
 func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (host string, port string) {
 	host = clusterName
-	port = "5432"
+	port = fmt.Sprintf("%d", pgPort)
 	return
 }
 
@@ -2170,7 +2192,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 		{
 			Name:  "PGPORT",
-			Value: "5432",
+			Value: fmt.Sprintf("%d", pgPort),
 		},
 		{
 			Name:  "PGUSER",

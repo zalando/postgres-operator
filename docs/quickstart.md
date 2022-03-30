@@ -37,7 +37,7 @@ The Postgres Operator can be deployed in the following ways:
 * Kustomization
 * Helm chart
 
-### Manual deployment setup
+### Manual deployment setup on Kubernetes
 
 The Postgres Operator can be installed simply by applying yaml manifests. Note,
 we provide the `/manifests` directory as an example only; you should consider
@@ -69,6 +69,18 @@ manifest.
 
 ```bash
 ./run_operator_locally.sh
+```
+
+### Manual deployment setup on OpenShift
+
+To install the Postgres Operator in OpenShift you have to change the config
+parameter `kubernetes_use_configmaps` to `"true"`. Otherwise, the operator
+and Patroni will store leader and config keys in `Endpoints` that are not
+supported in OpenShift. This requires also a slightly different set of rules
+for the `postgres-operator` and `postgres-pod` cluster roles.
+
+```bash
+oc create -f manifests/operator-service-account-rbac-openshift.yaml
 ```
 
 ### Helm chart
