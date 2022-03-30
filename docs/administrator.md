@@ -1087,9 +1087,9 @@ data:
 
 ### Standby clusters
 
-The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is very
-similar to cloning. They can stream from a WAL archive (S3, GCS). Like with
-cloning, if you are using [additional environment variables](#custom-pod-environment-variables)
+The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is
+similar to cloning when they stream changes from a WAL archive (S3 or GCS).
+If you are using [additional environment variables](#custom-pod-environment-variables)
 to access your backup location you have to copy those variables and prepend
 the `STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
 

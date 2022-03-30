@@ -1963,7 +1963,6 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 
 		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
-
 	}
 
 	return result
