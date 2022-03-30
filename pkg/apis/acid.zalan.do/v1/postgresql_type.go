@@ -172,8 +172,8 @@ type Patroni struct {
 
 // StandbyDescription contains remote primary config or s3 wal path
 type StandbyDescription struct {
-	S3WalPath string `json:"s3_wal_path,omitempty"`
-	GSWalPath string `json:"gs_wal_path,omitempty"`
+	S3WalPath   string `json:"s3_wal_path,omitempty"`
+	GSWalPath   string `json:"gs_wal_path,omitempty"`
 	StandbyHost string `json:"standby_host,omitempty"`
 	StandbyPort string `json:"standby_port,omitempty"`
 }

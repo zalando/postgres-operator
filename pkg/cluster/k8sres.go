@@ -762,7 +762,12 @@ func (c *Cluster) generatePodTemplate(
 }
 
 // generatePodEnvVars generates environment variables for the Spilo Pod
-func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *acidv1.CloneDescription, standbyDescription *acidv1.StandbyDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+func (c *Cluster) generateSpiloPodEnvVars(
+	uid types.UID,
+	spiloConfiguration string,
+	cloneDescription *acidv1.CloneDescription,
+	standbyDescription *acidv1.StandbyDescription,
+	customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -1110,12 +1115,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	customPodEnvVarsList = append(customPodEnvVarsList, secretEnvVarsList...)
 	sort.Slice(customPodEnvVarsList,
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
-
-	if spec.StandbyCluster != nil {
-		if spec.StandbyCluster.S3WalPath == "" && spec.StandbyCluster.GSWalPath == "" && spec.StandbyCluster.StandbyHost == "" {
-			return nil, fmt.Errorf("s3_wal_path, gs_wal_path and standby_host are empty for standby cluster")
-		}
-	}
 
 	// backward compatible check for InitContainers
 	if spec.InitContainersOld != nil {
