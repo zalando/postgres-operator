@@ -109,14 +109,13 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 			
 			c.logger.Debugf("checking if the spilo image runs with root or non-root (check for user id=0)")
-
 			resultIdCheck, errIdCheck := c.ExecCommand(podName, "/bin/bash", "-c", "/usr/bin/id -u")
 			if errIdCheck != nil {
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "Checking user id to run upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, errIdCheck)
 			}
 
 			resultIdCheck = strings.TrimSuffix(resultIdCheck, "\n")
-                        //result, err := c.ExecCommand(podName, "/bin/bash")
+                        var result, err string, error
 			if resultIdCheck != "0" {
 				c.logger.Infof("User id was identified as: %s, hence default user is non-root already", resultIdCheck)
 				result, err = c.ExecCommand(podName, "/bin/bash", "-c", upgradeCommand)
