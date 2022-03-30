@@ -59,7 +59,6 @@ type Config struct {
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
 	Endpoints           map[PostgresRole]*v1.Endpoints
-	ConfigMaps          map[PostgresRole]*v1.ConfigMap
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
