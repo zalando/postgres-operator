@@ -63,8 +63,6 @@ type ClusterStatus struct {
 	ReplicaService      *v1.Service
 	MasterEndpoint      *v1.Endpoints
 	ReplicaEndpoint     *v1.Endpoints
-	MasterConfigMap     *v1.ConfigMap
-	ReplicaConfigMap    *v1.ConfigMap
 	StatefulSet         *appsv1.StatefulSet
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 

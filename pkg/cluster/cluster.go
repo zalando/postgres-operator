@@ -1499,12 +1499,9 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 		Error: fmt.Errorf("error: %s", c.Error),
 	}
 
-	if c.patroniKubernetesUseConfigMaps() {
+	if !c.patroniKubernetesUseConfigMaps() {
 		status.MasterEndpoint = c.GetEndpointMaster()
 		status.ReplicaEndpoint = c.GetEndpointReplica()
-	} else {
-		status.MasterConfigMap = c.GetConfigMapMaster()
-		status.ReplicaConfigMap = c.GetConfigMapReplica()
 	}
 
 	return status

@@ -144,11 +144,7 @@ func (c *Cluster) syncServices() error {
 	for _, role := range []PostgresRole{Master, Replica} {
 		c.logger.Debugf("syncing %s service", role)
 
-		if c.patroniKubernetesUseConfigMaps() {
-			if err := c.syncConfigMap(role); err != nil {
-				return fmt.Errorf("could not sync %s config map: %v", role, err)
-			}
-		} else {
+		if !c.patroniKubernetesUseConfigMaps() {
 			if err := c.syncEndpoint(role); err != nil {
 				return fmt.Errorf("could not sync %s endpoint: %v", role, err)
 			}
@@ -235,40 +231,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 		}
 	}
 	c.Endpoints[role] = ep
-	return nil
-}
-
-func (c *Cluster) syncConfigMap(role PostgresRole) error {
-	var (
-		cm  *v1.ConfigMap
-		err error
-	)
-	c.setProcessName("syncing %s config map", role)
-
-	if cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), c.configMapName(role), metav1.GetOptions{}); err == nil {
-		// TODO: No syncing of config map here, is this covered completely by updateService?
-		c.ConfigMaps[role] = cm
-		return nil
-	}
-	if !k8sutil.ResourceNotFound(err) {
-		return fmt.Errorf("could not get %s config map: %v", role, err)
-	}
-	// no existing config map, create new one
-	c.ConfigMaps[role] = nil
-	c.logger.Infof("could not find the cluster's %s config map", role)
-
-	if cm, err = c.createConfigMap(role); err == nil {
-		c.logger.Infof("created missing %s config map %q", role, util.NameFromMeta(cm.ObjectMeta))
-	} else {
-		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not create missing %s config map: %v", role, err)
-		}
-		c.logger.Infof("%s config map %q already exists", role, util.NameFromMeta(cm.ObjectMeta))
-		if cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), c.configMapName(role), metav1.GetOptions{}); err != nil {
-			return fmt.Errorf("could not fetch existing %s config map: %v", role, err)
-		}
-	}
-	c.ConfigMaps[role] = cm
 	return nil
 }
 

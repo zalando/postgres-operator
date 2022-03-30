@@ -76,20 +76,13 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
-func (c *Cluster) configMapName(role PostgresRole) string {
+func (c *Cluster) endpointName(role PostgresRole) string {
 	name := c.Name
-	if role == Master {
-		name = name + "-leader"
-	}
 	if role == Replica {
 		name = name + "-repl"
 	}
 
 	return name
-}
-
-func (c *Cluster) endpointName(role PostgresRole) string {
-	return c.serviceName(role)
 }
 
 func (c *Cluster) serviceName(role PostgresRole) string {
@@ -1826,16 +1819,6 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 	}
 
 	return endpoints
-}
-
-func (c *Cluster) generateConfigMap(role PostgresRole) *v1.ConfigMap {
-	return &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.configMapName(role),
-			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(true, role),
-		},
-	}
 }
 
 func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription) []v1.EnvVar {
