@@ -45,9 +45,18 @@ func (c *Cluster) deleteStreams() error {
 		return nil
 	}
 
-	err = c.KubeClient.FabricEventStreams(c.Namespace).Delete(context.TODO(), c.Name, metav1.DeleteOptions{})
-	if err != nil {
-		return fmt.Errorf("could not delete event stream custom resource: %v", err)
+	errors := make([]string, 0)
+	appIds := gatherApplicationIds(c.Spec.Streams)
+	for _, appId := range appIds {
+		fesName := fmt.Sprintf("%s-%s", c.Name, appId)
+		err = c.KubeClient.FabricEventStreams(c.Namespace).Delete(context.TODO(), fesName, metav1.DeleteOptions{})
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("could not delete event stream %q: %v", fesName, err))
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("could not delete all event stream custom resources: %v", strings.Join(errors, `', '`))
 	}
 
 	return nil
