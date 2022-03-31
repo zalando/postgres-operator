@@ -106,7 +106,6 @@ func (c *Cluster) majorVersionUpgrade() error {
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			upgradeCommand := fmt.Sprintf("/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
-
 			
 			c.logger.Debugf("checking if the spilo image runs with root or non-root (check for user id=0)")
 			resultIdCheck, errIdCheck := c.ExecCommand(podName, "/bin/bash", "-c", "/usr/bin/id -u")
@@ -124,14 +123,13 @@ func (c *Cluster) majorVersionUpgrade() error {
 				result, err = c.ExecCommand(podName, "/bin/su", "postgres", "-c", upgradeCommand)
 			}
 			if err != nil {
-				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "Upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
 				return err
 			}
 			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
 
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d finished", c.currentMajorVersion, desiredVersion)
 		}
-
 	}
 
 	return nil
