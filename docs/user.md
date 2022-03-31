@@ -737,10 +737,14 @@ source cluster. If you create it in the same Kubernetes environment, use a
 different name.
 
 ```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-minimal-cluster-clone
 spec:
   clone:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
-    cluster: "acid-batman"
+    cluster: "acid-minimal-cluster"
     timestamp: "2017-12-19T12:40:33+01:00"
     s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
@@ -756,7 +760,7 @@ specified `uid`. You can find the UID of the source cluster in its metadata:
 apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
-  name: acid-batman
+  name: acid-minimal-cluster
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
 
@@ -767,7 +771,7 @@ implementations:
 spec:
   clone:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
-    cluster: "acid-batman"
+    cluster: "acid-minimal-cluster"
     timestamp: "2017-12-19T12:40:33+01:00"
     s3_endpoint: https://s3.acme.org
     s3_access_key_id: 0123456789abcdef0123456789abcdef
@@ -788,10 +792,48 @@ namespace.
 ```yaml
 spec:
   clone:
-    cluster: "acid-batman"
+    cluster: "acid-minimal-cluster"
 ```
 
 Be aware that on a busy source database this can result in an elevated load!
+
+## Restore in place
+
+There is also a possibility to restore a database without cloning it. The
+advantage to this is that there is no need to change anything on the
+application side. However, as it involves deleting the database first, this
+process is of course riskier than cloning (which involves adjusting the
+connection parameters of the app).
+
+First, make sure there is no writing activity on your DB, and save the UID.
+Then delete the `postgresql` K8S resource:
+
+```bash
+zkubectl delete postgresql acid-test-restore
+```
+
+Then deploy a new manifest with the same name, referring to itself
+(both name and UID) in the `clone` section:
+
+```yaml
+metadata:
+  name: acid-minimal-cluster
+  # [...]
+spec:
+  # [...]
+  clone:
+    cluster: "acid-minimal-cluster"  # the same as metadata.name above!
+    uid: "<original_UID>"
+    timestamp: "2022-04-01T10:11:12.000+00:00"
+```
+
+This will create a new database cluster with the same name but different UID,
+whereas the database will be in the state it was at the specified time.
+
+:warning: The backups and WAL files for the original DB are retained under the
+original UID, making it possible retry restoring. However, it is probably
+better to create a temporary clone for experimenting or finding out to which
+point you should restore.
 
 ## Setting up a standby cluster
 

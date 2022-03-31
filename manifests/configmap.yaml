@@ -63,13 +63,13 @@ data:
   # etcd_host: ""
   external_traffic_policy: "Cluster"
   # gcp_credentials: ""
-  # kubernetes_use_configmaps: "false"
   # ignored_annotations: ""
   # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
   # infrastructure_roles_secrets: "secretname:monitoring-roles,userkey:user,passwordkey:password,rolekey:inrole"
   # inherited_annotations: owned-by
   # inherited_labels: application,environment
   # kube_iam_role: ""
+  # kubernetes_use_configmaps: "false"
   # log_s3_bucket: ""
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.7.1"
   # logical_backup_google_application_credentials: ""

@@ -36,17 +36,17 @@ func TestApiURL(t *testing.T) {
 	}{
 		{
 			"127.0.0.1",
-			fmt.Sprintf("http://127.0.0.1:%d", apiPort),
+			fmt.Sprintf("http://127.0.0.1:%d", ApiPort),
 			nil,
 		},
 		{
 			"0000:0000:0000:0000:0000:0000:0000:0001",
-			fmt.Sprintf("http://[::1]:%d", apiPort),
+			fmt.Sprintf("http://[::1]:%d", ApiPort),
 			nil,
 		},
 		{
 			"::1",
-			fmt.Sprintf("http://[::1]:%d", apiPort),
+			fmt.Sprintf("http://[::1]:%d", ApiPort),
 			nil,
 		},
 		{
