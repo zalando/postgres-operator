@@ -114,7 +114,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 			}
 
 			resultIdCheck = strings.TrimSuffix(resultIdCheck, "\n")
-                        var result string
+			var result string
 			if resultIdCheck != "0" {
 				c.logger.Infof("User id was identified as: %s, hence default user is non-root already", resultIdCheck)
 				result, err = c.ExecCommand(podName, "/bin/bash", "-c", upgradeCommand)
