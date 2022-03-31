@@ -196,6 +196,9 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	_, err := cluster.createStatefulSet()
 	assert.NoError(t, err)
 
+	// createOrUpdateStreams will loop over existing apps
+	cluster.streamApplications = []string{appId}
+
 	// create the streams
 	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
@@ -327,6 +330,10 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	_, err := cluster.KubeClient.Postgresqls(namespace).Create(
 		context.TODO(), &pg, metav1.CreateOptions{})
 	assert.NoError(t, err)
+
+	// createOrUpdateStreams will loop over existing apps
+	cluster.streamApplications = []string{appId}
+
 	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
