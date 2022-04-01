@@ -706,6 +706,35 @@ data:
 The key-value pairs of the Secret are all accessible as environment variables
 to the Postgres StatefulSet/pods.
 
+### For individual cluster
+
+It is possible to set environment variables in the Spilo pods directly as parameters or
+as a link to secrets for each individual cluster, in addition to or instead of the
+global parameters given in the examples above.
+
+In order to do this, you need to configure the cluster parameters, as in the example below
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-test-cluster
+spec:
+  env:
+  - name: wal_s3_bucket
+    value: my-custom-bucket
+  - name: minio_secret_key
+      valueFrom:
+        secretKeyRef:
+          name: my-custom-secret
+          key: minio_secret_key
+```
+
+If global parameters are set at the level of the entire controller in the form of
+a ConfigMap or a Secret, then the individual cluster parameters will have a higher
+priority and the same keys will be overridden, and different ones will be merged into
+a single array of environment variable parameter values.
+
 ## Limiting the number of min and max instances in clusters
 
 As a preventive measure, one can restrict the minimum and the maximum number of

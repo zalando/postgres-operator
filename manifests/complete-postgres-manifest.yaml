@@ -49,6 +49,10 @@ spec:
       shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"
+#  env:
+#  - name: wal_s3_bucket
+#    value: my-custom-bucket
+
   volume:
     size: 1Gi
 #    storageClass: my-sc
@@ -120,7 +124,7 @@ spec:
 #        database: foo
 #        plugin: pgoutput
     ttl: 30
-    loop_wait: &loop_wait 10
+    loop_wait: 10
     retry_timeout: 10
     synchronous_mode: false
     synchronous_mode_strict: false
