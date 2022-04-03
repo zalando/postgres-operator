@@ -10,7 +10,7 @@ restore
       |
       | or
       |
-      a(href="/") start over
+      a(href="./") start over
       | .
 
     p(if='{ stored_clusters && stored_clusters.length === 0 }')
@@ -23,7 +23,7 @@ restore
           ol.breadcrumb
 
             li.breadcrumb-item
-              a(href='/#/backups')
+              a(href='./#/backups')
                 | PostgreSQL cluster backups ({ stored_clusters.length })
 
       p
@@ -63,7 +63,7 @@ restore
               p(if='{ versions === null }')
                 | Error loading backups.  Please try again or
                 |
-                a(href="/") start over
+                a(href="./") start over
                 | .
 
               p(if='{ versions && versions.length === 0 }')
@@ -96,7 +96,7 @@ restore
                         p(if='{ basebackups === null }')
                           | Error loading snapshots.  Please try again or
                           |
-                          a(href="/") start over
+                          a(href="./") start over
                           | .
 
                         p(if='{ basebackups && basebackups.length === 0 }')
@@ -312,7 +312,7 @@ restore
       get_subresources_once({
         parent_resource: this,
         key: 'stored_clusters',
-        url: '/stored_clusters',
+        url: './stored_clusters',
         build_subresource: stored_cluster_name => ({
           id: 'stored-cluster-' + stored_cluster_name,
           name: stored_cluster_name,
@@ -324,7 +324,7 @@ restore
           body: stored_cluster => get_subresources_once({
             parent_resource: stored_cluster,
             key: 'versions',
-            url: '/stored_clusters/' + stored_cluster.name,
+            url: './stored_clusters/' + stored_cluster.name,
             build_subresource: version_name => ({
               id: stored_cluster.id + '-version-' + version_name,
               name: version_name,
@@ -340,7 +340,7 @@ restore
                 parent_resource: version,
                 key: 'basebackups',
                 url: (
-                  '/stored_clusters/' + stored_cluster.name
+                  './stored_clusters/' + stored_cluster.name
                   + '/' + version.name
                 ),
                 build_subresource: basebackup => Object.assign(basebackup, {

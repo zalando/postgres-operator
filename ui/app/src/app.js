@@ -214,13 +214,13 @@ const delete_cluster = (namespace, clustername) => {
                     jQuery.ajax({
                         type: 'DELETE',
                         url: (
-                            '/postgresqls/'
+                            './postgresqls/'
               + encodeURI(namespace)
               + '/' + encodeURI(clustername)
                         ),
                         dataType: 'text',
-                        success: () => location.assign('/#/list'),
-                        error: (r, status, error) => location.assign('/#/list'), // TODO: show error
+                        success: () => location.assign('./#/list'),
+                        error: (r, status, error) => location.assign('./#/list'), // TODO: show error
                     })
                 },
             },

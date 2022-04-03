@@ -6,19 +6,19 @@ status
         ol.breadcrumb
 
           li.breadcrumb-item
-            a(href='/#/operator')
+            a(href='./#/operator')
               | Workers
 
           virtual(if='{ operatorShowLogs && logs }')
             li.breadcrumb-item { worker_id }
             li.breadcrumb-item
-              a(href='/#/operator/worker/{ worker_id }/logs')
+              a(href='./#/operator/worker/{ worker_id }/logs')
                 | Logs
 
           virtual(if='{ operatorShowQueue && queue }')
             li.breadcrumb-item { worker_id }
             li.breadcrumb-item
-              a(href='/#/operator/worker/{ worker_id }/queue')
+              a(href='./#/operator/worker/{ worker_id }/queue')
                 | Queue
 
     div(if='{ status }')
@@ -44,12 +44,12 @@ status
               )
 
                 a.btn.btn-info(
-                  href='/#/operator/worker/{ worker_id }/logs'
+                  href='./#/operator/worker/{ worker_id }/logs'
                 )
                   | Logs
 
                 a.btn.btn-info(
-                  href='/#/operator/worker/{ worker_id }/queue'
+                  href='./#/operator/worker/{ worker_id }/queue'
                 )
                   | Queue
 
@@ -96,7 +96,7 @@ status
 
     this.pollStatus = () => {
       jQuery.get(
-        '/operator/status',
+        './operator/status',
       ).done(data => {
         this.update({status: data})
       })
@@ -111,7 +111,7 @@ status
 
     this.pollLogs = id => {
       jQuery.get(
-        '/operator/workers/' + id + '/logs',
+        './operator/workers/' + id + '/logs',
       ).done(data => {
         data.reverse()
         this.update({logs: data})
@@ -120,7 +120,7 @@ status
 
     this.pollQueue = id => {
       jQuery.get(
-        '/operator/workers/' + id + '/queue',
+        './operator/workers/' + id + '/queue',
       ).done(data =>
         this.update({queue: data.List})
       )
