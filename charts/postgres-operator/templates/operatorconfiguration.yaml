@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 configuration:
+  docker_image: {{ .Values.spilo_image.registry }}/{{ .Values.spilo_image.repository }}{{ .Values.spilo_image.tag }}
 {{ toYaml .Values.configGeneral | indent 2 }}
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
@@ -31,6 +32,7 @@ configuration:
   aws_or_gcp:
 {{ toYaml .Values.configAwsOrGcp | indent 4 }}
   logical_backup:
+    logical_backup_docker_image: {{ .Values.logical_image.registry }}/{{ .Values.logical_image.repository }}:{{ .Values.logical_image.tag }}
 {{ toYaml .Values.configLogicalBackup | indent 4 }}
   debug:
 {{ toYaml .Values.configDebug | indent 4 }}
@@ -39,5 +41,6 @@ configuration:
   logging_rest_api:
 {{ toYaml .Values.configLoggingRestApi | indent 4 }}
   connection_pooler:
+    connection_pooler_image: {{ .Values.pooler_image.registry }}/{{ .Values.pooler_image.repository }}:{{ .Values.pooler_image.tag }}
 {{ toYaml .Values.configConnectionPooler | indent 4 }}
 {{- end }}
