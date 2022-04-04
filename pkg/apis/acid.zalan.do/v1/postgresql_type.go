@@ -170,10 +170,12 @@ type Patroni struct {
 	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:"1"`
 }
 
-// StandbyDescription contains s3 wal path
+// StandbyDescription contains remote primary config or s3/gs wal path
 type StandbyDescription struct {
-	S3WalPath string `json:"s3_wal_path,omitempty"`
-	GSWalPath string `json:"gs_wal_path,omitempty"`
+	S3WalPath   string `json:"s3_wal_path,omitempty"`
+	GSWalPath   string `json:"gs_wal_path,omitempty"`
+	StandbyHost string `json:"standby_host,omitempty"`
+	StandbyPort string `json:"standby_port,omitempty"`
 }
 
 // TLSDescription specs TLS properties

@@ -838,15 +838,15 @@ point you should restore.
 ## Setting up a standby cluster
 
 Standby cluster is a [Patroni feature](https://github.com/zalando/patroni/blob/master/docs/replica_bootstrap.rst#standby-cluster)
-that first clones a database, and keeps replicating changes afterwards. As the
-replication is happening by the means of archived WAL files (stored on S3 or
-the equivalent of other cloud providers), the standby cluster can exist in a
-different location than its source database. Unlike cloning, the PostgreSQL
-version between source and target cluster has to be the same.
+that first clones a database, and keeps replicating changes afterwards. It can
+exist in a different location than its source database, but unlike cloning,
+the PostgreSQL version between source and target cluster has to be the same.
 
 To start a cluster as standby, add the following `standby` section in the YAML
-file. Specify the S3/GS bucket path. Omitting both settings will result in an error
-and no statefulset will be created.
+file. You can stream changes from archived WAL files (AWS S3 or Google Cloud
+Storage) or from a remote primary where you specify the host address and port.
+If you leave out the port, Patroni will use `"5432"`. Only one option can be
+specfied in the manifest:
 
 ```yaml
 spec:
@@ -860,32 +860,42 @@ spec:
     gs_wal_path: "gs://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
-At the moment, the operator only allows to stream from the WAL archive of the
-master. Thus, it is recommended to deploy standby clusters with only [one pod](https://github.com/zalando/postgres-operator/blob/master/manifests/standby-manifest.yaml#L10).
-You can raise the instance count when detaching. Note, that the same pod role
-labels like for normal clusters are used: The standby leader is labeled as
-`master`.
+```yaml
+spec:
+  standby:
+    standby_host: "acid-minimal-cluster.default"
+    standby_port: "5433"
+```
+
+Note, that the pods and services use the same role labels like for normal clusters:
+The standby leader is labeled as `master`. When using the `standby_host` option
+you have to copy the credentials from the source cluster's secrets to successfully
+bootstrap a standby cluster (see next chapter).
 
 ### Providing credentials of source cluster
 
 A standby cluster is replicating the data (including users and passwords) from
 the source database and is read-only. The system and application users (like
 standby, postgres etc.) all have a password that does not match the credentials
-stored in secrets which are created by the operator. One solution is to create
-secrets beforehand and paste in the credentials of the source cluster.
+stored in secrets which are created by the operator. You have two options:
+
+a. Create secrets manually beforehand and paste the credentials of the source
+   cluster
+b. Let the operator create the secrets when it bootstraps the standby cluster.
+   Patch the secrets with the credentials of the source cluster. Replace the
+   spilo pods.
+
 Otherwise, you will see errors in the Postgres logs saying users cannot log in
 and the operator logs will complain about not being able to sync resources.
+If you stream changes from a remote primary you have to align the secrets or
+the standby cluster will not start up.
 
-When you only run a standby leader, you can safely ignore this, as it will be
-sorted out once the cluster is detached from the source. It is also harmless if
-you don’t plan it. But, when you created a standby replica, too, fix the
-credentials right away. WAL files will pile up on the standby leader if no
-connection can be established between standby replica(s). You can also edit the
-secrets after their creation. Find them by:
-
-```bash
-kubectl get secrets --all-namespaces | grep <standby-cluster-name>
-```
+If you stream changes from WAL files and you only run a standby leader, you
+can safely ignore the secret mismatch, as it will be sorted out once the
+cluster is detached from the source. It is also harmless if you do not plan it.
+But, when you create a standby replica, too, fix the credentials right away.
+WAL files will pile up on the standby leader if no connection can be
+established between standby replica(s).
 
 ### Promote the standby
 

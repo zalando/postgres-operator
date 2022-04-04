@@ -763,7 +763,12 @@ func (c *Cluster) generatePodTemplate(
 }
 
 // generatePodEnvVars generates environment variables for the Spilo Pod
-func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *acidv1.CloneDescription, standbyDescription *acidv1.StandbyDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+func (c *Cluster) generateSpiloPodEnvVars(
+	uid types.UID,
+	spiloConfiguration string,
+	cloneDescription *acidv1.CloneDescription,
+	standbyDescription *acidv1.StandbyDescription,
+	customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -1127,11 +1132,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	customPodEnvVarsList = append(customPodEnvVarsList, secretEnvVarsList...)
 	sort.Slice(customPodEnvVarsList,
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
-
-	if spec.StandbyCluster != nil && spec.StandbyCluster.S3WalPath == "" &&
-		spec.StandbyCluster.GSWalPath == "" {
-		return nil, fmt.Errorf("one of s3_wal_path or gs_wal_path must be set for standby cluster")
-	}
 
 	// backward compatible check for InitContainers
 	if spec.InitContainersOld != nil {
@@ -1944,39 +1944,48 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescription) []v1.EnvVar {
 	result := make([]v1.EnvVar, 0)
 
-	if description.S3WalPath == "" && description.GSWalPath == "" {
-		return nil
-	}
-
-	if description.S3WalPath != "" {
-		// standby with S3, find out the bucket to setup standby
-		msg := "standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
-		c.logger.Infof(msg, description.S3WalPath)
-
+	if description.StandbyHost != "" {
+		// standby from remote primary
 		result = append(result, v1.EnvVar{
-			Name:  "STANDBY_WALE_S3_PREFIX",
-			Value: description.S3WalPath,
+			Name:  "STANDBY_HOST",
+			Value: description.StandbyHost,
 		})
-	} else if description.GSWalPath != "" {
-		msg := "standby from GS bucket using custom parsed GSWalPath from the manifest %s "
-		c.logger.Infof(msg, description.GSWalPath)
-
-		envs := []v1.EnvVar{
-			{
-				Name:  "STANDBY_WALE_GS_PREFIX",
-				Value: description.GSWalPath,
-			},
-			{
-				Name:  "STANDBY_GOOGLE_APPLICATION_CREDENTIALS",
-				Value: c.OpConfig.GCPCredentials,
-			},
+		if description.StandbyPort != "" {
+			result = append(result, v1.EnvVar{
+				Name:  "STANDBY_PORT",
+				Value: description.StandbyPort,
+			})
 		}
-		result = append(result, envs...)
+	} else {
+		if description.S3WalPath != "" {
+			// standby with S3, find out the bucket to setup standby
+			msg := "Standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
+			c.logger.Infof(msg, description.S3WalPath)
 
+			result = append(result, v1.EnvVar{
+				Name:  "STANDBY_WALE_S3_PREFIX",
+				Value: description.S3WalPath,
+			})
+		} else if description.GSWalPath != "" {
+			msg := "Standby from GS bucket using custom parsed GSWalPath from the manifest %s "
+			c.logger.Infof(msg, description.GSWalPath)
+
+			envs := []v1.EnvVar{
+				{
+					Name:  "STANDBY_WALE_GS_PREFIX",
+					Value: description.GSWalPath,
+				},
+				{
+					Name:  "STANDBY_GOOGLE_APPLICATION_CREDENTIALS",
+					Value: c.OpConfig.GCPCredentials,
+				},
+			}
+			result = append(result, envs...)
+		}
+
+		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
+		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
-
-	result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
-	result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 	return result
 }

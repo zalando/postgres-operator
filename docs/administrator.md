@@ -1087,12 +1087,16 @@ data:
 
 ### Standby clusters
 
-The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is very
-similar to cloning. At the moment, the operator only allows for streaming from
-the S3 WAL archive of the master specified in the manifest. Like with cloning,
-if you are using [additional environment variables](#custom-pod-environment-variables)
-to access your backup location you have to copy those variables and prepend the
-`STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
+The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is
+similar to cloning when they stream changes from a WAL archive (S3 or GCS).
+If you are using [additional environment variables](#custom-pod-environment-variables)
+to access your backup location you have to copy those variables and prepend
+the `STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
+
+Alternatively, standby clusters can also stream from a remote primary cluster.
+You have to specify the host address. Port is optional and defaults to 5432.
+Note, that only one of the options (`s3_wal_path`, `gs_wal_path`,
+`standby_host`) can be present under the `standby` top-level key.
 
 ## Logical backups
 
