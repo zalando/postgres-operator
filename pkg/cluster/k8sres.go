@@ -969,7 +969,7 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 		}
 	}
 	for k, v := range cm.Data {
-		if !isEnvVarExist(configMapPodEnvVarsList, k) {
+		if !isEnvVarPresent(configMapPodEnvVarsList, k) {
 			configMapPodEnvVarsList = append(configMapPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
 		}
 	}
@@ -1015,7 +1015,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	}
 
 	for k := range secret.Data {
-		if !isEnvVarExist(secretPodEnvVarsList, k) {
+		if !isEnvVarPresent(secretPodEnvVarsList, k) {
 			secretPodEnvVarsList = append(secretPodEnvVarsList,
 				v1.EnvVar{Name: k, ValueFrom: &v1.EnvVarSource{
 					SecretKeyRef: &v1.SecretKeySelector{
@@ -1031,7 +1031,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	return secretPodEnvVarsList, nil
 }
 
-func isEnvVarExist(envs []v1.EnvVar, key string) bool {
+func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
 	for _, env := range envs {
 		if env.Name == key {
 			return true
