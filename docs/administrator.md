@@ -729,11 +729,6 @@ spec:
           key: minio_secret_key
 ```
 
-If global parameters are set at the level of the entire controller in the form of
-a ConfigMap or a Secret, then the individual cluster parameters will have a higher
-priority and the same keys will be overridden, and different ones will be merged into
-a single array of environment variable parameter values.
-
 ## Limiting the number of min and max instances in clusters
 
 As a preventive measure, one can restrict the minimum and the maximum number of
