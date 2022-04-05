@@ -83,14 +83,34 @@ kubectl port-forward $PGMASTER 6432:5432 -n default
 ```
 
 Open another CLI and connect to the database using e.g. the psql client.
-When connecting with the `postgres` user read its password from the K8s secret
-which was generated when creating the `acid-minimal-cluster`. As non-encrypted
-connections are rejected by default set the SSL mode to `require`:
+When connecting with a manifest role like `foo_user` user, read its password
+from the K8s secret which was generated when creating `acid-minimal-cluster`.
+As non-encrypted connections are rejected by default set SSL mode to `require`:
 
 ```bash
 export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d)
 export PGSSLMODE=require
 psql -U postgres -h localhost -p 6432
+```
+
+## Password encryption
+
+Passwords are encrypted with `md5` hash generation by default. However, it is
+possible to use the more recent `scram-sha-256` method by changing the
+`password_encryption` parameter in the Postgres config. You can define it
+directly from the cluster manifest:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-minimal-cluster
+spec:
+  [...]
+  postgresql:
+    version: "14"
+    parameters:
+      password_encryption: scram-sha-256
 ```
 
 ## Defining database roles in the operator
