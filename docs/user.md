@@ -101,7 +101,6 @@ possible to use the more recent `scram-sha-256` method by changing the
 directly from the cluster manifest:
 
 ```yaml
-```yaml
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
