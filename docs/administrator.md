@@ -708,11 +708,10 @@ to the Postgres StatefulSet/pods.
 
 ### For individual cluster
 
-It is possible to set environment variables in the Spilo pods directly as parameters or
-as a link to secrets for each individual cluster, in addition to or instead of the
-global parameters given in the examples above.
-
-In order to do this, you need to configure the cluster parameters, as in the example below
+It is possible to define environment variables directly in the Postgres cluster
+manifest to configure it individually. The variables must be listed under the
+`env` section in the same way you would do for [containers](https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/).
+Global parameters served from a custom config map or secret will be overridden.
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
