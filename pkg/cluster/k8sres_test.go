@@ -821,9 +821,8 @@ func newMockKubernetesClient() k8sutil.KubernetesClient {
 		ConfigMapsGetter: &MockConfigMapsGetter{},
 	}
 }
-func newMockCluster(opConfig config.Config, pgsql acidv1.Postgresql) *Cluster {
+func newMockCluster(opConfig config.Config) *Cluster {
 	cluster := &Cluster{
-		Postgresql: pgsql,
 		Config:     Config{OpConfig: opConfig},
 		KubeClient: newMockKubernetesClient(),
 	}
@@ -835,7 +834,6 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 	tests := []struct {
 		subTest  string
 		opConfig config.Config
-		pgsql    acidv1.Postgresql
 		envVars  []v1.EnvVar
 		err      error
 	}{
@@ -874,62 +872,9 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 				},
 			},
 		},
-		{
-			subTest: "Pod environment vars getting from the Postgresql spec EnvVar object",
-			pgsql: acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					Env: []v1.EnvVar{
-						{
-							Name:  "custom1",
-							Value: "value1",
-						},
-					},
-				},
-			},
-			envVars: []v1.EnvVar{
-				{
-					Name:  "custom1",
-					Value: "value1",
-				},
-			},
-		},
-		{
-			subTest: "Pod environment vars configured by PodEnvironmentConfigMap joined with Postgresql spec EnvVar object",
-			opConfig: config.Config{
-				Resources: config.Resources{
-					PodEnvironmentConfigMap: spec.NamespacedName{
-						Name: testPodEnvironmentConfigMapName,
-					},
-				},
-			},
-			pgsql: acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					Env: []v1.EnvVar{
-						{
-							Name:  "custom1",
-							Value: "value1",
-						},
-					},
-				},
-			},
-			envVars: []v1.EnvVar{
-				{
-					Name:  "custom1",
-					Value: "value1",
-				},
-				{
-					Name:  "foo1",
-					Value: "bar1",
-				},
-				{
-					Name:  "foo2",
-					Value: "bar2",
-				},
-			},
-		},
 	}
 	for _, tt := range tests {
-		c := newMockCluster(tt.opConfig, tt.pgsql)
+		c := newMockCluster(tt.opConfig)
 		vars, err := c.getPodEnvironmentConfigMapVariables()
 		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 		if !reflect.DeepEqual(vars, tt.envVars) {
@@ -957,7 +902,6 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 	tests := []struct {
 		subTest  string
 		opConfig config.Config
-		pgsql    acidv1.Postgresql
 		envVars  []v1.EnvVar
 		err      error
 	}{
@@ -1021,105 +965,10 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 				},
 			},
 		},
-		{
-			subTest: "Pod environment vars reference all keys from the Postgresql spec EnvVar object",
-			pgsql: acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					Env: []v1.EnvVar{
-						{
-							Name: "minio_root_password",
-							ValueFrom: &v1.EnvVarSource{
-								SecretKeyRef: &v1.SecretKeySelector{
-									LocalObjectReference: v1.LocalObjectReference{
-										Name: testPodEnvironmentSecretName,
-									},
-									Key: "minio_root_password",
-								},
-							},
-						},
-					},
-				},
-			},
-			envVars: []v1.EnvVar{
-				{
-					Name: "minio_root_password",
-					ValueFrom: &v1.EnvVarSource{
-						SecretKeyRef: &v1.SecretKeySelector{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: testPodEnvironmentSecretName,
-							},
-							Key: "minio_root_password",
-						},
-					},
-				},
-			},
-		},
-		{
-			subTest: "Pod environment vars reference all keys from the Postgresql spec EnvVar object joined with secret configured by PodEnvironmentSecret",
-			opConfig: config.Config{
-				Resources: config.Resources{
-					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
-				},
-			},
-			pgsql: acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					Env: []v1.EnvVar{
-						{
-							Name: "minio_root_password",
-							ValueFrom: &v1.EnvVarSource{
-								SecretKeyRef: &v1.SecretKeySelector{
-									LocalObjectReference: v1.LocalObjectReference{
-										Name: testPodEnvironmentSecretName,
-									},
-									Key: "minio_root_password",
-								},
-							},
-						},
-					},
-				},
-			},
-			envVars: []v1.EnvVar{
-				{
-					Name: "minio_access_key",
-					ValueFrom: &v1.EnvVarSource{
-						SecretKeyRef: &v1.SecretKeySelector{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: testPodEnvironmentSecretName,
-							},
-							Key: "minio_access_key",
-						},
-					},
-				},
-				{
-					Name: "minio_root_password",
-					ValueFrom: &v1.EnvVarSource{
-						SecretKeyRef: &v1.SecretKeySelector{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: testPodEnvironmentSecretName,
-							},
-							Key: "minio_root_password",
-						},
-					},
-				},
-				{
-					Name: "minio_secret_key",
-					ValueFrom: &v1.EnvVarSource{
-						SecretKeyRef: &v1.SecretKeySelector{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: testPodEnvironmentSecretName,
-							},
-							Key: "minio_secret_key",
-						},
-					},
-				},
-			},
-		},
 	}
 
 	for _, tt := range tests {
-		c := newMockCluster(tt.opConfig, tt.pgsql)
+		c := newMockCluster(tt.opConfig)
 		vars, err := c.getPodEnvironmentSecretVariables()
 		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 		if !reflect.DeepEqual(vars, tt.envVars) {

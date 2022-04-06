@@ -944,10 +944,6 @@ func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.
 func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	configMapPodEnvVarsList := make([]v1.EnvVar, 0)
 
-	if len(c.Spec.Env) > 0 {
-		configMapPodEnvVarsList = append(configMapPodEnvVarsList, c.Spec.Env...)
-	}
-
 	if c.OpConfig.PodEnvironmentConfigMap.Name == "" {
 		return configMapPodEnvVarsList, nil
 	}
@@ -969,9 +965,7 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 		}
 	}
 	for k, v := range cm.Data {
-		if !isEnvVarPresent(configMapPodEnvVarsList, k) {
-			configMapPodEnvVarsList = append(configMapPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
-		}
+		configMapPodEnvVarsList = append(configMapPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
 	}
 	return configMapPodEnvVarsList, nil
 }
@@ -979,10 +973,6 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 // Return list of variables the pod received from the configured Secret
 func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	secretPodEnvVarsList := make([]v1.EnvVar, 0)
-
-	if len(c.Spec.Env) > 0 {
-		secretPodEnvVarsList = append(secretPodEnvVarsList, c.Spec.Env...)
-	}
 
 	if c.OpConfig.PodEnvironmentSecret == "" {
 		return secretPodEnvVarsList, nil
@@ -1015,29 +1005,18 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	}
 
 	for k := range secret.Data {
-		if !isEnvVarPresent(secretPodEnvVarsList, k) {
-			secretPodEnvVarsList = append(secretPodEnvVarsList,
-				v1.EnvVar{Name: k, ValueFrom: &v1.EnvVarSource{
-					SecretKeyRef: &v1.SecretKeySelector{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: c.OpConfig.PodEnvironmentSecret,
-						},
-						Key: k,
+		secretPodEnvVarsList = append(secretPodEnvVarsList,
+			v1.EnvVar{Name: k, ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.OpConfig.PodEnvironmentSecret,
 					},
-				}})
-		}
+					Key: k,
+				},
+			}})
 	}
 
 	return secretPodEnvVarsList, nil
-}
-
-func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
-	for _, env := range envs {
-		if env.Name == key {
-			return true
-		}
-	}
-	return false
 }
 
 func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.ResourceRequirements) *v1.Container {
