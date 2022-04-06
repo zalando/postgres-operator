@@ -769,7 +769,13 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	cloneDescription *acidv1.CloneDescription,
 	standbyDescription *acidv1.StandbyDescription,
 	customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
-	envVars := []v1.EnvVar{
+	envVars := make([]v1.EnvVar, 0)
+
+	if len(c.Spec.Env) > 0 {
+		envVars = append(envVars, c.Spec.Env...)
+	}
+
+	envVars = append(envVars, []v1.EnvVar{
 		{
 			Name:  "SCOPE",
 			Value: c.Name,
@@ -842,7 +848,8 @@ func (c *Cluster) generateSpiloPodEnvVars(
 			Name:  "HUMAN_ROLE",
 			Value: c.OpConfig.PamRoleName,
 		},
-	}
+	}...)
+
 	if c.OpConfig.EnablePgVersionEnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
 	}
