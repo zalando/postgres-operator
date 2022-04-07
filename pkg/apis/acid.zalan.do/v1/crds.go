@@ -1094,6 +1094,12 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"etcd_host": {
 						Type: "string",
 					},
+					"etcd3_username": {
+						Type: "string",
+					},
+					"etcd3_password": {
+						Type: "string",
+					},
 					"kubernetes_use_configmaps": {
 						Type: "boolean",
 					},

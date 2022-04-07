@@ -558,6 +558,10 @@ func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
 }
 
+func (c * Cluster) patroniUsesEtcdV3() bool {
+	return c.OpConfig.Etcd3Password != "" || c.OpConfig.Etcd3Username != "" 
+}
+
 func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 	if !c.patroniUsesKubernetes() {
 		return false

@@ -61,6 +61,8 @@ data:
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
+  # etcd3_username:
+  # etcd3_password:
   external_traffic_policy: "Cluster"
   # gcp_credentials: ""
   # kubernetes_use_configmaps: "false"

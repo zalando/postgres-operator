@@ -233,6 +233,8 @@ type OperatorConfigurationData struct {
 	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
 	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
+	Etcd3Username              string                             `json:"etcd3_username,omitempty"`
+	Etcd3Password              string                             `json:"etcd3_password,omitempty"`
 	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
 	Workers                    uint32                             `json:"workers,omitempty"`

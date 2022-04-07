@@ -853,7 +853,13 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 	if c.patroniUsesKubernetes() {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
 	} else {
-		envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
+		if c.patroniUsesEtcdV3() {
+			envVars = append(envVars, v1.EnvVar{Name: "ETCD3_HOST", Value: c.OpConfig.EtcdHost})
+			envVars = append(envVars, v1.EnvVar{Name: "ETCD3_USERNAME", Value: c.OpConfig.Etcd3Username})
+			envVars = append(envVars, v1.EnvVar{Name: "ETCD3_PASSWORD", Value: c.OpConfig.Etcd3Password})
+		} else {
+			envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
+		}
 	}
 
 	if c.patroniKubernetesUseConfigMaps() {
