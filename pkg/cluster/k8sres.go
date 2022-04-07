@@ -649,8 +649,7 @@ func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, su
 				},
 			},
 		}
-		mergedEnv := append(env, container.Env...)
-		container.Env = deduplicateEnvVars(mergedEnv, container.Name, logger)
+		container.Env = appendEnvVars(env, container.Env...)
 		result = append(result, container)
 	}
 
@@ -936,36 +935,7 @@ func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
 	return false
 }
 
-// deduplicateEnvVars makes sure there are no duplicate in the target envVar array. While Kubernetes already
-// deduplicates variables defined in a container, it leaves the last definition in the list and this behavior is not
-// well-documented, which means that the behavior can be reversed at some point (it may also start producing an error).
-// Therefore, the merge is done by the operator, the entries that are ahead in the passed list take priority over those
-// that are behind, and only the name is considered in order to eliminate duplicates.
-func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.Entry) []v1.EnvVar {
-	result := make([]v1.EnvVar, 0)
-	names := make(map[string]int)
-
-	for i, va := range input {
-		if names[va.Name] == 0 {
-			names[va.Name]++
-			result = append(result, input[i])
-		} else if names[va.Name] == 1 {
-			names[va.Name]++
-
-			// Some variables (those to configure the WAL_ and LOG_ shipping) may be overwritten, only log as info
-			if strings.HasPrefix(va.Name, "WAL_") || strings.HasPrefix(va.Name, "LOG_") {
-				logger.Infof("global variable %q has been overwritten by configmap/secret for container %q",
-					va.Name, containerName)
-			} else {
-				logger.Warningf("variable %q is defined in %q more than once, the subsequent definitions are ignored",
-					va.Name, containerName)
-			}
-		}
-	}
-	return result
-}
-
-// Return list of variables the pod recieved from the configured ConfigMap
+// Return list of variables the pod received from the configured ConfigMap
 func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	configMapPodEnvVarsList := make([]v1.EnvVar, 0)
 
