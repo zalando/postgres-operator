@@ -170,11 +170,25 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			envVarValue:    "some_path_to_credentials",
 		},
 	}
-	expectedValuesS3Bucket := []ExpectedValue{
+	expectedClusterNameLabel := []ExpectedValue{
 		{
-			envIndex:       0,
+			envIndex:       5,
+			envVarConstant: "KUBERNETES_SCOPE_LABEL",
+			envVarValue:    "cluster-name",
+		},
+	}
+	expectedCustomS3Bucket := []ExpectedValue{
+		{
+			envIndex:       15,
 			envVarConstant: "WAL_S3_BUCKET",
 			envVarValue:    "custom-s3-bucket",
+		},
+	}
+	expectedCustomVariable := []ExpectedValue{
+		{
+			envIndex:       15,
+			envVarConstant: "CUSTOM_VARIABLE",
+			envVarValue:    "cluster-variable",
 		},
 	}
 
@@ -216,16 +230,40 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			expectedValues:     expectedValuesGCPCreds,
 		},
 		{
-			subTest: "Will overwrite global WAL_S3_BUCKET parameter from the cluster Env option",
+			subTest: "Will not overwrite global KUBERNETES_SCOPE_LABEL parameter from the cluster Env option",
 			opConfig: config.Config{
-				WALES3Bucket: "wale-s3-bucket",
+				Resources: config.Resources{
+					ClusterNameLabel: "cluster-name",
+				},
 			},
 			uid:                "SomeUUID",
 			spiloConfig:        "someConfig",
 			cloneDescription:   &acidv1.CloneDescription{},
 			standbyDescription: &acidv1.StandbyDescription{},
 			customEnvList:      []v1.EnvVar{},
-			expectedValues:     expectedValuesS3Bucket,
+			expectedValues:     expectedClusterNameLabel,
+			pgsql: acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					Env: []v1.EnvVar{
+						{
+							Name:  "KUBERNETES_SCOPE_LABEL",
+							Value: "my-scope-label",
+						},
+					},
+				},
+			},
+		},
+		{
+			subTest: "Will overwrite global WAL_S3_BUCKET parameter from the cluster Env option",
+			opConfig: config.Config{
+				WALGSBucket: "global-s3-bucket",
+			},
+			uid:                "SomeUUID",
+			spiloConfig:        "someConfig",
+			cloneDescription:   &acidv1.CloneDescription{},
+			standbyDescription: &acidv1.StandbyDescription{},
+			customEnvList:      []v1.EnvVar{},
+			expectedValues:     expectedCustomS3Bucket,
 			pgsql: acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
 					Env: []v1.EnvVar{
@@ -238,24 +276,24 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			},
 		},
 		{
-			subTest:            "Will overwrite custom WAL_S3_BUCKET parameter from the cluster Env option",
+			subTest:            "Will overwrite custom variable parameter from the cluster Env option",
 			uid:                "SomeUUID",
 			spiloConfig:        "someConfig",
 			cloneDescription:   &acidv1.CloneDescription{},
 			standbyDescription: &acidv1.StandbyDescription{},
 			customEnvList: []v1.EnvVar{
 				{
-					Name:  "WAL_S3_BUCKET",
-					Value: "global-s3-bucket",
+					Name:  "CUSTOM_VARIABLE",
+					Value: "custom-variable",
 				},
 			},
-			expectedValues: expectedValuesS3Bucket,
+			expectedValues: expectedCustomVariable,
 			pgsql: acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
 					Env: []v1.EnvVar{
 						{
-							Name:  "WAL_S3_BUCKET",
-							Value: "custom-s3-bucket",
+							Name:  "CUSTOM_VARIABLE",
+							Value: "cluster-variable",
 						},
 					},
 				},

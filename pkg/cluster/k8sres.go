@@ -769,13 +769,8 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	cloneDescription *acidv1.CloneDescription,
 	standbyDescription *acidv1.StandbyDescription,
 	customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
-	envVars := make([]v1.EnvVar, 0)
 
-	if len(c.Spec.Env) > 0 {
-		envVars = append(envVars, c.Spec.Env...)
-	}
-
-	envVars = append(envVars, []v1.EnvVar{
+	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
 			Value: c.Name,
@@ -848,7 +843,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 			Name:  "HUMAN_ROLE",
 			Value: c.OpConfig.PamRoleName,
 		},
-	}...)
+	}
 
 	if c.OpConfig.EnablePgVersionEnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
@@ -881,41 +876,64 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
 	}
 
+	if len(c.Spec.Env) > 0 {
+		envVars = appendEnvVars(envVars, c.Spec.Env...)
+	}
+
 	// add vars taken from pod_environment_configmap and pod_environment_secret first
 	// (to allow them to override the globals set in the operator config)
 	if len(customPodEnvVarsList) > 0 {
-		envVars = append(envVars, customPodEnvVarsList...)
+		envVars = appendEnvVars(envVars, customPodEnvVarsList...)
 	}
 
 	if c.OpConfig.WALES3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALGSBucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALAZStorageAccount != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.GCPCredentials != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 	}
 
 	if c.OpConfig.LogS3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
-		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	return envVars
+}
+
+func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
+	jenvs := envs
+	for _, env := range appEnv {
+		if !isEnvVarPresent(jenvs, env.Name) {
+			jenvs = append(jenvs, env)
+		}
+	}
+	return jenvs
+}
+
+func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
+	for _, env := range envs {
+		if env.Name == key {
+			return true
+		}
+	}
+	return false
 }
 
 // deduplicateEnvVars makes sure there are no duplicate in the target envVar array. While Kubernetes already
@@ -1217,7 +1235,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		// use the same filenames as Secret resources by default
 		certFile := ensurePath(spec.TLS.CertificateFile, mountPath, "tls.crt")
 		privateKeyFile := ensurePath(spec.TLS.PrivateKeyFile, mountPath, "tls.key")
-		spiloEnvVars = append(
+		spiloEnvVars = appendEnvVars(
 			spiloEnvVars,
 			v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: certFile},
 			v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: privateKeyFile},
@@ -1231,7 +1249,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			}
 
 			caFile := ensurePath(spec.TLS.CAFile, mountPathCA, "")
-			spiloEnvVars = append(
+			spiloEnvVars = appendEnvVars(
 				spiloEnvVars,
 				v1.EnvVar{Name: "SSL_CA_FILE", Value: caFile},
 			)
@@ -1256,7 +1274,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	spiloContainer := generateContainer(constants.PostgresContainerName,
 		&effectiveDockerImage,
 		resourceRequirements,
-		deduplicateEnvVars(spiloEnvVars, constants.PostgresContainerName, c.logger),
+		spiloEnvVars,
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
