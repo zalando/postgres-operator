@@ -302,6 +302,12 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 		isPostgresSuperuserTeam: true,
 	}
 
+	teamC := mockTeam{
+		teamID:                  "",
+		members:                 []string{""},
+		isPostgresSuperuserTeam: true,
+	}
+
 	userB := spec.PgUser{
 		Name:     "postgres_admin",
 		Origin:   spec.RoleOriginTeamsAPI,
@@ -334,7 +340,7 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 			ownerTeam:      "test",
 			existingRoles:  map[string]spec.PgUser{},
 			superuserTeams: []string{"postgres_superusers", "postgres_admins"},
-			teams:          []mockTeam{teamA, teamB, teamTest},
+			teams:          []mockTeam{teamA, teamB, teamC, teamTest},
 			result: map[string]spec.PgUser{
 				"postgres_superuser": userA,
 				"postgres_admin":     userB,
