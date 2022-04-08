@@ -15,6 +15,8 @@ RUN apt-get update     \
         gnupg \
         gcc \
         libffi-dev \
+        nodejs \
+        npm \
     && pip3 install --upgrade pip \
     && pip3 install --no-cache-dir awscli --upgrade \
     && pip3 install --no-cache-dir gsutil --upgrade \
@@ -32,6 +34,8 @@ RUN apt-get update     \
         postgresql-client-9.5 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+RUN npm install --global azbak
 
 COPY dump.sh ./
 

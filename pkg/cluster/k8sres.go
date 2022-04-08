@@ -2161,38 +2161,9 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 				},
 			},
 		},
-		// Bucket env vars
 		{
 			Name:  "LOGICAL_BACKUP_PROVIDER",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupProvider,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_BUCKET",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_REGION",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Region,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_ENDPOINT",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_SSE",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_RETENTION_TIME",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3RetentionTime,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
-			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
-		},
-		{
-			Name:  "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials,
 		},
 		// Postgres env vars
 		{
@@ -2226,6 +2197,25 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 				},
 			},
 		},
+	}
+
+	// logical backup storage env vars
+	if c.OpConfig.LogicalBackup.LogicalBackupProvider == "aws" || c.OpConfig.LogicalBackup.LogicalBackupProvider == "s3" {
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_S3_BUCKET", Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket})
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_S3_REGION", Value: c.OpConfig.LogicalBackup.LogicalBackupS3Region})
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_S3_ENDPOINT", Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint})
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_S3_SSE", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE})
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_S3_RETENTION_TIME", Value: c.OpConfig.LogicalBackup.LogicalBackupS3RetentionTime})
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(c.Postgresql.GetUID()))})
+	} else if c.OpConfig.LogicalBackup.LogicalBackupProvider == "google" || c.OpConfig.LogicalBackup.LogicalBackupProvider == "gcs" {
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GS_BUCKET", Value: c.OpConfig.LogicalBackup.LogicalBackupGSBucket})
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GS_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(c.Postgresql.GetUID()))})
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+	} else if c.OpConfig.LogicalBackup.LogicalBackupProvider == "azure" {
+		// assumes logical backups are going to the same place as wal archives.
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_AZ_BUCKET", Value: c.OpConfig.LogicalBackup.LogicalBackupAZBucket})
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_AZ_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(c.Postgresql.GetUID()))})
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_AZ_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
 	}
 
 	if c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID != "" {

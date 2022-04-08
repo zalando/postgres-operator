@@ -109,8 +109,18 @@ function aws_upload {
     aws s3 cp - "$PATH_TO_BACKUP" "${args[@]//\'/}"
 }
 
+function azure_upload {
+
+    # mimic bucket setup from Spilo
+    # to keep logical backups at the same path as WAL
+    # NB: $LOGICAL_BACKUP_AZ_BUCKET_SCOPE_SUFFIX already contains the leading "/" when set by the Postgres Operator
+    PATH_TO_BACKUP=s3://$LOGICAL_BACKUP_AZ_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_AZ_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
+
+    azbak - $PATH_TO_BACKUP --storage-account $LOGICAL_BACKUP_AZ_STORAGE_ACCOUNT --no-suffix
+}
+
 function gcs_upload {
-    PATH_TO_BACKUP=gs://$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
+    PATH_TO_BACKUP=gs://$LOGICAL_BACKUP_GS_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_GS_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
 
     gsutil -o Credentials:gs_service_key_file=$LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS cp - "$PATH_TO_BACKUP"
 }
@@ -119,6 +129,9 @@ function upload {
     case $LOGICAL_BACKUP_PROVIDER in
         "gcs")
             gcs_upload
+            ;;
+        "azure")
+            azure_upload
             ;;
         *)
             aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
