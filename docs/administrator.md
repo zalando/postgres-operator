@@ -706,6 +706,29 @@ data:
 The key-value pairs of the Secret are all accessible as environment variables
 to the Postgres StatefulSet/pods.
 
+### For individual cluster
+
+It is possible to define environment variables directly in the Postgres cluster
+manifest to configure it individually. The variables must be listed under the
+`env` section in the same way you would do for [containers](https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/).
+Global parameters served from a custom config map or secret will be overridden.
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-test-cluster
+spec:
+  env:
+  - name: wal_s3_bucket
+    value: my-custom-bucket
+  - name: minio_secret_key
+      valueFrom:
+        secretKeyRef:
+          name: my-custom-secret
+          key: minio_secret_key
+```
+
 ## Limiting the number of min and max instances in clusters
 
 As a preventive measure, one can restrict the minimum and the maximum number of

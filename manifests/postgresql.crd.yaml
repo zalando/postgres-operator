@@ -194,6 +194,12 @@ spec:
                 type: boolean
               enableShmVolume:
                 type: boolean
+              env:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
               init_containers:
                 type: array
                 description: deprecated

@@ -649,8 +649,7 @@ func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, su
 				},
 			},
 		}
-		mergedEnv := append(env, container.Env...)
-		container.Env = deduplicateEnvVars(mergedEnv, container.Name, logger)
+		container.Env = appendEnvVars(env, container.Env...)
 		result = append(result, container)
 	}
 
@@ -769,6 +768,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	cloneDescription *acidv1.CloneDescription,
 	standbyDescription *acidv1.StandbyDescription,
 	customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -843,6 +843,11 @@ func (c *Cluster) generateSpiloPodEnvVars(
 			Value: c.OpConfig.PamRoleName,
 		},
 	}
+
+	if c.OpConfig.EnableSpiloWalPathCompat {
+		envVars = append(envVars, v1.EnvVar{Name: "ENABLE_WAL_PATH_COMPAT", Value: "true"})
+	}
+
 	if c.OpConfig.EnablePgVersionEnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
 	}
@@ -874,73 +879,67 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
 	}
 
+	if len(c.Spec.Env) > 0 {
+		envVars = appendEnvVars(envVars, c.Spec.Env...)
+	}
+
 	// add vars taken from pod_environment_configmap and pod_environment_secret first
 	// (to allow them to override the globals set in the operator config)
 	if len(customPodEnvVarsList) > 0 {
-		envVars = append(envVars, customPodEnvVarsList...)
+		envVars = appendEnvVars(envVars, customPodEnvVarsList...)
 	}
 
 	if c.OpConfig.WALES3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALGSBucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALAZStorageAccount != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.GCPCredentials != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 	}
 
 	if c.OpConfig.LogS3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
-		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	return envVars
 }
 
-// deduplicateEnvVars makes sure there are no duplicate in the target envVar array. While Kubernetes already
-// deduplicates variables defined in a container, it leaves the last definition in the list and this behavior is not
-// well-documented, which means that the behavior can be reversed at some point (it may also start producing an error).
-// Therefore, the merge is done by the operator, the entries that are ahead in the passed list take priority over those
-// that are behind, and only the name is considered in order to eliminate duplicates.
-func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.Entry) []v1.EnvVar {
-	result := make([]v1.EnvVar, 0)
-	names := make(map[string]int)
-
-	for i, va := range input {
-		if names[va.Name] == 0 {
-			names[va.Name]++
-			result = append(result, input[i])
-		} else if names[va.Name] == 1 {
-			names[va.Name]++
-
-			// Some variables (those to configure the WAL_ and LOG_ shipping) may be overwritten, only log as info
-			if strings.HasPrefix(va.Name, "WAL_") || strings.HasPrefix(va.Name, "LOG_") {
-				logger.Infof("global variable %q has been overwritten by configmap/secret for container %q",
-					va.Name, containerName)
-			} else {
-				logger.Warningf("variable %q is defined in %q more than once, the subsequent definitions are ignored",
-					va.Name, containerName)
-			}
+func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
+	jenvs := envs
+	for _, env := range appEnv {
+		if !isEnvVarPresent(jenvs, env.Name) {
+			jenvs = append(jenvs, env)
 		}
 	}
-	return result
+	return jenvs
 }
 
-// Return list of variables the pod recieved from the configured ConfigMap
+func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
+	for _, env := range envs {
+		if env.Name == key {
+			return true
+		}
+	}
+	return false
+}
+
+// Return list of variables the pod received from the configured ConfigMap
 func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	configMapPodEnvVarsList := make([]v1.EnvVar, 0)
 
@@ -1105,16 +1104,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers = spec.InitContainers
 	}
 
-	spiloCompathWalPathList := make([]v1.EnvVar, 0)
-	if c.OpConfig.EnableSpiloWalPathCompat {
-		spiloCompathWalPathList = append(spiloCompathWalPathList,
-			v1.EnvVar{
-				Name:  "ENABLE_WAL_PATH_COMPAT",
-				Value: "true",
-			},
-		)
-	}
-
 	// fetch env vars from custom ConfigMap
 	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
 	if err != nil {
@@ -1128,8 +1117,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// concat all custom pod env vars and sort them
-	customPodEnvVarsList := append(spiloCompathWalPathList, configMapEnvVarsList...)
-	customPodEnvVarsList = append(customPodEnvVarsList, secretEnvVarsList...)
+	customPodEnvVarsList := append(configMapEnvVarsList, secretEnvVarsList...)
 	sort.Slice(customPodEnvVarsList,
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 
@@ -1210,7 +1198,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		// use the same filenames as Secret resources by default
 		certFile := ensurePath(spec.TLS.CertificateFile, mountPath, "tls.crt")
 		privateKeyFile := ensurePath(spec.TLS.PrivateKeyFile, mountPath, "tls.key")
-		spiloEnvVars = append(
+		spiloEnvVars = appendEnvVars(
 			spiloEnvVars,
 			v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: certFile},
 			v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: privateKeyFile},
@@ -1224,7 +1212,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			}
 
 			caFile := ensurePath(spec.TLS.CAFile, mountPathCA, "")
-			spiloEnvVars = append(
+			spiloEnvVars = appendEnvVars(
 				spiloEnvVars,
 				v1.EnvVar{Name: "SSL_CA_FILE", Value: caFile},
 			)
@@ -1249,7 +1237,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	spiloContainer := generateContainer(constants.PostgresContainerName,
 		&effectiveDockerImage,
 		resourceRequirements,
-		deduplicateEnvVars(spiloEnvVars, constants.PostgresContainerName, c.logger),
+		spiloEnvVars,
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,

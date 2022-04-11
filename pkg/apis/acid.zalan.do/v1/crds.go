@@ -311,6 +311,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enableShmVolume": {
 						Type: "boolean",
 					},
+					"env": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
+						},
+					},
 					"init_containers": {
 						Type:        "array",
 						Description: "deprecated",
