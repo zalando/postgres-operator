@@ -1318,7 +1318,7 @@ func (c *Cluster) initAdditionalOwnerRoles() {
 			}
 		}
 
-		if len(memberOf) > 1 {
+		if len(memberOf) > 0 {
 			namespace := c.Namespace
 			additionalOwnerPgUser := spec.PgUser{
 				Origin:    spec.RoleOriginSpilo,

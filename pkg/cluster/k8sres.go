@@ -766,9 +766,10 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	uid types.UID,
 	spiloConfiguration string,
 	cloneDescription *acidv1.CloneDescription,
-	standbyDescription *acidv1.StandbyDescription,
-	customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+	standbyDescription *acidv1.StandbyDescription) []v1.EnvVar {
 
+	// hard-coded set of environment variables we need
+	// to guarantee core functionality of the operator
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -871,51 +872,69 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_USE_CONFIGMAPS", Value: "true"})
 	}
 
-	if cloneDescription != nil && cloneDescription.ClusterName != "" {
-		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
-	}
-
-	if c.Spec.StandbyCluster != nil {
-		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
-	}
-
+	// fetch cluster-specific variables that will override all subsequent global variables
 	if len(c.Spec.Env) > 0 {
 		envVars = appendEnvVars(envVars, c.Spec.Env...)
 	}
 
-	// add vars taken from pod_environment_configmap and pod_environment_secret first
-	// (to allow them to override the globals set in the operator config)
-	if len(customPodEnvVarsList) > 0 {
-		envVars = appendEnvVars(envVars, customPodEnvVarsList...)
+	// fetch variables from custom environment Secret
+	// that will override all subsequent global variables
+	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
+	if err != nil {
+		c.logger.Warningf("%v", err)
 	}
+	envVars = appendEnvVars(envVars, secretEnvVarsList...)
 
+	// fetch variables from custom environment ConfigMap
+	// that will override all subsequent global variables
+	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
+	if err != nil {
+		c.logger.Warningf("%v", err)
+	}
+	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
+
+	// global variables derived from operator configuration
+	opConfigEnvVars := make([]v1.EnvVar, 0)
 	if c.OpConfig.WALES3Bucket != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALGSBucket != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALAZStorageAccount != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.GCPCredentials != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 	}
 
 	if c.OpConfig.LogS3Bucket != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
+
+	if cloneDescription != nil && cloneDescription.ClusterName != "" {
+		opConfigEnvVars = append(opConfigEnvVars, c.generateCloneEnvironment(cloneDescription)...)
+	}
+
+	if c.Spec.StandbyCluster != nil {
+		opConfigEnvVars = append(opConfigEnvVars, c.generateStandbyEnvironment(standbyDescription)...)
+	}
+
+	envVars = appendEnvVars(envVars, opConfigEnvVars...)
+
+	//sort.Slice(envVars,
+	//	func(i, j int) bool { return envVars[i].Name < envVars[j].Name })
 
 	return envVars
 }
@@ -923,6 +942,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
 	jenvs := envs
 	for _, env := range appEnv {
+		env.Name = strings.ToUpper(env.Name)
 		if !isEnvVarPresent(jenvs, env.Name) {
 			jenvs = append(jenvs, env)
 		}
@@ -960,12 +980,14 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 				metav1.GetOptions{})
 		}
 		if err != nil {
-			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
+			return configMapPodEnvVarsList, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
 		}
 	}
+
 	for k, v := range cm.Data {
 		configMapPodEnvVarsList = append(configMapPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
 	}
+	sort.Slice(configMapPodEnvVarsList, func(i, j int) bool { return configMapPodEnvVarsList[i].Name < configMapPodEnvVarsList[j].Name })
 	return configMapPodEnvVarsList, nil
 }
 
@@ -1000,7 +1022,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 		err = errors.Wrap(notFoundErr, err.Error())
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read Secret PodEnvironmentSecretName")
+		return secretPodEnvVarsList, errors.Wrap(err, "could not read Secret PodEnvironmentSecretName")
 	}
 
 	for k := range secret.Data {
@@ -1015,6 +1037,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 			}})
 	}
 
+	sort.Slice(secretPodEnvVarsList, func(i, j int) bool { return secretPodEnvVarsList[i].Name < secretPodEnvVarsList[j].Name })
 	return secretPodEnvVarsList, nil
 }
 
@@ -1104,23 +1127,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers = spec.InitContainers
 	}
 
-	// fetch env vars from custom ConfigMap
-	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
-	if err != nil {
-		return nil, err
-	}
-
-	// fetch env vars from custom ConfigMap
-	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
-	if err != nil {
-		return nil, err
-	}
-
-	// concat all custom pod env vars and sort them
-	customPodEnvVarsList := append(configMapEnvVarsList, secretEnvVarsList...)
-	sort.Slice(customPodEnvVarsList,
-		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
-
 	// backward compatible check for InitContainers
 	if spec.InitContainersOld != nil {
 		msg := "manifest parameter init_containers is deprecated."
@@ -1153,9 +1159,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.Postgresql.GetUID(),
 		spiloConfiguration,
 		spec.Clone,
-		spec.StandbyCluster,
-		customPodEnvVarsList,
-	)
+		spec.StandbyCluster)
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
