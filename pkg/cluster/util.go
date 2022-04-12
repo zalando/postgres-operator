@@ -272,9 +272,14 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 		return nil, fmt.Errorf("could not get oauth token to authenticate to team service API: %v", err)
 	}
 
-	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
+	teamInfo, statusCode, err := c.teamsAPIClient.TeamInfo(teamID, token)
+
 	if err != nil {
-		c.logger.Warningf("could not get team info for team %q: %v", teamID, err)
+		if statusCode == 404 {
+			c.logger.Warningf("could not get team info for team %q: %v", teamID, err)
+		} else {
+			return nil, fmt.Errorf("could not get team info for team %q: %v", teamID, err)
+		}
 	} else {
 		for _, member := range teamInfo.Members {
 			if !(util.SliceContains(members, member)) {
