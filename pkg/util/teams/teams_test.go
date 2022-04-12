@@ -62,12 +62,14 @@ var (
 var teamsAPItc = []struct {
 	in     string
 	inCode int
+	inTeam string
 	out    *Team
 	err    error
 }{
 	{
 		input,
 		200,
+		"acid",
 		&Team{
 			Dn:           "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
 			ID:           "acid",
@@ -105,30 +107,35 @@ var teamsAPItc = []struct {
 		nil}, {
 		`{"error": "Access Token not valid"}`,
 		401,
+		"acid",
 		nil,
 		fmt.Errorf(`team API query failed with status code 401 and message: '"Access Token not valid"'`),
 	},
 	{
 		`{"status": "I'm a teapot'"}`,
 		418,
+		"acid",
 		nil,
 		fmt.Errorf(`team API query failed with status code 418`),
 	},
 	{
 		`{"status": "I'm a teapot`,
 		418,
+		"acid",
 		nil,
 		fmt.Errorf(`team API query failed with status code 418 and malformed response: unexpected EOF`),
 	},
 	{
 		`{"status": "I'm a teapot`,
 		200,
+		"acid",
 		nil,
 		fmt.Errorf(`could not parse team API response: unexpected EOF`),
 	},
 	{
 		input,
 		404,
+		"banana",
 		nil,
 		fmt.Errorf(`team API query failed with status code 404`),
 	},
@@ -163,7 +170,7 @@ func TestInfo(t *testing.T) {
 			defer ts.Close()
 			api := NewTeamsAPI(ts.URL, logger)
 
-			actual, _, err := api.TeamInfo("acid", token)
+			actual, statusCode, err := api.TeamInfo(tc.inTeam, token)
 			if err != nil && err.Error() != tc.err.Error() {
 				t.Errorf("expected error: %v, got: %v", tc.err, err)
 				return
@@ -171,12 +178,6 @@ func TestInfo(t *testing.T) {
 
 			if !reflect.DeepEqual(actual, tc.out) {
 				t.Errorf("expected %#v, got: %#v", tc.out, actual)
-			}
-
-			_, statusCode, err := api.TeamInfo("sqlserver", token)
-			if err != nil && err.Error() != tc.err.Error() {
-				t.Errorf("expected error: %v, got: %v", tc.err, err)
-				return
 			}
 
 			if statusCode != tc.inCode {
