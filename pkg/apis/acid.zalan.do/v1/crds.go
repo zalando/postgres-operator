@@ -311,6 +311,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enableShmVolume": {
 						Type: "boolean",
 					},
+					"env": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
+						},
+					},
 					"init_containers": {
 						Type:        "array",
 						Description: "deprecated",
@@ -714,6 +724,17 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"gs_wal_path": {
 								Type: "string",
 							},
+							"standby_host": {
+								Type: "string",
+							},
+							"standby_port": {
+								Type: "string",
+							},
+						},
+						OneOf: []apiextv1.JSONSchemaProps{
+							apiextv1.JSONSchemaProps{Required: []string{"s3_wal_path"}},
+							apiextv1.JSONSchemaProps{Required: []string{"gs_wal_path"}},
+							apiextv1.JSONSchemaProps{Required: []string{"standby_host"}},
 						},
 					},
 					"streams": {

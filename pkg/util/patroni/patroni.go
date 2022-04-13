@@ -25,7 +25,7 @@ const (
 	clusterPath  = "/cluster"
 	statusPath   = "/patroni"
 	restartPath  = "/restart"
-	apiPort      = 8008
+	ApiPort      = 8008
 	timeout      = 30 * time.Second
 )
 
@@ -74,7 +74,7 @@ func apiURL(masterPod *v1.Pod) (string, error) {
 			return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", masterPod.Status.PodIP)
 		}
 	}
-	return fmt.Sprintf("http://%s", net.JoinHostPort(ip.String(), strconv.Itoa(apiPort))), nil
+	return fmt.Sprintf("http://%s", net.JoinHostPort(ip.String(), strconv.Itoa(ApiPort))), nil
 }
 
 func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer) (err error) {

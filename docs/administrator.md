@@ -706,6 +706,29 @@ data:
 The key-value pairs of the Secret are all accessible as environment variables
 to the Postgres StatefulSet/pods.
 
+### For individual cluster
+
+It is possible to define environment variables directly in the Postgres cluster
+manifest to configure it individually. The variables must be listed under the
+`env` section in the same way you would do for [containers](https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/).
+Global parameters served from a custom config map or secret will be overridden.
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-test-cluster
+spec:
+  env:
+  - name: wal_s3_bucket
+    value: my-custom-bucket
+  - name: minio_secret_key
+      valueFrom:
+        secretKeyRef:
+          name: my-custom-secret
+          key: minio_secret_key
+```
+
 ## Limiting the number of min and max instances in clusters
 
 As a preventive measure, one can restrict the minimum and the maximum number of
@@ -1087,12 +1110,16 @@ data:
 
 ### Standby clusters
 
-The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is very
-similar to cloning. At the moment, the operator only allows for streaming from
-the S3 WAL archive of the master specified in the manifest. Like with cloning,
-if you are using [additional environment variables](#custom-pod-environment-variables)
-to access your backup location you have to copy those variables and prepend the
-`STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
+The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is
+similar to cloning when they stream changes from a WAL archive (S3 or GCS).
+If you are using [additional environment variables](#custom-pod-environment-variables)
+to access your backup location you have to copy those variables and prepend
+the `STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
+
+Alternatively, standby clusters can also stream from a remote primary cluster.
+You have to specify the host address. Port is optional and defaults to 5432.
+Note, that only one of the options (`s3_wal_path`, `gs_wal_path`,
+`standby_host`) can be present under the `standby` top-level key.
 
 ## Logical backups
 

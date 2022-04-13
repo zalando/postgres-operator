@@ -1319,8 +1319,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # check if next rotation date was set in secret
-        secret_data = k8s.get_secret_data("zalando")
-        next_rotation_timestamp = datetime.strptime(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
+        zalando_secret = k8s.get_secret("zalando")
+        next_rotation_timestamp = datetime.strptime(str(base64.b64decode(zalando_secret.data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
         today90days = today+timedelta(days=90)
         self.assertEqual(today90days, next_rotation_timestamp.date(),
                         "Unexpected rotation date in secret of zalando user: expected {}, got {}".format(today90days, next_rotation_timestamp.date()))
@@ -1361,9 +1361,9 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
         # check if next rotation date and username have been replaced
-        secret_data = k8s.get_secret_data("foo_user")
-        secret_username = str(base64.b64decode(secret_data["username"]), 'utf-8')
-        next_rotation_timestamp = datetime.strptime(str(base64.b64decode(secret_data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
+        foo_user_secret = k8s.get_secret("foo_user")
+        secret_username = str(base64.b64decode(foo_user_secret.data["username"]), 'utf-8')
+        next_rotation_timestamp = datetime.strptime(str(base64.b64decode(foo_user_secret.data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
         rotation_user = "foo_user"+today.strftime("%y%m%d")
         today30days = today+timedelta(days=30)
 
@@ -1396,9 +1396,9 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
         # check if username in foo_user secret is reset
-        secret_data = k8s.get_secret_data("foo_user")
-        secret_username = str(base64.b64decode(secret_data["username"]), 'utf-8')
-        next_rotation_timestamp = str(base64.b64decode(secret_data["nextRotation"]), 'utf-8')
+        foo_user_secret = k8s.get_secret("foo_user")
+        secret_username = str(base64.b64decode(foo_user_secret.data["username"]), 'utf-8')
+        next_rotation_timestamp = str(base64.b64decode(foo_user_secret.data["nextRotation"]), 'utf-8')
         self.assertEqual("foo_user", secret_username,
                         "Unexpected username in secret of foo_user: expected {}, got {}".format("foo_user", secret_username))
         self.assertEqual('', next_rotation_timestamp,
@@ -1645,6 +1645,42 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_standby_cluster(self):
+        '''
+        Create standby cluster streaming from remote primary
+        '''
+        k8s = self.k8s
+        standby_cluster_name = 'acid-standby-cluster'
+        cluster_name_label = 'cluster-name'
+        cluster_label = 'application=spilo,{}={}'.format(cluster_name_label, standby_cluster_name)
+        superuser_name = 'postgres'
+        replication_user = 'standby'
+        secret_suffix = 'credentials.postgresql.acid.zalan.do'
+
+        # copy secrets from remote cluster before operator creates them when bootstrapping the standby cluster
+        postgres_secret = k8s.get_secret(superuser_name)
+        postgres_secret.metadata.name = '{}.{}.{}'.format(superuser_name, standby_cluster_name, secret_suffix)
+        postgres_secret.metadata.labels[cluster_name_label] = standby_cluster_name
+        k8s.create_secret(postgres_secret)
+        standby_secret = k8s.get_secret(replication_user)
+        standby_secret.metadata.name = '{}.{}.{}'.format(replication_user, standby_cluster_name, secret_suffix)
+        standby_secret.metadata.labels[cluster_name_label] = standby_cluster_name
+        k8s.create_secret(standby_secret)
+
+        try:
+            k8s.create_with_kubectl("manifests/standby-manifest.yaml")
+            k8s.wait_for_pod_start("spilo-role=master," + cluster_label)
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+        finally:
+            # delete the standby cluster so that the k8s_api.get_operator_state works correctly in subsequent tests
+            k8s.api.custom_objects_api.delete_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-standby-cluster")
+            time.sleep(5)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
         '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
@@ -1758,6 +1794,8 @@ class EndToEndTestCase(unittest.TestCase):
 
             self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", label_selector="cluster-name=acid-minimal-cluster")["items"]), 0, "Manifest not deleted")
+
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # check if everything has been deleted
             self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_label), 0, "Pods not deleted")

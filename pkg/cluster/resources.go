@@ -35,8 +35,10 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found secret: %q (uid: %q) namesapce: %s", util.NameFromMeta(obj.ObjectMeta), obj.UID, obj.ObjectMeta.Namespace)
 	}
 
-	for role, endpoint := range c.Endpoints {
-		c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+	if !c.patroniKubernetesUseConfigMaps() {
+		for role, endpoint := range c.Endpoints {
+			c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+		}
 	}
 
 	for role, service := range c.Services {
@@ -589,7 +591,7 @@ func (c *Cluster) GetEndpointMaster() *v1.Endpoints {
 	return c.Endpoints[Master]
 }
 
-// GetEndpointReplica returns cluster's kubernetes master Endpoint
+// GetEndpointReplica returns cluster's kubernetes replica Endpoint
 func (c *Cluster) GetEndpointReplica() *v1.Endpoints {
 	return c.Endpoints[Replica]
 }

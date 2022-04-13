@@ -196,6 +196,12 @@ spec:
                 type: boolean
               enableShmVolume:
                 type: boolean
+              env:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
               init_containers:
                 type: array
                 description: deprecated
@@ -460,6 +466,17 @@ spec:
                     type: string
                   gs_wal_path:
                     type: string
+                  standby_host:
+                    type: string
+                  standby_port:
+                    type: string
+                oneOf:
+                - required:
+                  - s3_wal_path
+                - required:
+                  - gs_wal_path
+                - required:
+                  - standby_host
               streams:
                 type: array
                 nullable: true

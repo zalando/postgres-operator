@@ -274,15 +274,14 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
 	if err != nil {
-		return nil, fmt.Errorf("could not get team info for team %q: %v", teamID, err)
-	}
-
-	for _, member := range teamInfo.Members {
-		if !(util.SliceContains(members, member)) {
-			members = append(members, member)
+		c.logger.Warningf("could not get team info for team %q: %v", teamID, err)
+	} else {
+		for _, member := range teamInfo.Members {
+			if !(util.SliceContains(members, member)) {
+				members = append(members, member)
+			}
 		}
 	}
-
 	return members, nil
 }
 
