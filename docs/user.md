@@ -770,8 +770,7 @@ spec:
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
 cluster will be cloned from S3, using the latest backup before the `timestamp`.
-Note, that a time zone is required for `timestamp` in the format of `+00:00`
-which is UTC.
+Note, a time zone is required for `timestamp` in the format of `+00:00` (UTC).
 
 The operator will try to find the WAL location based on the configured
 `wal_[s3|gs]_bucket` or `wal_az_storage_account` and the specified `uid`.
@@ -790,7 +789,7 @@ configuration you can specify the full path under `s3_wal_path`. For
 [Google Cloud Plattform](administrator.md#google-cloud-platform-setup)
 or [Azure](administrator.md#azure-setup)
 it can only be set globally with [custom Pod environment variables](administrator.md#custom-pod-environment-variables)
-or locally in the Postgres manifest's [`env`]() section.
+or locally in the Postgres manifest's [`env`](administrator.md#via-postgres-cluster-manifest) section.
 
 
 For non AWS S3 following settings can be set to support cloning from other S3

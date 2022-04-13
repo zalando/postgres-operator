@@ -250,7 +250,6 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 	}{
 		{
 			subTest: "no PodEnvironmentConfigMap",
-			envVars: []v1.EnvVar{},
 		},
 		{
 			subTest: "missing PodEnvironmentConfigMap",
@@ -261,8 +260,7 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 					},
 				},
 			},
-			envVars: []v1.EnvVar{},
-			err:     fmt.Errorf("could not read PodEnvironmentConfigMap: NotFound"),
+			err: fmt.Errorf("could not read PodEnvironmentConfigMap: NotFound"),
 		},
 		{
 			subTest: "Pod environment vars configured by PodEnvironmentConfigMap",
@@ -326,7 +324,6 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 	}{
 		{
 			subTest: "No PodEnvironmentSecret configured",
-			envVars: []v1.EnvVar{},
 		},
 		{
 			subTest: "Secret referenced by PodEnvironmentSecret does not exist",
@@ -337,8 +334,7 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
 			},
-			envVars: []v1.EnvVar{},
-			err:     fmt.Errorf("could not read Secret PodEnvironmentSecretName: still failing after %d retries: secret.core %q not found", maxRetries, testPodEnvironmentObjectNotExists),
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: still failing after %d retries: secret.core %q not found", maxRetries, testPodEnvironmentObjectNotExists),
 		},
 		{
 			subTest: "API error during PodEnvironmentSecret retrieval",
@@ -349,8 +345,7 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
 			},
-			envVars: []v1.EnvVar{},
-			err:     fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret API error"),
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret API error"),
 		},
 		{
 			subTest: "Pod environment vars reference all keys from secret configured by PodEnvironmentSecret",
@@ -941,6 +936,79 @@ func TestCloneEnv(t *testing.T) {
 		if env.Value != tt.env.Value {
 			t.Errorf("%s %s: Expected env value %s, have %s instead",
 				testName, tt.subTest, tt.env.Value, env.Value)
+		}
+	}
+}
+
+func TestAppendEnvVar(t *testing.T) {
+	testName := "TestAppendEnvVar"
+	tests := []struct {
+		subTest      string
+		envs         []v1.EnvVar
+		envsToAppend []v1.EnvVar
+		expectedSize int
+	}{
+		{
+			subTest: "append two variables - one with same key that should get rejected",
+			envs: []v1.EnvVar{
+				{
+					Name:  "CUSTOM_VARIABLE",
+					Value: "test",
+				},
+			},
+			envsToAppend: []v1.EnvVar{
+				{
+					Name:  "CUSTOM_VARIABLE",
+					Value: "new-test",
+				},
+				{
+					Name:  "ANOTHER_CUSTOM_VARIABLE",
+					Value: "another-test",
+				},
+			},
+			expectedSize: 2,
+		},
+		{
+			subTest: "append empty slice",
+			envs: []v1.EnvVar{
+				{
+					Name:  "CUSTOM_VARIABLE",
+					Value: "test",
+				},
+			},
+			envsToAppend: []v1.EnvVar{},
+			expectedSize: 1,
+		},
+		{
+			subTest: "append nil",
+			envs: []v1.EnvVar{
+				{
+					Name:  "CUSTOM_VARIABLE",
+					Value: "test",
+				},
+			},
+			envsToAppend: nil,
+			expectedSize: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		finalEnvs := appendEnvVars(tt.envs, tt.envsToAppend...)
+
+		if len(finalEnvs) != tt.expectedSize {
+			t.Errorf("%s %s: expected %d env variables, got %d",
+				testName, tt.subTest, tt.expectedSize, len(finalEnvs))
+		}
+
+		for _, env := range tt.envs {
+			for _, finalEnv := range finalEnvs {
+				if env.Name == finalEnv.Name {
+					if env.Value != finalEnv.Value {
+						t.Errorf("%s %s: expected env value %s of variable %s, got %s instead",
+							testName, tt.subTest, env.Value, env.Name, finalEnv.Value)
+					}
+				}
+			}
 		}
 	}
 }

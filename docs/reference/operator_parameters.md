@@ -648,7 +648,7 @@ yet officially supported.
   AWS region used to store EBS volumes. The default is `eu-central-1`. Note,
   this option is not meant for specifying the AWS region for backups and
   restore, since it can be separate from the EBS region. You have to define
-  AWS_REGION as a [custom environment variable](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#custom-pod-environment-variables).
+  AWS_REGION as a [custom environment variable](../administrator.md#custom-pod-environment-variables).
 
 * **additional_secret_mount**
   Additional Secret (aws or gcp credentials) to mount in the pod.

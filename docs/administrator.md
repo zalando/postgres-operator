@@ -603,9 +603,9 @@ spec:
 
 The operator will assign a set of environment variables to the database pods
 that cannot be overridden to guarantee core functionality. Only variables with
-'WAL_' and 'LOG_' prefixes can be customized, to allow backup and log shipping
-to be specified differently. There are three ways to specify extra environment
-variables (or override existing ones) for database pods:
+'WAL_' and 'LOG_' prefixes can be customized to allow for backup and log
+shipping to be specified differently. There are three ways to specify extra
+environment variables (or override existing ones) for database pods:
 
 * [Via ConfigMap](#via-configmap)
 * [Via Secret](#via-secret)
@@ -975,7 +975,7 @@ generated automatically. `WALG_S3_PREFIX` is identical to `WALE_S3_PREFIX`.
 `SCOPE` is the Postgres cluster name.
 
 :warning: If both `AWS_REGION` and `AWS_ENDPOINT` or `WALE_S3_ENDPOINT` are
-defined, backups with WAL-E will fail. You can fix it by switching to WAL-G
+defined backups with WAL-E will fail. You can fix it by switching to WAL-G
 with `USE_WALG_BACKUP: "true"`.
 
 ### Google Cloud Platform setup

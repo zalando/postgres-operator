@@ -937,14 +937,14 @@ func (c *Cluster) generateSpiloPodEnvVars(
 }
 
 func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
-	jenvs := envs
+	collectedEnvs := envs
 	for _, env := range appEnv {
 		env.Name = strings.ToUpper(env.Name)
-		if !isEnvVarPresent(jenvs, env.Name) {
-			jenvs = append(jenvs, env)
+		if !isEnvVarPresent(collectedEnvs, env.Name) {
+			collectedEnvs = append(collectedEnvs, env)
 		}
 	}
-	return jenvs
+	return collectedEnvs
 }
 
 func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
@@ -961,7 +961,7 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	configMapPodEnvVarsList := make([]v1.EnvVar, 0)
 
 	if c.OpConfig.PodEnvironmentConfigMap.Name == "" {
-		return configMapPodEnvVarsList, nil
+		return nil, nil
 	}
 
 	cm, err := c.KubeClient.ConfigMaps(c.OpConfig.PodEnvironmentConfigMap.Namespace).Get(
@@ -977,7 +977,7 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 				metav1.GetOptions{})
 		}
 		if err != nil {
-			return configMapPodEnvVarsList, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
+			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
 		}
 	}
 
@@ -993,7 +993,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	secretPodEnvVarsList := make([]v1.EnvVar, 0)
 
 	if c.OpConfig.PodEnvironmentSecret == "" {
-		return secretPodEnvVarsList, nil
+		return nil, nil
 	}
 
 	secret := &v1.Secret{}
@@ -1019,7 +1019,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 		err = errors.Wrap(notFoundErr, err.Error())
 	}
 	if err != nil {
-		return secretPodEnvVarsList, errors.Wrap(err, "could not read Secret PodEnvironmentSecretName")
+		return nil, errors.Wrap(err, "could not read Secret PodEnvironmentSecretName")
 	}
 
 	for k := range secret.Data {
@@ -1859,7 +1859,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 				c.logger.Debugf("found WALAZStorageAccount %s - will set CLONE_AZURE_STORAGE_ACCOUNT", c.OpConfig.WALAZStorageAccount)
 				result = append(result, v1.EnvVar{Name: "CLONE_AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
 			} else {
-				c.logger.Error("cannot figure out S3 or GS bucket or AZ storage account. All are empty in config.")
+				c.logger.Error("cannot figure out S3 or GS bucket or AZ storage account. All options are empty in the config.")
 			}
 
 			// append suffix because WAL location name is not the whole path
@@ -1915,7 +1915,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	result := make([]v1.EnvVar, 0)
 
 	if description.StandbyHost != "" {
-		c.logger.Info("preparing standby streaming from remote primary")
+		c.logger.Info("standby cluster streaming from remote primary")
 		result = append(result, v1.EnvVar{
 			Name:  "STANDBY_HOST",
 			Value: description.StandbyHost,
@@ -1927,7 +1927,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 			})
 		}
 	} else {
-		c.logger.Info("preparing standby streaming from WAL location")
+		c.logger.Info("standby cluster streaming from WAL location")
 		if description.S3WalPath != "" {
 			result = append(result, v1.EnvVar{
 				Name:  "STANDBY_WALE_S3_PREFIX",
