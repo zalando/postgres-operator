@@ -275,7 +275,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	teamInfo, statusCode, err := c.teamsAPIClient.TeamInfo(teamID, token)
 
 	if err != nil {
-		if statusCode == 404 {
+		if statusCode == http.StatusNotFound {
 			c.logger.Warningf("could not get team info for team %q: %v", teamID, err)
 		} else {
 			return nil, fmt.Errorf("could not get team info for team %q: %v", teamID, err)
