@@ -872,6 +872,14 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_USE_CONFIGMAPS", Value: "true"})
 	}
 
+	if cloneDescription != nil && cloneDescription.ClusterName != "" {
+		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
+	}
+
+	if standbyDescription != nil {
+		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
+	}
+
 	// fetch cluster-specific variables that will override all subsequent global variables
 	if len(c.Spec.Env) > 0 {
 		envVars = appendEnvVars(envVars, c.Spec.Env...)
@@ -921,14 +929,6 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
-	}
-
-	if cloneDescription != nil && cloneDescription.ClusterName != "" {
-		opConfigEnvVars = append(opConfigEnvVars, c.generateCloneEnvironment(cloneDescription)...)
-	}
-
-	if c.Spec.StandbyCluster != nil {
-		opConfigEnvVars = append(opConfigEnvVars, c.generateStandbyEnvironment(standbyDescription)...)
 	}
 
 	envVars = appendEnvVars(envVars, opConfigEnvVars...)
@@ -1823,6 +1823,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 	cluster := description.ClusterName
 	result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
 	if description.EndTimestamp == "" {
+		c.logger.Infof("cloning with basebackup from %s", cluster)
 		// cloning with basebackup, make a connection string to the cluster to clone from
 		host, port := c.getClusterServiceConnectionParameters(cluster)
 		// TODO: make some/all of those constants
@@ -1844,67 +1845,48 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 				},
 			})
 	} else {
-		// cloning with S3, find out the bucket to clone
-		msg := "clone from S3 bucket"
-		c.logger.Info(msg, description.S3WalPath)
-
+		c.logger.Info("cloning from WAL location")
 		if description.S3WalPath == "" {
-			msg := "figure out which S3 bucket to use from env"
-			c.logger.Info(msg, description.S3WalPath)
+			c.logger.Info("no S3 WAL path defined - taking value from global config", description.S3WalPath)
 
 			if c.OpConfig.WALES3Bucket != "" {
-				envs := []v1.EnvVar{
-					{
-						Name:  "CLONE_WAL_S3_BUCKET",
-						Value: c.OpConfig.WALES3Bucket,
-					},
-				}
-				result = append(result, envs...)
+				c.logger.Debugf("found WALES3Bucket %s - will set CLONE_WAL_S3_BUCKET", c.OpConfig.WALES3Bucket)
+				result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 			} else if c.OpConfig.WALGSBucket != "" {
-				envs := []v1.EnvVar{
-					{
-						Name:  "CLONE_WAL_GS_BUCKET",
-						Value: c.OpConfig.WALGSBucket,
-					},
-					{
-						Name:  "CLONE_GOOGLE_APPLICATION_CREDENTIALS",
-						Value: c.OpConfig.GCPCredentials,
-					},
+				c.logger.Debugf("found WALGSBucket %s - will set CLONE_WAL_GS_BUCKET", c.OpConfig.WALGSBucket)
+				result = append(result, v1.EnvVar{Name: "CLONE_WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
+				if c.OpConfig.GCPCredentials != "" {
+					result = append(result, v1.EnvVar{Name: "CLONE_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 				}
-				result = append(result, envs...)
 			} else if c.OpConfig.WALAZStorageAccount != "" {
-				envs := []v1.EnvVar{
-					{
-						Name:  "CLONE_AZURE_STORAGE_ACCOUNT",
-						Value: c.OpConfig.WALAZStorageAccount,
-					},
-				}
-				result = append(result, envs...)
+				c.logger.Debugf("found WALAZStorageAccount %s - will set CLONE_AZURE_STORAGE_ACCOUNT", c.OpConfig.WALAZStorageAccount)
+				result = append(result, v1.EnvVar{Name: "CLONE_AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
 			} else {
-				c.logger.Error("Cannot figure out S3 or GS bucket. Both are empty.")
+				c.logger.Error("cannot figure out S3 or GS bucket or AZ storage account. All are empty in config.")
+				return result
 			}
+
+			// append suffix because WAL location name is not the whole path
+			result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(description.UID)})
+		} else {
+			c.logger.Debugf("use S3WalPath %s from the manifest", description.S3WalPath)
 
 			envs := []v1.EnvVar{
 				{
+					Name:  "CLONE_WALE_S3_PREFIX",
+					Value: description.S3WalPath,
+				},
+				{
 					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
-					Value: getBucketScopeSuffix(description.UID),
+					Value: "",
 				},
 			}
 
 			result = append(result, envs...)
-		} else {
-			msg := "use custom parsed S3WalPath %s from the manifest"
-			c.logger.Warningf(msg, description.S3WalPath)
-
-			result = append(result, v1.EnvVar{
-				Name:  "CLONE_WALE_S3_PREFIX",
-				Value: description.S3WalPath,
-			})
 		}
 
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 		if description.S3Endpoint != "" {
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
@@ -1937,7 +1919,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	result := make([]v1.EnvVar, 0)
 
 	if description.StandbyHost != "" {
-		// standby from remote primary
+		c.logger.Info("preparing standby streaming from remote primary")
 		result = append(result, v1.EnvVar{
 			Name:  "STANDBY_HOST",
 			Value: description.StandbyHost,
@@ -1949,30 +1931,20 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 			})
 		}
 	} else {
+		c.logger.Info("preparing standby streaming from WAL location")
 		if description.S3WalPath != "" {
-			// standby with S3, find out the bucket to setup standby
-			msg := "Standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
-			c.logger.Infof(msg, description.S3WalPath)
-
 			result = append(result, v1.EnvVar{
 				Name:  "STANDBY_WALE_S3_PREFIX",
 				Value: description.S3WalPath,
 			})
 		} else if description.GSWalPath != "" {
-			msg := "Standby from GS bucket using custom parsed GSWalPath from the manifest %s "
-			c.logger.Infof(msg, description.GSWalPath)
-
-			envs := []v1.EnvVar{
-				{
-					Name:  "STANDBY_WALE_GS_PREFIX",
-					Value: description.GSWalPath,
-				},
-				{
-					Name:  "STANDBY_GOOGLE_APPLICATION_CREDENTIALS",
-					Value: c.OpConfig.GCPCredentials,
-				},
-			}
-			result = append(result, envs...)
+			result = append(result, v1.EnvVar{
+				Name:  "STANDBY_WALE_GS_PREFIX",
+				Value: description.GSWalPath,
+			})
+		} else {
+			c.logger.Error("no WAL path specified in standby section")
+			return result
 		}
 
 		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})

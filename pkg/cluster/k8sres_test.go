@@ -185,9 +185,9 @@ func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOpt
 	secret := &v1.Secret{}
 	secret.Name = testPodEnvironmentSecretName
 	secret.Data = map[string][]byte{
-		"clone_s3_access_key_id": []byte("0123456789abcdef0123456789abcdef"),
-		"custom_variable":        []byte("secret-test"),
-		"s3_access_key_id":       []byte("0123456789abcdef0123456789abcdef"),
+		"clone_aws_access_key_id":                []byte("0123456789abcdef0123456789abcdef"),
+		"custom_variable":                        []byte("secret-test"),
+		"standby_google_application_credentials": []byte("0123456789abcdef0123456789abcdef"),
 	}
 	return secret, nil
 }
@@ -199,14 +199,12 @@ func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.Get
 	configmap := &v1.ConfigMap{}
 	configmap.Name = testPodEnvironmentConfigMapName
 	configmap.Data = map[string]string{
-		// hard-coded clone env variable, can be overridden
+		// hard-coded clone env variable, can set when not specified in manifest
 		"clone_aws_endpoint": "s3.eu-west-1.amazonaws.com",
 		// custom variable, can be overridden by c.Spec.Env
 		"custom_variable": "configmap-test",
 		// hard-coded env variable, can not be overridden
 		"kubernetes_scope_label": "pgaas",
-		// hard-coded standby env variable, can be overridden
-		"standby_wal_bucket_scope_prefix": "my-prefix",
 		// hard-coded env variable, can be overridden
 		"wal_s3_bucket": "global-s3-bucket-configmap",
 	}
@@ -289,10 +287,6 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 					Value: "pgaas",
 				},
 				{
-					Name:  "standby_wal_bucket_scope_prefix",
-					Value: "my-prefix",
-				},
-				{
 					Name:  "wal_s3_bucket",
 					Value: "global-s3-bucket-configmap",
 				},
@@ -369,13 +363,13 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			},
 			envVars: []v1.EnvVar{
 				{
-					Name: "clone_s3_access_key_id",
+					Name: "clone_aws_access_key_id",
 					ValueFrom: &v1.EnvVarSource{
 						SecretKeyRef: &v1.SecretKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
 								Name: testPodEnvironmentSecretName,
 							},
-							Key: "clone_s3_access_key_id",
+							Key: "clone_aws_access_key_id",
 						},
 					},
 				},
@@ -391,13 +385,13 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 					},
 				},
 				{
-					Name: "s3_access_key_id",
+					Name: "standby_google_application_credentials",
 					ValueFrom: &v1.EnvVarSource{
 						SecretKeyRef: &v1.SecretKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
 								Name: testPodEnvironmentSecretName,
 							},
-							Key: "s3_access_key_id",
+							Key: "standby_google_application_credentials",
 						},
 					},
 				},
@@ -512,7 +506,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 	expectedS3BucketConfigMap := []ExpectedValue{
 		{
-			envIndex:       18,
+			envIndex:       17,
 			envVarConstant: "WAL_S3_BUCKET",
 			envVarValue:    "global-s3-bucket-configmap",
 		},
@@ -552,18 +546,71 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			envVarValue:    "spec-env-test",
 		},
 	}
+	expectedCloneEnvSpec := []ExpectedValue{
+		{
+			envIndex:       16,
+			envVarConstant: "CLONE_WALE_S3_PREFIX",
+			envVarValue:    "s3://another-bucket",
+		},
+		{
+			envIndex:       17,
+			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "",
+		},
+		{
+			envIndex:       20,
+			envVarConstant: "CLONE_AWS_ENDPOINT",
+			envVarValue:    "s3.eu-central-1.amazonaws.com",
+		},
+	}
 	expectedCloneEnvConfigMap := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       16,
+			envVarConstant: "CLONE_WAL_S3_BUCKET",
+			envVarValue:    "global-s3-bucket",
+		},
+		{
+			envIndex:       17,
+			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    fmt.Sprintf("/%s", dummyUUID),
+		},
+		{
+			envIndex:       20,
 			envVarConstant: "CLONE_AWS_ENDPOINT",
 			envVarValue:    "s3.eu-west-1.amazonaws.com",
 		},
 	}
-	expectedStandbyEnvConfigMap := []ExpectedValue{
+	expectedCloneEnvSecret := []ExpectedValue{
 		{
-			envIndex:       17,
-			envVarConstant: "STANDBY_WAL_BUCKET_SCOPE_PREFIX",
-			envVarValue:    "my-prefix",
+			envIndex:       20,
+			envVarConstant: "CLONE_AWS_ACCESS_KEY_ID",
+			envVarValueRef: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: testPodEnvironmentSecretName,
+					},
+					Key: "clone_aws_access_key_id",
+				},
+			},
+		},
+	}
+	expectedStandbyEnvSecret := []ExpectedValue{
+		{
+			envIndex:       15,
+			envVarConstant: "STANDBY_WALE_GS_PREFIX",
+			envVarValue:    "gs://some/path/",
+		},
+		{
+			envIndex:       20,
+			envVarConstant: "STANDBY_GOOGLE_APPLICATION_CREDENTIALS",
+			envVarValueRef: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: testPodEnvironmentSecretName,
+					},
+					Key: "standby_google_application_credentials",
+				},
+			},
 		},
 	}
 
@@ -636,7 +683,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 						Name: testPodEnvironmentConfigMapName,
 					},
 				},
-				WALES3Bucket: "global-s3-bucket-configmap",
+				WALES3Bucket: "global-s3-bucket",
 			},
 			cloneDescription:   &acidv1.CloneDescription{},
 			standbyDescription: &acidv1.StandbyDescription{},
@@ -717,38 +764,76 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			},
 		},
 		{
-			subTest: "will override global CLONE_AWS_ENDPOINT parameter from pod environment config map",
+			subTest: "will set CLONE_ parameters from spec and not global config or pod environment config map",
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentConfigMap: spec.NamespacedName{
 						Name: testPodEnvironmentConfigMapName,
 					},
 				},
-				WALES3Bucket: "global-s3-bucket-configmap",
+				WALES3Bucket: "global-s3-bucket",
 			},
 			cloneDescription: &acidv1.CloneDescription{
 				ClusterName:  "test-cluster",
 				EndTimestamp: "somewhen",
-				UID:          "0000",
+				UID:          dummyUUID,
+				S3WalPath:    "s3://another-bucket",
+				S3Endpoint:   "s3.eu-central-1.amazonaws.com",
+			},
+			standbyDescription: &acidv1.StandbyDescription{},
+			expectedValues:     expectedCloneEnvSpec,
+		},
+		{
+			subTest: "will set CLONE_AWS_ENDPOINT parameter from pod environment config map",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentConfigMap: spec.NamespacedName{
+						Name: testPodEnvironmentConfigMapName,
+					},
+				},
+				WALES3Bucket: "global-s3-bucket",
+			},
+			cloneDescription: &acidv1.CloneDescription{
+				ClusterName:  "test-cluster",
+				EndTimestamp: "somewhen",
+				UID:          dummyUUID,
 			},
 			standbyDescription: &acidv1.StandbyDescription{},
 			expectedValues:     expectedCloneEnvConfigMap,
 		},
 		{
-			subTest: "will override global STANDBY_WAL_BUCKET_SCOPE_PREFIX parameter from pod environment config map",
+			subTest: "will set CLONE_AWS_ACCESS_KEY_ID parameter from pod environment secret",
 			opConfig: config.Config{
 				Resources: config.Resources{
-					PodEnvironmentConfigMap: spec.NamespacedName{
-						Name: testPodEnvironmentConfigMapName,
-					},
+					PodEnvironmentSecret:  testPodEnvironmentSecretName,
+					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
+					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
-				WALES3Bucket: "global-s3-bucket-configmap",
+				WALES3Bucket: "global-s3-bucket",
+			},
+			cloneDescription: &acidv1.CloneDescription{
+				ClusterName:  "test-cluster",
+				EndTimestamp: "somewhen",
+				UID:          dummyUUID,
+			},
+			standbyDescription: &acidv1.StandbyDescription{},
+			expectedValues:     expectedCloneEnvSecret,
+		},
+		{
+			subTest: "will set STANDBY_GOOGLE_APPLICATION_CREDENTIALS parameter from pod environment secret",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentSecret:  testPodEnvironmentSecretName,
+					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
+					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+				},
+				WALES3Bucket: "global-s3-bucket",
 			},
 			cloneDescription: &acidv1.CloneDescription{},
 			standbyDescription: &acidv1.StandbyDescription{
-				S3WalPath: "primary-bucket",
+				GSWalPath: "gs://some/path/",
 			},
-			expectedValues: expectedStandbyEnvConfigMap,
+			expectedValues: expectedStandbyEnvSecret,
 		},
 	}
 
@@ -880,18 +965,6 @@ func TestStandbyEnv(t *testing.T) {
 			},
 			envPos: 0,
 			envLen: 3,
-		},
-		{
-			subTest: "from custom gs path",
-			standbyOpts: &acidv1.StandbyDescription{
-				GSWalPath: "gs://some/path/",
-			},
-			env: v1.EnvVar{
-				Name:  "STANDBY_GOOGLE_APPLICATION_CREDENTIALS",
-				Value: "",
-			},
-			envPos: 1,
-			envLen: 4,
 		},
 		{
 			subTest: "ignore gs path if s3 is set",
