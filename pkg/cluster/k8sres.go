@@ -933,9 +933,6 @@ func (c *Cluster) generateSpiloPodEnvVars(
 
 	envVars = appendEnvVars(envVars, opConfigEnvVars...)
 
-	//sort.Slice(envVars,
-	//	func(i, j int) bool { return envVars[i].Name < envVars[j].Name })
-
 	return envVars
 }
 
@@ -1863,7 +1860,6 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 				result = append(result, v1.EnvVar{Name: "CLONE_AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
 			} else {
 				c.logger.Error("cannot figure out S3 or GS bucket or AZ storage account. All are empty in config.")
-				return result
 			}
 
 			// append suffix because WAL location name is not the whole path

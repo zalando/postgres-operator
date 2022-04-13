@@ -766,15 +766,16 @@ spec:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-minimal-cluster"
     timestamp: "2017-12-19T12:40:33+01:00"
-    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
 cluster will be cloned from S3, using the latest backup before the `timestamp`.
-Note, that a time zone is required for `timestamp` in the format of +00:00 which
-is UTC. You can specify the `s3_wal_path` of the source cluster or let the
-operator try to find it based on the configured `wal_[s3|gs]_bucket` and the
-specified `uid`. You can find the UID of the source cluster in its metadata:
+Note, that a time zone is required for `timestamp` in the format of `+00:00`
+which is UTC.
+
+The operator will try to find the WAL location based on the configured
+`wal_[s3|gs]_bucket` or `wal_az_storage_account` and the specified `uid`.
+You can find the UID of the source cluster in its metadata:
 
 ```yaml
 apiVersion: acid.zalan.do/v1
@@ -783,6 +784,14 @@ metadata:
   name: acid-minimal-cluster
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
+
+If your source cluster uses a WAL location different from the global
+configuration you can specify the full path under `s3_wal_path`. For
+[Google Cloud Plattform](administrator.md#google-cloud-platform-setup)
+or [Azure](administrator.md#azure-setup)
+it can only be set globally with [custom Pod environment variables](administrator.md#custom-pod-environment-variables)
+or locally in the Postgres manifest's [`env`]() section.
+
 
 For non AWS S3 following settings can be set to support cloning from other S3
 implementations:
@@ -793,6 +802,7 @@ spec:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-minimal-cluster"
     timestamp: "2017-12-19T12:40:33+01:00"
+    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
     s3_endpoint: https://s3.acme.org
     s3_access_key_id: 0123456789abcdef0123456789abcdef
     s3_secret_access_key: 0123456789abcdef0123456789abcdef
@@ -864,9 +874,8 @@ the PostgreSQL version between source and target cluster has to be the same.
 
 To start a cluster as standby, add the following `standby` section in the YAML
 file. You can stream changes from archived WAL files (AWS S3 or Google Cloud
-Storage) or from a remote primary where you specify the host address and port.
-If you leave out the port, Patroni will use `"5432"`. Only one option can be
-specfied in the manifest:
+Storage) or from a remote primary. Only one option can be specfied in the
+manifest:
 
 ```yaml
 spec:
@@ -874,11 +883,18 @@ spec:
     s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
+For GCS, you have to define STANDBY_GOOGLE_APPLICATION_CREDENTIALS as a
+[custom pod environment variable](administrator.md#custom-pod-environment-variables).
+It is not set from the config to allow for overridding.
+
 ```yaml
 spec:
   standby:
     gs_wal_path: "gs://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
+
+For a remote primry you specify the host address and optionally the port.
+If you leave out the port Patroni will use `"5432"`.
 
 ```yaml
 spec:
