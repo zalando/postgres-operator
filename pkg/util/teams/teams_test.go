@@ -162,7 +162,9 @@ func TestInfo(t *testing.T) {
 				if r.Header.Get("Authorization") != "Bearer "+token {
 					t.Errorf("authorization token is wrong or not provided")
 				}
-				w.WriteHeader(tc.inCode)
+				if tc.inTeam == "acid" {
+					w.WriteHeader(tc.inCode)
+				}
 				if _, err := fmt.Fprint(w, tc.in); err != nil {
 					t.Errorf("error writing teams api response %v", err)
 				}
