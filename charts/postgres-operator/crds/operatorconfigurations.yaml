@@ -91,6 +91,9 @@ spec:
               etcd_host:
                 type: string
                 default: ""
+              etcd3_host:
+                type: string
+                default: ""
               etcd3_username:
                 type: string
                 default: ""

@@ -97,6 +97,17 @@ Those are top-level keys, containing both leaf keys and groups.
   Patroni native Kubernetes support is used. The default is empty (use
   Kubernetes-native DCS).
 
+* **etcd3_host**
+  EtcdV3 connection string for Patroni defined as `host:port`. Not required when
+  Patroni native Kubernetes support is used. The default is empty (use
+  Kubernetes-native DCS).
+
+* **etcd3_username**
+  EtcdV3 username string for Patroni usage. 
+
+* **etcd3_password**
+  EtcdV3 password string for Patroni usage. 
+
 * **kubernetes_use_configmaps**
   Select if setup uses endpoints (default), or configmaps to manage leader when
   DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to

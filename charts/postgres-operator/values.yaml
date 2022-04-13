@@ -35,6 +35,12 @@ configGeneral:
   enable_spilo_wal_path_compat: false
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
+  # etcdv3 connection string for Patroni. Empty uses K8s-native DCS.
+  etcd3_host: ""
+  # etcdv3 username string for Patroni.
+  etcd3_username: ""
+  # etcdv3 password string for Patroni.
+  etcd3_password: ""
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: false
   # Spilo docker image

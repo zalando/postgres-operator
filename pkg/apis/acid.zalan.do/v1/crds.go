@@ -1094,6 +1094,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"etcd_host": {
 						Type: "string",
 					},
+					"etcd3_host": {
+						Type: "string",
+					},
 					"etcd3_username": {
 						Type: "string",
 					},

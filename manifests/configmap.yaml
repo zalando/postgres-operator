@@ -61,8 +61,9 @@ data:
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
-  # etcd3_username:
-  # etcd3_password:
+  etcd3_host: "my-release-etcd.default.svc.cluster.local"
+  etcd3_username: "root"
+  etcd3_password: "02WHs03KE1"
   external_traffic_policy: "Cluster"
   # gcp_credentials: ""
   # kubernetes_use_configmaps: "false"

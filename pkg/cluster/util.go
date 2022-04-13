@@ -555,11 +555,11 @@ func (c *Cluster) GetSpec() (*acidv1.Postgresql, error) {
 }
 
 func (c *Cluster) patroniUsesKubernetes() bool {
-	return c.OpConfig.EtcdHost == ""
+	return c.OpConfig.EtcdHost == "" && c.OpConfig.Etcd3Host == ""
 }
 
 func (c * Cluster) patroniUsesEtcdV3() bool {
-	return c.OpConfig.Etcd3Password != "" || c.OpConfig.Etcd3Username != "" 
+	return c.OpConfig.Etcd3Host != ""
 }
 
 func (c *Cluster) patroniKubernetesUseConfigMaps() bool {

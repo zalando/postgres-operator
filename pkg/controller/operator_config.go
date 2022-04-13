@@ -37,6 +37,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnablePgVersionEnvVar = fromCRD.EnablePgVersionEnvVar
 	result.EnableSpiloWalPathCompat = fromCRD.EnableSpiloWalPathCompat
 	result.EtcdHost = fromCRD.EtcdHost
+	result.Etcd3Host = fromCRD.Etcd3Host
 	result.Etcd3Username = fromCRD.Etcd3Username
 	result.Etcd3Password = fromCRD.Etcd3Password
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps

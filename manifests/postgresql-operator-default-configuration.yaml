@@ -12,6 +12,9 @@ configuration:
   # enable_shm_volume: true
   enable_spilo_wal_path_compat: false
   etcd_host: ""
+  etcd3_host: ""
+  etcd3_username: ""
+  etcd3_password: ""
   # kubernetes_use_configmaps: false
   max_instances: -1
   min_instances: -1
