@@ -961,7 +961,7 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	configMapPodEnvVarsList := make([]v1.EnvVar, 0)
 
 	if c.OpConfig.PodEnvironmentConfigMap.Name == "" {
-		return nil, nil
+		return configMapPodEnvVarsList, nil
 	}
 
 	cm, err := c.KubeClient.ConfigMaps(c.OpConfig.PodEnvironmentConfigMap.Namespace).Get(
@@ -993,7 +993,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	secretPodEnvVarsList := make([]v1.EnvVar, 0)
 
 	if c.OpConfig.PodEnvironmentSecret == "" {
-		return nil, nil
+		return secretPodEnvVarsList, nil
 	}
 
 	secret := &v1.Secret{}
@@ -1298,7 +1298,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	sidecarContainers, conflicts := mergeContainers(clusterSpecificSidecars, c.Config.OpConfig.SidecarContainers, globalSidecarContainersByDockerImage, scalyrSidecars)
 	for containerName := range conflicts {
-		c.logger.Warningf("a sidecar is specified twice. Ignoring sidecar %q in favor of %q with high a precendence",
+		c.logger.Warningf("a sidecar is specified twice. Ignoring sidecar %q in favor of %q with high a precedence",
 			containerName, containerName)
 	}
 

@@ -786,7 +786,7 @@ metadata:
 
 If your source cluster uses a WAL location different from the global
 configuration you can specify the full path under `s3_wal_path`. For
-[Google Cloud Plattform](administrator.md#google-cloud-platform-setup)
+[Google Cloud Platform](administrator.md#google-cloud-platform-setup)
 or [Azure](administrator.md#azure-setup)
 it can only be set globally with [custom Pod environment variables](administrator.md#custom-pod-environment-variables)
 or locally in the Postgres manifest's [`env`](administrator.md#via-postgres-cluster-manifest) section.
@@ -801,7 +801,7 @@ spec:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-minimal-cluster"
     timestamp: "2017-12-19T12:40:33+01:00"
-    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
+    s3_wal_path: "s3://custom/path/to/bucket"
     s3_endpoint: https://s3.acme.org
     s3_access_key_id: 0123456789abcdef0123456789abcdef
     s3_secret_access_key: 0123456789abcdef0123456789abcdef
@@ -892,7 +892,7 @@ spec:
     gs_wal_path: "gs://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
-For a remote primry you specify the host address and optionally the port.
+For a remote primary you specify the host address and optionally the port.
 If you leave out the port Patroni will use `"5432"`.
 
 ```yaml

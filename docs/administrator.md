@@ -623,8 +623,9 @@ individual backup locations for each of your clusters. Or you want to disable
 WAL archiving for a certain cluster by setting `WAL_S3_BUCKET`, `WAL_GS_BUCKET`
 or `AZURE_STORAGE_ACCOUNT` to an empty string.
 
-The operator will give precendence to environment variables in the following
-order:
+The operator will give precedence to environment variables in the following
+order (e.g. a variable defined in 4. overrides a variable with the same name
+in 5.):
 
 1. Assigned by the operator
 2. Clone section (with WAL settings from operator config when `s3_wal_path` is empty)
