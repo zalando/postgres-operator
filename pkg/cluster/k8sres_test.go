@@ -250,6 +250,7 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 	}{
 		{
 			subTest: "no PodEnvironmentConfigMap",
+			envVars: []v1.EnvVar{},
 		},
 		{
 			subTest: "missing PodEnvironmentConfigMap",
@@ -324,6 +325,7 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 	}{
 		{
 			subTest: "No PodEnvironmentSecret configured",
+			envVars: []v1.EnvVar{},
 		},
 		{
 			subTest: "Secret referenced by PodEnvironmentSecret does not exist",
