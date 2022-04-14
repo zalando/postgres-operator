@@ -194,8 +194,8 @@ type mockTeamsAPIClient struct {
 	members []string
 }
 
-func (m *mockTeamsAPIClient) TeamInfo(teamID, token string) (tm *teams.Team, err error) {
-	return &teams.Team{Members: m.members}, nil
+func (m *mockTeamsAPIClient) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
+	return &teams.Team{Members: m.members}, statusCode, nil
 }
 
 func (m *mockTeamsAPIClient) setMembers(members []string) {
@@ -260,15 +260,15 @@ type mockTeamsAPIClientMultipleTeams struct {
 	teams []mockTeam
 }
 
-func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *teams.Team, err error) {
+func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
 	for _, team := range m.teams {
 		if team.teamID == teamID {
-			return &teams.Team{Members: team.members}, nil
+			return &teams.Team{Members: team.members}, statusCode, nil
 		}
 	}
 
 	// should not be reached if a slice with teams is populated correctly
-	return nil, nil
+	return nil, statusCode, nil
 }
 
 // Test adding members of maintenance teams that get superuser rights for all PG databases
