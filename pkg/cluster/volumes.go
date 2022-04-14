@@ -137,7 +137,6 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 		for _, s := range errors {
 			c.logger.Warningf(s)
 		}
-		// c.logger.Errorf("failed to modify %d of %d volumes", len(c.EBSVolumes), len(errors))
 	}
 	return nil
 }
@@ -149,7 +148,11 @@ func (c *Cluster) populateVolumeMetaData() error {
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
-	c.logger.Debugf("found %d volumes, size of known volumes %d", len(pvs), len(c.EBSVolumes))
+	if len(pvs) == 0 {
+		c.EBSVolumes = make(map[string]volumes.VolumeProperties)
+		return fmt.Errorf("no persistent volumes found")
+	}
+	c.logger.Debugf("found %d persistent volumes, size of known volumes %d", len(pvs), len(c.EBSVolumes))
 
 	volumeIds := []string{}
 	var volumeID string
@@ -167,7 +170,7 @@ func (c *Cluster) populateVolumeMetaData() error {
 		return err
 	}
 
-	if len(currentVolumes) != len(c.EBSVolumes) {
+	if len(currentVolumes) != len(c.EBSVolumes) && len(c.EBSVolumes) > 0 {
 		c.logger.Debugf("number of ebs volumes (%d) discovered differs from already known volumes (%d)", len(currentVolumes), len(c.EBSVolumes))
 	}
 
@@ -205,7 +208,7 @@ func (c *Cluster) syncVolumeClaims() error {
 
 // syncVolumes reads all persistent volumes and checks that their size matches the one declared in the statefulset.
 func (c *Cluster) syncEbsVolumes() error {
-	c.setProcessName("syncing EBS and Claims volumes")
+	c.setProcessName("syncing EBS volumes")
 
 	act, err := c.volumesNeedResizing()
 	if err != nil {
@@ -451,11 +454,6 @@ func quantityToGigabyte(q resource.Quantity) int64 {
 }
 
 func (c *Cluster) executeEBSMigration() error {
-	if !c.OpConfig.EnableEBSGp3Migration {
-		return nil
-	}
-	c.logger.Infof("starting EBS gp2 to gp3 migration")
-
 	pvs, err := c.listPersistentVolumes()
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
