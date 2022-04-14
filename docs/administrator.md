@@ -601,15 +601,39 @@ spec:
 
 ## Custom Pod Environment Variables
 
-It is possible to configure a ConfigMap as well as a Secret which are used by
-the Postgres pods as an additional provider for environment variables. One use
-case is a customized Spilo image configured by extra environment variables.
-Another case could be to provide custom cloud provider or backup settings.
+The operator will assign a set of environment variables to the database pods
+that cannot be overridden to guarantee core functionality. Only variables with
+'WAL_' and 'LOG_' prefixes can be customized to allow for backup and log
+shipping to be specified differently. There are three ways to specify extra
+environment variables (or override existing ones) for database pods:
 
-In general the Operator will give preference to the globally configured
-variables, to not have the custom ones interfere with core functionality.
-Variables with the 'WAL_' and 'LOG_' prefix can be overwritten though, to
-allow backup and log shipping to be specified differently.
+* [Via ConfigMap](#via-configmap)
+* [Via Secret](#via-secret)
+* [Via Postgres Cluster Manifest](#via-postgres-cluster-manifest)
+
+The first two options must be referenced from the operator configuration
+making them global settings for all Postgres cluster the operator watches.
+One use case is a customized Spilo image that must be configured by extra
+environment variables. Another case could be to provide custom cloud
+provider or backup settings.
+
+The last options allows for specifying environment variables individual to
+every cluster via the `env` section in the manifest. For example, if you use
+individual backup locations for each of your clusters. Or you want to disable
+WAL archiving for a certain cluster by setting `WAL_S3_BUCKET`, `WAL_GS_BUCKET`
+or `AZURE_STORAGE_ACCOUNT` to an empty string.
+
+The operator will give precedence to environment variables in the following
+order (e.g. a variable defined in 4. overrides a variable with the same name
+in 5.):
+
+1. Assigned by the operator
+2. Clone section (with WAL settings from operator config when `s3_wal_path` is empty)
+3. Standby section
+4. `env` section in cluster manifest
+5. Pod environment secret via operator config
+6. Pod environment config map via operator config
+7. WAL and logical backup settings from operator config
 
 ### Via ConfigMap
 
@@ -706,7 +730,7 @@ data:
 The key-value pairs of the Secret are all accessible as environment variables
 to the Postgres StatefulSet/pods.
 
-### For individual cluster
+### Via Postgres Cluster Manifest
 
 It is possible to define environment variables directly in the Postgres cluster
 manifest to configure it individually. The variables must be listed under the
@@ -950,6 +974,10 @@ the physical backups on restore (next chapter).
 When the `AWS_REGION` is set, `AWS_ENDPOINT` and `WALE_S3_ENDPOINT` are
 generated automatically. `WALG_S3_PREFIX` is identical to `WALE_S3_PREFIX`.
 `SCOPE` is the Postgres cluster name.
+
+:warning: If both `AWS_REGION` and `AWS_ENDPOINT` or `WALE_S3_ENDPOINT` are
+defined backups with WAL-E will fail. You can fix it by switching to WAL-G
+with `USE_WALG_BACKUP: "true"`.
 
 ### Google Cloud Platform setup
 
