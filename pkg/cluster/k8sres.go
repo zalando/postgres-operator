@@ -1118,7 +1118,7 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 func generateSpiloReadinessProbe() *v1.Probe {
 	return &v1.Probe{
 		FailureThreshold: 3,
-		Handler: v1.Handler{
+		ProbeHandler: v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path:   "/readiness",
 				Port:   intstr.IntOrString{IntVal: patroni.ApiPort},
