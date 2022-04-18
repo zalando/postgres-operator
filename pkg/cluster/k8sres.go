@@ -67,9 +67,22 @@ type pgBootstrap struct {
 	DCS    patroniDCS        `json:"dcs,omitempty"`
 }
 
+type patroniLog struct {
+	Level          string   `json:"level,omitempty"`
+	TracebackLevel string   `json:"traceback_level,omitempty"`
+	Format         string   `json:"format,omitempty"`
+	Dateformat     string   `json:"dateformat,omitempty"`
+	MaxQueueSize   string   `json:"max_queue_size,omitempty"`
+	Dir            string   `json:"dir,omitempty"`
+	FileNum        string   `json:"file_num,omitempty"`
+	FileSize       string   `json:"file_size,omitempty"`
+	Loggers        []string `json:"loggers,omitempty"`
+}
+
 type spiloConfiguration struct {
 	PgLocalConfiguration map[string]interface{} `json:"postgresql"`
 	Bootstrap            pgBootstrap            `json:"bootstrap"`
+	Log                  *patroniLog            `json:"log,omitempty"`
 }
 
 func (c *Cluster) statefulSetName() string {
@@ -343,6 +356,36 @@ PatroniInitDBParams:
 	}
 	if patroni.SynchronousNodeCount >= 1 {
 		config.Bootstrap.DCS.SynchronousNodeCount = patroni.SynchronousNodeCount
+	}
+	if patroni.Log != nil {
+		config.Log = &patroniLog{}
+		if patroni.Log.Level != nil {
+			config.Log.Level = *patroni.Log.Level
+		}
+		if patroni.Log.TracebackLevel != nil {
+			config.Log.TracebackLevel = *patroni.Log.TracebackLevel
+		}
+		if patroni.Log.Format != nil {
+			config.Log.Format = *patroni.Log.Format
+		}
+		if patroni.Log.Dateformat != nil {
+			config.Log.Dateformat = *patroni.Log.Dateformat
+		}
+		if patroni.Log.MaxQueueSize != nil {
+			config.Log.MaxQueueSize = *patroni.Log.MaxQueueSize
+		}
+		if patroni.Log.Dir != nil {
+			config.Log.Dir = *patroni.Log.Dir
+		}
+		if patroni.Log.FileNum != nil {
+			config.Log.FileNum = *patroni.Log.FileNum
+		}
+		if patroni.Log.FileSize != nil {
+			config.Log.FileSize = *patroni.Log.FileSize
+		}
+		if patroni.Log.Loggers != nil {
+			config.Log.Loggers = patroni.Log.Loggers
+		}
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})

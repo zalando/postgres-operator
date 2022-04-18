@@ -322,6 +322,29 @@ spec:
                     type: object
                     additionalProperties:
                       type: string
+                  log:
+                    type: object
+                    properties:
+                      level:
+                        type: string
+                      traceback_level:
+                        type: string
+                      format:
+                        type: string
+                      dateformat:
+                        type: string
+                      max_queue_size:
+                        type: string
+                      dir:
+                        type: string
+                      file_num:
+                        type: string
+                      file_size:
+                        type: string
+                      loggers:
+                        type: array
+                        items:
+                          type: string
                   loop_wait:
                     type: integer
                   maximum_lag_on_failover:

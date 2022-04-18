@@ -157,6 +157,19 @@ type Resources struct {
 	ResourceLimits   ResourceDescription `json:"limits,omitempty"`
 }
 
+// PatroniLog contains Patroni-specific log configuration
+type PatroniLog struct {
+	Level          *string  `json:"level,omitempty"`
+	TracebackLevel *string  `json:"traceback_level,omitempty"`
+	Format         *string  `json:"format,omitempty"`
+	Dateformat     *string  `json:"dateformat,omitempty"`
+	MaxQueueSize   *string  `json:"max_queue_size,omitempty"`
+	Dir            *string  `json:"dir,omitempty"`
+	FileNum        *string  `json:"file_num,omitempty"`
+	FileSize       *string  `json:"file_size,omitempty"`
+	Loggers        []string `json:"loggers,omitempty"`
+}
+
 // Patroni contains Patroni-specific configuration
 type Patroni struct {
 	InitDB                map[string]string            `json:"initdb,omitempty"`
@@ -169,6 +182,7 @@ type Patroni struct {
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
 	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:"1"`
+	Log                   *PatroniLog                  `json:"log,omitempty"`
 }
 
 // StandbyDescription contains remote primary config or s3/gs wal path
