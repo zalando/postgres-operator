@@ -69,7 +69,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
-	if c.OpConfig.EnableEBSGp3Migration {
+	if c.OpConfig.EnableEBSGp3Migration && len(c.EBSVolumes) > 0 {
 		err = c.executeEBSMigration()
 		if nil != err {
 			return err
