@@ -961,8 +961,13 @@ def get_operator_get_logs(worker: int):
 @app.route('/operator/clusters/<namespace>/<cluster>/logs')
 @authorize
 def get_operator_get_logs_per_cluster(namespace: str, cluster: str):
-    team, clustername = cluster.split('-', 1)
-    return proxy_operator(f'/clusters/{team}/{namespace}/{clustername}/logs/')
+    user_teams = get_teams_for_user(session.get('user_name', ''))
+    for user_team in user_teams:
+        if cluster.find(user_team) == 0:
+            team = cluster[:len(user_team)]
+            cluster_name = cluster[len(user_team)+1:]
+            break
+    return proxy_operator(f'/clusters/{team}/{namespace}/{cluster_name}/logs/')
 
 
 @app.route('/login')
