@@ -766,9 +766,10 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	uid types.UID,
 	spiloConfiguration string,
 	cloneDescription *acidv1.CloneDescription,
-	standbyDescription *acidv1.StandbyDescription,
-	customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+	standbyDescription *acidv1.StandbyDescription) []v1.EnvVar {
 
+	// hard-coded set of environment variables we need
+	// to guarantee core functionality of the operator
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -881,59 +882,75 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
 
-	if c.Spec.StandbyCluster != nil {
+	if standbyDescription != nil {
 		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
 	}
 
+	// fetch cluster-specific variables that will override all subsequent global variables
 	if len(c.Spec.Env) > 0 {
 		envVars = appendEnvVars(envVars, c.Spec.Env...)
 	}
 
-	// add vars taken from pod_environment_configmap and pod_environment_secret first
-	// (to allow them to override the globals set in the operator config)
-	if len(customPodEnvVarsList) > 0 {
-		envVars = appendEnvVars(envVars, customPodEnvVarsList...)
+	// fetch variables from custom environment Secret
+	// that will override all subsequent global variables
+	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
+	if err != nil {
+		c.logger.Warningf("%v", err)
 	}
+	envVars = appendEnvVars(envVars, secretEnvVarsList...)
 
+	// fetch variables from custom environment ConfigMap
+	// that will override all subsequent global variables
+	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
+	if err != nil {
+		c.logger.Warningf("%v", err)
+	}
+	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
+
+	// global variables derived from operator configuration
+	opConfigEnvVars := make([]v1.EnvVar, 0)
 	if c.OpConfig.WALES3Bucket != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALGSBucket != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALAZStorageAccount != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.GCPCredentials != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 	}
 
 	if c.OpConfig.LogS3Bucket != "" {
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = appendEnvVars(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
+
+	envVars = appendEnvVars(envVars, opConfigEnvVars...)
 
 	return envVars
 }
 
 func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
-	jenvs := envs
+	collectedEnvs := envs
 	for _, env := range appEnv {
-		if !isEnvVarPresent(jenvs, env.Name) {
-			jenvs = append(jenvs, env)
+		env.Name = strings.ToUpper(env.Name)
+		if !isEnvVarPresent(collectedEnvs, env.Name) {
+			collectedEnvs = append(collectedEnvs, env)
 		}
 	}
-	return jenvs
+	return collectedEnvs
 }
 
 func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
@@ -969,9 +986,11 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
 		}
 	}
+
 	for k, v := range cm.Data {
 		configMapPodEnvVarsList = append(configMapPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
 	}
+	sort.Slice(configMapPodEnvVarsList, func(i, j int) bool { return configMapPodEnvVarsList[i].Name < configMapPodEnvVarsList[j].Name })
 	return configMapPodEnvVarsList, nil
 }
 
@@ -1021,6 +1040,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 			}})
 	}
 
+	sort.Slice(secretPodEnvVarsList, func(i, j int) bool { return secretPodEnvVarsList[i].Name < secretPodEnvVarsList[j].Name })
 	return secretPodEnvVarsList, nil
 }
 
@@ -1110,23 +1130,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers = spec.InitContainers
 	}
 
-	// fetch env vars from custom ConfigMap
-	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
-	if err != nil {
-		return nil, err
-	}
-
-	// fetch env vars from custom ConfigMap
-	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
-	if err != nil {
-		return nil, err
-	}
-
-	// concat all custom pod env vars and sort them
-	customPodEnvVarsList := append(configMapEnvVarsList, secretEnvVarsList...)
-	sort.Slice(customPodEnvVarsList,
-		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
-
 	// backward compatible check for InitContainers
 	if spec.InitContainersOld != nil {
 		msg := "manifest parameter init_containers is deprecated."
@@ -1159,9 +1162,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.Postgresql.GetUID(),
 		spiloConfiguration,
 		spec.Clone,
-		spec.StandbyCluster,
-		customPodEnvVarsList,
-	)
+		spec.StandbyCluster)
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
@@ -1303,7 +1304,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	sidecarContainers, conflicts := mergeContainers(clusterSpecificSidecars, c.Config.OpConfig.SidecarContainers, globalSidecarContainersByDockerImage, scalyrSidecars)
 	for containerName := range conflicts {
-		c.logger.Warningf("a sidecar is specified twice. Ignoring sidecar %q in favor of %q with high a precendence",
+		c.logger.Warningf("a sidecar is specified twice. Ignoring sidecar %q in favor of %q with high a precedence",
 			containerName, containerName)
 	}
 
@@ -1825,6 +1826,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 	cluster := description.ClusterName
 	result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
 	if description.EndTimestamp == "" {
+		c.logger.Infof("cloning with basebackup from %s", cluster)
 		// cloning with basebackup, make a connection string to the cluster to clone from
 		host, port := c.getClusterServiceConnectionParameters(cluster)
 		// TODO: make some/all of those constants
@@ -1846,67 +1848,47 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 				},
 			})
 	} else {
-		// cloning with S3, find out the bucket to clone
-		msg := "clone from S3 bucket"
-		c.logger.Info(msg, description.S3WalPath)
-
+		c.logger.Info("cloning from WAL location")
 		if description.S3WalPath == "" {
-			msg := "figure out which S3 bucket to use from env"
-			c.logger.Info(msg, description.S3WalPath)
+			c.logger.Info("no S3 WAL path defined - taking value from global config", description.S3WalPath)
 
 			if c.OpConfig.WALES3Bucket != "" {
-				envs := []v1.EnvVar{
-					{
-						Name:  "CLONE_WAL_S3_BUCKET",
-						Value: c.OpConfig.WALES3Bucket,
-					},
-				}
-				result = append(result, envs...)
+				c.logger.Debugf("found WALES3Bucket %s - will set CLONE_WAL_S3_BUCKET", c.OpConfig.WALES3Bucket)
+				result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 			} else if c.OpConfig.WALGSBucket != "" {
-				envs := []v1.EnvVar{
-					{
-						Name:  "CLONE_WAL_GS_BUCKET",
-						Value: c.OpConfig.WALGSBucket,
-					},
-					{
-						Name:  "CLONE_GOOGLE_APPLICATION_CREDENTIALS",
-						Value: c.OpConfig.GCPCredentials,
-					},
+				c.logger.Debugf("found WALGSBucket %s - will set CLONE_WAL_GS_BUCKET", c.OpConfig.WALGSBucket)
+				result = append(result, v1.EnvVar{Name: "CLONE_WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
+				if c.OpConfig.GCPCredentials != "" {
+					result = append(result, v1.EnvVar{Name: "CLONE_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 				}
-				result = append(result, envs...)
 			} else if c.OpConfig.WALAZStorageAccount != "" {
-				envs := []v1.EnvVar{
-					{
-						Name:  "CLONE_AZURE_STORAGE_ACCOUNT",
-						Value: c.OpConfig.WALAZStorageAccount,
-					},
-				}
-				result = append(result, envs...)
+				c.logger.Debugf("found WALAZStorageAccount %s - will set CLONE_AZURE_STORAGE_ACCOUNT", c.OpConfig.WALAZStorageAccount)
+				result = append(result, v1.EnvVar{Name: "CLONE_AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
 			} else {
-				c.logger.Error("Cannot figure out S3 or GS bucket. Both are empty.")
+				c.logger.Error("cannot figure out S3 or GS bucket or AZ storage account. All options are empty in the config.")
 			}
+
+			// append suffix because WAL location name is not the whole path
+			result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(description.UID)})
+		} else {
+			c.logger.Debugf("use S3WalPath %s from the manifest", description.S3WalPath)
 
 			envs := []v1.EnvVar{
 				{
+					Name:  "CLONE_WALE_S3_PREFIX",
+					Value: description.S3WalPath,
+				},
+				{
 					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
-					Value: getBucketScopeSuffix(description.UID),
+					Value: "",
 				},
 			}
 
 			result = append(result, envs...)
-		} else {
-			msg := "use custom parsed S3WalPath %s from the manifest"
-			c.logger.Warningf(msg, description.S3WalPath)
-
-			result = append(result, v1.EnvVar{
-				Name:  "CLONE_WALE_S3_PREFIX",
-				Value: description.S3WalPath,
-			})
 		}
 
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 		if description.S3Endpoint != "" {
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
@@ -1939,7 +1921,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	result := make([]v1.EnvVar, 0)
 
 	if description.StandbyHost != "" {
-		// standby from remote primary
+		c.logger.Info("standby cluster streaming from remote primary")
 		result = append(result, v1.EnvVar{
 			Name:  "STANDBY_HOST",
 			Value: description.StandbyHost,
@@ -1951,30 +1933,20 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 			})
 		}
 	} else {
+		c.logger.Info("standby cluster streaming from WAL location")
 		if description.S3WalPath != "" {
-			// standby with S3, find out the bucket to setup standby
-			msg := "Standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
-			c.logger.Infof(msg, description.S3WalPath)
-
 			result = append(result, v1.EnvVar{
 				Name:  "STANDBY_WALE_S3_PREFIX",
 				Value: description.S3WalPath,
 			})
 		} else if description.GSWalPath != "" {
-			msg := "Standby from GS bucket using custom parsed GSWalPath from the manifest %s "
-			c.logger.Infof(msg, description.GSWalPath)
-
-			envs := []v1.EnvVar{
-				{
-					Name:  "STANDBY_WALE_GS_PREFIX",
-					Value: description.GSWalPath,
-				},
-				{
-					Name:  "STANDBY_GOOGLE_APPLICATION_CREDENTIALS",
-					Value: c.OpConfig.GCPCredentials,
-				},
-			}
-			result = append(result, envs...)
+			result = append(result, v1.EnvVar{
+				Name:  "STANDBY_WALE_GS_PREFIX",
+				Value: description.GSWalPath,
+			})
+		} else {
+			c.logger.Error("no WAL path specified in standby section")
+			return result
 		}
 
 		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})

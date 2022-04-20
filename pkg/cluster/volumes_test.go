@@ -224,7 +224,10 @@ func TestMigrateEBS(t *testing.T) {
 	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	cluster.VolumeResizer = resizer
-	cluster.executeEBSMigration()
+	err := cluster.populateVolumeMetaData()
+	assert.NoError(t, err)
+	err = cluster.executeEBSMigration()
+	assert.NoError(t, err)
 }
 
 func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustername string, labels labels.Set, volumes []testVolume) {

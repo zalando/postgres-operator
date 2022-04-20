@@ -122,7 +122,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.7.1"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.8.0"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
 	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
@@ -164,7 +164,7 @@ type Config struct {
 	Etcd3Host                string           `name:"etcd3_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
 	Etcd3Username           string            `name:"etcd3_username"`
 	Etcd3Password           string            `name:"etcd3_password"`
-	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-14:2.1-p4"`
+	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-14:2.1-p5"`
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
