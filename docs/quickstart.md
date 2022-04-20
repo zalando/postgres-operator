@@ -85,19 +85,24 @@ oc create -f manifests/operator-service-account-rbac-openshift.yaml
 
 ### Helm chart
 
-Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
-chart which saves you the manual steps. Clone this repo and change directory to
-the repo root. With Helm v3 installed you should be able to run:
+Alternatively, the operator can be installed by using the provided
+[Helm](https://helm.sh/) chart which saves you the manual steps. The charts
+for both the Postgres Operator and its UI are hosted via the `gh-pages` branch.
+They only work only with Helm v3. Helm v2 support was dropped with v1.8.0.
 
 ```bash
-helm install postgres-operator ./charts/postgres-operator
+# add repo for postgres-operator
+helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+
+# install the postgres-operator
+helm install postgres-operator postgres-operator-charts/postgres-operator
+
+# add repo for postgres-operator-ui
+helm repo add postgres-operator-ui-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui
+
+# install the postgres-operator-ui
+helm install postgres-operator-ui postgres-operator-ui-charts/postgres-operator-ui
 ```
-
-The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will
-be skipped with warning when using v3. Documentation for installing applications
-with Helm 2 can be found in the [v2 docs](https://v2.helm.sh/docs/).
-
-The chart is also hosted at: https://opensource.zalando.com/postgres-operator/charts/postgres-operator/
 
 ## Check if Postgres Operator is running
 
