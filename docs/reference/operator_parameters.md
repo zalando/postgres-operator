@@ -178,8 +178,8 @@ under the `users` key.
   `standby`.
 
 * **additional_owner_roles**
-  Specifies database roles that will become members of all database owners.
-  Then owners can use `SET ROLE` to obtain privileges of these roles to e.g.
+  Specifies database roles that will granted to all database owners. Owners
+  can then use `SET ROLE` to obtain privileges of these roles to e.g.
   create/update functionality from extensions as part of a migration script.
   Note, that roles listed here should be preconfigured in the docker image
   and already exist in the database cluster on startup. One such role can be

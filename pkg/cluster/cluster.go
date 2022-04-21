@@ -1308,28 +1308,15 @@ func (c *Cluster) initRobotUsers() error {
 }
 
 func (c *Cluster) initAdditionalOwnerRoles() {
-	for _, additionalOwner := range c.OpConfig.AdditionalOwnerRoles {
-		// fetch all database owners the additional should become a member of
-		memberOf := make([]string, 0)
-		for username, pgUser := range c.pgUsers {
-			if pgUser.IsDbOwner {
-				memberOf = append(memberOf, username)
-			}
-		}
+	if len(c.OpConfig.AdditionalOwnerRoles) == 0 {
+		return
+	}
 
-		if len(memberOf) > 0 {
-			namespace := c.Namespace
-			additionalOwnerPgUser := spec.PgUser{
-				Origin:    spec.RoleOriginSpilo,
-				MemberOf:  memberOf,
-				Name:      additionalOwner,
-				Namespace: namespace,
-			}
-			if currentRole, present := c.pgUsers[additionalOwner]; present {
-				c.pgUsers[additionalOwner] = c.resolveNameConflict(&currentRole, &additionalOwnerPgUser)
-			} else {
-				c.pgUsers[additionalOwner] = additionalOwnerPgUser
-			}
+	// fetch database owners and assign additional owner roles
+	for username, pgUser := range c.pgUsers {
+		if pgUser.IsDbOwner {
+			pgUser.MemberOf = append(pgUser.MemberOf, c.OpConfig.AdditionalOwnerRoles...)
+			c.pgUsers[username] = pgUser
 		}
 	}
 }

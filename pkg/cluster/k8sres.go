@@ -1649,7 +1649,7 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
-		if pgUser.Origin != spec.RoleOriginTeamsAPI && pgUser.Origin != spec.RoleOriginSpilo {
+		if pgUser.Origin != spec.RoleOriginTeamsAPI {
 			c.logger.Warningf("could not generate secret for a non-teamsAPI role %q: role has no password",
 				pgUser.Name)
 		}

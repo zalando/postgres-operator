@@ -161,7 +161,7 @@ class EndToEndTestCase(unittest.TestCase):
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_owner_roles(self):
         '''
-           Test adding additional member roles to existing database owner roles
+           Test granting additional roles to existing database owners
         '''
         k8s = self.k8s
 
@@ -181,10 +181,10 @@ class EndToEndTestCase(unittest.TestCase):
               FROM pg_catalog.pg_authid a
               JOIN pg_catalog.pg_auth_members am
                 ON a.oid = am.member
-               AND a.rolname = 'cron_admin'
+               AND a.rolname IN ('zalando', 'bar_owner', 'bar_data_owner')
               JOIN pg_catalog.pg_authid a2
                 ON a2.oid = am.roleid
-             WHERE a2.rolname IN ('zalando', 'bar_owner', 'bar_data_owner');
+             WHERE a2.rolname = 'cron_admin';
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", owner_query)), 3,
             "Not all additional users found in database", 10, 5)
