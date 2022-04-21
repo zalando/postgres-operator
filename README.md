@@ -17,15 +17,15 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Live volume resize without pod restarts (AWS EBS, PVC)
 * Database connection pooling with PGBouncer
 * Support fast in place major version upgrade to PG13. Supports global upgrade of all clusters.
-* Restore and cloning Postgres clusters (incl. major version upgrade)
-* Additionally logical backups to S3 bucket can be configured
-* Standby cluster from S3 WAL archive
+* Restore and cloning Postgres clusters on AWS, GCS and Azure
+* Additionally logical backups to S3 or GCS bucket can be configured
+* Standby cluster from S3 or GCS WAL archive
 * Configurable for non-cloud environments
 * Basic credential and user management on K8s, eases application deployments
 * Support for custom TLS certificates
 * UI to create and edit Postgres cluster manifests
-* Works well on Amazon AWS, Google Cloud, OpenShift and locally on Kind
 * Support for AWS EBS gp2 to gp3 migration, supporting iops and throughput configuration
+* Compatible with OpenShift
 
 ### PostgreSQL features
 
@@ -61,7 +61,7 @@ We introduce the major version into the backup path to smoothen the [major versi
 The new operator configuration can set a compatibility flag *enable_spilo_wal_path_compat* to make Spilo look for wal segments in the current path but also old format paths.
 This comes at potential performance costs and should be disabled after a few days.
 
-The newest Spilo image is: `registry.opensource.zalan.do/acid/spilo-14:2.1-p3`
+The newest Spilo image is: `registry.opensource.zalan.do/acid/spilo-14:2.1-p5`
 
 The last Spilo 12 image is: `registry.opensource.zalan.do/acid/spilo-12:1.6-p5`
 

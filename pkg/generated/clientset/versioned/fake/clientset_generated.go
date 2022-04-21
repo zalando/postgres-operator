@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Compose, Zalando SE
+Copyright 2022 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,8 @@ import (
 	clientset "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1/fake"
+	zalandov1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/zalando.org/v1"
+	fakezalandov1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/zalando.org/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -88,4 +90,9 @@ var (
 // AcidV1 retrieves the AcidV1Client
 func (c *Clientset) AcidV1() acidv1.AcidV1Interface {
 	return &fakeacidv1.FakeAcidV1{Fake: &c.Fake}
+}
+
+// ZalandoV1 retrieves the ZalandoV1Client
+func (c *Clientset) ZalandoV1() zalandov1.ZalandoV1Interface {
+	return &fakezalandov1.FakeZalandoV1{Fake: &c.Fake}
 }

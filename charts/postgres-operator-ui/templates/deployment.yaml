@@ -70,6 +70,11 @@ spec:
                   "replica_load_balancer_visible": true,
                   "resources_visible": true,
                   "users_visible": true,
+                  "cost_ebs": 0.0952,
+                  "cost_iops": 0.006,
+                  "cost_throughput": 0.0476,
+                  "cost_core": 0.0575,
+                  "cost_memory": 0.014375,
                   "postgresql_versions": [
                     "14",
                     "13",

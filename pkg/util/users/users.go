@@ -18,6 +18,7 @@ const (
 	alterUserRenameSQL   = `ALTER ROLE "%s" RENAME TO "%s%s"`
 	alterRoleResetAllSQL = `ALTER ROLE "%s" RESET ALL`
 	alterRoleSetSQL      = `ALTER ROLE "%s" SET %s TO %s`
+	dropUserSQL          = `SET LOCAL synchronous_commit = 'local'; DROP ROLE "%s";`
 	grantToUserSQL       = `GRANT %s TO "%s"`
 	doBlockStmt          = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
 	passwordTemplate     = "ENCRYPTED PASSWORD '%s'"
@@ -52,25 +53,31 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 			}
 		} else {
 			r := spec.PgSyncUserRequest{}
+			r.User = dbUser
 			newMD5Password := util.NewEncryptor(strategy.PasswordEncryption).PGUserPassword(newUser)
 
-			if dbUser.Password != newMD5Password {
-				r.User.Password = newMD5Password
-				r.Kind = spec.PGsyncUserAlter
+			// do not compare for roles coming from docker image
+			if newUser.Origin != spec.RoleOriginSpilo {
+				if dbUser.Password != newMD5Password {
+					r.User.Password = newMD5Password
+					r.Kind = spec.PGsyncUserAlter
+				}
+				if addNewFlags, equal := util.SubstractStringSlices(newUser.Flags, dbUser.Flags); !equal {
+					r.User.Flags = addNewFlags
+					r.Kind = spec.PGsyncUserAlter
+				}
 			}
 			if addNewRoles, equal := util.SubstractStringSlices(newUser.MemberOf, dbUser.MemberOf); !equal {
 				r.User.MemberOf = addNewRoles
-				r.Kind = spec.PGsyncUserAlter
-			}
-			if addNewFlags, equal := util.SubstractStringSlices(newUser.Flags, dbUser.Flags); !equal {
-				r.User.Flags = addNewFlags
 				r.Kind = spec.PGsyncUserAlter
 			}
 			if r.Kind == spec.PGsyncUserAlter {
 				r.User.Name = newUser.Name
 				reqs = append(reqs, r)
 			}
-			if len(newUser.Parameters) > 0 && !reflect.DeepEqual(dbUser.Parameters, newUser.Parameters) {
+			if newUser.Origin != spec.RoleOriginSpilo &&
+				len(newUser.Parameters) > 0 &&
+				!reflect.DeepEqual(dbUser.Parameters, newUser.Parameters) {
 				reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncAlterSet, User: newUser})
 			}
 		}
@@ -101,7 +108,7 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 // ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
 func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSyncUserRequest, db *sql.DB) error {
 	var reqretries []spec.PgSyncUserRequest
-	var errors []string
+	errors := make([]string, 0)
 	for _, request := range requests {
 		switch request.Kind {
 		case spec.PGSyncUserAdd:
@@ -138,7 +145,7 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 				return err
 			}
 		} else {
-			return fmt.Errorf("could not execute sync requests for users: %v", errors)
+			return fmt.Errorf("could not execute sync requests for users: %v", strings.Join(errors, `', '`))
 		}
 	}
 
@@ -287,4 +294,14 @@ func quoteParameterValue(name, val string) string {
 		return val
 	}
 	return fmt.Sprintf(`'%s'`, strings.Trim(val, " "))
+}
+
+// DropPgUser to remove user created by the operator e.g. for password rotation
+func DropPgUser(user string, db *sql.DB) error {
+	query := fmt.Sprintf(dropUserSQL, user)
+	if _, err := db.Exec(query); err != nil { // TODO: Try several times
+		return err
+	}
+
+	return nil
 }

@@ -30,6 +30,7 @@ const (
 	RoleOriginManifest
 	RoleOriginInfrastructure
 	RoleOriginTeamsAPI
+	RoleOriginSpilo
 	RoleOriginSystem
 	RoleOriginBootstrap
 	RoleConnectionPooler
@@ -55,6 +56,7 @@ type PgUser struct {
 	MemberOf   []string          `yaml:"inrole"`
 	Parameters map[string]string `yaml:"db_parameters"`
 	AdminRole  string            `yaml:"admin_role"`
+	IsDbOwner  bool              `yaml:"is_db_owner"`
 	Deleted    bool              `yaml:"deleted"`
 }
 
@@ -117,6 +119,7 @@ type ControllerConfig struct {
 	CRDReadyWaitTimeout  time.Duration
 	ConfigMapName        NamespacedName
 	Namespace            string
+	IgnoredAnnotations   []string
 
 	EnableJsonLogging bool
 }

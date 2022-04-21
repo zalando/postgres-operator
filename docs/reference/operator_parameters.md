@@ -70,10 +70,17 @@ Variable names are underscore-separated words.
 
 Those are top-level keys, containing both leaf keys and groups.
 
-* **enable_crd_validation**
-  toggles if the operator will create or update CRDs with
-  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
+* **enable_crd_registration**
+  Instruct the operator to create/update the CRDs. If disabled the operator will rely on the CRDs being managed separately.
   The default is `true`.
+
+* **enable_crd_validation**
+  *deprecated*: toggles if the operator will create or update CRDs with
+  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
+  The default is `true`. `false` will be ignored, since `apiextensions.io/v1` requires a structural schema definition.
+
+* **crd_categories**
+  The operator will register CRDs in the `all` category by default so that they will be returned by a `kubectl get all` call. You are free to change categories or leave them empty.
 
 * **enable_lazy_spilo_upgrade**
   Instruct operator to update only the statefulsets with new images (Spilo and InitContainers) without immediately doing the rolling update. The assumption is pods will be re-started later with new images, for example due to the node rotation.
@@ -152,9 +159,9 @@ Those are top-level keys, containing both leaf keys and groups.
   at the cost of overprovisioning memory and potential scheduling problems for
   containers with high memory limits due to the lack of memory on Kubernetes
   cluster nodes. This affects all containers created by the operator (Postgres,
-  Scalyr sidecar, and other sidecars except **sidecars** defined in the operator
-  configuration); to set resources for the operator's own container, change the
-  [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
+  connection pooler, logical backup, scalyr sidecar, and other sidecars except 
+  **sidecars** defined in the operator configuration); to set resources for the
+  operator's own container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
 ## Postgres users
@@ -170,6 +177,37 @@ under the `users` key.
   Postgres username used for replication between instances. The default is
   `standby`.
 
+* **additional_owner_roles**
+  Specifies database roles that will become members of all database owners.
+  Then owners can use `SET ROLE` to obtain privileges of these roles to e.g.
+  create/update functionality from extensions as part of a migration script.
+  Note, that roles listed here should be preconfigured in the docker image
+  and already exist in the database cluster on startup. One such role can be
+  `cron_admin` which is provided by the Spilo docker image to set up cron
+  jobs inside the `postgres` database. Default is `empty`.
+
+* **enable_password_rotation**
+  For all `LOGIN` roles that are not database owners the operator can rotate
+  credentials in the corresponding K8s secrets by replacing the username and
+  password. This means, new users will be added on each rotation inheriting
+  all priviliges from the original roles. The rotation date (in YYMMDD format)
+  is appended to the names of the new user. The timestamp of the next rotation
+  is written to the secret. The default is `false`.
+
+* **password_rotation_interval**
+  If password rotation is enabled (either from config or cluster manifest) the
+  interval can be configured with this parameter. The measure is in days which
+  means daily rotation (`1`) is the most frequent interval possible.
+  Default is `90`.
+
+* **password_rotation_user_retention**
+  To avoid an ever growing amount of new users due to password rotation the
+  operator will remove the created users again after a certain amount of days
+  has passed. The number can be configured with this parameter. However, the
+  operator will check that the retention policy is at least twice as long as
+  the rotation interval and update to this minimum in case it is not.
+  Default is `180`.
+
 ## Major version upgrades
 
 Parameters configuring automatic major version upgrades. In a
@@ -183,6 +221,10 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
   `"full"` = manifest and minimal version violation trigger upgrade.
   Note, that with all three modes increasing the version in the manifest will
   trigger a rolling update of the pods. The default is `"off"`.
+
+* **major_version_upgrade_team_allow_list**
+  Upgrades will only be carried out for clusters of listed teams when mode is
+  set to "off". The default is empty.
 
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
@@ -244,6 +286,12 @@ configuration they are grouped under the `kubernetes` key.
   statefulset and, if exists, to the connection pooler deployment as well.
   Regular expressions like `downscaler/*` etc. are also accepted. Can be used
   with [kube-downscaler](https://github.com/hjacobs/kube-downscaler).
+
+* **ignored_annotations**
+  Some K8s tools inject and update annotations out of the Postgres Operator
+  control. This can cause rolling updates on each cluster sync cycle. With
+  this option you can specify an array of annotation keys that should be
+  ignored when comparing K8s resources on sync. The default is empty.
 
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not
@@ -336,11 +384,16 @@ configuration they are grouped under the `kubernetes` key.
 
 * **node_readiness_label**
   a set of labels that a running and active node should possess to be
-  considered `ready`. The operator uses values of those labels to detect the
-  start of the Kubernetes cluster upgrade procedure and move master pods off
-  the nodes to be decommissioned. When the set is not empty, the operator also
-  assigns the `Affinity` clause to the Postgres pods to be scheduled only on
-  `ready` nodes. The default is empty.
+  considered `ready`. When the set is not empty, the operator assigns the
+  `nodeAffinity` clause to the Postgres pods to be scheduled only on `ready`
+  nodes. The default is empty.
+
+* **node_readiness_label_merge**
+  If a `nodeAffinity` is also specified in the postgres cluster manifest
+  it will get merged with the `node_readiness_label` affinity on the pods.
+  The merge strategy can be configured - it can either be "AND" or "OR".
+  See [user docs](../user.md#use-taints-tolerations-and-node-affinity-for-dedicated-postgresql-nodes)
+  for more details. Default is "OR".
 
 * **toleration**
   a dictionary that should contain `key`, `operator`, `value` and
@@ -460,6 +513,13 @@ configuration `resource_check_interval` and `resource_check_timeout` have no
 effect, and the parameters are grouped under the `timeouts` key in the
 CRD-based configuration.
 
+* **PatroniAPICheckInterval**
+  the interval between consecutive attempts waiting for the return of 
+  Patroni Api. The default is `1s`.
+
+* **PatroniAPICheckTimeout**
+  the timeout for a response from Patroni Api. The default is `5s`.
+
 * **resource_check_interval**
   interval to wait between consecutive attempts to check for the presence of
   some Kubernetes resource (i.e. `StatefulSet` or `PodDisruptionBudget`). The
@@ -508,10 +568,20 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   toggles service type load balancer pointing to the master pod of the cluster.
   Can be overridden by individual cluster settings. The default is `true`.
 
-* **enable_replica_load_balancer**
-  toggles service type load balancer pointing to the replica pod of the
-  cluster.  Can be overridden by individual cluster settings. The default is
+* **enable_master_pooler_load_balancer**
+  toggles service type load balancer pointing to the master pooler pod of the
+  cluster. Can be overridden by individual cluster settings. The default is
   `false`.
+
+* **enable_replica_load_balancer**
+  toggles service type load balancer pointing to the replica pod(s) of the
+  cluster. Can be overridden by individual cluster settings. The default is
+  `false`.
+
+* **enable_replica_pooler_load_balancer**
+  toggles service type load balancer pointing to the replica pooler pod(s) of
+  the cluster. Can be overridden by individual cluster settings. The default
+  is `false`.
 
 * **external_traffic_policy** defines external traffic policy for load
   balancers. Allowed values are `Cluster` (default) and `Local`.
@@ -575,7 +645,10 @@ yet officially supported.
   empty.
 
 * **aws_region**
-  AWS region used to store EBS volumes. The default is `eu-central-1`.
+  AWS region used to store EBS volumes. The default is `eu-central-1`. Note,
+  this option is not meant for specifying the AWS region for backups and
+  restore, since it can be separate from the EBS region. You have to define
+  AWS_REGION as a [custom environment variable](../administrator.md#custom-pod-environment-variables).
 
 * **additional_secret_mount**
   Additional Secret (aws or gcp credentials) to mount in the pod.
@@ -606,7 +679,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.7.1"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.8.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -637,6 +710,11 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_sse**
   Specify server side encryption that S3 storage is using. If empty string
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
+
+* **logical_backup_s3_retention_time**
+  Specify a retention time for logical backups stored in S3. Backups older than the specified retention 
+  time will be deleted after a new backup was uploaded. If empty, all backups will be kept. Example values are
+  "3 days", "2 weeks", or "1 month". The default is empty.
 
 * **logical_backup_schedule**
   Backup schedule in the cron format. Please take the
@@ -710,7 +788,7 @@ key.
 
 * **protected_role_names**
   List of roles that cannot be overwritten by an application, team or
-  infrastructure role. The default is `admin`.
+  infrastructure role. The default list is `admin` and `cron_admin`.
 
 * **postgres_superuser_teams**
   List of teams which members need the superuser role in each PG database

@@ -7,7 +7,7 @@ features and tests.
 
 Postgres Operator is written in Go. Use the [installation instructions](https://golang.org/doc/install#install)
 if you don't have Go on your system. You won't be able to compile the operator
-with Go older than 1.16. We recommend installing [the latest one](https://golang.org/dl/).
+with Go older than 1.17. We recommend installing [the latest one](https://golang.org/dl/).
 
 Go projects expect their source code and all the dependencies to be located
 under the [GOPATH](https://github.com/golang/go/wiki/GOPATH). Normally, one
@@ -72,20 +72,30 @@ make docker
 
 # kind
 make docker
-kind load docker-image <image> --name <kind-cluster-name>
+kind load docker-image registry.opensource.zalan.do/acid/postgres-operator:${TAG} --name <kind-cluster-name>
 ```
 
-Then create a new Postgres Operator deployment. You can reuse the provided
-manifest but replace the version and tag. Don't forget to also apply
+Then create a new Postgres Operator deployment.
+
+### Deploying manually with manifests and kubectl
+
+You can reuse the provided manifest but replace the version and tag. Don't forget to also apply
 configuration and RBAC manifests first, e.g.:
 
 ```bash
 kubectl create -f manifests/configmap.yaml
 kubectl create -f manifests/operator-service-account-rbac.yaml
-sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml | kubectl create  -f -
+sed -e "s/\(image\:.*\:\).*$/\1$TAG/" -e "s/\(imagePullPolicy\:\).*$/\1 Never/" manifests/postgres-operator.yaml | kubectl create  -f -
 
 # check if the operator is coming up
 kubectl get pod -l name=postgres-operator
+```
+
+### Deploying with Helm chart
+
+Yoy can reuse the provided Helm chart to deploy local operator build with the following command:
+```bash
+helm install postgres-operator ./charts/postgres-operator --namespace zalando-operator --set image.tag=${TAG} --set image.pullPolicy=Never
 ```
 
 ## Code generation
@@ -176,7 +186,7 @@ go get -u github.com/derekparker/delve/cmd/dlv
 
 ```
 RUN apk --no-cache add go git musl-dev
-RUN go get github.com/derekparker/delve/cmd/dlv
+RUN go get -d github.com/derekparker/delve/cmd/dlv
 ```
 
 * Update the `Makefile` to build the project with debugging symbols. For that
@@ -207,6 +217,13 @@ dlv connect 127.0.0.1:DLV_PORT
 ```
 
 ## Unit tests
+
+Prerequisites:
+
+```bash
+make deps
+make mocks
+```
 
 To run all unit tests, you can simply do:
 

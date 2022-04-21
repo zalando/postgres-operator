@@ -34,16 +34,34 @@ rules:
   - get
   - list
   - watch
+# all verbs allowed for event streams
+{{- if .Values.enableStreams }}
+- apiGroups:
+  - zalando.org
+  resources:
+  - fabriceventstreams
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+{{- end }}
 # to create or get/update CRDs when starting up
 - apiGroups:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
   verbs:
-  - create
   - get
+{{- if toString .Values.configGeneral.enable_crd_registration | eq "true" }}
+  - create
   - patch
   - update
+{{- end }}
 # to send events to the CRs
 - apiGroups:
   - ""
@@ -71,12 +89,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  verbs:
-  - get
 {{- else }}
 # to read configuration from ConfigMaps
 - apiGroups:

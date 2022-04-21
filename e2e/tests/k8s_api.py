@@ -53,7 +53,7 @@ class K8s:
 
         return master_pod_node, replica_pod_nodes
 
-    def get_cluster_nodes(self, cluster_labels='cluster-name=acid-minimal-cluster', namespace='default'):
+    def get_cluster_nodes(self, cluster_labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         m = []
         r = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=cluster_labels)
@@ -321,6 +321,15 @@ class K8s:
     def get_cluster_replica_pod(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         return self.get_cluster_pod('replica', labels, namespace)
 
+    def get_secret(self, username, clustername='acid-minimal-cluster', namespace='default'):
+        secret = self.api.core_v1.read_namespaced_secret(
+                "{}.{}.credentials.postgresql.acid.zalan.do".format(username.replace("_","-"), clustername), namespace)
+        secret.metadata.resource_version = None
+        secret.metadata.uid = None
+        return secret
+
+    def create_secret(self, secret, namespace='default'):
+        return self.api.core_v1.create_namespaced_secret(namespace, secret)
 
 class K8sBase:
     '''

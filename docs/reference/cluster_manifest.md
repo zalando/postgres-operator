@@ -91,10 +91,22 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   `enable_master_load_balancer` parameter) to define whether to enable the load
   balancer pointing to the Postgres primary. Optional.
 
+* **enableMasterPoolerLoadBalancer**
+  boolean flag to override the operator defaults (set by the
+  `enable_master_pooler_load_balancer` parameter) to define whether to enable
+  the load balancer for master pooler pods pointing to the Postgres primary.
+  Optional.
+
 * **enableReplicaLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_replica_load_balancer` parameter) to define whether to enable the
   load balancer pointing to the Postgres standby instances. Optional.
+
+* **enableReplicaPoolerLoadBalancer**
+  boolean flag to override the operator defaults (set by the
+  `enable_replica_pooler_load_balancer` parameter) to define whether to enable
+  the load balancer for replica pooler pods pointing to the Postgres standby
+  instances. Optional.
 
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter
@@ -114,6 +126,22 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   the user name in the form `{namespace}.{username}` and the operator will
   create the K8s secret in that namespace. The part after the first `.` is
   considered to be the user name. Optional.
+
+* **usersWithSecretRotation**
+  list of users to enable credential rotation in K8s secrets. The rotation
+  interval can only be configured globally. On each rotation a new user will
+  be added in the database replacing the `username` value in the secret of
+  the listed user. Although, rotation users inherit all rights from the
+  original role, keep in mind that ownership is not transferred. See more
+  details in the [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#password-rotation-in-k8s-secrets).
+
+* **usersWithInPlaceSecretRotation**
+  list of users to enable in-place password rotation in K8s secrets. The
+  rotation interval can only be configured globally. On each rotation the
+  password value will be replaced in the secrets which the operator reflects
+  in the database, too. List only users here that rarely connect to the
+  database, like a flyway user running a migration on Pod start. See more
+  details in the [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#password-replacement-without-extra-users).
 
 * **databases**
   a map of database names to database owners for the databases that should be
@@ -287,13 +315,14 @@ explanation of `ttl` and `loop_wait` parameters.
 * **synchronous_mode_strict**
   Patroni `synchronous_mode_strict` parameter value. Can be used in addition to `synchronous_mode`. The default is set to `false`. Optional.
 
+* **synchronous_node_count**
+  Patroni `synchronous_node_count` parameter value. Note, this option is only available for Spilo images with Patroni 2.0+. The default is set to `1`. Optional.
+  
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the Postgres container. They are grouped under the `resources` top-level
-key with subgroups `requests` and `limits`. The whole section is optional,
-however if you specify a request or limit you have to define everything
-(unless you are not modifying the default CRD schema validation). 
+key with subgroups `requests` and `limits`. 
 
 ### Requests
 
@@ -366,12 +395,22 @@ under the `clone` top-level key and do not affect the already running cluster.
 ## Standby cluster
 
 On startup, an existing `standby` top-level key creates a standby Postgres
-cluster streaming from a remote location. So far only streaming from a S3 WAL
-archive is supported.
+cluster streaming from a remote location - either from a S3 or GCS WAL
+archive or a remote primary. Only one of options is allowed and required
+if the `standby` key is present.
 
 * **s3_wal_path**
   the url to S3 bucket containing the WAL archive of the remote primary.
-  Required when the `standby` section is present.
+
+* **gs_wal_path**
+  the url to GS bucket containing the WAL archive of the remote primary.
+
+* **standby_host**
+  hostname or IP address of the primary to stream from.
+
+* **standby_port**
+  TCP port on which the primary is listening for connections. Patroni will
+  use `"5432"` if not set.
 
 ## Volume properties
 
@@ -513,3 +552,54 @@ Those parameters are grouped under the `tls` top-level key.
   relative to the "/tls/", which is mount path of the tls secret.
   If `caSecretName` is defined, the ca.crt path is relative to "/tlsca/",
   otherwise to the same "/tls/".
+
+## Change data capture streams
+
+This sections enables change data capture (CDC) streams via Postgres' 
+[logical decoding](https://www.postgresql.org/docs/14/logicaldecoding.html)
+feature and `pgoutput` plugin. While the Postgres operator takes responsibility
+for providing the setup to publish change events, it relies on external tools
+to consume them. At Zalando, we are using a workflow based on
+[Debezium Connector](https://debezium.io/documentation/reference/stable/connectors/postgresql.html)
+which can feed streams into Zalando’s distributed event broker [Nakadi](https://nakadi.io/)
+among others.
+
+The Postgres Operator creates custom resources for Zalando's internal CDC
+operator which will be used to set up the consumer part. Each stream object
+can have the following properties:
+
+* **applicationId**
+  The application name to which the database and CDC belongs to. For each
+  set of streams with a distinct `applicationId` a separate stream CR as well
+  as a separate logical replication slot will be created. This means there can
+  be different streams in the same database and streams with the same
+  `applicationId` are bundled in one stream CR. The stream CR will be called
+  like the Postgres cluster plus "-<applicationId>" suffix. Required.
+
+* **database**
+  Name of the database from where events will be published via Postgres'
+  logical decoding feature. The operator will take care of updating the
+  database configuration (setting `wal_level: logical`, creating logical
+  replication slots, using output plugin `pgoutput` and creating a dedicated
+  replication user). Required.
+
+* **tables**
+  Defines a map of table names and their properties (`eventType`, `idColumn`
+  and `payloadColumn`). The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
+  The application is responsible for putting events into a (JSON/B or VARCHAR)
+  payload column of the outbox table in the structure of the specified target
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/14/logical-replication-publication.html)
+  in Postgres for all tables specified for one `database` and `applicationId`.
+  The CDC operator will consume from it shortly after transactions are
+  committed to the outbox table. The `idColumn` will be used in telemetry for
+  the CDC operator. The names for `idColumn` and `payloadColumn` can be
+  configured. Defaults are `id` and `payload`. The target `eventType` has to
+  be defined. Required.
+
+* **filter**
+  Streamed events can be filtered by a jsonpath expression for each table.
+  Optional.
+
+* **batchSize**
+  Defines the size of batches in which events are consumed. Optional.
+  Defaults to 1.

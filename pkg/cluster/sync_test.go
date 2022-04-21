@@ -19,6 +19,7 @@ import (
 	"github.com/zalando/postgres-operator/mocks"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
@@ -26,6 +27,8 @@ import (
 )
 
 var patroniLogger = logrus.New().WithField("test", "patroni")
+var acidClientSet = fakeacidv1.NewSimpleClientset()
+var clientSet = fake.NewSimpleClientset()
 
 func newMockPod(ip string) *v1.Pod {
 	return &v1.Pod{
@@ -36,13 +39,16 @@ func newMockPod(ip string) *v1.Pod {
 }
 
 func newFakeK8sSyncClient() (k8sutil.KubernetesClient, *fake.Clientset) {
-	acidClientSet := fakeacidv1.NewSimpleClientset()
-	clientSet := fake.NewSimpleClientset()
-
 	return k8sutil.KubernetesClient{
 		PodsGetter:         clientSet.CoreV1(),
 		PostgresqlsGetter:  acidClientSet.AcidV1(),
 		StatefulSetsGetter: clientSet.AppsV1(),
+	}, clientSet
+}
+
+func newFakeK8sSyncSecretsClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	return k8sutil.KubernetesClient{
+		SecretsGetter: clientSet.CoreV1(),
 	}, clientSet
 }
 
@@ -196,17 +202,15 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	cluster.patroni = p
 	mockPod := newMockPod("192.168.100.1")
 
-	// simulate existing config that differs with cluster.Spec
+	// simulate existing config that differs from cluster.Spec
 	tests := []struct {
 		subtest       string
-		pod           *v1.Pod
 		patroni       acidv1.Patroni
 		pgParams      map[string]string
 		restartMaster bool
 	}{
 		{
 			subtest: "Patroni and Postgresql.Parameters differ - restart replica first",
-			pod:     mockPod,
 			patroni: acidv1.Patroni{
 				TTL: 30, // desired 20
 			},
@@ -218,7 +222,6 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "multiple Postgresql.Parameters differ - restart replica first",
-			pod:     mockPod,
 			patroni: acidv1.Patroni{
 				TTL: 20,
 			},
@@ -230,7 +233,6 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "desired max_connections bigger - restart replica first",
-			pod:     mockPod,
 			patroni: acidv1.Patroni{
 				TTL: 20,
 			},
@@ -242,7 +244,6 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "desired max_connections smaller - restart master first",
-			pod:     mockPod,
 			patroni: acidv1.Patroni{
 				TTL: 20,
 			},
@@ -255,10 +256,112 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		requireMasterRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(tt.pod, tt.patroni, tt.pgParams)
+		requireMasterRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
 		assert.NoError(t, err)
 		if requireMasterRestart != tt.restartMaster {
 			t.Errorf("%s - %s: unexpect master restart strategy, got %v, expected %v", testName, tt.subtest, requireMasterRestart, tt.restartMaster)
+		}
+	}
+}
+
+func TestUpdateSecret(t *testing.T) {
+	testName := "test syncing secrets"
+	client, _ := newFakeK8sSyncSecretsClient()
+
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	dbname := "app"
+	dbowner := "appowner"
+	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
+	rotationUsers := make(spec.PgUserMap)
+	retentionUsers := make([]string, 0)
+
+	// define manifest users and enable rotation for dbowner
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			Databases:                      map[string]string{dbname: dbowner},
+			Users:                          map[string]acidv1.UserFlags{"foo": {}, dbowner: {}},
+			UsersWithInPlaceSecretRotation: []string{dbowner},
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	// new cluster with enabled password rotation
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				Auth: config.Auth{
+					SecretNameTemplate:            secretTemplate,
+					EnablePasswordRotation:        true,
+					PasswordRotationInterval:      1,
+					PasswordRotationUserRetention: 3,
+				},
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: "cluster-name",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+	cluster.pgUsers = map[string]spec.PgUser{}
+	cluster.initRobotUsers()
+
+	// create secrets
+	cluster.syncSecrets()
+	// initialize rotation with current time
+	cluster.syncSecrets()
+
+	dayAfterTomorrow := time.Now().AddDate(0, 0, 2)
+
+	for username := range cluster.Spec.Users {
+		pgUser := cluster.pgUsers[username]
+
+		// first, get the secret
+		secret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+		assert.NoError(t, err)
+		secretPassword := string(secret.Data["password"])
+
+		// now update the secret setting a next rotation date (tomorrow + interval)
+		cluster.updateSecret(username, secret, &rotationUsers, &retentionUsers, dayAfterTomorrow)
+		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+		assert.NoError(t, err)
+
+		// check that passwords are different
+		rotatedPassword := string(updatedSecret.Data["password"])
+		if secretPassword == rotatedPassword {
+			t.Errorf("%s: password unchanged in updated secret for %s", testName, username)
+		}
+
+		// check that next rotation date is tomorrow + interval, not date in secret + interval
+		nextRotation := string(updatedSecret.Data["nextRotation"])
+		_, nextRotationDate := cluster.getNextRotationDate(dayAfterTomorrow)
+		if nextRotation != nextRotationDate {
+			t.Errorf("%s: updated secret of %s does not contain correct rotation date: expected %s, got %s", testName, username, nextRotationDate, nextRotation)
+		}
+
+		// compare username, when it's dbowner they should be equal because of UsersWithInPlaceSecretRotation
+		secretUsername := string(updatedSecret.Data["username"])
+		if pgUser.IsDbOwner {
+			if secretUsername != username {
+				t.Errorf("%s: username differs in updated secret: expected %s, got %s", testName, username, secretUsername)
+			}
+		} else {
+			rotatedUsername := username + dayAfterTomorrow.Format("060102")
+			if secretUsername != rotatedUsername {
+				t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, rotatedUsername, secretUsername)
+			}
+
+			if len(rotationUsers) != 1 && len(retentionUsers) != 1 {
+				t.Errorf("%s: unexpected number of users to rotate - expected only %s, found %d", testName, username, len(rotationUsers))
+			}
 		}
 	}
 }

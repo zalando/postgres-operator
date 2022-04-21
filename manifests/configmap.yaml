@@ -3,6 +3,7 @@ kind: ConfigMap
 metadata:
   name: postgres-operator
 data:
+  # additional_owner_roles: "cron_admin"
   # additional_pod_capabilities: "SYS_NICE"
   # additional_secret_mount: "some-secret-name"
   # additional_secret_mount_path: "/some/dir"
@@ -16,12 +17,13 @@ data:
   # connection_pooler_default_cpu_request: "500m"
   # connection_pooler_default_memory_limit: 100Mi
   # connection_pooler_default_memory_request: 100Mi
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-19"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-22"
   # connection_pooler_max_db_connections: 60
   # connection_pooler_mode: "transaction"
   # connection_pooler_number_of_instances: 2
   # connection_pooler_schema: "pooler"
   # connection_pooler_user: "pooler"
+  crd_categories: "all"
   # custom_service_annotations: "keyx:valuez,keya:valuea"
   # custom_pod_annotations: "keya:valuea,keyb:valueb"
   db_hosted_zone: db.example.com
@@ -32,10 +34,10 @@ data:
   # default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p3
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p5
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
-  # enable_crd_validation: "true"
+  # enable_crd_registration: "true"
   # enable_cross_namespace_secret: "false"
   # enable_database_access: "true"
   enable_ebs_gp3_migration: "false"
@@ -43,12 +45,15 @@ data:
   # enable_init_containers: "true"
   # enable_lazy_spilo_upgrade: "false"
   enable_master_load_balancer: "false"
+  enable_master_pooler_load_balancer: "false"
+  enable_password_rotation: "false"
   enable_pgversion_env_var: "true"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
   # enable_postgres_team_crd: "false"
   # enable_postgres_team_crd_superusers: "false"
   enable_replica_load_balancer: "false"
+  enable_replica_pooler_load_balancer: "false"
   # enable_shm_volume: "true"
   # enable_sidecars: "true"
   enable_spilo_wal_path_compat: "true"
@@ -58,14 +63,15 @@ data:
   # etcd_host: ""
   external_traffic_policy: "Cluster"
   # gcp_credentials: ""
-  # kubernetes_use_configmaps: "false"
+  # ignored_annotations: ""
   # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
   # infrastructure_roles_secrets: "secretname:monitoring-roles,userkey:user,passwordkey:password,rolekey:inrole"
   # inherited_annotations: owned-by
   # inherited_labels: application,environment
   # kube_iam_role: ""
+  # kubernetes_use_configmaps: "false"
   # log_s3_bucket: ""
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.7.1"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.8.0"
   # logical_backup_google_application_credentials: ""
   logical_backup_job_prefix: "logical-backup-"
   logical_backup_provider: "s3"
@@ -75,8 +81,10 @@ data:
   # logical_backup_s3_endpoint: ""
   # logical_backup_s3_secret_access_key: ""
   logical_backup_s3_sse: "AES256"
+  # logical_backup_s3_retention_time: ""
   logical_backup_schedule: "30 00 * * *"
   major_version_upgrade_mode: "manual"
+  # major_version_upgrade_team_allow_list: ""
   master_dns_name_format: "{cluster}.{team}.{hostedzone}"
   # master_pod_move_timeout: 20m
   # max_instances: "-1"
@@ -84,11 +92,16 @@ data:
   # min_cpu_limit: 250m
   # min_memory_limit: 250Mi
   # minimal_major_version: "9.6"
-  # node_readiness_label: ""
+  # node_readiness_label: "status:ready"
+  # node_readiness_label_merge: "OR"
   # oauth_token_secret_name: postgresql-operator
   # pam_configuration: |
   #  https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
   # pam_role_name: zalandos
+  patroni_api_check_interval: "1s"
+  patroni_api_check_timeout: "5s"
+  # password_rotation_interval: "90"
+  # password_rotation_user_retention: "180"
   pdb_name_format: "postgres-{cluster}-pdb"
   # pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   pod_deletion_wait_timeout: 10m
@@ -103,7 +116,7 @@ data:
   # pod_service_account_role_binding_definition: ""
   pod_terminate_grace_period: 5m
   # postgres_superuser_teams: "postgres_superusers"
-  # protected_role_names: "admin"
+  # protected_role_names: "admin,cron_admin"
   ready_wait_interval: 3s
   ready_wait_timeout: 30s
   repair_period: 5m

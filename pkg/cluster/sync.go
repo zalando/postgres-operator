@@ -69,19 +69,14 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
-	if c.OpConfig.EnableEBSGp3Migration {
+	if c.OpConfig.EnableEBSGp3Migration && len(c.EBSVolumes) > 0 {
 		err = c.executeEBSMigration()
 		if nil != err {
 			return err
 		}
 	}
 
-	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
-		err = fmt.Errorf("could not enforce minimum resource limits: %v", err)
-		return err
-	}
-
-	c.logger.Debugf("syncing statefulsets")
+	c.logger.Debug("syncing statefulsets")
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
@@ -107,17 +102,17 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 
 	// create database objects unless we are running without pods or disabled that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
-		c.logger.Debugf("syncing roles")
+		c.logger.Debug("syncing roles")
 		if err = c.syncRoles(); err != nil {
 			err = fmt.Errorf("could not sync roles: %v", err)
 			return err
 		}
-		c.logger.Debugf("syncing databases")
+		c.logger.Debug("syncing databases")
 		if err = c.syncDatabases(); err != nil {
 			err = fmt.Errorf("could not sync databases: %v", err)
 			return err
 		}
-		c.logger.Debugf("syncing prepared databases with schemas")
+		c.logger.Debug("syncing prepared databases with schemas")
 		if err = c.syncPreparedDatabases(); err != nil {
 			err = fmt.Errorf("could not sync prepared database: %v", err)
 			return err
@@ -127,6 +122,14 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	// sync connection pooler
 	if _, err = c.syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
+	}
+
+	if len(c.Spec.Streams) > 0 {
+		c.logger.Debug("syncing streams")
+		if err = c.syncStreams(); err != nil {
+			err = fmt.Errorf("could not sync streams: %v", err)
+			return err
+		}
 	}
 
 	// Major version upgrade must only run after success of all earlier operations, must remain last item in sync
@@ -164,11 +167,13 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		if match, reason := k8sutil.SameService(svc, desiredSvc); !match {
+		if match, reason := c.compareServices(svc, desiredSvc); !match {
 			c.logServiceChanges(role, svc, desiredSvc, false, reason)
-			if err = c.updateService(role, desiredSvc); err != nil {
+			updatedSvc, err := c.updateService(role, svc, desiredSvc)
+			if err != nil {
 				return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 			}
+			c.Services[role] = updatedSvc
 			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		}
 		return nil
@@ -277,6 +282,7 @@ func (c *Cluster) syncStatefulSet() error {
 		restartMasterFirst bool
 	)
 	podsToRecreate := make([]v1.Pod, 0)
+	isSafeToRecreatePods := true
 	switchoverCandidates := make([]spec.NamespacedName, 0)
 
 	pods, err := c.listPods()
@@ -400,25 +406,26 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	// get Postgres config, compare with manifest and update via Patroni PATCH endpoint if it differs
-	// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used.
+	// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used
 	for i, pod := range pods {
-		emptyPatroniConfig := acidv1.Patroni{}
-		podName := util.NameFromMeta(pods[i].ObjectMeta)
-		patroniConfig, pgParameters, err := c.patroni.GetConfig(&pod)
+		patroniConfig, pgParameters, err := c.getPatroniConfig(&pod)
 		if err != nil {
-			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
+			c.logger.Warningf("%v", err)
+			isSafeToRecreatePods = false
 			continue
 		}
 		restartWait = patroniConfig.LoopWait
 
 		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
 		// do not attempt a restart
-		if !reflect.DeepEqual(patroniConfig, emptyPatroniConfig) || len(pgParameters) > 0 {
-			restartMasterFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, pgParameters)
+		if !reflect.DeepEqual(patroniConfig, acidv1.Patroni{}) || len(pgParameters) > 0 {
+			// compare config returned from Patroni with what is specified in the manifest
+			restartMasterFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, c.Spec.Patroni, pgParameters, c.Spec.Parameters)
 			if err != nil {
-				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
+				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", pods[i].Name, err)
 				continue
 			}
+
 			// it could take up to LoopWait to apply the config
 			time.Sleep(time.Duration(restartWait)*time.Second + time.Second*2)
 			break
@@ -437,50 +444,59 @@ func (c *Cluster) syncStatefulSet() error {
 			remainingPods = append(remainingPods, &pods[i])
 			continue
 		}
-		c.restartInstance(&pod, restartWait)
+		if err = c.restartInstance(&pod, restartWait); err != nil {
+			c.logger.Errorf("%v", err)
+			isSafeToRecreatePods = false
+		}
 	}
 
 	// in most cases only the master should be left to restart
 	if len(remainingPods) > 0 {
 		for _, remainingPod := range remainingPods {
-			c.restartInstance(remainingPod, restartWait)
+			if err = c.restartInstance(remainingPod, restartWait); err != nil {
+				c.logger.Errorf("%v", err)
+				isSafeToRecreatePods = false
+			}
 		}
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if len(podsToRecreate) > 0 {
-		c.logger.Debugln("performing rolling update")
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
-		if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
-			return fmt.Errorf("could not recreate pods: %v", err)
+		if isSafeToRecreatePods {
+			c.logger.Debugln("performing rolling update")
+			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
+			if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
+				return fmt.Errorf("could not recreate pods: %v", err)
+			}
+			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
+		} else {
+			c.logger.Warningf("postpone pod recreation until next sync")
 		}
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 	}
 	return nil
 }
 
-func (c *Cluster) restartInstance(pod *v1.Pod, restartWait uint32) {
+func (c *Cluster) restartInstance(pod *v1.Pod, restartWait uint32) error {
+	// if the config update requires a restart, call Patroni restart
 	podName := util.NameFromMeta(pod.ObjectMeta)
 	role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-
-	// if the config update requires a restart, call Patroni restart
-	memberData, err := c.patroni.GetMemberData(pod)
+	memberData, err := c.getPatroniMemberData(pod)
 	if err != nil {
-		c.logger.Debugf("could not get member data of %s pod %s - skipping possible restart attempt: %v", role, podName, err)
-		return
+		return fmt.Errorf("could not restart Postgres in %s pod %s: %v", role, podName, err)
 	}
 
 	// do restart only when it is pending
 	if memberData.PendingRestart {
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("restarting Postgres server within %s pod %s", role, pod.Name))
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("restarting Postgres server within %s pod %s", role, podName))
 		if err := c.patroni.Restart(pod); err != nil {
-			c.logger.Warningf("could not restart Postgres server within %s pod %s: %v", role, podName, err)
-			return
+			return err
 		}
 		time.Sleep(time.Duration(restartWait) * time.Second)
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for %s pod %s", role, pod.Name))
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for %s pod %s", role, podName))
 	}
+
+	return nil
 }
 
 // AnnotationsToPropagate get the annotations to update if required
@@ -517,40 +533,39 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) have changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig acidv1.Patroni, effectivePgParameters map[string]string) (bool, error) {
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectivePatroniConfig, desiredPatroniConfig acidv1.Patroni, effectivePgParameters, desiredPgParameters map[string]string) (bool, error) {
 	configToSet := make(map[string]interface{})
 	parametersToSet := make(map[string]string)
 	restartMaster := make([]bool, 0)
 	requiresMasterRestart := false
 
-	// compare options from config with c.Spec.Patroni from manifest
-	desiredPatroniConfig := c.Spec.Patroni
-	if desiredPatroniConfig.LoopWait > 0 && desiredPatroniConfig.LoopWait != patroniConfig.LoopWait {
+	// compare effective and desired Patroni config options
+	if desiredPatroniConfig.LoopWait > 0 && desiredPatroniConfig.LoopWait != effectivePatroniConfig.LoopWait {
 		configToSet["loop_wait"] = desiredPatroniConfig.LoopWait
 	}
-	if desiredPatroniConfig.MaximumLagOnFailover > 0 && desiredPatroniConfig.MaximumLagOnFailover != patroniConfig.MaximumLagOnFailover {
+	if desiredPatroniConfig.MaximumLagOnFailover > 0 && desiredPatroniConfig.MaximumLagOnFailover != effectivePatroniConfig.MaximumLagOnFailover {
 		configToSet["maximum_lag_on_failover"] = desiredPatroniConfig.MaximumLagOnFailover
 	}
-	if desiredPatroniConfig.PgHba != nil && !reflect.DeepEqual(desiredPatroniConfig.PgHba, patroniConfig.PgHba) {
+	if desiredPatroniConfig.PgHba != nil && !reflect.DeepEqual(desiredPatroniConfig.PgHba, effectivePatroniConfig.PgHba) {
 		configToSet["pg_hba"] = desiredPatroniConfig.PgHba
 	}
-	if desiredPatroniConfig.RetryTimeout > 0 && desiredPatroniConfig.RetryTimeout != patroniConfig.RetryTimeout {
+	if desiredPatroniConfig.RetryTimeout > 0 && desiredPatroniConfig.RetryTimeout != effectivePatroniConfig.RetryTimeout {
 		configToSet["retry_timeout"] = desiredPatroniConfig.RetryTimeout
 	}
-	if desiredPatroniConfig.SynchronousMode != patroniConfig.SynchronousMode {
+	if desiredPatroniConfig.SynchronousMode != effectivePatroniConfig.SynchronousMode {
 		configToSet["synchronous_mode"] = desiredPatroniConfig.SynchronousMode
 	}
-	if desiredPatroniConfig.SynchronousModeStrict != patroniConfig.SynchronousModeStrict {
+	if desiredPatroniConfig.SynchronousModeStrict != effectivePatroniConfig.SynchronousModeStrict {
 		configToSet["synchronous_mode_strict"] = desiredPatroniConfig.SynchronousModeStrict
 	}
-	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != patroniConfig.TTL {
+	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != effectivePatroniConfig.TTL {
 		configToSet["ttl"] = desiredPatroniConfig.TTL
 	}
 
 	// check if specified slots exist in config and if they differ
 	slotsToSet := make(map[string]map[string]string)
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
-		if effectiveSlot, exists := patroniConfig.Slots[slotName]; exists {
+		if effectiveSlot, exists := effectivePatroniConfig.Slots[slotName]; exists {
 			if reflect.DeepEqual(desiredSlot, effectiveSlot) {
 				continue
 			}
@@ -561,8 +576,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 		configToSet["slots"] = slotsToSet
 	}
 
-	// compare parameters under postgresql section with c.Spec.Postgresql.Parameters from manifest
-	desiredPgParameters := c.Spec.Parameters
+	// compare effective and desired parameters under postgresql section in Patroni config
 	for desiredOption, desiredValue := range desiredPgParameters {
 		effectiveValue := effectivePgParameters[desiredOption]
 		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
@@ -605,64 +619,182 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 	c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
 		podName, configToSetJson)
 	if err = c.patroni.SetConfig(pod, configToSet); err != nil {
-		return requiresMasterRestart, fmt.Errorf("could not patch postgres parameters with a pod %s: %v", podName, err)
+		return requiresMasterRestart, fmt.Errorf("could not patch postgres parameters within pod %s: %v", podName, err)
 	}
 
 	return requiresMasterRestart, nil
 }
 
 func (c *Cluster) syncSecrets() error {
-	var (
-		err    error
-		secret *v1.Secret
-	)
+
 	c.logger.Info("syncing secrets")
 	c.setProcessName("syncing secrets")
-	secrets := c.generateUserSecrets()
+	generatedSecrets := c.generateUserSecrets()
+	rotationUsers := make(spec.PgUserMap)
+	retentionUsers := make([]string, 0)
+	currentTime := time.Now()
 
-	for secretUsername, secretSpec := range secrets {
-		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
+	for secretUsername, generatedSecret := range generatedSecrets {
+		secret, err := c.KubeClient.Secrets(generatedSecret.Namespace).Create(context.TODO(), generatedSecret, metav1.CreateOptions{})
+		if err == nil {
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secretSpec.Namespace, secret.UID)
+			c.logger.Debugf("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), generatedSecret.Namespace, secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
-			var userMap map[string]spec.PgUser
-			if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Get(context.TODO(), secretSpec.Name, metav1.GetOptions{}); err != nil {
-				return fmt.Errorf("could not get current secret: %v", err)
-			}
-			if secretUsername != string(secret.Data["username"]) {
-				c.logger.Errorf("secret %s does not contain the role %s", secretSpec.Name, secretUsername)
-				continue
-			}
-			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("secret %s already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
-			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
-				secretUsername = constants.SuperuserKeyName
-				userMap = c.systemUsers
-			} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
-				secretUsername = constants.ReplicationUserKeyName
-				userMap = c.systemUsers
-			} else {
-				userMap = c.pgUsers
-			}
-			pwdUser := userMap[secretUsername]
-			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
-			if pwdUser.Password != string(secret.Data["password"]) &&
-				pwdUser.Origin == spec.RoleOriginInfrastructure {
-
-				c.logger.Debugf("updating the secret %s from the infrastructure roles", secretSpec.Name)
-				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secretSpec, metav1.UpdateOptions{}); err != nil {
-					return fmt.Errorf("could not update infrastructure role secret for role %q: %v", secretUsername, err)
-				}
-			} else {
-				// for non-infrastructure role - update the role with the password from the secret
-				pwdUser.Password = string(secret.Data["password"])
-				userMap[secretUsername] = pwdUser
+			if err = c.updateSecret(secretUsername, generatedSecret, &rotationUsers, &retentionUsers, currentTime); err != nil {
+				c.logger.Warningf("syncing secret %s failed: %v", util.NameFromMeta(secret.ObjectMeta), err)
 			}
 		} else {
-			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, secretSpec.Namespace, err)
+			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err)
 		}
+	}
+
+	// add new user with date suffix and use it in the secret of the original user
+	if len(rotationUsers) > 0 {
+		err := c.initDbConn()
+		if err != nil {
+			return fmt.Errorf("could not init db connection: %v", err)
+		}
+		pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(spec.PgUserMap{}, rotationUsers)
+		if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
+			return fmt.Errorf("error creating database roles for password rotation: %v", err)
+		}
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection after creating users for password rotation: %v", err)
+		}
+	}
+
+	// remove rotation users that exceed the retention interval
+	if len(retentionUsers) > 0 {
+		err := c.initDbConn()
+		if err != nil {
+			return fmt.Errorf("could not init db connection: %v", err)
+		}
+		if err = c.cleanupRotatedUsers(retentionUsers, c.pgDb); err != nil {
+			return fmt.Errorf("error removing users exceeding configured retention interval: %v", err)
+		}
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection after removing users exceeding configured retention interval: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) getNextRotationDate(currentDate time.Time) (time.Time, string) {
+	nextRotationDate := currentDate.AddDate(0, 0, int(c.OpConfig.PasswordRotationInterval))
+	return nextRotationDate, nextRotationDate.Format(time.RFC3339)
+}
+
+func (c *Cluster) updateSecret(
+	secretUsername string,
+	generatedSecret *v1.Secret,
+	rotationUsers *spec.PgUserMap,
+	retentionUsers *[]string,
+	currentTime time.Time) error {
+	var (
+		secret              *v1.Secret
+		err                 error
+		updateSecret        bool
+		updateSecretMsg     string
+		nextRotationDate    time.Time
+		nextRotationDateStr string
+	)
+
+	// get the secret first
+	if secret, err = c.KubeClient.Secrets(generatedSecret.Namespace).Get(context.TODO(), generatedSecret.Name, metav1.GetOptions{}); err != nil {
+		return fmt.Errorf("could not get current secret: %v", err)
+	}
+	c.Secrets[secret.UID] = secret
+
+	// fetch user map to update later
+	var userMap map[string]spec.PgUser
+	var userKey string
+	if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
+		userKey = constants.SuperuserKeyName
+		userMap = c.systemUsers
+	} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
+		userKey = constants.ReplicationUserKeyName
+		userMap = c.systemUsers
+	} else {
+		userKey = secretUsername
+		userMap = c.pgUsers
+	}
+	pwdUser := userMap[userKey]
+	secretName := util.NameFromMeta(secret.ObjectMeta)
+
+	// if password rotation is enabled update password and username if rotation interval has been passed
+	if (c.OpConfig.EnablePasswordRotation && !pwdUser.IsDbOwner &&
+		pwdUser.Origin != spec.RoleOriginInfrastructure && pwdUser.Origin != spec.RoleOriginSystem) ||
+		util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) ||
+		util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+
+		// initialize password rotation setting first rotation date
+		nextRotationDateStr = string(secret.Data["nextRotation"])
+		if nextRotationDate, err = time.ParseInLocation(time.RFC3339, nextRotationDateStr, currentTime.UTC().Location()); err != nil {
+			nextRotationDate, nextRotationDateStr = c.getNextRotationDate(currentTime)
+			secret.Data["nextRotation"] = []byte(nextRotationDateStr)
+			updateSecret = true
+			updateSecretMsg = fmt.Sprintf("rotation date not found in secret %q. Setting it to %s", secretName, nextRotationDateStr)
+		}
+
+		// check if next rotation can happen sooner
+		// if rotation interval has been decreased
+		currentRotationDate, nextRotationDateStr := c.getNextRotationDate(currentTime)
+		if nextRotationDate.After(currentRotationDate) {
+			nextRotationDate = currentRotationDate
+		}
+
+		// update password and next rotation date if configured interval has passed
+		if currentTime.After(nextRotationDate) {
+			// create rotation user if role is not listed for in-place password update
+			if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+				rotationUser := pwdUser
+				newRotationUsername := secretUsername + currentTime.Format("060102")
+				rotationUser.Name = newRotationUsername
+				rotationUser.MemberOf = []string{secretUsername}
+				(*rotationUsers)[newRotationUsername] = rotationUser
+				secret.Data["username"] = []byte(newRotationUsername)
+
+				// whenever there is a rotation, check if old rotation users can be deleted
+				*retentionUsers = append(*retentionUsers, secretUsername)
+			}
+			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+			secret.Data["nextRotation"] = []byte(nextRotationDateStr)
+
+			updateSecret = true
+			updateSecretMsg = fmt.Sprintf("updating secret %q due to password rotation - next rotation date: %s", secretName, nextRotationDateStr)
+		}
+	} else {
+		// username might not match if password rotation has been disabled again
+		if secretUsername != string(secret.Data["username"]) {
+			*retentionUsers = append(*retentionUsers, secretUsername)
+			secret.Data["username"] = []byte(secretUsername)
+			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+			secret.Data["nextRotation"] = []byte{}
+			updateSecret = true
+			updateSecretMsg = fmt.Sprintf("secret %s does not contain the role %s - updating username and resetting password", secretName, secretUsername)
+		}
+	}
+
+	// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
+	if pwdUser.Password != string(secret.Data["password"]) && pwdUser.Origin == spec.RoleOriginInfrastructure {
+		secret = generatedSecret
+		updateSecret = true
+		updateSecretMsg = fmt.Sprintf("updating the secret %s from the infrastructure roles", secretName)
+	} else {
+		// for non-infrastructure role - update the role with the password from the secret
+		pwdUser.Password = string(secret.Data["password"])
+		userMap[userKey] = pwdUser
+	}
+
+	if updateSecret {
+		c.logger.Debugln(updateSecretMsg)
+		if _, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("could not update secret %q: %v", secretName, err)
+		}
+		c.Secrets[secret.UID] = secret
 	}
 
 	return nil

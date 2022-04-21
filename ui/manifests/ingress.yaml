@@ -6,6 +6,7 @@ metadata:
   labels:
     application: "postgres-operator-ui"
 spec:
+  # ingressClassName: "ingress-nginx"
   rules:
     - host: "ui.example.org"
       http:

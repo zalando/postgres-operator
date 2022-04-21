@@ -89,8 +89,10 @@ TARGET_NAMESPACE = getenv('TARGET_NAMESPACE')
 GOOGLE_ANALYTICS = getenv('GOOGLE_ANALYTICS', False)
 MIN_PODS= getenv('MIN_PODS', 2)
 
-# storage pricing, i.e. https://aws.amazon.com/ebs/pricing/
-COST_EBS = float(getenv('COST_EBS', 0.119))  # GB per month
+# storage pricing, i.e. https://aws.amazon.com/ebs/pricing/ (e.g. Europe - Franfurt)
+COST_EBS = float(getenv('COST_EBS', 0.0952))  # GB per month
+COST_IOPS = float(getenv('COST_IOPS', 0.006))  # IOPS per month above 3000 baseline
+COST_THROUGHPUT = float(getenv('COST_THROUGHPUT', 0.0476))  # MB/s per month above 125 MB/s baseline
 
 # compute costs, i.e. https://www.ec2instances.info/?region=eu-central-1&selected=m5.2xlarge
 COST_CORE = 30.5 * 24 * float(getenv('COST_CORE', 0.0575))  # Core per hour m5.2xlarge / 8.
@@ -98,7 +100,7 @@ COST_MEMORY = 30.5 * 24 * float(getenv('COST_MEMORY', 0.014375))  # Memory GB m5
 
 WALE_S3_ENDPOINT = getenv(
     'WALE_S3_ENDPOINT',
-    'https+path://s3-eu-central-1.amazonaws.com:443',
+    'https+path://s3.eu-central-1.amazonaws.com:443',
 )
 
 USE_AWS_INSTANCE_PROFILE = (
@@ -308,6 +310,8 @@ DEFAULT_UI_CONFIG = {
     'pgui_link': '',
     'static_network_whitelist': {},
     'cost_ebs': COST_EBS,
+    'cost_iops': COST_IOPS,
+    'cost_throughput': COST_THROUGHPUT,
     'cost_core': COST_CORE,
     'cost_memory': COST_MEMORY,
     'min_pods': MIN_PODS
@@ -487,6 +491,8 @@ def get_postgresqls():
             'cpu': spec.get('resources', {}).get('requests', {}).get('cpu', 0),
             'cpu_limit': spec.get('resources', {}).get('limits', {}).get('cpu', 0),
             'volume_size': spec.get('volume', {}).get('size', 0),
+            'iops': spec.get('volume', {}).get('iops', 3000),
+            'throughput': spec.get('volume', {}).get('throughput', 125),
             'team': (
                 spec.get('teamId') or
                 metadata.get('labels', {}).get('team', '')
@@ -613,6 +619,28 @@ def update_postgresql(namespace: str, cluster: str):
             return fail('volume.size is invalid; should be like 123Gi')
 
         spec['volume'] = {'size': size}
+
+    if (
+        'volume' in postgresql['spec']
+        and 'iops' in postgresql['spec']['volume']
+        and postgresql['spec']['volume']['iops'] != None
+    ):
+        iops = int(postgresql['spec']['volume']['iops'])
+        if not 'volume' in spec:
+            spec['volume'] = {}
+
+        spec['volume']['iops'] = iops
+
+    if (
+        'volume' in postgresql['spec']
+        and 'throughput' in postgresql['spec']['volume']
+        and postgresql['spec']['volume']['throughput'] != None
+    ):
+        throughput = int(postgresql['spec']['volume']['throughput'])
+        if not 'volume' in spec:
+            spec['volume'] = {}
+
+        spec['volume']['throughput'] = throughput
 
     if 'enableConnectionPooler' in postgresql['spec']:
         cp = postgresql['spec']['enableConnectionPooler']
@@ -757,6 +785,27 @@ def update_postgresql(namespace: str, cluster: str):
                     VALID_USERNAME=VALID_USERNAME.pattern,
                     owner_username=owner_username,
                 )
+
+    resource_types = ["cpu","memory"]
+    resource_constraints = ["requests","limits"]
+    if "resources" in postgresql["spec"]:
+        spec["resources"] = {}
+
+        res = postgresql["spec"]["resources"]
+        for rt in resource_types:
+            for rc in resource_constraints:
+                if rc in res:
+                    if rt in res[rc]:
+                        if not rc in spec["resources"]:
+                            spec["resources"][rc] = {}
+                        spec["resources"][rc][rt] = res[rc][rt]
+
+    if "postgresql" in postgresql["spec"]:
+        if "version" in postgresql["spec"]["postgresql"]:
+            if "postgresql" not in spec:
+                spec["postgresql"]={}
+
+            spec["postgresql"]["version"] = postgresql["spec"]["postgresql"]["version"]
 
     o['spec'].update(spec)
 
@@ -912,8 +961,13 @@ def get_operator_get_logs(worker: int):
 @app.route('/operator/clusters/<namespace>/<cluster>/logs')
 @authorize
 def get_operator_get_logs_per_cluster(namespace: str, cluster: str):
-    team, clustername = cluster.split('-', 1)
-    return proxy_operator(f'/clusters/{team}/{namespace}/{clustername}/logs/')
+    user_teams = get_teams_for_user(session.get('user_name', ''))
+    for user_team in user_teams:
+        if cluster.find(user_team) == 0:
+            team = cluster[:len(user_team)]
+            cluster_name = cluster[len(user_team)+1:]
+            break
+    return proxy_operator(f'/clusters/{team}/{namespace}/{cluster_name}/logs/')
 
 
 @app.route('/login')

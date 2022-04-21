@@ -27,7 +27,7 @@ type PostgresSpec struct {
 	PostgresqlParam `json:"postgresql"`
 	Volume          `json:"volume,omitempty"`
 	Patroni         `json:"patroni,omitempty"`
-	Resources       `json:"resources,omitempty"`
+	*Resources      `json:"resources,omitempty"`
 
 	EnableConnectionPooler        *bool             `json:"enableConnectionPooler,omitempty"`
 	EnableReplicaConnectionPooler *bool             `json:"enableReplicaConnectionPooler,omitempty"`
@@ -42,8 +42,10 @@ type PostgresSpec struct {
 
 	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
 	// in that case the var evaluates to nil and the value is taken from the operator config
-	EnableMasterLoadBalancer  *bool `json:"enableMasterLoadBalancer,omitempty"`
-	EnableReplicaLoadBalancer *bool `json:"enableReplicaLoadBalancer,omitempty"`
+	EnableMasterLoadBalancer        *bool `json:"enableMasterLoadBalancer,omitempty"`
+	EnableMasterPoolerLoadBalancer  *bool `json:"enableMasterPoolerLoadBalancer,omitempty"`
+	EnableReplicaLoadBalancer       *bool `json:"enableReplicaLoadBalancer,omitempty"`
+	EnableReplicaPoolerLoadBalancer *bool `json:"enableReplicaPoolerLoadBalancer,omitempty"`
 
 	// deprecated load balancer settings maintained for backward compatibility
 	// see "Load balancers" operator docs
@@ -53,8 +55,11 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
+	Users                          map[string]UserFlags `json:"users,omitempty"`
+	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
+	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
+
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
-	Users                 map[string]UserFlags        `json:"users,omitempty"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
 	Clone                 *CloneDescription           `json:"clone,omitempty"`
 	ClusterName           string                      `json:"-"`
@@ -74,6 +79,8 @@ type PostgresSpec struct {
 	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
 	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
+	Streams               []Stream                    `json:"streams,omitempty"`
+	Env                   []v1.EnvVar                 `json:"env,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -161,11 +168,15 @@ type Patroni struct {
 	Slots                 map[string]map[string]string `json:"slots,omitempty"`
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
+	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:"1"`
 }
 
-// StandbyDescription contains s3 wal path
+// StandbyDescription contains remote primary config or s3/gs wal path
 type StandbyDescription struct {
-	S3WalPath string `json:"s3_wal_path,omitempty"`
+	S3WalPath   string `json:"s3_wal_path,omitempty"`
+	GSWalPath   string `json:"gs_wal_path,omitempty"`
+	StandbyHost string `json:"standby_host,omitempty"`
+	StandbyPort string `json:"standby_port,omitempty"`
 }
 
 // TLSDescription specs TLS properties
@@ -191,7 +202,7 @@ type CloneDescription struct {
 
 // Sidecar defines a container to be run in the same pod as the Postgres container.
 type Sidecar struct {
-	Resources   `json:"resources,omitempty"`
+	*Resources  `json:"resources,omitempty"`
 	Name        string             `json:"name,omitempty"`
 	DockerImage string             `json:"image,omitempty"`
 	Ports       []v1.ContainerPort `json:"ports,omitempty"`
@@ -224,5 +235,19 @@ type ConnectionPooler struct {
 	DockerImage       string `json:"dockerImage,omitempty"`
 	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
 
-	Resources `json:"resources,omitempty"`
+	*Resources `json:"resources,omitempty"`
+}
+
+type Stream struct {
+	ApplicationId string                 `json:"applicationId"`
+	Database      string                 `json:"database"`
+	Tables        map[string]StreamTable `json:"tables"`
+	Filter        map[string]*string     `json:"filter,omitempty"`
+	BatchSize     *uint32                `json:"batchSize,omitempty"`
+}
+
+type StreamTable struct {
+	EventType     string  `json:"eventType"`
+	IdColumn      *string `json:"idColumn,omitempty"`
+	PayloadColumn *string `json:"payloadColumn,omitempty"`
 }

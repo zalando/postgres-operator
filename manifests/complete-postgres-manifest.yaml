@@ -3,19 +3,27 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 #  labels:
+#    application: test-app
 #    environment: demo
 #  annotations:
 #    "acid.zalan.do/controller": "second-operator"
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-14:2.1-p3
+  dockerImage: registry.opensource.zalan.do/acid/spilo-14:2.1-p5
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
     zalando:
     - superuser
     - createdb
+    foo_user: []
+#    flyway: []
+#  usersWithSecretRotation:
+#  - foo_user
+#  usersWithInPlaceSecretRotation:
+#  - flyway
+#  - bar_owner_user
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
   enableConnectionPooler: false # enable/disable connection pooler deployment
@@ -41,6 +49,10 @@ spec:
       shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"
+#  env:
+#  - name: wal_s3_bucket
+#    value: my-custom-bucket
+
   volume:
     size: 1Gi
 #    storageClass: my-sc
@@ -112,10 +124,11 @@ spec:
 #        database: foo
 #        plugin: pgoutput
     ttl: 30
-    loop_wait: &loop_wait 10
+    loop_wait: 10
     retry_timeout: 10
     synchronous_mode: false
     synchronous_mode_strict: false
+    synchronous_node_count: 1
     maximum_lag_on_failover: 33554432
 
 # restore a Postgres DB with point-in-time-recovery
@@ -123,7 +136,7 @@ spec:
 # with an empty/absent timestamp, clone from an existing alive cluster using pg_basebackup
 #  clone:
 #    uid: "efd12e58-5786-11e8-b5a7-06148230260c"
-#    cluster: "acid-batman"
+#    cluster: "acid-minimal-cluster"
 #    timestamp: "2017-12-19T12:40:33+01:00"  # timezone required (offset relative to UTC, see RFC 3339 section 5.6)
 #    s3_wal_path: "s3://custom/path/to/bucket"
 
@@ -195,3 +208,21 @@ spec:
 #              operator: In
 #              values:
 #                - enabled
+
+# Enables change data capture streams for defined database tables
+#  streams:
+#  - applicationId: test-app
+#    database: foo
+#    tables:
+#      data.state_pending_outbox:
+#        eventType: test-app.status-pending
+#      data.state_approved_outbox:
+#        eventType: test-app.status-approved
+#      data.orders_outbox:
+#        eventType: test-app.order-completed
+#        idColumn: o_id
+#        payloadColumn: o_payload
+#    # Optional. Filter ignores events before a certain txnId and lsn. Can be used to skip bad events
+#    filter:
+#      data.orders_outbox: "[?(@.source.txId > 500 && @.source.lsn > 123456)]"
+#    batchSize: 1000

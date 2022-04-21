@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.7.1
+  tag: v1.8.0
   pullPolicy: "IfNotPresent"
 
   # Optionally specify an array of imagePullSecrets.
@@ -20,8 +20,11 @@ enableJsonLogging: false
 
 # general configuration parameters
 configGeneral:
-  # choose if deployment creates/updates CRDs with OpenAPIV3Validation
-  enable_crd_validation: true
+  # the deployment should create/update the CRDs
+  enable_crd_registration: true
+  # specify categories under which crds should be listed
+  crd_categories:
+  - "all"
   # update only the statefulsets without immediately doing the rolling update
   enable_lazy_spilo_upgrade: false
   # set the PGVERSION env var instead of providing the version via postgresql.bin_dir in SPILO_CONFIGURATION
@@ -35,7 +38,7 @@ configGeneral:
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: false
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p3
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p5
   # min number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # max number of instances in Postgres cluster. -1 = no limit
@@ -56,6 +59,16 @@ configGeneral:
 
 # parameters describing Postgres users
 configUsers:
+  # roles to be granted to database owners
+  # additional_owner_roles:
+  # - cron_admin
+
+  # enable password rotation for app users that are not database owners
+  enable_password_rotation: false
+  # rotation interval for updating credentials in K8s secrets of app users
+  password_rotation_interval: 90
+  # retention interval to keep rotation users
+  password_rotation_user_retention: 180
   # postgres username used for replication between instances
   replication_username: standby
   # postgres superuser name to be created by initdb
@@ -64,6 +77,10 @@ configUsers:
 configMajorVersionUpgrade:
   # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
   major_version_upgrade_mode: "off"
+  # upgrades will only be carried out for clusters of listed teams when mode is "off"
+  # major_version_upgrade_team_allow_list:
+  # - acid
+
   # minimal Postgres major version that will not automatically be upgraded
   minimal_major_version: "9.6"
   # target Postgres major version when upgrading clusters automatically
@@ -107,6 +124,11 @@ configKubernetes:
   enable_pod_disruption_budget: true
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
+
+  # annotations to be ignored when comparing statefulsets, services etc.
+  # ignored_annotations:
+  # - k8s.v1.cni.cncf.io/network-status
+
   # namespaced name of the secret containing infrastructure roles names and passwords
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 
@@ -125,6 +147,9 @@ configKubernetes:
   # set of labels that a running and active node should possess to be considered ready
   # node_readiness_label:
   #   status: ready
+
+  # defines how nodeAffinity from manifest should be merged with node_readiness_label
+  # node_readiness_label_merge: "OR"
 
   # namespaced name of the secret containing the OAuth2 token to pass to the teams API
   # oauth_token_secret_name: postgresql-operator
@@ -194,6 +219,10 @@ configPostgresPodResources:
 
 # timeouts related to some operator actions
 configTimeouts:
+  # interval between consecutive attempts of operator calling the Patroni API
+  patroni_api_check_interval: 1s
+  # timeout when waiting for successful response from Patroni API
+  patroni_api_check_timeout: 5s
   # timeout when waiting for the Postgres pods to be deleted
   pod_deletion_wait_timeout: 10m
   # timeout when waiting for pod role and cluster labels
@@ -218,8 +247,12 @@ configLoadBalancer:
 
   # toggles service type load balancer pointing to the master pod of the cluster
   enable_master_load_balancer: false
+  # toggles service type load balancer pointing to the master pooler pod of the cluster
+  enable_master_pooler_load_balancer: false
   # toggles service type load balancer pointing to the replica pod of the cluster
   enable_replica_load_balancer: false
+  # toggles service type load balancer pointing to the replica pooler pod of the cluster
+  enable_replica_pooler_load_balancer: false
   # define external traffic policy for the load balancer
   external_traffic_policy: "Cluster"
   # defines the DNS name string template for the master load balancer cluster
@@ -280,7 +313,7 @@ configAwsOrGcp:
 # configure K8s cron job managed by the operator
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.7.1"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.8.0"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -300,6 +333,8 @@ configLogicalBackup:
   logical_backup_s3_secret_access_key: ""
   # S3 server side encryption
   logical_backup_s3_sse: "AES256"
+  # S3 retention time for stored backups for example "2 week" or "7 days"
+  logical_backup_s3_retention_time: ""
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
 
@@ -328,6 +363,7 @@ configTeamsApi:
   # List of roles that cannot be overwritten by an application, team or infrastructure role
   protected_role_names:
     - admin
+    - cron_admin
   # Suffix to add if members are removed from TeamsAPI or PostgresTeam CRD
   role_deletion_suffix: "_deleted"
   # role name to grant to team members created from the Teams API
@@ -345,7 +381,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-19"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-22"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode
@@ -358,14 +394,14 @@ configConnectionPooler:
   connection_pooler_default_cpu_limit: "1"
   connection_pooler_default_memory_limit: 100Mi
 
+# Zalando's internal CDC stream feature
+enableStreams: false
+
 rbac:
   # Specifies whether RBAC resources should be created
   create: true
-
-crd:
-  # Specifies whether custom resource definitions should be created
-  # When using helm3, this is ignored; instead use "--skip-crds" to skip.
-  create: true
+  # Specifies whether ClusterRoles that are aggregated into the K8s default roles should be created. (https://kubernetes.io/docs/reference/access-authn-authz/rbac/#default-roles-and-role-bindings)
+  createAggregateClusterRoles: false
 
 serviceAccount:
   # Specifies whether a ServiceAccount should be created
