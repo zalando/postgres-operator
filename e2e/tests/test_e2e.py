@@ -195,8 +195,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", owner_query)), 3,
             "Not all additional users found in database", 10, 5)
 
-        print('Operator log: {}'.format(k8s.get_operator_log()))
-
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_pod_capabilities(self):
         '''
