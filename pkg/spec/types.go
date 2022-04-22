@@ -75,7 +75,7 @@ type PgSyncUserRequest struct {
 // UserSyncer defines an interface for the implementations to sync users from the manifest to the DB.
 type UserSyncer interface {
 	ProduceSyncRequests(dbUsers PgUserMap, newUsers PgUserMap) (req []PgSyncUserRequest)
-	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB) error
+	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB, additionalOwners []string) error
 }
 
 // LogEntry describes log entry in the RingLogger

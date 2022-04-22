@@ -657,7 +657,7 @@ func (c *Cluster) syncSecrets() error {
 			return fmt.Errorf("could not init db connection: %v", err)
 		}
 		pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(spec.PgUserMap{}, rotationUsers)
-		if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
+		if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb, c.OpConfig.AdditionalOwnerRoles); err != nil {
 			return fmt.Errorf("error creating database roles for password rotation: %v", err)
 		}
 		if err := c.closeDbConn(); err != nil {
@@ -872,7 +872,7 @@ func (c *Cluster) syncRoles() (err error) {
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)
-	if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
+	if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb, c.OpConfig.AdditionalOwnerRoles); err != nil {
 		return fmt.Errorf("error executing sync statements: %v", err)
 	}
 

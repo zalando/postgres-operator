@@ -164,6 +164,13 @@ class EndToEndTestCase(unittest.TestCase):
            Test granting additional roles to existing database owners
         '''
         k8s = self.k8s
+        leader = k8s.get_cluster_leader_pod()
+
+        # produce wrong membership from v1.8.0
+        grant_dbowner = """
+            GRANT bar_owner TO cron_admin;
+        """
+        self.query_database(leader.metadata.name, "postgres", grant_dbowner)
 
         # enable PostgresTeam CRD and lower resync
         owner_roles = {
@@ -175,7 +182,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
 
-        leader = k8s.get_cluster_leader_pod()
         owner_query = """
             SELECT a2.rolname
               FROM pg_catalog.pg_authid a
@@ -188,6 +194,8 @@ class EndToEndTestCase(unittest.TestCase):
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", owner_query)), 3,
             "Not all additional users found in database", 10, 5)
+
+        print('Operator log: {}'.format(k8s.get_operator_log()))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_pod_capabilities(self):

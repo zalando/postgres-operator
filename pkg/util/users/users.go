@@ -20,6 +20,7 @@ const (
 	alterRoleSetSQL      = `ALTER ROLE "%s" SET %s TO %s`
 	dropUserSQL          = `SET LOCAL synchronous_commit = 'local'; DROP ROLE "%s";`
 	grantToUserSQL       = `GRANT %s TO "%s"`
+	revokeFromUserSQL    = `REVOKE %s FROM %s`
 	doBlockStmt          = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
 	passwordTemplate     = "ENCRYPTED PASSWORD '%s'"
 	inRoleTemplate       = `IN ROLE %s`
@@ -103,7 +104,7 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 }
 
 // ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
-func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSyncUserRequest, db *sql.DB) error {
+func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSyncUserRequest, db *sql.DB, additionalOwnerRoles []string) error {
 	var reqretries []spec.PgSyncUserRequest
 	errors := make([]string, 0)
 	for _, request := range requests {
@@ -117,6 +118,11 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 			if err := strategy.alterPgUser(request.User, db); err != nil {
 				reqretries = append(reqretries, request)
 				errors = append(errors, fmt.Sprintf("could not alter user %q: %v", request.User.Name, err))
+				if request.User.IsDbOwner && len(additionalOwnerRoles) > 0 {
+					if err := resolveOwnerMembership(request.User, additionalOwnerRoles, db); err != nil {
+						errors = append(errors, fmt.Sprintf("could not resolve owner membership for %q: %v", request.User.Name, err))
+					}
+				}
 			}
 		case spec.PGSyncAlterSet:
 			if err := strategy.alterPgUserSet(request.User, db); err != nil {
@@ -138,12 +144,31 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 	// retry adding roles as long as the number of failed attempts is shrinking
 	if len(reqretries) > 0 {
 		if len(reqretries) < len(requests) {
-			if err := strategy.ExecuteSyncRequests(reqretries, db); err != nil {
+			if err := strategy.ExecuteSyncRequests(reqretries, db, additionalOwnerRoles); err != nil {
 				return err
 			}
 		} else {
 			return fmt.Errorf("could not execute sync requests for users: %v", strings.Join(errors, `', '`))
 		}
+	}
+
+	return nil
+}
+
+func resolveOwnerMembership(dbOwner spec.PgUser, additionalOwners []string, db *sql.DB) error {
+	errors := make([]string, 0)
+	for _, groupRole := range dbOwner.MemberOf {
+		for _, additionalOwner := range additionalOwners {
+			if additionalOwner == groupRole {
+				if err := revokeRole(dbOwner.Name, additionalOwner, db); err != nil {
+					errors = append(errors, fmt.Sprintf("could not revoke %q from %q: %v", dbOwner.Name, additionalOwner, err))
+				}
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("could not resolve membership between %q and additional owner roles: %v", dbOwner.Name, strings.Join(errors, `', '`))
 	}
 
 	return nil
@@ -267,6 +292,16 @@ func quoteMemberList(user spec.PgUser) string {
 		memberof = append(memberof, fmt.Sprintf(`"%s"`, member))
 	}
 	return strings.Join(memberof, ",")
+}
+
+func revokeRole(groupRole, role string, db *sql.DB) error {
+	revokeStmt := fmt.Sprintf(revokeFromUserSQL, groupRole, role)
+
+	if _, err := db.Exec(fmt.Sprintf(doBlockStmt, revokeStmt)); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // quoteVal quotes values to be used at ALTER ROLE SET param = value if necessary
