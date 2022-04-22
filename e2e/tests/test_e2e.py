@@ -164,9 +164,13 @@ class EndToEndTestCase(unittest.TestCase):
            Test granting additional roles to existing database owners
         '''
         k8s = self.k8s
+
+        # first test - wait for the operator to get in sync and set everything up
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+            "Operator does not get in sync")
         leader = k8s.get_cluster_leader_pod()
 
-        # produce wrong membership from v1.8.0
+        # produce wrong membership for cron_admin
         grant_dbowner = """
             GRANT bar_owner TO cron_admin;
         """

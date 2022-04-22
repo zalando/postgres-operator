@@ -54,7 +54,6 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 			}
 		} else {
 			r := spec.PgSyncUserRequest{}
-			r.User = dbUser
 			newMD5Password := util.NewEncryptor(strategy.PasswordEncryption).PGUserPassword(newUser)
 
 			// do not compare for roles coming from docker image
@@ -62,12 +61,13 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 				r.User.Password = newMD5Password
 				r.Kind = spec.PGsyncUserAlter
 			}
-			if addNewFlags, equal := util.SubstractStringSlices(newUser.Flags, dbUser.Flags); !equal {
-				r.User.Flags = addNewFlags
-				r.Kind = spec.PGsyncUserAlter
-			}
 			if addNewRoles, equal := util.SubstractStringSlices(newUser.MemberOf, dbUser.MemberOf); !equal {
 				r.User.MemberOf = addNewRoles
+				r.User.IsDbOwner = newUser.IsDbOwner
+				r.Kind = spec.PGsyncUserAlter
+			}
+			if addNewFlags, equal := util.SubstractStringSlices(newUser.Flags, dbUser.Flags); !equal {
+				r.User.Flags = addNewFlags
 				r.Kind = spec.PGsyncUserAlter
 			}
 			if r.Kind == spec.PGsyncUserAlter {
@@ -118,6 +118,8 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 			if err := strategy.alterPgUser(request.User, db); err != nil {
 				reqretries = append(reqretries, request)
 				errors = append(errors, fmt.Sprintf("could not alter user %q: %v", request.User.Name, err))
+				// check if additional owners are misconfigured as members to a database owner
+				// resolve it by revoking the database owner from the additional owner role
 				if request.User.IsDbOwner && len(additionalOwnerRoles) > 0 {
 					if err := resolveOwnerMembership(request.User, additionalOwnerRoles, db); err != nil {
 						errors = append(errors, fmt.Sprintf("could not resolve owner membership for %q: %v", request.User.Name, err))
