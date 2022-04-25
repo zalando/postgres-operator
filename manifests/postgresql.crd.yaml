@@ -477,7 +477,6 @@ spec:
                   - standby_host
               streams:
                 type: array
-                nullable: true
                 items:
                   type: object
                   required:
@@ -586,12 +585,12 @@ spec:
                     - SUPERUSER
                     - nosuperuser
                     - NOSUPERUSER
-              usersWithPasswordRotation:
+              usersWithInPlaceSecretRotation:
                 type: array
                 nullable: true
                 items:
                   type: string
-              usersWithInPlacePasswordRotation:
+              usersWithSecretRotation:
                 type: array
                 nullable: true
                 items:
@@ -610,17 +609,26 @@ spec:
                         type: array
                         items:
                           type: object
+                          required:
+                            - key
+                            - operator
                           properties:
                             key:
                               type: string
                             operator:
                               type: string
+                              enum:
+                                - DoesNotExists
+                                - Exists
+                                - In
+                                - NotIn
                             values:
                               type: array
                               items:
                                 type: string
                       matchLabels:
                         type: object
+                        x-kubernetes-preserve-unknown-fields: true
                   size:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'

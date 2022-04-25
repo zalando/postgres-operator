@@ -957,7 +957,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
-					"usersWithSecretRotation": {
+					"usersWithInPlaceSecretRotation": {
 						Type:     "array",
 						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -966,7 +966,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
-					"usersWithInPlaceSecretRotation": {
+					"usersWithSecretRotation": {
 						Type:     "array",
 						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -990,7 +990,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
 												Type:     "object",
-												Required: []string{"key", "operator", "values"},
+												Required: []string{"key", "operator"},
 												Properties: map[string]apiextv1.JSONSchemaProps{
 													"key": {
 														Type: "string",
@@ -999,16 +999,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Type: "string",
 														Enum: []apiextv1.JSON{
 															{
-																Raw: []byte(`"In"`),
-															},
-															{
-																Raw: []byte(`"NotIn"`),
+																Raw: []byte(`"DoesNotExist"`),
 															},
 															{
 																Raw: []byte(`"Exists"`),
 															},
 															{
-																Raw: []byte(`"DoesNotExist"`),
+																Raw: []byte(`"In"`),
+															},
+															{
+																Raw: []byte(`"NotIn"`),
 															},
 														},
 													},
