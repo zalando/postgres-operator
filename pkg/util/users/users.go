@@ -32,8 +32,9 @@ const (
 // an existing roles of another role membership, nor it removes the already assigned flag
 // (except for the NOLOGIN). TODO: process other NOflags, i.e. NOSUPERUSER correctly.
 type DefaultUserSyncStrategy struct {
-	PasswordEncryption string
-	RoleDeletionSuffix string
+	PasswordEncryption   string
+	RoleDeletionSuffix   string
+	AdditionalOwnerRoles []string
 }
 
 // ProduceSyncRequests figures out the types of changes that need to happen with the given users.
@@ -104,7 +105,7 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 }
 
 // ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
-func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSyncUserRequest, db *sql.DB, additionalOwnerRoles []string) error {
+func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSyncUserRequest, db *sql.DB) error {
 	var reqretries []spec.PgSyncUserRequest
 	errors := make([]string, 0)
 	for _, request := range requests {
@@ -120,8 +121,8 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 				errors = append(errors, fmt.Sprintf("could not alter user %q: %v", request.User.Name, err))
 				// check if additional owners are misconfigured as members to a database owner
 				// resolve it by revoking the database owner from the additional owner role
-				if request.User.IsDbOwner && len(additionalOwnerRoles) > 0 {
-					if err := resolveOwnerMembership(request.User, additionalOwnerRoles, db); err != nil {
+				if request.User.IsDbOwner && len(strategy.AdditionalOwnerRoles) > 0 {
+					if err := resolveOwnerMembership(request.User, strategy.AdditionalOwnerRoles, db); err != nil {
 						errors = append(errors, fmt.Sprintf("could not resolve owner membership for %q: %v", request.User.Name, err))
 					}
 				}
@@ -146,7 +147,7 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 	// retry adding roles as long as the number of failed attempts is shrinking
 	if len(reqretries) > 0 {
 		if len(reqretries) < len(requests) {
-			if err := strategy.ExecuteSyncRequests(reqretries, db, additionalOwnerRoles); err != nil {
+			if err := strategy.ExecuteSyncRequests(reqretries, db); err != nil {
 				return err
 			}
 		} else {
