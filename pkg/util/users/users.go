@@ -119,7 +119,7 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 			if err := strategy.alterPgUser(request.User, db); err != nil {
 				reqretries = append(reqretries, request)
 				errors = append(errors, fmt.Sprintf("could not alter user %q: %v", request.User.Name, err))
-				// check if additional owners are misconfigured as members to a database owner
+				// check if additional owners are misconfigured as members to a database owner (check #1862 for details)
 				// resolve it by revoking the database owner from the additional owner role
 				if request.User.IsDbOwner && len(strategy.AdditionalOwnerRoles) > 0 {
 					if err := resolveOwnerMembership(request.User, strategy.AdditionalOwnerRoles, db); err != nil {
@@ -160,13 +160,9 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 
 func resolveOwnerMembership(dbOwner spec.PgUser, additionalOwners []string, db *sql.DB) error {
 	errors := make([]string, 0)
-	for _, groupRole := range dbOwner.MemberOf {
-		for _, additionalOwner := range additionalOwners {
-			if additionalOwner == groupRole {
-				if err := revokeRole(dbOwner.Name, additionalOwner, db); err != nil {
-					errors = append(errors, fmt.Sprintf("could not revoke %q from %q: %v", dbOwner.Name, additionalOwner, err))
-				}
-			}
+	for _, additionalOwner := range additionalOwners {
+		if err := revokeRole(dbOwner.Name, additionalOwner, db); err != nil {
+			errors = append(errors, fmt.Sprintf("could not revoke %q from %q: %v", dbOwner.Name, additionalOwner, err))
 		}
 	}
 
