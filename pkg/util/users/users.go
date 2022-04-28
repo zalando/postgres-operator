@@ -119,8 +119,10 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 			if err := strategy.alterPgUser(request.User, db); err != nil {
 				reqretries = append(reqretries, request)
 				errors = append(errors, fmt.Sprintf("could not alter user %q: %v", request.User.Name, err))
-				// check if additional owners are misconfigured as members to a database owner (check #1862 for details)
-				// resolve it by revoking the database owner from the additional owner role
+				// XXX: we do not allow additional owner roles to be members of database owners
+				// if ALTER fails it could be because of the wrong memberhip (check #1862 for details)
+				// so in any case try to revoke the database owner from the additional owner roles
+				// the initial ALTER statement will be retried once and should work then
 				if request.User.IsDbOwner && len(strategy.AdditionalOwnerRoles) > 0 {
 					if err := resolveOwnerMembership(request.User, strategy.AdditionalOwnerRoles, db); err != nil {
 						errors = append(errors, fmt.Sprintf("could not resolve owner membership for %q: %v", request.User.Name, err))

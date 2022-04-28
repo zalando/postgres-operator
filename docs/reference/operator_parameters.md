@@ -179,12 +179,17 @@ under the `users` key.
 
 * **additional_owner_roles**
   Specifies database roles that will be granted to all database owners. Owners
-  can then use `SET ROLE` to obtain privileges of these roles to e.g.
-  create/update functionality from extensions as part of a migration script.
-  Note, that roles listed here should be preconfigured in the docker image
-  and already exist in the database cluster on startup. One such role can be
-  `cron_admin` which is provided by the Spilo docker image to set up cron
-  jobs inside the `postgres` database. Default is `empty`.
+  can then use `SET ROLE` to obtain privileges of these roles to e.g. create
+  or update functionality from extensions as part of a migration script. One
+  such role can be `cron_admin` which is provided by the Spilo docker image to
+  set up cron jobs inside the `postgres` database. In general, roles listed
+  here should be preconfigured in the docker image and already exist in the
+  database cluster on startup. Otherwise, syncing roles will return an error
+  on each cluster sync process. Alternatively, you have to create the role and
+  do the GRANT manually. Note, the operator will not allow additional owner
+  roles to be members of database owners because it should be vice versa. If
+  the operator cannot set up the correct membership it tries to revoke all
+  additional owner roles from database owners. Default is `empty`.
 
 * **enable_password_rotation**
   For all `LOGIN` roles that are not database owners the operator can rotate
