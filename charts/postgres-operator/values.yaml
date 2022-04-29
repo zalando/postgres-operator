@@ -459,6 +459,11 @@ securityContext:
   readOnlyRootFilesystem: true
   allowPrivilegeEscalation: false
 
+# Allow to setup operator Deployment readiness probe
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
 # Affinity for pod assignment
 # Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
 affinity: {}

@@ -455,12 +455,13 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
-	go c.apiserver.Run(stopCh, wg)
 	go c.kubeNodesInformer(stopCh, wg)
 
 	if c.opConfig.EnablePostgresTeamCRD {
 		go c.runPostgresTeamInformer(stopCh, wg)
 	}
+
+	go c.apiserver.Run(stopCh, wg)
 
 	c.logger.Info("started working in background")
 }
