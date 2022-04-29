@@ -67,7 +67,7 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 		return fmt.Errorf("could not form patch for pod's rolling update flag: %v", err)
 	}
 
-	err = retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
 			_, err2 := c.KubeClient.Pods(pod.Namespace).Patch(
 				context.TODO(),
@@ -149,14 +149,14 @@ func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	c.logger.Debugf("unsubscribing from pod %q events", podName)
 	c.podSubscribersMu.Lock()
-	defer c.podSubscribersMu.Unlock()
-
-	if _, ok := c.podSubscribers[podName]; !ok {
+	ch, ok := c.podSubscribers[podName]
+	if !ok {
 		panic("subscriber for pod '" + podName.String() + "' is not found")
 	}
 
-	close(c.podSubscribers[podName])
 	delete(c.podSubscribers, podName)
+	c.podSubscribersMu.Unlock()
+	close(ch)
 }
 
 func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan PodEvent {
@@ -399,11 +399,12 @@ func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) 
 }
 
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
+	stopCh := make(chan struct{})
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
-	stopChan := make(chan struct{})
+	defer close(stopCh)
 
-	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
+	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.PodDeletionWaitTimeout,
 		func() (bool, error) {
 			err2 := c.KubeClient.Pods(podName.Namespace).Delete(
 				context.TODO(),
@@ -421,7 +422,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	if err := c.waitForPodDeletion(ch); err != nil {
 		return nil, err
 	}
-	pod, err := c.waitForPodLabel(ch, stopChan, nil)
+	pod, err := c.waitForPodLabel(ch, stopCh, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +447,7 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 			continue
 		}
 
-		podName := util.NameFromMeta(pod.ObjectMeta)
+		podName := util.NameFromMeta(pods[i].ObjectMeta)
 		newPod, err := c.recreatePod(podName)
 		if err != nil {
 			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)

@@ -324,10 +324,18 @@ func testNil(values ...*int32) bool {
 	return false
 }
 
-// Convert int to IntOrString type
+// ToIntStr convert int to IntOrString type
 func ToIntStr(val int) *intstr.IntOrString {
 	b := intstr.FromInt(val)
 	return &b
+}
+
+// Bool2Int converts bool to int
+func Bool2Int(flag bool) int {
+	if flag {
+		return 1
+	}
+	return 0
 }
 
 // Get int from IntOrString and return max int if string
