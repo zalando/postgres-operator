@@ -1033,11 +1033,12 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 	}
 
 	c.podSubscribersMu.RLock()
+	defer c.podSubscribersMu.RUnlock()
+
 	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
 	if ok {
 		subscriber <- event
 	}
-	c.podSubscribersMu.RUnlock()
 
 	return nil
 }

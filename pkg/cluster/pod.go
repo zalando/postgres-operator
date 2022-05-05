@@ -149,13 +149,14 @@ func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	c.logger.Debugf("unsubscribing from pod %q events", podName)
 	c.podSubscribersMu.Lock()
+	defer c.podSubscribersMu.Unlock()
+
 	ch, ok := c.podSubscribers[podName]
 	if !ok {
 		panic("subscriber for pod '" + podName.String() + "' is not found")
 	}
 
 	delete(c.podSubscribers, podName)
-	c.podSubscribersMu.Unlock()
 	close(ch)
 }
 
