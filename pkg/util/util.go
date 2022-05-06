@@ -324,7 +324,7 @@ func testNil(values ...*int32) bool {
 	return false
 }
 
-// ToIntStr convert int to IntOrString type
+// ToIntStr converts int to IntOrString type
 func ToIntStr(val int) *intstr.IntOrString {
 	b := intstr.FromInt(val)
 	return &b
