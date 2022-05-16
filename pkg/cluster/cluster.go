@@ -1034,10 +1034,15 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 
 	c.podSubscribersMu.RLock()
 	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
-	c.podSubscribersMu.RUnlock()
 	if ok {
-		subscriber <- event
+		select {
+		case subscriber <- event:
+		default:
+			// we end up here when there is no receiver of the channel
+			// avoiding a deadlock: https://gobyexample.com/non-blocking-channel-operations
+		}
 	}
+	c.podSubscribersMu.RUnlock()
 
 	return nil
 }
