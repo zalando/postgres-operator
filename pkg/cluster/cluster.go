@@ -1046,8 +1046,8 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 		select {
 		case <-subscriber.stopEvent:
 			c.unregisterPodSubscriber(podName)
+		case subscriber.podEvents <- event:
 		default:
-			subscriber.podEvents <- event
 		}
 	}
 	// hold lock for the time of processing the event to avoid race condition
