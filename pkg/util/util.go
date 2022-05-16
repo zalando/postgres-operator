@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"math/rand"
 	"reflect"
@@ -328,14 +327,6 @@ func testNil(values ...*int32) bool {
 func ToIntStr(val int) *intstr.IntOrString {
 	b := intstr.FromInt(val)
 	return &b
-}
-
-// Get int from IntOrString and return max int if string
-func IntFromIntStr(intOrStr intstr.IntOrString) int {
-	if intOrStr.Type == 1 {
-		return math.MaxInt
-	}
-	return intOrStr.IntValue()
 }
 
 // MaxInt32 : Return maximum of two integers provided via pointers. If one value
