@@ -451,7 +451,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 		panic("could not acquire initial list of clusters")
 	}
 
-	wg.Add(5)
+	wg.Add(5 + util.Bool2Int(c.opConfig.EnablePostgresTeamCRD))
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
