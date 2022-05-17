@@ -137,7 +137,6 @@ func (c *Cluster) deletePods() error {
 func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 	c.setProcessName("deleting pod %q", podName)
 	subscriber := c.registerPodSubscriber(podName)
-	defer c.unregisterPodSubscriber(podName)
 
 	if err := c.KubeClient.Pods(podName.Namespace).Delete(context.TODO(), podName.Name, c.deleteOptions); err != nil {
 		return err
@@ -406,7 +405,6 @@ func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) 
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	stopCh := make(chan struct{})
 	subscriber := c.registerPodSubscriber(podName)
-	defer c.unregisterPodSubscriber(podName)
 	defer close(stopCh)
 
 	err := retryutil.Retry(1*time.Second, 5*time.Second,

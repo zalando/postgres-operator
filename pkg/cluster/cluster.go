@@ -1037,13 +1037,15 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 		return fmt.Errorf("could not cast to PodEvent")
 	}
 
+	podName := spec.NamespacedName(event.PodName)
+
 	// can only take lock when (un)registerPodSubscriber is finshed
 	c.podSubscribersMu.RLock()
-	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
+	subscriber, ok := c.podSubscribers[podName]
 	if ok {
 		select {
 		case <-subscriber.stopEvent:
-			c.logger.Debugf("ignoring pod event %s for pod %q", event.EventType, event.PodName)
+			c.unregisterPodSubscriber(podName)
 		default:
 			subscriber.podEvents <- event
 		}
@@ -1516,7 +1518,6 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
 	stopCh := make(chan struct{})
 	ch := c.registerPodSubscriber(candidate)
-	defer c.unregisterPodSubscriber(candidate)
 	defer close(stopCh)
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
