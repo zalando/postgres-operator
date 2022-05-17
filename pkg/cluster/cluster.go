@@ -1032,16 +1032,19 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 		return fmt.Errorf("could not cast to PodEvent")
 	}
 
+	// can only take lock when (un)registerPodSubscriber is finshed
 	c.podSubscribersMu.RLock()
 	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
 	if ok {
 		select {
 		case subscriber <- event:
 		default:
-			// we end up here when there is no receiver of the channel
-			// avoiding a deadlock: https://gobyexample.com/non-blocking-channel-operations
+			// ending up here when there is no receiver on the channel (i.e. waitForPodLabel finished)
+			// avoids blocking channel: https://gobyexample.com/non-blocking-channel-operations
 		}
 	}
+	// hold lock for the time of processing the event to avoid race condition
+	// with unregisterPodSubscriber closing the channel (see #1876)
 	c.podSubscribersMu.RUnlock()
 
 	return nil

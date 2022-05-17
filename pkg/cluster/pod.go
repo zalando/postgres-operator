@@ -67,7 +67,7 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 		return fmt.Errorf("could not form patch for pod's rolling update flag: %v", err)
 	}
 
-	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err = retryutil.Retry(1*time.Second, 5*time.Second,
 		func() (bool, error) {
 			_, err2 := c.KubeClient.Pods(pod.Namespace).Patch(
 				context.TODO(),
@@ -405,7 +405,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	defer c.unregisterPodSubscriber(podName)
 	defer close(stopCh)
 
-	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.PodDeletionWaitTimeout,
+	err := retryutil.Retry(1*time.Second, 5*time.Second,
 		func() (bool, error) {
 			err2 := c.KubeClient.Pods(podName.Namespace).Delete(
 				context.TODO(),
