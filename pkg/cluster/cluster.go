@@ -1517,13 +1517,16 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
 	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
 	stopCh := make(chan struct{})
-	ch := c.registerPodSubscriber(candidate)
+	subscriber := c.registerPodSubscriber(candidate)
+	defer func() {
+		subscriber.stopEvent <- struct{}{}
+	}()
 	defer close(stopCh)
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
-		_, err = c.waitForPodLabel(ch, stopCh, nil)
+		_, err = c.waitForPodLabel(subscriber.podEvents, stopCh, nil)
 		if err != nil {
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
