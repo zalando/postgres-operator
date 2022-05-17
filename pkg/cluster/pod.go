@@ -136,14 +136,14 @@ func (c *Cluster) deletePods() error {
 
 func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 	c.setProcessName("deleting pod %q", podName)
-	ch := c.registerPodSubscriber(podName)
+	subscriber := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
 	if err := c.KubeClient.Pods(podName.Namespace).Delete(context.TODO(), podName.Name, c.deleteOptions); err != nil {
 		return err
 	}
 
-	return c.waitForPodDeletion(ch)
+	return c.waitForPodDeletion(subscriber.podEvents)
 }
 
 func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
@@ -151,27 +151,31 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
-	ch, ok := c.podSubscribers[podName]
+	subscriber, ok := c.podSubscribers[podName]
 	if !ok {
 		panic("subscriber for pod '" + podName.String() + "' is not found")
 	}
 
 	delete(c.podSubscribers, podName)
-	close(ch)
+	close(subscriber.podEvents)
+	close(subscriber.stopEvent)
 }
 
-func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan PodEvent {
+func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) PodSubscriber {
 	c.logger.Debugf("subscribing to pod %q", podName)
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
-	ch := make(chan PodEvent)
+	var subscriber PodSubscriber
+	subscriber.podEvents = make(chan PodEvent)
+	subscriber.stopEvent = make(chan struct{})
+
 	if _, ok := c.podSubscribers[podName]; ok {
 		panic("pod '" + podName.String() + "' is already subscribed")
 	}
-	c.podSubscribers[podName] = ch
+	c.podSubscribers[podName] = subscriber
 
-	return ch
+	return subscriber
 }
 
 func (c *Cluster) movePodFromEndOfLifeNode(pod *v1.Pod) (*v1.Pod, error) {
@@ -401,7 +405,7 @@ func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) 
 
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	stopCh := make(chan struct{})
-	ch := c.registerPodSubscriber(podName)
+	subscriber := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 	defer close(stopCh)
 
@@ -420,10 +424,10 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 		return nil, fmt.Errorf("could not delete pod: %v", err)
 	}
 
-	if err := c.waitForPodDeletion(ch); err != nil {
+	if err := c.waitForPodDeletion(subscriber.podEvents); err != nil {
 		return nil, err
 	}
-	pod, err := c.waitForPodLabel(ch, stopCh, nil)
+	pod, err := c.waitForPodLabel(subscriber, stopCh, nil)
 	if err != nil {
 		return nil, err
 	}

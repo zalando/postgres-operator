@@ -316,18 +316,20 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 	return nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{}, role *PostgresRole) (*v1.Pod, error) {
+func (c *Cluster) waitForPodLabel(subscriber PodSubscriber, stopCh chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
-		case podEvent := <-podEvents:
+		case podEvent := <-subscriber.podEvents:
 			podRole := PostgresRole(podEvent.CurPod.Labels[c.OpConfig.PodRoleLabel])
 
 			if role == nil {
 				if podRole == Master || podRole == Replica {
+					subscriber.stopEvent <- struct{}{}
 					return podEvent.CurPod, nil
 				}
 			} else if *role == podRole {
+				subscriber.stopEvent <- struct{}{}
 				return podEvent.CurPod, nil
 			}
 		case <-timeout:

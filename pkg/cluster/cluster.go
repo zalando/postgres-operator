@@ -77,7 +77,7 @@ type Cluster struct {
 	pgUsers          map[string]spec.PgUser
 	pgUsersCache     map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
-	podSubscribers   map[spec.NamespacedName]chan PodEvent
+	podSubscribers   map[spec.NamespacedName]PodSubscriber
 	podSubscribersMu sync.RWMutex
 	pgDb             *sql.DB
 	mu               sync.Mutex
@@ -96,6 +96,11 @@ type Cluster struct {
 	EBSVolumes          map[string]volumes.VolumeProperties
 	VolumeResizer       volumes.VolumeResizer
 	currentMajorVersion int
+}
+
+type PodSubscriber struct {
+	podEvents chan PodEvent
+	stopEvent chan struct{}
 }
 
 type compareStatefulsetResult struct {
@@ -127,7 +132,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 		Postgresql:     pgSpec,
 		pgUsers:        make(map[string]spec.PgUser),
 		systemUsers:    make(map[string]spec.PgUser),
-		podSubscribers: make(map[spec.NamespacedName]chan PodEvent),
+		podSubscribers: make(map[spec.NamespacedName]PodSubscriber),
 		kubeResources: kubeResources{
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
@@ -1037,10 +1042,10 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
 	if ok {
 		select {
-		case subscriber <- event:
+		case <-subscriber.stopEvent:
+			c.logger.Debugf("ignoring pod event %s for pod %q", event.EventType, event.PodName)
 		default:
-			// ending up here when there is no receiver on the channel (i.e. waitForPodLabel finished)
-			// avoids blocking channel: https://gobyexample.com/non-blocking-channel-operations
+			subscriber.podEvents <- event
 		}
 	}
 	// hold lock for the time of processing the event to avoid race condition
