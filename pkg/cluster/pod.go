@@ -136,8 +136,9 @@ func (c *Cluster) deletePods() error {
 
 func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 	c.setProcessName("deleting pod %q", podName)
-	ch := c.registerPodSubscriber(podName)
-	defer c.unregisterPodSubscriber(podName)
+	ch := c.registerUnbufferedPodSubscriber(podName)
+	// send special end event to trigger removal of PodEvent channel by processPodEvent
+	defer c.ReceivePodEvent(PodEvent{PodName: types.NamespacedName(podName), EventType: PodEventEnd})
 
 	if err := c.KubeClient.Pods(podName.Namespace).Delete(context.TODO(), podName.Name, c.deleteOptions); err != nil {
 		return err
@@ -155,17 +156,31 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	if !ok {
 		panic("subscriber for pod '" + podName.String() + "' is not found")
 	}
-
 	delete(c.podSubscribers, podName)
 	close(ch)
 }
 
-func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan PodEvent {
+func (c *Cluster) registerUnbufferedPodSubscriber(podName spec.NamespacedName) chan PodEvent {
+	return c.registerPodSubscriber(podName, 0)
+}
+
+func (c *Cluster) registerBufferedPodSubscriber(podName spec.NamespacedName, chanSize int) chan PodEvent {
+	return c.registerPodSubscriber(podName, chanSize)
+}
+
+func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName, chanSize int) chan PodEvent {
 	c.logger.Debugf("subscribing to pod %q", podName)
+	var ch chan PodEvent
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
-	ch := make(chan PodEvent)
+	// buffered or unbuffered PodEvent channel
+	if chanSize > 0 {
+		ch = make(chan PodEvent, chanSize)
+	} else {
+		ch = make(chan PodEvent)
+	}
+
 	if _, ok := c.podSubscribers[podName]; ok {
 		panic("pod '" + podName.String() + "' is already subscribed")
 	}
@@ -401,8 +416,9 @@ func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) 
 
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	stopCh := make(chan struct{})
-	ch := c.registerPodSubscriber(podName)
-	defer c.unregisterPodSubscriber(podName)
+	ch := c.registerUnbufferedPodSubscriber(podName)
+	// send special end event to trigger removal of PodEvent channel by processPodEvent
+	defer c.ReceivePodEvent(PodEvent{PodName: types.NamespacedName(podName), EventType: PodEventEnd})
 	defer close(stopCh)
 
 	err := retryutil.Retry(1*time.Second, 5*time.Second,

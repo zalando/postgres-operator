@@ -32,6 +32,7 @@ const (
 	PodEventAdd    PodEventType = "ADD"
 	PodEventUpdate PodEventType = "UPDATE"
 	PodEventDelete PodEventType = "DELETE"
+	PodEventEnd    PodEventType = "END"
 )
 
 // PodEvent describes the event for a single Pod

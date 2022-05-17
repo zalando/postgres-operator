@@ -1031,16 +1031,21 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 	if !ok {
 		return fmt.Errorf("could not cast to PodEvent")
 	}
+	podName := spec.NamespacedName(event.PodName)
 
 	// can only take lock when (un)registerPodSubscriber is finshed
 	c.podSubscribersMu.RLock()
-	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
+	subscriber, ok := c.podSubscribers[podName]
 	if ok {
-		select {
-		case subscriber <- event:
-		default:
-			// ending up here when there is no receiver on the channel (i.e. waitForPodLabel finished)
-			// avoids blocking channel: https://gobyexample.com/non-blocking-channel-operations
+		if event.EventType == PodEventEnd {
+			c.unregisterPodSubscriber(podName)
+		} else {
+			select {
+			case subscriber <- event:
+			default:
+				// ending up here when there is no receiver on the channel (i.e. waitForPodLabel finished)
+				// avoids blocking channel: https://gobyexample.com/non-blocking-channel-operations
+			}
 		}
 	}
 	// hold lock for the time of processing the event to avoid race condition
@@ -1510,8 +1515,13 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
 	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
 	stopCh := make(chan struct{})
-	ch := c.registerPodSubscriber(candidate)
-	defer c.unregisterPodSubscriber(candidate)
+	// create buffered channel so that go routine with processPodEvent does not block when
+	// consumer waitForPodLabel is already finished. Channel size should be big enough to
+	// receive an event for all pod label wait timeout + patroni API timeout seconds
+	chanSize := int(c.OpConfig.PodLabelWaitTimeout.Seconds() + c.OpConfig.PatroniAPICheckTimeout.Seconds())
+	ch := c.registerBufferedPodSubscriber(candidate, chanSize)
+	// send special end event to trigger removal of PodEvent channel by processPodEvent
+	defer c.ReceivePodEvent(PodEvent{PodName: types.NamespacedName(candidate), EventType: PodEventEnd})
 	defer close(stopCh)
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
