@@ -194,17 +194,17 @@ type ClusterMember struct {
 
 type ReplicationLag uint64
 
-// UnmarshalJSON implements the json.Unmarshaller interface.
-func (pl *ReplicationLag) UnmarshalJSON(value []byte) error {
+// UnmarshalJSON converts member lag (can be int or string) into uint64
+func (rl *ReplicationLag) UnmarshalJSON(data []byte) error {
 	var lagUInt64 uint64
-	if value[0] == '"' {
-		*pl = math.MaxUint64
+	if data[0] == '"' {
+		*rl = math.MaxUint64
 		return nil
 	}
-	if err := json.Unmarshal(value, &lagUInt64); err != nil {
+	if err := json.Unmarshal(data, &lagUInt64); err != nil {
 		return err
 	}
-	*pl = ReplicationLag(lagUInt64)
+	*rl = ReplicationLag(lagUInt64)
 	return nil
 }
 
