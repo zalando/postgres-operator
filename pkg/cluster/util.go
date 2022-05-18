@@ -316,7 +316,7 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 	return nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
+func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
@@ -332,7 +332,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{
 			}
 		case <-timeout:
 			return nil, fmt.Errorf("pod label wait timeout")
-		case <-stopChan:
+		case <-stopCh:
 			return nil, fmt.Errorf("pod label wait cancelled")
 		}
 	}
