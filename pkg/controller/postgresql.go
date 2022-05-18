@@ -225,7 +225,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	switch event.EventType {
 	case EventAdd:
 		if clusterFound {
-			lg.Infof("recieved add event for already existing Postgres cluster")
+			lg.Infof("received add event for already existing Postgres cluster")
 			return
 		}
 
