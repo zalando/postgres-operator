@@ -1032,12 +1032,20 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 		return fmt.Errorf("could not cast to PodEvent")
 	}
 
+	// can only take lock when (un)registerPodSubscriber is finshed
 	c.podSubscribersMu.RLock()
 	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
-	c.podSubscribersMu.RUnlock()
 	if ok {
-		subscriber <- event
+		select {
+		case subscriber <- event:
+		default:
+			// ending up here when there is no receiver on the channel (i.e. waitForPodLabel finished)
+			// avoids blocking channel: https://gobyexample.com/non-blocking-channel-operations
+		}
 	}
+	// hold lock for the time of processing the event to avoid race condition
+	// with unregisterPodSubscriber closing the channel (see #1876)
+	c.podSubscribersMu.RUnlock()
 
 	return nil
 }
@@ -1501,48 +1509,22 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	var err error
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
 	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
-
-	var wg sync.WaitGroup
-
-	podLabelErr := make(chan error)
 	stopCh := make(chan struct{})
-
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		ch := c.registerPodSubscriber(candidate)
-		defer c.unregisterPodSubscriber(candidate)
-
-		role := Master
-
-		select {
-		case <-stopCh:
-		case podLabelErr <- func() (err2 error) {
-			_, err2 = c.waitForPodLabel(ch, stopCh, &role)
-			return
-		}():
-		}
-	}()
+	ch := c.registerPodSubscriber(candidate)
+	defer c.unregisterPodSubscriber(candidate)
+	defer close(stopCh)
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
-		if err = <-podLabelErr; err != nil {
+		_, err = c.waitForPodLabel(ch, stopCh, nil)
+		if err != nil {
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
 		err = fmt.Errorf("could not switch over from %q to %q: %v", curMaster.Name, candidate, err)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	}
-
-	// signal the role label waiting goroutine to close the shop and go home
-	close(stopCh)
-	// wait until the goroutine terminates, since unregisterPodSubscriber
-	// must be called before the outer return; otherwise we risk subscribing to the same pod twice.
-	wg.Wait()
-	// close the label waiting channel no sooner than the waiting goroutine terminates.
-	close(podLabelErr)
 
 	return err
 }

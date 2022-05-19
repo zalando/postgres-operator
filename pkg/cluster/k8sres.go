@@ -940,7 +940,6 @@ func (c *Cluster) generateSpiloPodEnvVars(
 func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
 	collectedEnvs := envs
 	for _, env := range appEnv {
-		env.Name = strings.ToUpper(env.Name)
 		if !isEnvVarPresent(collectedEnvs, env.Name) {
 			collectedEnvs = append(collectedEnvs, env)
 		}
@@ -950,7 +949,7 @@ func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
 
 func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
 	for _, env := range envs {
-		if env.Name == key {
+		if strings.EqualFold(env.Name, key) {
 			return true
 		}
 	}
