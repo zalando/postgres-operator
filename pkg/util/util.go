@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"math/rand"
 	"reflect"
@@ -336,14 +335,6 @@ func Bool2Int(flag bool) int {
 		return 1
 	}
 	return 0
-}
-
-// Get int from IntOrString and return max int if string
-func IntFromIntStr(intOrStr intstr.IntOrString) int {
-	if intOrStr.Type == 1 {
-		return math.MaxInt
-	}
-	return intOrStr.IntValue()
 }
 
 // MaxInt32 : Return maximum of two integers provided via pointers. If one value
