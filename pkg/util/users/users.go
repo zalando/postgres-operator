@@ -20,7 +20,7 @@ const (
 	alterRoleSetSQL      = `ALTER ROLE "%s" SET %s TO %s`
 	dropUserSQL          = `SET LOCAL synchronous_commit = 'local'; DROP ROLE "%s";`
 	grantToUserSQL       = `GRANT %s TO "%s"`
-	revokeFromUserSQL    = `REVOKE %s FROM %s`
+	revokeFromUserSQL    = `REVOKE "%s" FROM "%s"`
 	doBlockStmt          = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
 	passwordTemplate     = "ENCRYPTED PASSWORD '%s'"
 	inRoleTemplate       = `IN ROLE %s`
