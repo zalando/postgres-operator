@@ -10,7 +10,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-14:2.1-p3
+  dockerImage: registry.opensource.zalan.do/acid/spilo-14:2.1-p5
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -49,6 +49,10 @@ spec:
       shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"
+#  env:
+#  - name: wal_s3_bucket
+#    value: my-custom-bucket
+
   volume:
     size: 1Gi
 #    storageClass: my-sc
@@ -120,7 +124,7 @@ spec:
 #        database: foo
 #        plugin: pgoutput
     ttl: 30
-    loop_wait: &loop_wait 10
+    loop_wait: 10
     retry_timeout: 10
     synchronous_mode: false
     synchronous_mode_strict: false
@@ -132,7 +136,7 @@ spec:
 # with an empty/absent timestamp, clone from an existing alive cluster using pg_basebackup
 #  clone:
 #    uid: "efd12e58-5786-11e8-b5a7-06148230260c"
-#    cluster: "acid-batman"
+#    cluster: "acid-minimal-cluster"
 #    timestamp: "2017-12-19T12:40:33+01:00"  # timezone required (offset relative to UTC, see RFC 3339 section 5.6)
 #    s3_wal_path: "s3://custom/path/to/bucket"
 

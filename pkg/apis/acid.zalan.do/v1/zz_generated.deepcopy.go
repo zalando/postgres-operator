@@ -790,6 +790,13 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		in, out := &in.HorizontalPodAutoscalerV2, &out.HorizontalPodAutoscalerV2
 		*out = new(v2beta1.HorizontalPodAutoscaler)
 		(*in).DeepCopyInto(*out)
+
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.InitContainersOld != nil {
 		in, out := &in.InitContainersOld, &out.InitContainersOld

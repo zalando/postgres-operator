@@ -26,6 +26,8 @@ import (
 const (
 	superUserName       = "postgres"
 	replicationUserName = "standby"
+	exampleSpiloConfig  = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
+	spiloConfigDiff     = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
 )
 
 var logger = logrus.New().WithField("test", "cluster")
@@ -146,11 +148,9 @@ func TestInitAdditionalOwnerRoles(t *testing.T) {
 
 	manifestUsers := map[string]acidv1.UserFlags{"foo_owner": {}, "bar_owner": {}, "app_user": {}}
 	expectedUsers := map[string]spec.PgUser{
-		"foo_owner":  {Origin: spec.RoleOriginManifest, Name: "foo_owner", Namespace: cl.Namespace, Password: "f123", Flags: []string{"LOGIN"}, IsDbOwner: true},
-		"bar_owner":  {Origin: spec.RoleOriginManifest, Name: "bar_owner", Namespace: cl.Namespace, Password: "b123", Flags: []string{"LOGIN"}, IsDbOwner: true},
-		"app_user":   {Origin: spec.RoleOriginManifest, Name: "app_user", Namespace: cl.Namespace, Password: "a123", Flags: []string{"LOGIN"}, IsDbOwner: false},
-		"cron_admin": {Origin: spec.RoleOriginSpilo, Name: "cron_admin", Namespace: cl.Namespace, MemberOf: []string{"foo_owner", "bar_owner"}},
-		"part_man":   {Origin: spec.RoleOriginSpilo, Name: "part_man", Namespace: cl.Namespace, MemberOf: []string{"foo_owner", "bar_owner"}},
+		"foo_owner": {Origin: spec.RoleOriginManifest, Name: "foo_owner", Namespace: cl.Namespace, Password: "f123", Flags: []string{"LOGIN"}, IsDbOwner: true, MemberOf: []string{"cron_admin", "part_man"}},
+		"bar_owner": {Origin: spec.RoleOriginManifest, Name: "bar_owner", Namespace: cl.Namespace, Password: "b123", Flags: []string{"LOGIN"}, IsDbOwner: true, MemberOf: []string{"cron_admin", "part_man"}},
+		"app_user":  {Origin: spec.RoleOriginManifest, Name: "app_user", Namespace: cl.Namespace, Password: "a123", Flags: []string{"LOGIN"}, IsDbOwner: false},
 	}
 
 	cl.Spec.Databases = map[string]string{"foo_db": "foo_owner", "bar_db": "bar_owner"}
@@ -161,24 +161,15 @@ func TestInitAdditionalOwnerRoles(t *testing.T) {
 		t.Errorf("%s could not init manifest users", testName)
 	}
 
-	// update passwords to compare with result
-	for manifestUser := range manifestUsers {
-		pgUser := cl.pgUsers[manifestUser]
-		pgUser.Password = manifestUser[0:1] + "123"
-		cl.pgUsers[manifestUser] = pgUser
-	}
-
+	// now assign additional roles to owners
 	cl.initAdditionalOwnerRoles()
 
-	for _, additionalOwnerRole := range cl.Config.OpConfig.AdditionalOwnerRoles {
-		expectedPgUser := expectedUsers[additionalOwnerRole]
-		existingPgUser, exists := cl.pgUsers[additionalOwnerRole]
-		if !exists {
-			t.Errorf("%s additional owner role %q not initilaized", testName, additionalOwnerRole)
-		}
+	// update passwords to compare with result
+	for username, existingPgUser := range cl.pgUsers {
+		expectedPgUser := expectedUsers[username]
 		if !util.IsEqualIgnoreOrder(expectedPgUser.MemberOf, existingPgUser.MemberOf) {
-			t.Errorf("%s unexpected membership of additional owner role %q: expected member of %#v, got member of %#v",
-				testName, additionalOwnerRole, expectedPgUser.MemberOf, existingPgUser.MemberOf)
+			t.Errorf("%s unexpected membership of user %q: expected member of %#v, got member of %#v",
+				testName, username, expectedPgUser.MemberOf, existingPgUser.MemberOf)
 		}
 	}
 }
@@ -194,8 +185,8 @@ type mockTeamsAPIClient struct {
 	members []string
 }
 
-func (m *mockTeamsAPIClient) TeamInfo(teamID, token string) (tm *teams.Team, err error) {
-	return &teams.Team{Members: m.members}, nil
+func (m *mockTeamsAPIClient) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
+	return &teams.Team{Members: m.members}, statusCode, nil
 }
 
 func (m *mockTeamsAPIClient) setMembers(members []string) {
@@ -260,15 +251,15 @@ type mockTeamsAPIClientMultipleTeams struct {
 	teams []mockTeam
 }
 
-func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *teams.Team, err error) {
+func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
 	for _, team := range m.teams {
 		if team.teamID == teamID {
-			return &teams.Team{Members: team.members}, nil
+			return &teams.Team{Members: team.members}, statusCode, nil
 		}
 	}
 
 	// should not be reached if a slice with teams is populated correctly
-	return nil, nil
+	return nil, statusCode, nil
 }
 
 // Test adding members of maintenance teams that get superuser rights for all PG databases
@@ -957,7 +948,7 @@ func TestCompareEnv(t *testing.T) {
 				},
 				{
 					Name:  "SPILO_CONFIGURATION",
-					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+					Value: exampleSpiloConfig,
 				},
 			},
 			ExpectedResult: true,
@@ -978,7 +969,7 @@ func TestCompareEnv(t *testing.T) {
 				},
 				{
 					Name:  "SPILO_CONFIGURATION",
-					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+					Value: spiloConfigDiff,
 				},
 			},
 			ExpectedResult: true,
@@ -999,7 +990,7 @@ func TestCompareEnv(t *testing.T) {
 				},
 				{
 					Name:  "SPILO_CONFIGURATION",
-					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+					Value: exampleSpiloConfig,
 				},
 			},
 			ExpectedResult: false,
@@ -1024,7 +1015,7 @@ func TestCompareEnv(t *testing.T) {
 				},
 				{
 					Name:  "SPILO_CONFIGURATION",
-					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+					Value: exampleSpiloConfig,
 				},
 			},
 			ExpectedResult: false,
@@ -1041,7 +1032,7 @@ func TestCompareEnv(t *testing.T) {
 				},
 				{
 					Name:  "SPILO_CONFIGURATION",
-					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+					Value: exampleSpiloConfig,
 				},
 			},
 			ExpectedResult: false,

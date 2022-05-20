@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -16,7 +17,6 @@ import (
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 	clusterPath  = "/cluster"
 	statusPath   = "/patroni"
 	restartPath  = "/restart"
-	apiPort      = 8008
+	ApiPort      = 8008
 	timeout      = 30 * time.Second
 )
 
@@ -74,7 +74,7 @@ func apiURL(masterPod *v1.Pod) (string, error) {
 			return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", masterPod.Status.PodIP)
 		}
 	}
-	return fmt.Sprintf("http://%s", net.JoinHostPort(ip.String(), strconv.Itoa(apiPort))), nil
+	return fmt.Sprintf("http://%s", net.JoinHostPort(ip.String(), strconv.Itoa(ApiPort))), nil
 }
 
 func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer) (err error) {
@@ -185,11 +185,27 @@ type ClusterMembers struct {
 
 // ClusterMember cluster member data from Patroni API
 type ClusterMember struct {
-	Name     string             `json:"name"`
-	Role     string             `json:"role"`
-	State    string             `json:"state"`
-	Timeline int                `json:"timeline"`
-	Lag      intstr.IntOrString `json:"lag,omitempty"`
+	Name     string         `json:"name"`
+	Role     string         `json:"role"`
+	State    string         `json:"state"`
+	Timeline int            `json:"timeline"`
+	Lag      ReplicationLag `json:"lag,omitempty"`
+}
+
+type ReplicationLag uint64
+
+// UnmarshalJSON converts member lag (can be int or string) into uint64
+func (rl *ReplicationLag) UnmarshalJSON(data []byte) error {
+	var lagUInt64 uint64
+	if data[0] == '"' {
+		*rl = math.MaxUint64
+		return nil
+	}
+	if err := json.Unmarshal(data, &lagUInt64); err != nil {
+		return err
+	}
+	*rl = ReplicationLag(lagUInt64)
+	return nil
 }
 
 // MemberDataPatroni child element

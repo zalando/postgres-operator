@@ -311,6 +311,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enableShmVolume": {
 						Type: "boolean",
 					},
+					"env": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
+						},
+					},
 					"init_containers": {
 						Type:        "array",
 						Description: "deprecated",
@@ -822,6 +832,17 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"gs_wal_path": {
 								Type: "string",
 							},
+							"standby_host": {
+								Type: "string",
+							},
+							"standby_port": {
+								Type: "string",
+							},
+						},
+						OneOf: []apiextv1.JSONSchemaProps{
+							apiextv1.JSONSchemaProps{Required: []string{"s3_wal_path"}},
+							apiextv1.JSONSchemaProps{Required: []string{"gs_wal_path"}},
+							apiextv1.JSONSchemaProps{Required: []string{"standby_host"}},
 						},
 					},
 					"streams": {
@@ -1044,7 +1065,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
-					"usersWithSecretRotation": {
+					"usersWithInPlaceSecretRotation": {
 						Type:     "array",
 						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -1053,7 +1074,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
-					"usersWithInPlaceSecretRotation": {
+					"usersWithSecretRotation": {
 						Type:     "array",
 						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -1077,7 +1098,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
 												Type:     "object",
-												Required: []string{"key", "operator", "values"},
+												Required: []string{"key", "operator"},
 												Properties: map[string]apiextv1.JSONSchemaProps{
 													"key": {
 														Type: "string",
@@ -1086,16 +1107,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Type: "string",
 														Enum: []apiextv1.JSON{
 															{
-																Raw: []byte(`"In"`),
-															},
-															{
-																Raw: []byte(`"NotIn"`),
+																Raw: []byte(`"DoesNotExist"`),
 															},
 															{
 																Raw: []byte(`"Exists"`),
 															},
 															{
-																Raw: []byte(`"DoesNotExist"`),
+																Raw: []byte(`"In"`),
+															},
+															{
+																Raw: []byte(`"NotIn"`),
 															},
 														},
 													},

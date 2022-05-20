@@ -45,9 +45,17 @@ func (c *Cluster) deleteStreams() error {
 		return nil
 	}
 
-	err = c.KubeClient.FabricEventStreams(c.Namespace).Delete(context.TODO(), c.Name, metav1.DeleteOptions{})
-	if err != nil {
-		return fmt.Errorf("could not delete event stream custom resource: %v", err)
+	errors := make([]string, 0)
+	for _, appId := range c.streamApplications {
+		fesName := fmt.Sprintf("%s-%s", c.Name, appId)
+		err = c.KubeClient.FabricEventStreams(c.Namespace).Delete(context.TODO(), fesName, metav1.DeleteOptions{})
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("could not delete event stream %q: %v", fesName, err))
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("could not delete all event stream custom resources: %v", strings.Join(errors, `', '`))
 	}
 
 	return nil
@@ -265,6 +273,11 @@ func (c *Cluster) syncStreams() error {
 		return nil
 	}
 
+	// fetch different application IDs from streams section
+	// there will be a separate event stream resource for each ID
+	appIds := gatherApplicationIds(c.Spec.Streams)
+	c.streamApplications = appIds
+
 	slots := make(map[string]map[string]string)
 	publications := make(map[string]map[string]acidv1.StreamTable)
 
@@ -329,9 +342,7 @@ func (c *Cluster) syncStreams() error {
 }
 
 func (c *Cluster) createOrUpdateStreams() error {
-
-	appIds := gatherApplicationIds(c.Spec.Streams)
-	for _, appId := range appIds {
+	for _, appId := range c.streamApplications {
 		fesName := fmt.Sprintf("%s-%s", c.Name, appId)
 		effectiveStreams, err := c.KubeClient.FabricEventStreams(c.Namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
 		if err != nil {

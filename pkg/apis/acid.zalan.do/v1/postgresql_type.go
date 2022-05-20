@@ -82,6 +82,7 @@ type PostgresSpec struct {
 	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 	Streams               []Stream                    `json:"streams,omitempty"`
+	Env                   []v1.EnvVar                 `json:"env,omitempty"`
 
 	// Integrating the HPA
 	HorizontalPodAutoscalerV1 *autoscalingApiV1.HorizontalPodAutoscaler `json:"horizontalPodAutoscalerV1,omitempty"`
@@ -176,10 +177,12 @@ type Patroni struct {
 	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:"1"`
 }
 
-// StandbyDescription contains s3 wal path
+// StandbyDescription contains remote primary config or s3/gs wal path
 type StandbyDescription struct {
-	S3WalPath string `json:"s3_wal_path,omitempty"`
-	GSWalPath string `json:"gs_wal_path,omitempty"`
+	S3WalPath   string `json:"s3_wal_path,omitempty"`
+	GSWalPath   string `json:"gs_wal_path,omitempty"`
+	StandbyHost string `json:"standby_host,omitempty"`
+	StandbyPort string `json:"standby_port,omitempty"`
 }
 
 // TLSDescription specs TLS properties
@@ -241,6 +244,7 @@ type ConnectionPooler struct {
 	*Resources `json:"resources,omitempty"`
 }
 
+// Stream defines properties for creating FabricEventStream resources
 type Stream struct {
 	ApplicationId string                 `json:"applicationId"`
 	Database      string                 `json:"database"`
@@ -249,6 +253,7 @@ type Stream struct {
 	BatchSize     *uint32                `json:"batchSize,omitempty"`
 }
 
+// StreamTable defines properties of outbox tables for FabricEventStreams
 type StreamTable struct {
 	EventType     string  `json:"eventType"`
 	IdColumn      *string `json:"idColumn,omitempty"`

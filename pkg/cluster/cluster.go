@@ -45,7 +45,7 @@ var (
 	alphaNumericRegexp    = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
 	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
-	patroniObjectSuffixes = []string{"config", "failover", "sync", "leader"}
+	patroniObjectSuffixes = []string{"leader", "config", "sync", "failover"}
 )
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
@@ -95,6 +95,7 @@ type Cluster struct {
 	currentProcess      Process
 	processMu           sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu              sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+	streamApplications  []string
 	ConnectionPooler    map[PostgresRole]*ConnectionPoolerObjects
 	EBSVolumes          map[string]volumes.VolumeProperties
 	VolumeResizer       volumes.VolumeResizer
@@ -136,8 +137,10 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
-			PasswordEncryption: passwordEncryption,
-			RoleDeletionSuffix: cfg.OpConfig.RoleDeletionSuffix},
+			PasswordEncryption:   passwordEncryption,
+			RoleDeletionSuffix:   cfg.OpConfig.RoleDeletionSuffix,
+			AdditionalOwnerRoles: cfg.OpConfig.AdditionalOwnerRoles,
+		},
 		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
@@ -152,7 +155,6 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	cluster.EBSVolumes = make(map[string]volumes.VolumeProperties)
 	if cfg.OpConfig.StorageResizeMode != "pvc" || cfg.OpConfig.EnableEBSGp3Migration {
 		cluster.VolumeResizer = &volumes.EBSVolumeResizer{AWSRegion: cfg.OpConfig.AWSRegion}
-
 	}
 
 	return cluster
@@ -262,6 +264,8 @@ func (c *Cluster) Create() error {
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
+		// if kubernetes_use_configmaps is set Patroni will create configmaps
+		// otherwise it will use endpoints
 		if !c.patroniKubernetesUseConfigMaps() {
 			if c.Endpoints[role] != nil {
 				return fmt.Errorf("%s endpoint already exists in the cluster", role)
@@ -1073,12 +1077,20 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 		return fmt.Errorf("could not cast to PodEvent")
 	}
 
+	// can only take lock when (un)registerPodSubscriber is finshed
 	c.podSubscribersMu.RLock()
 	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
-	c.podSubscribersMu.RUnlock()
 	if ok {
-		subscriber <- event
+		select {
+		case subscriber <- event:
+		default:
+			// ending up here when there is no receiver on the channel (i.e. waitForPodLabel finished)
+			// avoids blocking channel: https://gobyexample.com/non-blocking-channel-operations
+		}
 	}
+	// hold lock for the time of processing the event to avoid race condition
+	// with unregisterPodSubscriber closing the channel (see #1876)
+	c.podSubscribersMu.RUnlock()
 
 	return nil
 }
@@ -1351,28 +1363,15 @@ func (c *Cluster) initRobotUsers() error {
 }
 
 func (c *Cluster) initAdditionalOwnerRoles() {
-	for _, additionalOwner := range c.OpConfig.AdditionalOwnerRoles {
-		// fetch all database owners the additional should become a member of
-		memberOf := make([]string, 0)
-		for username, pgUser := range c.pgUsers {
-			if pgUser.IsDbOwner {
-				memberOf = append(memberOf, username)
-			}
-		}
+	if len(c.OpConfig.AdditionalOwnerRoles) == 0 {
+		return
+	}
 
-		if len(memberOf) > 1 {
-			namespace := c.Namespace
-			additionalOwnerPgUser := spec.PgUser{
-				Origin:    spec.RoleOriginSpilo,
-				MemberOf:  memberOf,
-				Name:      additionalOwner,
-				Namespace: namespace,
-			}
-			if currentRole, present := c.pgUsers[additionalOwner]; present {
-				c.pgUsers[additionalOwner] = c.resolveNameConflict(&currentRole, &additionalOwnerPgUser)
-			} else {
-				c.pgUsers[additionalOwner] = additionalOwnerPgUser
-			}
+	// fetch database owners and assign additional owner roles
+	for username, pgUser := range c.pgUsers {
+		if pgUser.IsDbOwner {
+			pgUser.MemberOf = append(pgUser.MemberOf, c.OpConfig.AdditionalOwnerRoles...)
+			c.pgUsers[username] = pgUser
 		}
 	}
 }
@@ -1527,22 +1526,26 @@ func (c *Cluster) GetCurrentProcess() Process {
 
 // GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() *ClusterStatus {
-	return &ClusterStatus{
-		Cluster: c.Spec.ClusterName,
-		Team:    c.Spec.TeamID,
-		Status:  c.Status,
-		Spec:    c.Spec,
-
+	status := &ClusterStatus{
+		Cluster:             c.Spec.ClusterName,
+		Team:                c.Spec.TeamID,
+		Status:              c.Status,
+		Spec:                c.Spec,
 		MasterService:       c.GetServiceMaster(),
 		ReplicaService:      c.GetServiceReplica(),
-		MasterEndpoint:      c.GetEndpointMaster(),
-		ReplicaEndpoint:     c.GetEndpointReplica(),
 		StatefulSet:         c.GetStatefulSet(),
 		PodDisruptionBudget: c.GetPodDisruptionBudget(),
 		CurrentProcess:      c.GetCurrentProcess(),
 
 		Error: fmt.Errorf("error: %s", c.Error),
 	}
+
+	if !c.patroniKubernetesUseConfigMaps() {
+		status.MasterEndpoint = c.GetEndpointMaster()
+		status.ReplicaEndpoint = c.GetEndpointReplica()
+	}
+
+	return status
 }
 
 // Switchover does a switchover (via Patroni) to a candidate pod
@@ -1551,48 +1554,22 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	var err error
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
 	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
-
-	var wg sync.WaitGroup
-
-	podLabelErr := make(chan error)
 	stopCh := make(chan struct{})
-
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		ch := c.registerPodSubscriber(candidate)
-		defer c.unregisterPodSubscriber(candidate)
-
-		role := Master
-
-		select {
-		case <-stopCh:
-		case podLabelErr <- func() (err2 error) {
-			_, err2 = c.waitForPodLabel(ch, stopCh, &role)
-			return
-		}():
-		}
-	}()
+	ch := c.registerPodSubscriber(candidate)
+	defer c.unregisterPodSubscriber(candidate)
+	defer close(stopCh)
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
-		if err = <-podLabelErr; err != nil {
+		_, err = c.waitForPodLabel(ch, stopCh, nil)
+		if err != nil {
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
 		err = fmt.Errorf("could not switch over from %q to %q: %v", curMaster.Name, candidate, err)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	}
-
-	// signal the role label waiting goroutine to close the shop and go home
-	close(stopCh)
-	// wait until the goroutine terminates, since unregisterPodSubscriber
-	// must be called before the outer return; otherwise we risk subscribing to the same pod twice.
-	wg.Wait()
-	// close the label waiting channel no sooner than the waiting goroutine terminates.
-	close(podLabelErr)
 
 	return err
 }
@@ -1607,7 +1584,7 @@ func (c *Cluster) Unlock() {
 	c.mu.Unlock()
 }
 
-type simpleActionWithResult func() error
+type simpleActionWithResult func()
 
 type clusterObjectGet func(name string) (spec.NamespacedName, error)
 
@@ -1621,46 +1598,47 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
 
-	if !c.patroniKubernetesUseConfigMaps() {
-		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
+	actionsList = append(actionsList, c.deletePatroniClusterServices)
+	if c.patroniKubernetesUseConfigMaps() {
+		actionsList = append(actionsList, c.deletePatroniClusterConfigMaps)
 	} else {
-		actionsList = append(actionsList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
+		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
 	}
 
 	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
 	for _, deleter := range actionsList {
-		if err := deleter(); err != nil {
-			return err
-		}
+		deleter()
 	}
 	return nil
 }
 
-func (c *Cluster) deleteClusterObject(
+func deleteClusterObject(
 	get clusterObjectGet,
 	del clusterObjectDelete,
-	objType string) error {
+	objType string,
+	clusterName string,
+	logger *logrus.Entry) {
 	for _, suffix := range patroniObjectSuffixes {
-		name := fmt.Sprintf("%s-%s", c.Name, suffix)
+		name := fmt.Sprintf("%s-%s", clusterName, suffix)
 
-		if namespacedName, err := get(name); err == nil {
-			c.logger.Debugf("deleting Patroni cluster object %q with name %q",
+		namespacedName, err := get(name)
+		if err == nil {
+			logger.Debugf("deleting %s %q",
 				objType, namespacedName)
 
 			if err = del(name); err != nil {
-				return fmt.Errorf("could not delete Patroni cluster object %q with name %q: %v",
+				logger.Warningf("could not delete %s %q: %v",
 					objType, namespacedName, err)
 			}
 
 		} else if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("could not fetch Patroni Endpoint %q: %v",
-				namespacedName, err)
+			logger.Warningf("could not fetch %s %q: %v",
+				objType, namespacedName, err)
 		}
 	}
-	return nil
 }
 
-func (c *Cluster) deletePatroniClusterServices() error {
+func (c *Cluster) deletePatroniClusterServices() {
 	get := func(name string) (spec.NamespacedName, error) {
 		svc, err := c.KubeClient.Services(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		return util.NameFromMeta(svc.ObjectMeta), err
@@ -1670,10 +1648,10 @@ func (c *Cluster) deletePatroniClusterServices() error {
 		return c.KubeClient.Services(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
 	}
 
-	return c.deleteClusterObject(get, deleteServiceFn, "service")
+	deleteClusterObject(get, deleteServiceFn, "service", c.Name, c.logger)
 }
 
-func (c *Cluster) deletePatroniClusterEndpoints() error {
+func (c *Cluster) deletePatroniClusterEndpoints() {
 	get := func(name string) (spec.NamespacedName, error) {
 		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		return util.NameFromMeta(ep.ObjectMeta), err
@@ -1683,10 +1661,10 @@ func (c *Cluster) deletePatroniClusterEndpoints() error {
 		return c.KubeClient.Endpoints(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
 	}
 
-	return c.deleteClusterObject(get, deleteEndpointFn, "endpoint")
+	deleteClusterObject(get, deleteEndpointFn, "endpoint", c.Name, c.logger)
 }
 
-func (c *Cluster) deletePatroniClusterConfigMaps() error {
+func (c *Cluster) deletePatroniClusterConfigMaps() {
 	get := func(name string) (spec.NamespacedName, error) {
 		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		return util.NameFromMeta(cm.ObjectMeta), err
@@ -1696,5 +1674,5 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 		return c.KubeClient.ConfigMaps(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
 	}
 
-	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
+	deleteClusterObject(get, deleteConfigMapFn, "configmap", c.Name, c.logger)
 }

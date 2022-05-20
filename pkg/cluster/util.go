@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -272,17 +273,21 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 		return nil, fmt.Errorf("could not get oauth token to authenticate to team service API: %v", err)
 	}
 
-	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
-	if err != nil {
-		return nil, fmt.Errorf("could not get team info for team %q: %v", teamID, err)
-	}
+	teamInfo, statusCode, err := c.teamsAPIClient.TeamInfo(teamID, token)
 
-	for _, member := range teamInfo.Members {
-		if !(util.SliceContains(members, member)) {
-			members = append(members, member)
+	if err != nil {
+		if statusCode == http.StatusNotFound {
+			c.logger.Warningf("could not get team info for team %q: %v", teamID, err)
+		} else {
+			return nil, fmt.Errorf("could not get team info for team %q: %v", teamID, err)
+		}
+	} else {
+		for _, member := range teamInfo.Members {
+			if !(util.SliceContains(members, member)) {
+				members = append(members, member)
+			}
 		}
 	}
-
 	return members, nil
 }
 
@@ -311,7 +316,7 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 	return nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
+func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
@@ -327,7 +332,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{
 			}
 		case <-timeout:
 			return nil, fmt.Errorf("pod label wait timeout")
-		case <-stopChan:
+		case <-stopCh:
 			return nil, fmt.Errorf("pod label wait cancelled")
 		}
 	}

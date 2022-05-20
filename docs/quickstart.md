@@ -37,7 +37,7 @@ The Postgres Operator can be deployed in the following ways:
 * Kustomization
 * Helm chart
 
-### Manual deployment setup
+### Manual deployment setup on Kubernetes
 
 The Postgres Operator can be installed simply by applying yaml manifests. Note,
 we provide the `/manifests` directory as an example only; you should consider
@@ -71,21 +71,38 @@ manifest.
 ./run_operator_locally.sh
 ```
 
-### Helm chart
+### Manual deployment setup on OpenShift
 
-Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
-chart which saves you the manual steps. Clone this repo and change directory to
-the repo root. With Helm v3 installed you should be able to run:
+To install the Postgres Operator in OpenShift you have to change the config
+parameter `kubernetes_use_configmaps` to `"true"`. Otherwise, the operator
+and Patroni will store leader and config keys in `Endpoints` that are not
+supported in OpenShift. This requires also a slightly different set of rules
+for the `postgres-operator` and `postgres-pod` cluster roles.
 
 ```bash
-helm install postgres-operator ./charts/postgres-operator
+oc create -f manifests/operator-service-account-rbac-openshift.yaml
 ```
 
-The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will
-be skipped with warning when using v3. Documentation for installing applications
-with Helm 2 can be found in the [v2 docs](https://v2.helm.sh/docs/).
+### Helm chart
 
-The chart is also hosted at: https://opensource.zalando.com/postgres-operator/charts/postgres-operator/
+Alternatively, the operator can be installed by using the provided
+[Helm](https://helm.sh/) chart which saves you the manual steps. The charts
+for both the Postgres Operator and its UI are hosted via the `gh-pages` branch.
+They only work only with Helm v3. Helm v2 support was dropped with v1.8.0.
+
+```bash
+# add repo for postgres-operator
+helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+
+# install the postgres-operator
+helm install postgres-operator postgres-operator-charts/postgres-operator
+
+# add repo for postgres-operator-ui
+helm repo add postgres-operator-ui-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui
+
+# install the postgres-operator-ui
+helm install postgres-operator-ui postgres-operator-ui-charts/postgres-operator-ui
+```
 
 ## Check if Postgres Operator is running
 

@@ -395,16 +395,22 @@ under the `clone` top-level key and do not affect the already running cluster.
 ## Standby cluster
 
 On startup, an existing `standby` top-level key creates a standby Postgres
-cluster streaming from a remote location. So far streaming from S3 and GCS WAL
-archives is supported.
+cluster streaming from a remote location - either from a S3 or GCS WAL
+archive or a remote primary. Only one of options is allowed and required
+if the `standby` key is present.
 
 * **s3_wal_path**
   the url to S3 bucket containing the WAL archive of the remote primary.
-  Optional, but `s3_wal_path`  or `gs_wal_path` is required.
 
 * **gs_wal_path**
   the url to GS bucket containing the WAL archive of the remote primary.
-  Optional, but `s3_wal_path`  or `gs_wal_path` is required.
+
+* **standby_host**
+  hostname or IP address of the primary to stream from.
+
+* **standby_port**
+  TCP port on which the primary is listening for connections. Patroni will
+  use `"5432"` if not set.
 
 ## Volume properties
 

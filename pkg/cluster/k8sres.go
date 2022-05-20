@@ -28,6 +28,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -43,6 +44,7 @@ const (
 	logicalBackupContainerName     = "logical-backup"
 	connectionPoolerContainer      = "connection-pooler"
 	pgPort                         = 5432
+	operatorPort                   = 8080
 )
 
 type pgUser struct {
@@ -113,7 +115,7 @@ func (c *Cluster) servicePort(role PostgresRole) int32 {
 		return service.Spec.Ports[0].Port
 	}
 
-	c.logger.Warningf("No service for role %s - defaulting to port 5432", role)
+	c.logger.Warningf("No service for role %s - defaulting to port %d", role, pgPort)
 	return pgPort
 }
 
@@ -560,15 +562,15 @@ func generateContainer(
 		Resources:       *resourceRequirements,
 		Ports: []v1.ContainerPort{
 			{
-				ContainerPort: 8008,
+				ContainerPort: patroni.ApiPort,
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				ContainerPort: 5432,
+				ContainerPort: pgPort,
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				ContainerPort: 8080,
+				ContainerPort: operatorPort,
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
@@ -686,8 +688,7 @@ func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, su
 				},
 			},
 		}
-		mergedEnv := append(env, container.Env...)
-		container.Env = deduplicateEnvVars(mergedEnv, container.Name, logger)
+		container.Env = appendEnvVars(env, container.Env...)
 		result = append(result, container)
 	}
 
@@ -800,7 +801,14 @@ func (c *Cluster) generatePodTemplate(
 }
 
 // generatePodEnvVars generates environment variables for the Spilo Pod
-func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *acidv1.CloneDescription, standbyDescription *acidv1.StandbyDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+func (c *Cluster) generateSpiloPodEnvVars(
+	uid types.UID,
+	spiloConfiguration string,
+	cloneDescription *acidv1.CloneDescription,
+	standbyDescription *acidv1.StandbyDescription) []v1.EnvVar {
+
+	// hard-coded set of environment variables we need
+	// to guarantee core functionality of the operator
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -875,6 +883,11 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 			Value: c.OpConfig.PamRoleName,
 		},
 	}
+
+	if c.OpConfig.EnableSpiloWalPathCompat {
+		envVars = append(envVars, v1.EnvVar{Name: "ENABLE_WAL_PATH_COMPAT", Value: "true"})
+	}
+
 	if c.OpConfig.EnablePgVersionEnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
 	}
@@ -902,77 +915,86 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
 
-	if c.Spec.StandbyCluster != nil {
+	if standbyDescription != nil {
 		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
 	}
 
-	// add vars taken from pod_environment_configmap and pod_environment_secret first
-	// (to allow them to override the globals set in the operator config)
-	if len(customPodEnvVarsList) > 0 {
-		envVars = append(envVars, customPodEnvVarsList...)
+	// fetch cluster-specific variables that will override all subsequent global variables
+	if len(c.Spec.Env) > 0 {
+		envVars = appendEnvVars(envVars, c.Spec.Env...)
 	}
 
+	// fetch variables from custom environment Secret
+	// that will override all subsequent global variables
+	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
+	if err != nil {
+		c.logger.Warningf("%v", err)
+	}
+	envVars = appendEnvVars(envVars, secretEnvVarsList...)
+
+	// fetch variables from custom environment ConfigMap
+	// that will override all subsequent global variables
+	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
+	if err != nil {
+		c.logger.Warningf("%v", err)
+	}
+	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
+
+	// global variables derived from operator configuration
+	opConfigEnvVars := make([]v1.EnvVar, 0)
 	if c.OpConfig.WALES3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALGSBucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.WALAZStorageAccount != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.OpConfig.GCPCredentials != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 	}
 
 	if c.OpConfig.LogS3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
-		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
+
+	envVars = appendEnvVars(envVars, opConfigEnvVars...)
 
 	return envVars
 }
 
-// deduplicateEnvVars makes sure there are no duplicate in the target envVar array. While Kubernetes already
-// deduplicates variables defined in a container, it leaves the last definition in the list and this behavior is not
-// well-documented, which means that the behavior can be reversed at some point (it may also start producing an error).
-// Therefore, the merge is done by the operator, the entries that are ahead in the passed list take priority over those
-// that are behind, and only the name is considered in order to eliminate duplicates.
-func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.Entry) []v1.EnvVar {
-	result := make([]v1.EnvVar, 0)
-	names := make(map[string]int)
-
-	for i, va := range input {
-		if names[va.Name] == 0 {
-			names[va.Name]++
-			result = append(result, input[i])
-		} else if names[va.Name] == 1 {
-			names[va.Name]++
-
-			// Some variables (those to configure the WAL_ and LOG_ shipping) may be overwritten, only log as info
-			if strings.HasPrefix(va.Name, "WAL_") || strings.HasPrefix(va.Name, "LOG_") {
-				logger.Infof("global variable %q has been overwritten by configmap/secret for container %q",
-					va.Name, containerName)
-			} else {
-				logger.Warningf("variable %q is defined in %q more than once, the subsequent definitions are ignored",
-					va.Name, containerName)
-			}
+func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
+	collectedEnvs := envs
+	for _, env := range appEnv {
+		if !isEnvVarPresent(collectedEnvs, env.Name) {
+			collectedEnvs = append(collectedEnvs, env)
 		}
 	}
-	return result
+	return collectedEnvs
 }
 
-// Return list of variables the pod recieved from the configured ConfigMap
+func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
+	for _, env := range envs {
+		if strings.EqualFold(env.Name, key) {
+			return true
+		}
+	}
+	return false
+}
+
+// Return list of variables the pod received from the configured ConfigMap
 func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	configMapPodEnvVarsList := make([]v1.EnvVar, 0)
 
@@ -996,9 +1018,11 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
 		}
 	}
+
 	for k, v := range cm.Data {
 		configMapPodEnvVarsList = append(configMapPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
 	}
+	sort.Slice(configMapPodEnvVarsList, func(i, j int) bool { return configMapPodEnvVarsList[i].Name < configMapPodEnvVarsList[j].Name })
 	return configMapPodEnvVarsList, nil
 }
 
@@ -1048,6 +1072,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 			}})
 	}
 
+	sort.Slice(secretPodEnvVarsList, func(i, j int) bool { return secretPodEnvVarsList[i].Name < secretPodEnvVarsList[j].Name })
 	return secretPodEnvVarsList, nil
 }
 
@@ -1096,6 +1121,22 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 	return fmt.Sprintf("%v", pgVersion), nil
 }
 
+func generateSpiloReadinessProbe() *v1.Probe {
+	return &v1.Probe{
+		Handler: v1.Handler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/readiness",
+				Port: intstr.IntOrString{IntVal: patroni.ApiPort},
+			},
+		},
+		InitialDelaySeconds: 6,
+		PeriodSeconds:       10,
+		TimeoutSeconds:      5,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+	}
+}
+
 func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
 
 	var (
@@ -1119,39 +1160,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
 		}
 		initContainers = spec.InitContainers
-	}
-
-	spiloCompathWalPathList := make([]v1.EnvVar, 0)
-	if c.OpConfig.EnableSpiloWalPathCompat {
-		spiloCompathWalPathList = append(spiloCompathWalPathList,
-			v1.EnvVar{
-				Name:  "ENABLE_WAL_PATH_COMPAT",
-				Value: "true",
-			},
-		)
-	}
-
-	// fetch env vars from custom ConfigMap
-	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
-	if err != nil {
-		return nil, err
-	}
-
-	// fetch env vars from custom ConfigMap
-	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
-	if err != nil {
-		return nil, err
-	}
-
-	// concat all custom pod env vars and sort them
-	customPodEnvVarsList := append(spiloCompathWalPathList, configMapEnvVarsList...)
-	customPodEnvVarsList = append(customPodEnvVarsList, secretEnvVarsList...)
-	sort.Slice(customPodEnvVarsList,
-		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
-
-	if spec.StandbyCluster != nil && spec.StandbyCluster.S3WalPath == "" &&
-		spec.StandbyCluster.GSWalPath == "" {
-		return nil, fmt.Errorf("one of s3_wal_path or gs_wal_path must be set for standby cluster")
 	}
 
 	// backward compatible check for InitContainers
@@ -1186,9 +1194,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.Postgresql.GetUID(),
 		spiloConfiguration,
 		spec.Clone,
-		spec.StandbyCluster,
-		customPodEnvVarsList,
-	)
+		spec.StandbyCluster)
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
@@ -1231,7 +1237,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		// use the same filenames as Secret resources by default
 		certFile := ensurePath(spec.TLS.CertificateFile, mountPath, "tls.crt")
 		privateKeyFile := ensurePath(spec.TLS.PrivateKeyFile, mountPath, "tls.key")
-		spiloEnvVars = append(
+		spiloEnvVars = appendEnvVars(
 			spiloEnvVars,
 			v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: certFile},
 			v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: privateKeyFile},
@@ -1245,7 +1251,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			}
 
 			caFile := ensurePath(spec.TLS.CAFile, mountPathCA, "")
-			spiloEnvVars = append(
+			spiloEnvVars = appendEnvVars(
 				spiloEnvVars,
 				v1.EnvVar{Name: "SSL_CA_FILE", Value: caFile},
 			)
@@ -1270,12 +1276,15 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	spiloContainer := generateContainer(constants.PostgresContainerName,
 		&effectiveDockerImage,
 		resourceRequirements,
-		deduplicateEnvVars(spiloEnvVars, constants.PostgresContainerName, c.logger),
+		spiloEnvVars,
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
 	)
+
+	// Patroni responds 200 to probe only if it either owns the leader lock or postgres is running and DCS is accessible
+	spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
 
 	// generate container specs for sidecars specified in the cluster manifest
 	clusterSpecificSidecars := []v1.Container{}
@@ -1327,7 +1336,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	sidecarContainers, conflicts := mergeContainers(clusterSpecificSidecars, c.Config.OpConfig.SidecarContainers, globalSidecarContainersByDockerImage, scalyrSidecars)
 	for containerName := range conflicts {
-		c.logger.Warningf("a sidecar is specified twice. Ignoring sidecar %q in favor of %q with high a precendence",
+		c.logger.Warningf("a sidecar is specified twice. Ignoring sidecar %q in favor of %q with high a precedence",
 			containerName, containerName)
 	}
 
@@ -1678,7 +1687,7 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
-		if pgUser.Origin != spec.RoleOriginTeamsAPI && pgUser.Origin != spec.RoleOriginSpilo {
+		if pgUser.Origin != spec.RoleOriginTeamsAPI {
 			c.logger.Warningf("could not generate secret for a non-teamsAPI role %q: role has no password",
 				pgUser.Name)
 		}
@@ -1746,10 +1755,12 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 
 func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) *v1.Service {
 	serviceSpec := v1.ServiceSpec{
-		Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+		Ports: []v1.ServicePort{{Name: "postgresql", Port: pgPort, TargetPort: intstr.IntOrString{IntVal: pgPort}}},
 		Type:  v1.ServiceTypeClusterIP,
 	}
 
+	// no selector for master, see https://github.com/zalando/postgres-operator/issues/340
+	// if kubernetes_use_configmaps is set master service needs a selector
 	if role == Replica || c.patroniKubernetesUseConfigMaps() {
 		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
@@ -1847,6 +1858,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 	cluster := description.ClusterName
 	result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
 	if description.EndTimestamp == "" {
+		c.logger.Infof("cloning with basebackup from %s", cluster)
 		// cloning with basebackup, make a connection string to the cluster to clone from
 		host, port := c.getClusterServiceConnectionParameters(cluster)
 		// TODO: make some/all of those constants
@@ -1868,67 +1880,47 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 				},
 			})
 	} else {
-		// cloning with S3, find out the bucket to clone
-		msg := "clone from S3 bucket"
-		c.logger.Info(msg, description.S3WalPath)
-
+		c.logger.Info("cloning from WAL location")
 		if description.S3WalPath == "" {
-			msg := "figure out which S3 bucket to use from env"
-			c.logger.Info(msg, description.S3WalPath)
+			c.logger.Info("no S3 WAL path defined - taking value from global config", description.S3WalPath)
 
 			if c.OpConfig.WALES3Bucket != "" {
-				envs := []v1.EnvVar{
-					{
-						Name:  "CLONE_WAL_S3_BUCKET",
-						Value: c.OpConfig.WALES3Bucket,
-					},
-				}
-				result = append(result, envs...)
+				c.logger.Debugf("found WALES3Bucket %s - will set CLONE_WAL_S3_BUCKET", c.OpConfig.WALES3Bucket)
+				result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 			} else if c.OpConfig.WALGSBucket != "" {
-				envs := []v1.EnvVar{
-					{
-						Name:  "CLONE_WAL_GS_BUCKET",
-						Value: c.OpConfig.WALGSBucket,
-					},
-					{
-						Name:  "CLONE_GOOGLE_APPLICATION_CREDENTIALS",
-						Value: c.OpConfig.GCPCredentials,
-					},
+				c.logger.Debugf("found WALGSBucket %s - will set CLONE_WAL_GS_BUCKET", c.OpConfig.WALGSBucket)
+				result = append(result, v1.EnvVar{Name: "CLONE_WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
+				if c.OpConfig.GCPCredentials != "" {
+					result = append(result, v1.EnvVar{Name: "CLONE_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 				}
-				result = append(result, envs...)
 			} else if c.OpConfig.WALAZStorageAccount != "" {
-				envs := []v1.EnvVar{
-					{
-						Name:  "CLONE_AZURE_STORAGE_ACCOUNT",
-						Value: c.OpConfig.WALAZStorageAccount,
-					},
-				}
-				result = append(result, envs...)
+				c.logger.Debugf("found WALAZStorageAccount %s - will set CLONE_AZURE_STORAGE_ACCOUNT", c.OpConfig.WALAZStorageAccount)
+				result = append(result, v1.EnvVar{Name: "CLONE_AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
 			} else {
-				c.logger.Error("Cannot figure out S3 or GS bucket. Both are empty.")
+				c.logger.Error("cannot figure out S3 or GS bucket or AZ storage account. All options are empty in the config.")
 			}
+
+			// append suffix because WAL location name is not the whole path
+			result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(description.UID)})
+		} else {
+			c.logger.Debugf("use S3WalPath %s from the manifest", description.S3WalPath)
 
 			envs := []v1.EnvVar{
 				{
+					Name:  "CLONE_WALE_S3_PREFIX",
+					Value: description.S3WalPath,
+				},
+				{
 					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
-					Value: getBucketScopeSuffix(description.UID),
+					Value: "",
 				},
 			}
 
 			result = append(result, envs...)
-		} else {
-			msg := "use custom parsed S3WalPath %s from the manifest"
-			c.logger.Warningf(msg, description.S3WalPath)
-
-			result = append(result, v1.EnvVar{
-				Name:  "CLONE_WALE_S3_PREFIX",
-				Value: description.S3WalPath,
-			})
 		}
 
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 		if description.S3Endpoint != "" {
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
@@ -1960,39 +1952,38 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescription) []v1.EnvVar {
 	result := make([]v1.EnvVar, 0)
 
-	if description.S3WalPath == "" && description.GSWalPath == "" {
-		return nil
-	}
-
-	if description.S3WalPath != "" {
-		// standby with S3, find out the bucket to setup standby
-		msg := "standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
-		c.logger.Infof(msg, description.S3WalPath)
-
+	if description.StandbyHost != "" {
+		c.logger.Info("standby cluster streaming from remote primary")
 		result = append(result, v1.EnvVar{
-			Name:  "STANDBY_WALE_S3_PREFIX",
-			Value: description.S3WalPath,
+			Name:  "STANDBY_HOST",
+			Value: description.StandbyHost,
 		})
-	} else if description.GSWalPath != "" {
-		msg := "standby from GS bucket using custom parsed GSWalPath from the manifest %s "
-		c.logger.Infof(msg, description.GSWalPath)
-
-		envs := []v1.EnvVar{
-			{
+		if description.StandbyPort != "" {
+			result = append(result, v1.EnvVar{
+				Name:  "STANDBY_PORT",
+				Value: description.StandbyPort,
+			})
+		}
+	} else {
+		c.logger.Info("standby cluster streaming from WAL location")
+		if description.S3WalPath != "" {
+			result = append(result, v1.EnvVar{
+				Name:  "STANDBY_WALE_S3_PREFIX",
+				Value: description.S3WalPath,
+			})
+		} else if description.GSWalPath != "" {
+			result = append(result, v1.EnvVar{
 				Name:  "STANDBY_WALE_GS_PREFIX",
 				Value: description.GSWalPath,
-			},
-			{
-				Name:  "STANDBY_GOOGLE_APPLICATION_CREDENTIALS",
-				Value: c.OpConfig.GCPCredentials,
-			},
+			})
+		} else {
+			c.logger.Error("no WAL path specified in standby section")
+			return result
 		}
-		result = append(result, envs...)
 
+		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
+		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
-
-	result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
-	result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 	return result
 }
@@ -2027,7 +2018,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 // TODO: handle clusters in different namespaces
 func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (host string, port string) {
 	host = clusterName
-	port = "5432"
+	port = fmt.Sprintf("%d", pgPort)
 	return
 }
 
@@ -2208,7 +2199,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 		{
 			Name:  "PGPORT",
-			Value: "5432",
+			Value: fmt.Sprintf("%d", pgPort),
 		},
 		{
 			Name:  "PGUSER",

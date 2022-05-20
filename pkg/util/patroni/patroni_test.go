@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"reflect"
 	"testing"
@@ -15,7 +16,6 @@ import (
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 var logger = logrus.New().WithField("test", "patroni")
@@ -36,17 +36,17 @@ func TestApiURL(t *testing.T) {
 	}{
 		{
 			"127.0.0.1",
-			fmt.Sprintf("http://127.0.0.1:%d", apiPort),
+			fmt.Sprintf("http://127.0.0.1:%d", ApiPort),
 			nil,
 		},
 		{
 			"0000:0000:0000:0000:0000:0000:0000:0001",
-			fmt.Sprintf("http://[::1]:%d", apiPort),
+			fmt.Sprintf("http://[::1]:%d", ApiPort),
 			nil,
 		},
 		{
 			"::1",
-			fmt.Sprintf("http://[::1]:%d", apiPort),
+			fmt.Sprintf("http://[::1]:%d", ApiPort),
 			nil,
 		},
 		{
@@ -101,16 +101,27 @@ func TestGetClusterMembers(t *testing.T) {
 			Role:     "sync_standby",
 			State:    "running",
 			Timeline: 1,
-			Lag:      intstr.IntOrString{IntVal: 0},
+			Lag:      0,
 		}, {
 			Name:     "acid-test-cluster-2",
 			Role:     "replica",
 			State:    "running",
 			Timeline: 1,
-			Lag:      intstr.IntOrString{Type: 1, StrVal: "unknown"},
+			Lag:      math.MaxUint64,
+		}, {
+			Name:     "acid-test-cluster-3",
+			Role:     "replica",
+			State:    "running",
+			Timeline: 1,
+			Lag:      3000000000,
 		}}
 
-	json := `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "sync_standby", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 0}, {"name": "acid-test-cluster-2", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": "unknown"}]}`
+	json := `{"members": [
+		{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1},
+		{"name": "acid-test-cluster-1", "role": "sync_standby", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 0},
+		{"name": "acid-test-cluster-2", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": "unknown"},
+		{"name": "acid-test-cluster-3", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 3000000000}
+		]}`
 	r := ioutil.NopCloser(bytes.NewReader([]byte(json)))
 
 	response := http.Response{
