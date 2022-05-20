@@ -504,7 +504,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	expectedS3BucketConfigMap := []ExpectedValue{
 		{
 			envIndex:       17,
-			envVarConstant: "WAL_S3_BUCKET",
+			envVarConstant: "wal_s3_bucket",
 			envVarValue:    "global-s3-bucket-configmap",
 		},
 	}
@@ -518,7 +518,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	expectedCustomVariableSecret := []ExpectedValue{
 		{
 			envIndex:       16,
-			envVarConstant: "CUSTOM_VARIABLE",
+			envVarConstant: "custom_variable",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
@@ -532,7 +532,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	expectedCustomVariableConfigMap := []ExpectedValue{
 		{
 			envIndex:       16,
-			envVarConstant: "CUSTOM_VARIABLE",
+			envVarConstant: "custom_variable",
 			envVarValue:    "configmap-test",
 		},
 	}
@@ -573,14 +573,14 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		},
 		{
 			envIndex:       20,
-			envVarConstant: "CLONE_AWS_ENDPOINT",
+			envVarConstant: "clone_aws_endpoint",
 			envVarValue:    "s3.eu-west-1.amazonaws.com",
 		},
 	}
 	expectedCloneEnvSecret := []ExpectedValue{
 		{
 			envIndex:       20,
-			envVarConstant: "CLONE_AWS_ACCESS_KEY_ID",
+			envVarConstant: "clone_aws_access_key_id",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
@@ -599,7 +599,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		},
 		{
 			envIndex:       20,
-			envVarConstant: "STANDBY_GOOGLE_APPLICATION_CREDENTIALS",
+			envVarConstant: "standby_google_application_credentials",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{

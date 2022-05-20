@@ -42,6 +42,7 @@ const (
 	logicalBackupContainerName     = "logical-backup"
 	connectionPoolerContainer      = "connection-pooler"
 	pgPort                         = 5432
+	operatorPort                   = 8080
 )
 
 type pgUser struct {
@@ -567,7 +568,7 @@ func generateContainer(
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				ContainerPort: patroni.ApiPort,
+				ContainerPort: operatorPort,
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
@@ -939,7 +940,6 @@ func (c *Cluster) generateSpiloPodEnvVars(
 func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
 	collectedEnvs := envs
 	for _, env := range appEnv {
-		env.Name = strings.ToUpper(env.Name)
 		if !isEnvVarPresent(collectedEnvs, env.Name) {
 			collectedEnvs = append(collectedEnvs, env)
 		}
@@ -949,7 +949,7 @@ func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
 
 func isEnvVarPresent(envs []v1.EnvVar, key string) bool {
 	for _, env := range envs {
-		if env.Name == key {
+		if strings.EqualFold(env.Name, key) {
 			return true
 		}
 	}
@@ -1649,7 +1649,7 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
-		if pgUser.Origin != spec.RoleOriginTeamsAPI && pgUser.Origin != spec.RoleOriginSpilo {
+		if pgUser.Origin != spec.RoleOriginTeamsAPI {
 			c.logger.Warningf("could not generate secret for a non-teamsAPI role %q: role has no password",
 				pgUser.Name)
 		}

@@ -12,8 +12,8 @@ from kubernetes import client
 from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-14-e2e:0.1"
-SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-14-e2e:0.2"
+SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-14-e2e:0.3"
+SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-14-e2e:0.4"
 
 
 def to_selector(labels):
@@ -161,9 +161,20 @@ class EndToEndTestCase(unittest.TestCase):
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_owner_roles(self):
         '''
-           Test adding additional member roles to existing database owner roles
+           Test granting additional roles to existing database owners
         '''
         k8s = self.k8s
+
+        # first test - wait for the operator to get in sync and set everything up
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+            "Operator does not get in sync")
+        leader = k8s.get_cluster_leader_pod()
+
+        # produce wrong membership for cron_admin
+        grant_dbowner = """
+            GRANT bar_owner TO cron_admin;
+        """
+        self.query_database(leader.metadata.name, "postgres", grant_dbowner)
 
         # enable PostgresTeam CRD and lower resync
         owner_roles = {
@@ -175,16 +186,15 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
 
-        leader = k8s.get_cluster_leader_pod()
         owner_query = """
             SELECT a2.rolname
               FROM pg_catalog.pg_authid a
               JOIN pg_catalog.pg_auth_members am
                 ON a.oid = am.member
-               AND a.rolname = 'cron_admin'
+               AND a.rolname IN ('zalando', 'bar_owner', 'bar_data_owner')
               JOIN pg_catalog.pg_authid a2
                 ON a2.oid = am.roleid
-             WHERE a2.rolname IN ('zalando', 'bar_owner', 'bar_data_owner');
+             WHERE a2.rolname = 'cron_admin';
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", owner_query)), 3,
             "Not all additional users found in database", 10, 5)

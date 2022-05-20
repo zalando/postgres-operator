@@ -148,11 +148,9 @@ func TestInitAdditionalOwnerRoles(t *testing.T) {
 
 	manifestUsers := map[string]acidv1.UserFlags{"foo_owner": {}, "bar_owner": {}, "app_user": {}}
 	expectedUsers := map[string]spec.PgUser{
-		"foo_owner":  {Origin: spec.RoleOriginManifest, Name: "foo_owner", Namespace: cl.Namespace, Password: "f123", Flags: []string{"LOGIN"}, IsDbOwner: true},
-		"bar_owner":  {Origin: spec.RoleOriginManifest, Name: "bar_owner", Namespace: cl.Namespace, Password: "b123", Flags: []string{"LOGIN"}, IsDbOwner: true},
-		"app_user":   {Origin: spec.RoleOriginManifest, Name: "app_user", Namespace: cl.Namespace, Password: "a123", Flags: []string{"LOGIN"}, IsDbOwner: false},
-		"cron_admin": {Origin: spec.RoleOriginSpilo, Name: "cron_admin", Namespace: cl.Namespace, MemberOf: []string{"foo_owner", "bar_owner"}},
-		"part_man":   {Origin: spec.RoleOriginSpilo, Name: "part_man", Namespace: cl.Namespace, MemberOf: []string{"foo_owner", "bar_owner"}},
+		"foo_owner": {Origin: spec.RoleOriginManifest, Name: "foo_owner", Namespace: cl.Namespace, Password: "f123", Flags: []string{"LOGIN"}, IsDbOwner: true, MemberOf: []string{"cron_admin", "part_man"}},
+		"bar_owner": {Origin: spec.RoleOriginManifest, Name: "bar_owner", Namespace: cl.Namespace, Password: "b123", Flags: []string{"LOGIN"}, IsDbOwner: true, MemberOf: []string{"cron_admin", "part_man"}},
+		"app_user":  {Origin: spec.RoleOriginManifest, Name: "app_user", Namespace: cl.Namespace, Password: "a123", Flags: []string{"LOGIN"}, IsDbOwner: false},
 	}
 
 	cl.Spec.Databases = map[string]string{"foo_db": "foo_owner", "bar_db": "bar_owner"}
@@ -163,24 +161,15 @@ func TestInitAdditionalOwnerRoles(t *testing.T) {
 		t.Errorf("%s could not init manifest users", testName)
 	}
 
-	// update passwords to compare with result
-	for manifestUser := range manifestUsers {
-		pgUser := cl.pgUsers[manifestUser]
-		pgUser.Password = manifestUser[0:1] + "123"
-		cl.pgUsers[manifestUser] = pgUser
-	}
-
+	// now assign additional roles to owners
 	cl.initAdditionalOwnerRoles()
 
-	for _, additionalOwnerRole := range cl.Config.OpConfig.AdditionalOwnerRoles {
-		expectedPgUser := expectedUsers[additionalOwnerRole]
-		existingPgUser, exists := cl.pgUsers[additionalOwnerRole]
-		if !exists {
-			t.Errorf("%s additional owner role %q not initilaized", testName, additionalOwnerRole)
-		}
+	// update passwords to compare with result
+	for username, existingPgUser := range cl.pgUsers {
+		expectedPgUser := expectedUsers[username]
 		if !util.IsEqualIgnoreOrder(expectedPgUser.MemberOf, existingPgUser.MemberOf) {
-			t.Errorf("%s unexpected membership of additional owner role %q: expected member of %#v, got member of %#v",
-				testName, additionalOwnerRole, expectedPgUser.MemberOf, existingPgUser.MemberOf)
+			t.Errorf("%s unexpected membership of user %q: expected member of %#v, got member of %#v",
+				testName, username, expectedPgUser.MemberOf, existingPgUser.MemberOf)
 		}
 	}
 }

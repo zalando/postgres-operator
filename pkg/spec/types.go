@@ -30,7 +30,6 @@ const (
 	RoleOriginManifest
 	RoleOriginInfrastructure
 	RoleOriginTeamsAPI
-	RoleOriginSpilo
 	RoleOriginSystem
 	RoleOriginBootstrap
 	RoleConnectionPooler

@@ -238,6 +238,7 @@ type ConnectionPooler struct {
 	*Resources `json:"resources,omitempty"`
 }
 
+// Stream defines properties for creating FabricEventStream resources
 type Stream struct {
 	ApplicationId string                 `json:"applicationId"`
 	Database      string                 `json:"database"`
@@ -246,6 +247,7 @@ type Stream struct {
 	BatchSize     *uint32                `json:"batchSize,omitempty"`
 }
 
+// StreamTable defines properties of outbox tables for FabricEventStreams
 type StreamTable struct {
 	EventType     string  `json:"eventType"`
 	IdColumn      *string `json:"idColumn,omitempty"`
