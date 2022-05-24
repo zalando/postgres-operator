@@ -5,6 +5,7 @@ import (
 
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	"github.com/zalando/postgres-operator/pkg/util"
+	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -219,6 +220,20 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"dockerImage": {
 								Type: "string",
 							},
+							"imagePullPolicy": {
+								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(v1.PullAlways),
+									},
+									{
+										Raw: []byte(v1.PullNever),
+									},
+									{
+										Raw: []byte(v1.PullIfNotPresent),
+									},
+								},
+							},
 							"maxDBConnections": {
 								Type: "integer",
 							},
@@ -287,6 +302,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"dockerImage": {
 						Type: "string",
 					},
+
 					"enableConnectionPooler": {
 						Type: "boolean",
 					},

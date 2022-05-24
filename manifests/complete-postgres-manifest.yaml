@@ -11,6 +11,7 @@ metadata:
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
   dockerImage: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+  imagePullPolicy: IfNotPresent
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users

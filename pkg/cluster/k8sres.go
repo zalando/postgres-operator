@@ -580,6 +580,7 @@ func generateVolumeMounts(volume acidv1.Volume) []v1.VolumeMount {
 func generateContainer(
 	name string,
 	dockerImage *string,
+	imagePullPolicy v1.PullPolicy,
 	resourceRequirements *v1.ResourceRequirements,
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
@@ -590,7 +591,7 @@ func generateContainer(
 	return &v1.Container{
 		Name:            name,
 		Image:           *dockerImage,
-		ImagePullPolicy: v1.PullIfNotPresent,
+		ImagePullPolicy: imagePullPolicy,
 		Resources:       *resourceRequirements,
 		Ports: []v1.ContainerPort{
 			{
@@ -617,7 +618,7 @@ func generateContainer(
 	}
 }
 
-func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar,
+func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar, imagePullPolicy v1.PullPolicy,
 	defaultResources acidv1.Resources, startIndex int) ([]v1.Container, error) {
 
 	if len(sidecars) > 0 {
@@ -635,7 +636,7 @@ func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar,
 				return nil, err
 			}
 
-			sc := getSidecarContainer(sidecar, startIndex+index, resources)
+			sc := getSidecarContainer(sidecar, imagePullPolicy, startIndex+index, resources)
 			result = append(result, *sc)
 		}
 		return result, nil
@@ -1072,7 +1073,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	return secretPodEnvVarsList, nil
 }
 
-func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.ResourceRequirements) *v1.Container {
+func getSidecarContainer(sidecar acidv1.Sidecar, imagePullPolicy v1.PullPolicy, index int, resources *v1.ResourceRequirements) *v1.Container {
 	name := sidecar.Name
 	if name == "" {
 		name = fmt.Sprintf("sidecar-%d", index)
@@ -1081,7 +1082,7 @@ func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.Resour
 	return &v1.Container{
 		Name:            name,
 		Image:           sidecar.DockerImage,
-		ImagePullPolicy: v1.PullIfNotPresent,
+		ImagePullPolicy: imagePullPolicy,
 		Resources:       *resources,
 		Env:             sidecar.Env,
 		Ports:           sidecar.Ports,
@@ -1194,6 +1195,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
+	imagePullPolicy := v1.PullPolicy(util.Coalesce(spec.ImagePullPolicy, string(v1.PullIfNotPresent)))
 
 	// determine the User, Group and FSGroup for the spilo pod
 	effectiveRunAsUser := c.OpConfig.Resources.SpiloRunAsUser
@@ -1271,6 +1273,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	// generate the spilo container
 	spiloContainer := generateContainer(constants.PostgresContainerName,
 		&effectiveDockerImage,
+		imagePullPolicy,
 		resourceRequirements,
 		spiloEnvVars,
 		volumeMounts,
@@ -1290,7 +1293,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			c.logger.Warningf("sidecars specified but disabled in configuration - next statefulset creation would fail")
 		}
 
-		if clusterSpecificSidecars, err = c.generateSidecarContainers(spec.Sidecars, defaultResources, 0); err != nil {
+		if clusterSpecificSidecars, err = c.generateSidecarContainers(spec.Sidecars, imagePullPolicy, defaultResources, 0); err != nil {
 			return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
 		}
 	}
@@ -1301,7 +1304,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	for name, dockerImage := range c.OpConfig.SidecarImages {
 		globalSidecarsByDockerImage = append(globalSidecarsByDockerImage, acidv1.Sidecar{Name: name, DockerImage: dockerImage})
 	}
-	if globalSidecarContainersByDockerImage, err = c.generateSidecarContainers(globalSidecarsByDockerImage, defaultResources, len(clusterSpecificSidecars)); err != nil {
+	if globalSidecarContainersByDockerImage, err = c.generateSidecarContainers(globalSidecarsByDockerImage, imagePullPolicy, defaultResources, len(clusterSpecificSidecars)); err != nil {
 		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
 	}
 	// make the resulting list reproducible
@@ -1318,6 +1321,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			c.OpConfig.ScalyrAPIKey,
 			c.OpConfig.ScalyrServerURL,
 			c.OpConfig.ScalyrImage,
+			imagePullPolicy,
 			c.OpConfig.ScalyrCPURequest,
 			c.OpConfig.ScalyrMemoryRequest,
 			c.OpConfig.ScalyrCPULimit,
@@ -1433,7 +1437,7 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 	return annotations
 }
 
-func (c *Cluster) generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
+func (c *Cluster) generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string, imagePullPolicy v1.PullPolicy,
 	scalyrCPURequest string, scalyrMemoryRequest string, scalyrCPULimit string, scalyrMemoryLimit string,
 	defaultResources acidv1.Resources) (*v1.Container, error) {
 	if APIKey == "" || dockerImage == "" {
@@ -1469,8 +1473,8 @@ func (c *Cluster) generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dock
 	return &v1.Container{
 		Name:            scalyrSidecarName,
 		Image:           dockerImage,
+		ImagePullPolicy: imagePullPolicy,
 		Env:             env,
-		ImagePullPolicy: v1.PullIfNotPresent,
 		Resources:       *resourceRequirementsScalyrSidecar,
 	}, nil
 }
@@ -1668,18 +1672,16 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 
 func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	secrets := make(map[string]*v1.Secret, len(c.pgUsers))
-	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		secret := c.generateSingleUserSecret(pgUser.Namespace, pgUser)
+		secret := c.generateSingleUserSecret(pgUser)
 		if secret != nil {
 			secrets[username] = secret
 		}
-		namespace = pgUser.Namespace
 	}
 	/* special case for the system user */
 	for _, systemUser := range c.systemUsers {
-		secret := c.generateSingleUserSecret(namespace, systemUser)
+		secret := c.generateSingleUserSecret(systemUser)
 		if secret != nil {
 			secrets[systemUser.Name] = secret
 		}
@@ -1688,7 +1690,7 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	return secrets
 }
 
-func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
+func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
 		if pgUser.Origin != spec.RoleOriginTeamsAPI {
@@ -2037,6 +2039,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	logicalBackupContainer := generateContainer(
 		logicalBackupContainerName,
 		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
+		v1.PullPolicy(util.Coalesce(c.Spec.ImagePullPolicy, string(v1.PullIfNotPresent))),
 		resourceRequirements,
 		envVars,
 		[]v1.VolumeMount{},

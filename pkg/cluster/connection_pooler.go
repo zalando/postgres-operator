@@ -230,6 +230,8 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		connectionPoolerSpec.DockerImage,
 		c.OpConfig.ConnectionPooler.Image)
 
+	imagePullPolicy := v1.PullPolicy(util.Coalesce(spec.ImagePullPolicy, string(v1.PullIfNotPresent)))
+
 	effectiveSchema := util.Coalesce(
 		connectionPoolerSpec.Schema,
 		c.OpConfig.ConnectionPooler.Schema)
@@ -284,7 +286,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	poolerContainer := v1.Container{
 		Name:            connectionPoolerContainer,
 		Image:           effectiveDockerImage,
-		ImagePullPolicy: v1.PullIfNotPresent,
+		ImagePullPolicy: imagePullPolicy,
 		Resources:       *resources,
 		Ports: []v1.ContainerPort{
 			{
