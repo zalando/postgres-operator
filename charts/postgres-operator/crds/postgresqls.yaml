@@ -352,6 +352,10 @@ spec:
                 type: object
                 additionalProperties:
                   type: string
+              podLabels:
+                type: object
+                additionalProperties:
+                  type: string
               pod_priority_class_name:
                 type: string
                 description: deprecated
