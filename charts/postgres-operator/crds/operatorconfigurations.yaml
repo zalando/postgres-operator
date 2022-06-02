@@ -91,6 +91,12 @@ spec:
               etcd_host:
                 type: string
                 default: ""
+              etcd_host_version:
+                type: string
+                default: "v2"
+                enum:
+                  - "v2"
+                  - "v3"
               ignore_instance_limits_annotation_key:
                 type: string
               kubernetes_use_configmaps:

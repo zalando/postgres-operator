@@ -899,7 +899,13 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	if c.patroniUsesKubernetes() {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
 	} else {
-		envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
+		switch c.OpConfig.EtcdHostVersion {
+		// Select etcd version to use. See "Patroni - ETCD" for more information
+		case "v3":
+			envVars = append(envVars, v1.EnvVar{Name: "ETCD3_HOST", Value: c.OpConfig.EtcdHost})
+		default: // v2
+			envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
+		}
 	}
 
 	if c.patroniKubernetesUseConfigMaps() {

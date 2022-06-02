@@ -37,6 +37,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnablePgVersionEnvVar = fromCRD.EnablePgVersionEnvVar
 	result.EnableSpiloWalPathCompat = fromCRD.EnableSpiloWalPathCompat
 	result.EtcdHost = fromCRD.EtcdHost
+	result.EtcdHostVersion = fromCRD.EtcdHostVersion
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
 	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-14:2.1-p6")
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
