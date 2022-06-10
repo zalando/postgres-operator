@@ -268,7 +268,7 @@ configuration they are grouped under the `kubernetes` key.
   will be used. The default is empty.
 
 * **pod_terminate_grace_period**
-  Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
+  Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination)
   after this timeout. The default is `5m`.
 
 * **custom_pod_annotations**
