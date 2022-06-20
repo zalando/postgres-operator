@@ -68,7 +68,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "registry.opensource.zalan.do/acid/spilo-14:2.1-p5"
+                default: "registry.opensource.zalan.do/acid/spilo-14:2.1-p6"
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -450,7 +450,7 @@ spec:
                 properties:
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.8.1"
+                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.8.2"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:

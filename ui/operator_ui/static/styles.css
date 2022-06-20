@@ -66,7 +66,7 @@ td {
 }
 
 .tooltip {
-  position: relative;
+  position: inherit;
   display: inline-block;
   opacity: 1;
   font-size: 14px;
