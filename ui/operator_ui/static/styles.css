@@ -71,6 +71,7 @@ td {
   opacity: 1;
   font-size: 14px;
   font-weight: bold;
+  z-index: 0;
 }
 .tooltip:after {
   content: '?';
@@ -97,7 +98,6 @@ td {
   border-radius: 6px;
   padding: 10px 10px;
   position: absolute;
-  z-index: 1;
   bottom: 150%;
   left: 50%;
   margin-left: -120px;

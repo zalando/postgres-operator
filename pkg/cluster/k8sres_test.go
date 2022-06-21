@@ -550,8 +550,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			envVarValue:    "s3://another-bucket",
 		},
 		{
-			envIndex:       17,
-			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
+			envIndex:       19,
+			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 		{
@@ -572,14 +572,14 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			envVarValue:    fmt.Sprintf("/%s", dummyUUID),
 		},
 		{
-			envIndex:       20,
+			envIndex:       21,
 			envVarConstant: "clone_aws_endpoint",
 			envVarValue:    "s3.eu-west-1.amazonaws.com",
 		},
 	}
 	expectedCloneEnvSecret := []ExpectedValue{
 		{
-			envIndex:       20,
+			envIndex:       21,
 			envVarConstant: "clone_aws_access_key_id",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{

@@ -1867,22 +1867,15 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		} else {
 			c.logger.Debugf("use S3WalPath %s from the manifest", description.S3WalPath)
 
-			envs := []v1.EnvVar{
-				{
-					Name:  "CLONE_WALE_S3_PREFIX",
-					Value: description.S3WalPath,
-				},
-				{
-					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
-					Value: "",
-				},
-			}
-
-			result = append(result, envs...)
+			result = append(result, v1.EnvVar{
+				Name:  "CLONE_WALE_S3_PREFIX",
+				Value: description.S3WalPath,
+			})
 		}
 
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 		if description.S3Endpoint != "" {
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
