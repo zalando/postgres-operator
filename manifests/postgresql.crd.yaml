@@ -618,7 +618,7 @@ spec:
                             operator:
                               type: string
                               enum:
-                                - DoesNotExists
+                                - DoesNotExist
                                 - Exists
                                 - In
                                 - NotIn
