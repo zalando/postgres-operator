@@ -66,6 +66,7 @@ data:
   # ignored_annotations: ""
   # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
   # infrastructure_roles_secrets: "secretname:monitoring-roles,userkey:user,passwordkey:password,rolekey:inrole"
+  # ignore_instance_limits_annotation_key: ""
   # inherited_annotations: owned-by
   # inherited_labels: application,environment
   # kube_iam_role: ""

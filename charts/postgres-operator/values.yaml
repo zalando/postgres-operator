@@ -35,10 +35,15 @@ configGeneral:
   enable_spilo_wal_path_compat: false
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
-  # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
-  # kubernetes_use_configmaps: false
   # Spilo docker image
   docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+
+  # key name for annotation to ignore globally configured instance limits
+  # ignore_instance_limits_annotation_key: ""
+
+  # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
+  # kubernetes_use_configmaps: false
+
   # min number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # max number of instances in Postgres cluster. -1 = no limit

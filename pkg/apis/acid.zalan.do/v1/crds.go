@@ -1115,6 +1115,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"etcd_host": {
 						Type: "string",
 					},
+					"ignore_instance_limits_annotation_key": {
+						Type: "string",
+					},
 					"kubernetes_use_configmaps": {
 						Type: "boolean",
 					},

@@ -1343,6 +1343,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
+	// global minInstances and maxInstances settings can overwrite manifest
 	numberOfInstances := c.getNumberOfInstances(spec)
 
 	// the operator has domain-specific logic on how to do rolling updates of PG clusters
@@ -1443,8 +1444,15 @@ func (c *Cluster) generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dock
 func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	min := c.OpConfig.MinInstances
 	max := c.OpConfig.MaxInstances
+	instanceLimitAnnotationKey := c.OpConfig.IgnoreInstanceLimitsAnnotationKey
 	cur := spec.NumberOfInstances
 	newcur := cur
+
+	if instanceLimitAnnotationKey != "" {
+		if value, exists := c.ObjectMeta.Annotations[instanceLimitAnnotationKey]; exists && value == "true" {
+			return cur
+		}
+	}
 
 	if spec.StandbyCluster != nil {
 		if newcur == 1 {

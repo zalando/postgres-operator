@@ -58,9 +58,11 @@ type Resources struct {
 	PodEnvironmentSecret          string              `name:"pod_environment_secret"`
 	NodeReadinessLabel            map[string]string   `name:"node_readiness_label" default:""`
 	NodeReadinessLabelMerge       string              `name:"node_readiness_label_merge" default:"OR"`
-	MaxInstances                  int32               `name:"max_instances" default:"-1"`
-	MinInstances                  int32               `name:"min_instances" default:"-1"`
 	ShmVolume                     *bool               `name:"enable_shm_volume" default:"true"`
+
+	MaxInstances                      int32  `name:"max_instances" default:"-1"`
+	MinInstances                      int32  `name:"min_instances" default:"-1"`
+	IgnoreInstanceLimitsAnnotationKey string `name:"ignore_instance_limits_annotation_key"`
 }
 
 type InfrastructureRole struct {
