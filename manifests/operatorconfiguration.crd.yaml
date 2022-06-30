@@ -89,6 +89,8 @@ spec:
               etcd_host:
                 type: string
                 default: ""
+              ignore_instance_limits_annotation_key:
+                type: string
               kubernetes_use_configmaps:
                 type: boolean
                 default: false

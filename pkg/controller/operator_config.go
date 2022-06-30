@@ -42,6 +42,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
+	result.IgnoreInstanceLimitsAnnotationKey = fromCRD.IgnoreInstanceLimitsAnnotationKey
 	result.ResyncPeriod = util.CoalesceDuration(time.Duration(fromCRD.ResyncPeriod), "30m")
 	result.RepairPeriod = util.CoalesceDuration(time.Duration(fromCRD.RepairPeriod), "5m")
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit

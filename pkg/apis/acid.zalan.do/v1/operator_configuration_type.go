@@ -236,8 +236,6 @@ type OperatorConfigurationData struct {
 	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
 	Workers                    uint32                             `json:"workers,omitempty"`
-	MinInstances               int32                              `json:"min_instances,omitempty"`
-	MaxInstances               int32                              `json:"max_instances,omitempty"`
 	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
 	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
 	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
@@ -257,6 +255,10 @@ type OperatorConfigurationData struct {
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
 	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
+
+	MinInstances                      int32  `json:"min_instances,omitempty"`
+	MaxInstances                      int32  `json:"max_instances,omitempty"`
+	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
 }
 
 //Duration shortens this frequently used name

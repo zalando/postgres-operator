@@ -864,6 +864,136 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 }
 
+func TestGetNumberOfInstances(t *testing.T) {
+	testName := "TestGetNumberOfInstances"
+	tests := []struct {
+		subTest         string
+		config          config.Config
+		annotationKey   string
+		annotationValue string
+		desired         int32
+		provided        int32
+	}{
+		{
+			subTest: "no constraints",
+			config: config.Config{
+				Resources: config.Resources{
+					MinInstances:                      -1,
+					MaxInstances:                      -1,
+					IgnoreInstanceLimitsAnnotationKey: "",
+				},
+			},
+			annotationKey:   "",
+			annotationValue: "",
+			desired:         2,
+			provided:        2,
+		},
+		{
+			subTest: "minInstances defined",
+			config: config.Config{
+				Resources: config.Resources{
+					MinInstances:                      2,
+					MaxInstances:                      -1,
+					IgnoreInstanceLimitsAnnotationKey: "",
+				},
+			},
+			annotationKey:   "",
+			annotationValue: "",
+			desired:         1,
+			provided:        2,
+		},
+		{
+			subTest: "maxInstances defined",
+			config: config.Config{
+				Resources: config.Resources{
+					MinInstances:                      -1,
+					MaxInstances:                      5,
+					IgnoreInstanceLimitsAnnotationKey: "",
+				},
+			},
+			annotationKey:   "",
+			annotationValue: "",
+			desired:         10,
+			provided:        5,
+		},
+		{
+			subTest: "ignore minInstances",
+			config: config.Config{
+				Resources: config.Resources{
+					MinInstances:                      2,
+					MaxInstances:                      -1,
+					IgnoreInstanceLimitsAnnotationKey: "ignore-instance-limits",
+				},
+			},
+			annotationKey:   "ignore-instance-limits",
+			annotationValue: "true",
+			desired:         1,
+			provided:        1,
+		},
+		{
+			subTest: "want to ignore minInstances but wrong key",
+			config: config.Config{
+				Resources: config.Resources{
+					MinInstances:                      2,
+					MaxInstances:                      -1,
+					IgnoreInstanceLimitsAnnotationKey: "ignore-instance-limits",
+				},
+			},
+			annotationKey:   "ignoring-instance-limits",
+			annotationValue: "true",
+			desired:         1,
+			provided:        2,
+		},
+		{
+			subTest: "want to ignore minInstances but wrong value",
+			config: config.Config{
+				Resources: config.Resources{
+					MinInstances:                      2,
+					MaxInstances:                      -1,
+					IgnoreInstanceLimitsAnnotationKey: "ignore-instance-limits",
+				},
+			},
+			annotationKey:   "ignore-instance-limits",
+			annotationValue: "active",
+			desired:         1,
+			provided:        2,
+		},
+		{
+			subTest: "annotation set but no constraints to ignore",
+			config: config.Config{
+				Resources: config.Resources{
+					MinInstances:                      -1,
+					MaxInstances:                      -1,
+					IgnoreInstanceLimitsAnnotationKey: "ignore-instance-limits",
+				},
+			},
+			annotationKey:   "ignore-instance-limits",
+			annotationValue: "true",
+			desired:         1,
+			provided:        1,
+		},
+	}
+
+	for _, tt := range tests {
+		var cluster = New(
+			Config{
+				OpConfig: tt.config,
+			}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+		cluster.Spec.NumberOfInstances = tt.desired
+		if tt.annotationKey != "" {
+			cluster.ObjectMeta.Annotations = make(map[string]string)
+			cluster.ObjectMeta.Annotations[tt.annotationKey] = tt.annotationValue
+		}
+		numInstances := cluster.getNumberOfInstances(&cluster.Spec)
+
+		if numInstances != tt.provided {
+			t.Errorf("%s %s: Expected to get %d instances, have %d instead",
+				testName, tt.subTest, tt.provided, numInstances)
+		}
+	}
+}
+
 func TestCloneEnv(t *testing.T) {
 	testName := "TestCloneEnv"
 	tests := []struct {

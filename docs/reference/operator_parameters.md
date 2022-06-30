@@ -147,6 +147,12 @@ Those are top-level keys, containing both leaf keys and groups.
   When `-1` is specified for `min_instances`, no limits are applied. The default
   is `-1`.
 
+* **ignore_instance_limits_annotation_key**
+  for some clusters it might be required to scale beyond the limits that can be
+  configured with `min_instances` and `max_instances` options. You can define
+  an annotation key that can be used as a toggle in cluster manifests to ignore
+  globally configured instance limits. The default is empty.
+
 * **resync_period**
   period between consecutive sync requests. The default is `30m`.
 
