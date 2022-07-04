@@ -486,10 +486,10 @@ configuration they are grouped under the `kubernetes` key.
 * **storage_resize_mode**
   defines how operator handles the difference between the requested volume size and
     the actual size. Available options are:
-    1. `ebs` : operator resizes EBS volumes directly and executes `resizefs` within a pod
-    2. `pvc` : operator only changes PVC definition
-    3. `off` : disables resize of the volumes.
-    4. `mixed` :operator  uses AWS API to adjust size, throughput, and IOPS, and calls pvc change for file system resize
+    1. `ebs`   : operator resizes EBS volumes directly and executes `resizefs` within a pod
+    2. `pvc`   : operator only changes PVC definition
+    3. `off`   : disables resize of the volumes.
+    4. `mixed` : operator uses AWS API to adjust size, throughput, and IOPS, and calls pvc change for file system resize
     Default is "pvc".
 
 ## Kubernetes resource requests
