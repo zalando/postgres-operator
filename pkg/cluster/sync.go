@@ -763,6 +763,19 @@ func (c *Cluster) updateSecret(
 			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
 			secret.Data["nextRotation"] = []byte(nextRotationDateStr)
 
+			// when passwords of system users are rotated, pods have to be replaced
+			if pwdUser.Origin == spec.RoleOriginSystem {
+				pods, err := c.listPods()
+				if err != nil {
+					return fmt.Errorf("could not list pods of the statefulset - abort password rotation: %v", err)
+				}
+				for _, pod := range pods {
+					if err = c.markRollingUpdateFlagForPod(&pod, "replace pod due to password rotation of system user "+secretUsername); err != nil {
+						c.logger.Warnf("marking pod for rolling update due to password rotation failed: %v", err)
+					}
+				}
+			}
+
 			updateSecret = true
 			updateSecretMsg = fmt.Sprintf("updating secret %q due to password rotation - next rotation date: %s", secretName, nextRotationDateStr)
 		}
@@ -805,6 +818,7 @@ func (c *Cluster) syncRoles() (err error) {
 
 	var (
 		dbUsers   spec.PgUserMap
+		newUsers  spec.PgUserMap
 		userNames []string
 	)
 
@@ -825,6 +839,7 @@ func (c *Cluster) syncRoles() (err error) {
 
 	// mapping between original role name and with deletion suffix
 	deletedUsers := map[string]string{}
+	newUsers = make(map[string]spec.PgUser)
 
 	// create list of database roles to query
 	for _, u := range c.pgUsers {
@@ -850,10 +865,18 @@ func (c *Cluster) syncRoles() (err error) {
 	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {
 		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
 		userNames = append(userNames, connectionPoolerUser.Name)
-
 		if _, exists := c.pgUsers[connectionPoolerUser.Name]; !exists {
 			c.pgUsers[connectionPoolerUser.Name] = connectionPoolerUser
 		}
+	}
+
+	// copy map for ProduceSyncRequests to include also system users
+	for userName, pgUser := range c.pgUsers {
+		newUsers[userName] = pgUser
+	}
+	for _, systemUser := range c.systemUsers {
+		userNames = append(userNames, systemUser.Name)
+		newUsers[systemUser.Name] = systemUser
 	}
 
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
@@ -871,7 +894,7 @@ func (c *Cluster) syncRoles() (err error) {
 		}
 	}
 
-	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)
+	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, newUsers)
 	if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
 		return fmt.Errorf("error executing sync statements: %v", err)
 	}
