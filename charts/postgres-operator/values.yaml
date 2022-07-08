@@ -196,7 +196,7 @@ configKubernetes:
   # whether the Spilo container should run with additional permissions other than parent.
   # required by cron which needs setuid
   spilo_allow_privilege_escalation: true
-  # storage resize strategy, available options are: ebs, pvc, off
+  # storage resize strategy, available options are: ebs, pvc, off or mixed
   storage_resize_mode: pvc
   # pod toleration assigned to instances of every Postgres cluster
   # toleration:

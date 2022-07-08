@@ -1029,9 +1029,9 @@ specified but globally disabled in the configuration. The
 
 ## Increase volume size
 
-Postgres operator supports statefulset volume resize if you're using the
-operator on top of AWS. For that you need to change the size field of the
-volume description in the cluster manifest and apply the change:
+Postgres operator supports statefulset volume resize without doing a rolling
+update. For that you need to change the size field of the volume description
+in the cluster manifest and apply the change:
 
 ```yaml
 spec:
@@ -1040,22 +1040,29 @@ spec:
 ```
 
 The operator compares the new value of the size field with the previous one and
-acts on differences.
+acts on differences. The `storage_resize_mode` can be configured. By default,
+the operator will adjust the PVCs and leave it to K8s and the infrastructure to
+apply the change.
 
-You can only enlarge the volume with the process described above, shrinking is
-not supported and will emit a warning. After this update all the new volumes in
-the statefulset are allocated according to the new size. To enlarge persistent
-volumes attached to the running pods, the operator performs the following
-actions:
+When using AWS with gp3 volumes you should set the mode to `mixed` because it
+will also adjust the IOPS and throughput that can be defined in the manifest.
+Check the [AWS docs](https://aws.amazon.com/ebs/general-purpose/) to learn
+about default and maximum values. Keep in mind that AWS rate-limits updating
+volume specs to no more than once every 6 hours. 
 
-* call AWS API to change the volume size
+```yaml
+spec:
+  volume:
+    size: 5Gi # new volume size
+    iops: 4000
+    throughput: 500
+```
 
-* connect to pod using `kubectl exec` and resize filesystem with `resize2fs`.
-
-Fist step has a limitation, AWS rate-limits this operation to no more than once
-every 6 hours. Note, that if the statefulset is scaled down before resizing the
-new size is only applied to the volumes attached to the running pods. The
-size of volumes that correspond to the previously running pods is not changed.
+The operator can only enlarge volumes. Shrinking is not supported and will emit
+a warning. However, it can be done manually after updating the manifest. You
+have to delete the PVC, which will hang until you also delete the corresponding
+pod. Proceed with the next pod when the cluster is healthy again and replicas
+are streaming.
 
 ## Logical backups
 
