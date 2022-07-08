@@ -91,6 +91,8 @@ data:
   # min_instances: "-1"
   # min_cpu_limit: 250m
   # min_memory_limit: 250Mi
+  # max_cpu_limit: 250m
+  # max_memory_limit: 250Mi
   # minimal_major_version: "9.6"
   # node_readiness_label: "status:ready"
   # node_readiness_label_merge: "OR"

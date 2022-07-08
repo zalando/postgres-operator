@@ -131,10 +131,15 @@ func makeDefaultResources(config *config.Config) acidv1.Resources {
 		CPU:    config.Resources.DefaultCPULimit,
 		Memory: config.Resources.DefaultMemoryLimit,
 	}
+	maxRequests := acidv1.ResourceDescription{
+		CPU:    config.Resources.MaxCPURequest,
+		Memory: config.Resources.MaxMemoryRequest,
+	}
 
 	return acidv1.Resources{
-		ResourceRequests: defaultRequests,
-		ResourceLimits:   defaultLimits,
+		ResourceRequests:    defaultRequests,
+		ResourceLimits:      defaultLimits,
+		MaxResourceRequests: maxRequests,
 	}
 }
 
@@ -177,6 +182,51 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 			c.logger.Warningf(msg)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
 			resources.Limits[v1.ResourceMemory], _ = resource.ParseQuantity(minMemoryLimit)
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) enforceMaxnRequests(resources *v1.ResourceRequirements) error {
+	var (
+		isMax bool
+		err   error
+		msg   string
+	)
+
+	// setting limits too low can cause unnecessary evictions / OOM kills
+	cpuRequest := resources.Requests[v1.ResourceCPU]
+	maxCPURequest := c.OpConfig.MaxCPURequest
+	if maxCPURequest != "" {
+		isMax, err = util.IsSmallerQuantity(cpuRequest.String(), maxCPURequest)
+		if err != nil {
+			return fmt.Errorf("could not compare defined CPU limit %s for %q container with configured minimum value %s: %v",
+				cpuRequest.String(), constants.PostgresContainerName, maxCPURequest, err)
+		}
+		if isMax {
+			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required minimum %s and will be increased",
+				cpuRequest.String(), constants.PostgresContainerName, maxCPURequest)
+			c.logger.Warningf(msg)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+			resources.Limits[v1.ResourceCPU], _ = resource.ParseQuantity(maxCPURequest)
+		}
+	}
+
+	memoryRequest := resources.Limits[v1.ResourceMemory]
+	maxMemoryRequest := c.OpConfig.MinMemoryLimit
+	if maxMemoryRequest != "" {
+		isMax, err = util.IsSmallerQuantity(memoryRequest.String(), maxMemoryRequest)
+		if err != nil {
+			return fmt.Errorf("could not compare defined memory limit %s for %q container with configured minimum value %s: %v",
+				memoryRequest.String(), constants.PostgresContainerName, maxMemoryRequest, err)
+		}
+		if isMax {
+			msg = fmt.Sprintf("defined memory limit %s for %q container is below required minimum %s and will be increased",
+				memoryRequest.String(), constants.PostgresContainerName, maxMemoryRequest)
+			c.logger.Warningf(msg)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+			resources.Limits[v1.ResourceMemory], _ = resource.ParseQuantity(maxMemoryRequest)
 		}
 	}
 
@@ -1061,15 +1111,15 @@ func getBucketScopeSuffix(uid string) string {
 	return ""
 }
 
-func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) acidv1.Resources {
+func makeResources(cpuRequest, memoryRequest, maxcpuRequest, maxmemoryRequest string) acidv1.Resources {
 	return acidv1.Resources{
 		ResourceRequests: acidv1.ResourceDescription{
 			CPU:    cpuRequest,
 			Memory: memoryRequest,
 		},
 		ResourceLimits: acidv1.ResourceDescription{
-			CPU:    cpuLimit,
-			Memory: memoryLimit,
+			CPU:    maxcpuRequest,
+			Memory: maxmemoryRequest,
 		},
 	}
 }

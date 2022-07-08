@@ -153,8 +153,9 @@ type ResourceDescription struct {
 
 // Resources describes requests and limits for the cluster resouces.
 type Resources struct {
-	ResourceRequests ResourceDescription `json:"requests,omitempty"`
-	ResourceLimits   ResourceDescription `json:"limits,omitempty"`
+	ResourceRequests    ResourceDescription `json:"requests,omitempty"`
+	ResourceLimits      ResourceDescription `json:"limits,omitempty"`
+	MaxResourceRequests ResourceDescription `json:"limits,omitempty"`
 }
 
 // Patroni contains Patroni-specific configuration

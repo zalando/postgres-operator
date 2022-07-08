@@ -1711,8 +1711,10 @@ func TestSidecars(t *testing.T) {
 				},
 				Resources: config.Resources{
 					DefaultCPURequest:    "200m",
+					MaxCPURequest:        "300m",
 					DefaultCPULimit:      "500m",
 					DefaultMemoryRequest: "0.7Gi",
+					MaxMemoryRequest:     "1.0Gi",
 					DefaultMemoryLimit:   "1.3Gi",
 				},
 				SidecarImages: map[string]string{
@@ -1998,8 +2000,10 @@ func TestGenerateService(t *testing.T) {
 				},
 				Resources: config.Resources{
 					DefaultCPURequest:    "200m",
+					MaxCPURequest:        "300m",
 					DefaultCPULimit:      "500m",
 					DefaultMemoryRequest: "0.7Gi",
+					MaxMemoryRequest:     "1.0Gi",
 					DefaultMemoryLimit:   "1.3Gi",
 				},
 				SidecarImages: map[string]string{
@@ -2293,8 +2297,10 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		ClusterLabels:        map[string]string{"application": "spilo"},
 		ClusterNameLabel:     clusterNameLabel,
 		DefaultCPURequest:    "100m",
+		MaxCPURequest:        "300m",
 		DefaultCPULimit:      "1",
 		DefaultMemoryRequest: "100Mi",
+		MaxMemoryRequest:     "300Mi",
 		DefaultMemoryLimit:   "500Mi",
 		MinCPULimit:          "250m",
 		MinMemoryLimit:       "250Mi",
