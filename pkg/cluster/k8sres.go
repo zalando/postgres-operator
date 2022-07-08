@@ -1111,13 +1111,17 @@ func getBucketScopeSuffix(uid string) string {
 	return ""
 }
 
-func makeResources(cpuRequest, memoryRequest, maxcpuRequest, maxmemoryRequest string) acidv1.Resources {
+func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit, maxcpuRequest, maxmemoryRequest string) acidv1.Resources {
 	return acidv1.Resources{
 		ResourceRequests: acidv1.ResourceDescription{
 			CPU:    cpuRequest,
 			Memory: memoryRequest,
 		},
 		ResourceLimits: acidv1.ResourceDescription{
+			CPU:    cpuLimit,
+			Memory: memoryLimit,
+		},
+		MaxResourceRequests: acidv1.ResourceDescription{
 			CPU:    maxcpuRequest,
 			Memory: maxmemoryRequest,
 		},

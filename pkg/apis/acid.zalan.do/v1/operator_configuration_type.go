@@ -109,8 +109,8 @@ type PostgresPodResourcesDefaults struct {
 	DefaultMemoryLimit   string `json:"default_memory_limit,omitempty"`
 	MinCPULimit          string `json:"min_cpu_limit,omitempty"`
 	MinMemoryLimit       string `json:"min_memory_limit,omitempty"`
-	MaxCPURequest        string `json:"max_cpu_limit,omitempty"`
-	MaxMemoryRequest     string `json:"max_memory_limit,omitempty"`
+	MaxCPURequest        string `json:"max_cpu_request,omitempty"`
+	MaxMemoryRequest     string `json:"max_memory_request,omitempty"`
 }
 
 // OperatorTimeouts defines the timeout of ResourceCheck, PodWait, ReadyWait

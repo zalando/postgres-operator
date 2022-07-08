@@ -155,7 +155,7 @@ type ResourceDescription struct {
 type Resources struct {
 	ResourceRequests    ResourceDescription `json:"requests,omitempty"`
 	ResourceLimits      ResourceDescription `json:"limits,omitempty"`
-	MaxResourceRequests ResourceDescription `json:"limits,omitempty"`
+	MaxResourceRequests ResourceDescription `json:"requests,omitempty"`
 }
 
 // Patroni contains Patroni-specific configuration
