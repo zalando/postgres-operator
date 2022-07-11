@@ -1907,6 +1907,10 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_S3_FORCE_PATH_STYLE", Value: s3ForcePathStyle})
 		}
+
+		if description.TimelineID != "" {
+			result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIMELINE", Value: description.TimelineID})
+		}
 	}
 
 	return result
