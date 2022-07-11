@@ -211,6 +211,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type:   "string",
 								Format: "uuid",
 							},
+							"clone_target_timeline": {
+								Type: "string",
+							},
 						},
 					},
 					"connectionPooler": {
