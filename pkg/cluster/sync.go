@@ -723,10 +723,11 @@ func (c *Cluster) updateSecret(
 	}
 	pwdUser := userMap[userKey]
 	secretName := util.NameFromMeta(secret.ObjectMeta)
+	excludedRoleTypes := []spec.RoleOrigin{spec.RoleOriginSystem, spec.RoleOriginInfrastructure, spec.RoleOriginConnectionPooler}
 
 	// if password rotation is enabled update password and username if rotation interval has been passed
 	if (c.OpConfig.EnablePasswordRotation && !pwdUser.IsDbOwner &&
-		pwdUser.Origin != spec.RoleOriginInfrastructure && pwdUser.Origin != spec.RoleOriginSystem) ||
+		util.SliceContains(excludedRoleTypes, pwdUser.Origin)) ||
 		util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) ||
 		util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
 

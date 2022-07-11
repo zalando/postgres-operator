@@ -1112,7 +1112,7 @@ func (c *Cluster) initSystemUsers() {
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{
-			Origin:    spec.RoleConnectionPooler,
+			Origin:    spec.RoleOriginConnectionPooler,
 			Name:      username,
 			Namespace: c.Namespace,
 			Flags:     []string{constants.RoleFlagLogin},
@@ -1133,7 +1133,7 @@ func (c *Cluster) initSystemUsers() {
 	if len(c.Spec.Streams) > 0 {
 		username := constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
 		streamUser := spec.PgUser{
-			Origin:    spec.RoleConnectionPooler,
+			Origin:    spec.RoleOriginSystem,
 			Name:      username,
 			Namespace: c.Namespace,
 			Flags:     []string{constants.RoleFlagLogin, constants.RoleFlagReplication},
