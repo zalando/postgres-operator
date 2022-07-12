@@ -367,3 +367,19 @@ func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 
 	return request.Cmp(limit) == -1, nil
 }
+
+// IsGreaterQuantity : checks if first resource is of a greater quantity than the second
+func IsGreaterQuantity(requestStr, limitStr string) (bool, error) {
+
+	request, err := resource.ParseQuantity(requestStr)
+	if err != nil {
+		return false, fmt.Errorf("could not parse request %v : %v", requestStr, err)
+	}
+
+	limit, err2 := resource.ParseQuantity(limitStr)
+	if err2 != nil {
+		return false, fmt.Errorf("could not parse limit %v : %v", limitStr, err2)
+	}
+
+	return request.Cmp(limit) == 1, nil
+}

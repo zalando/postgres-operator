@@ -131,15 +131,10 @@ func makeDefaultResources(config *config.Config) acidv1.Resources {
 		CPU:    config.Resources.DefaultCPULimit,
 		Memory: config.Resources.DefaultMemoryLimit,
 	}
-	maxRequests := acidv1.ResourceDescription{
-		CPU:    config.Resources.MaxCPURequest,
-		Memory: config.Resources.MaxMemoryRequest,
-	}
 
 	return acidv1.Resources{
-		ResourceRequests:    defaultRequests,
-		ResourceLimits:      defaultLimits,
-		MaxResourceRequests: maxRequests,
+		ResourceRequests: defaultRequests,
+		ResourceLimits:   defaultLimits,
 	}
 }
 
@@ -188,7 +183,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 	return nil
 }
 
-func (c *Cluster) enforceMaxnRequests(resources *v1.ResourceRequirements) error {
+func (c *Cluster) enforceMaxRequests(resources *v1.ResourceRequirements) error {
 	var (
 		isMax bool
 		err   error
@@ -199,13 +194,13 @@ func (c *Cluster) enforceMaxnRequests(resources *v1.ResourceRequirements) error 
 	cpuRequest := resources.Requests[v1.ResourceCPU]
 	maxCPURequest := c.OpConfig.MaxCPURequest
 	if maxCPURequest != "" {
-		isMax, err = util.IsSmallerQuantity(cpuRequest.String(), maxCPURequest)
+		isMax, err = util.IsGreaterQuantity(cpuRequest.String(), maxCPURequest)
 		if err != nil {
-			return fmt.Errorf("could not compare defined CPU limit %s for %q container with configured minimum value %s: %v",
+			return fmt.Errorf("could not compare defined CPU limit %s for %q container with configured maximum value %s: %v",
 				cpuRequest.String(), constants.PostgresContainerName, maxCPURequest, err)
 		}
 		if isMax {
-			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required minimum %s and will be increased",
+			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required maximum %s and will be increased",
 				cpuRequest.String(), constants.PostgresContainerName, maxCPURequest)
 			c.logger.Warningf(msg)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
@@ -213,16 +208,16 @@ func (c *Cluster) enforceMaxnRequests(resources *v1.ResourceRequirements) error 
 		}
 	}
 
-	memoryRequest := resources.Limits[v1.ResourceMemory]
-	maxMemoryRequest := c.OpConfig.MinMemoryLimit
+	memoryRequest := resources.Requests[v1.ResourceMemory]
+	maxMemoryRequest := c.OpConfig.MaxMemoryRequest
 	if maxMemoryRequest != "" {
-		isMax, err = util.IsSmallerQuantity(memoryRequest.String(), maxMemoryRequest)
+		isMax, err = util.IsGreaterQuantity(memoryRequest.String(), maxMemoryRequest)
 		if err != nil {
-			return fmt.Errorf("could not compare defined memory limit %s for %q container with configured minimum value %s: %v",
+			return fmt.Errorf("could not compare defined memory limit %s for %q container with configured maximum value %s: %v",
 				memoryRequest.String(), constants.PostgresContainerName, maxMemoryRequest, err)
 		}
 		if isMax {
-			msg = fmt.Sprintf("defined memory limit %s for %q container is below required minimum %s and will be increased",
+			msg = fmt.Sprintf("defined memory limit %s for %q container is below required maximum %s and will be increased",
 				memoryRequest.String(), constants.PostgresContainerName, maxMemoryRequest)
 			c.logger.Warningf(msg)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
@@ -303,6 +298,12 @@ func (c *Cluster) generateResourceRequirements(
 	if containerName == constants.PostgresContainerName {
 		if err = c.enforceMinResourceLimits(&result); err != nil {
 			return nil, fmt.Errorf("could not enforce minimum resource limits: %v", err)
+		}
+	}
+
+	if containerName == constants.PostgresContainerName {
+		if err = c.enforceMaxRequests(&result); err != nil {
+			return nil, fmt.Errorf("could not enforce maximum resource limits: %v", err)
 		}
 	}
 
@@ -1111,7 +1112,7 @@ func getBucketScopeSuffix(uid string) string {
 	return ""
 }
 
-func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit, maxcpuRequest, maxmemoryRequest string) acidv1.Resources {
+func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) acidv1.Resources {
 	return acidv1.Resources{
 		ResourceRequests: acidv1.ResourceDescription{
 			CPU:    cpuRequest,
@@ -1120,10 +1121,6 @@ func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit, maxcpuReque
 		ResourceLimits: acidv1.ResourceDescription{
 			CPU:    cpuLimit,
 			Memory: memoryLimit,
-		},
-		MaxResourceRequests: acidv1.ResourceDescription{
-			CPU:    maxcpuRequest,
-			Memory: maxmemoryRequest,
 		},
 	}
 }
