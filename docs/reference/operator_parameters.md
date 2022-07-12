@@ -724,6 +724,9 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_secret_access_key**
   When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
 
+**logical_backup_s3_access_secret_name**
+  When set, value is taken from the secret and set as AWS_SECRET_ACCESS_KEY env variable. The existing secret must contain the key "password". The Default is empty.
+
 * **logical_backup_s3_sse**
   Specify server side encryption that S3 storage is using. If empty string
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".

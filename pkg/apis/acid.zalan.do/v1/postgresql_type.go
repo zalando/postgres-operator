@@ -197,6 +197,7 @@ type CloneDescription struct {
 	S3Endpoint        string `json:"s3_endpoint,omitempty"`
 	S3AccessKeyId     string `json:"s3_access_key_id,omitempty"`
 	S3SecretAccessKey string `json:"s3_secret_access_key,omitempty"`
+	S3AccessSecretName string `json:"s3_access_secret_name,omitempty"`
 	S3ForcePathStyle  *bool  `json:"s3_force_path_style,omitempty" defaults:"false"`
 }
 

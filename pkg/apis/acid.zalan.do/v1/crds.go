@@ -1617,6 +1617,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"logical_backup_s3_secret_access_key": {
 								Type: "string",
 							},
+							"logical_backup_s3_access_secret_name": {
+								Type: "string",
+							},
 							"logical_backup_s3_sse": {
 								Type: "string",
 							},

@@ -336,6 +336,8 @@ configLogicalBackup:
   logical_backup_s3_endpoint: ""
   # S3 Secret Access Key
   logical_backup_s3_secret_access_key: ""
+  # S3 Secret Access Key from an existing secret containing the access key. The secret must contain the key "password"
+  logical_backup_s3_access_secret_name: ""
   # S3 server side encryption
   logical_backup_s3_sse: "AES256"
   # S3 retention time for stored backups for example "2 week" or "7 days"

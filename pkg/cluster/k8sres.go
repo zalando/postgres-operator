@@ -1896,7 +1896,19 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 
 		if description.S3SecretAccessKey != "" {
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_SECRET_ACCESS_KEY", Value: description.S3SecretAccessKey})
-		}
+		} else if description.S3AccessSecretName != "" {
+			result = append(result, v1.EnvVar{
+					Name: "CLONE_AWS_SECRET_ACCESS_KEY",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name:description.S3AccessSecretName,
+							},
+							Key: "password",
+						},
+					},
+				})
+			}
 
 		if description.S3ForcePathStyle != nil {
 			s3ForcePathStyle := "0"
@@ -2195,7 +2207,21 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
 	if c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
+	} else if c.OpConfig.LogicalBackup.LogicalBackupS3AccessSecretName != "" {
+		envVars = append(envVars, v1.EnvVar{
+			Name: "AWS_SECRET_ACCESS_KEY",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.OpConfig.LogicalBackup.LogicalBackupS3AccessSecretName,
+					},
+					Key: "password",
+				},
+			},
+		})
 	}
+
+
 
 	c.logger.Debugf("Generated logical backup env vars")
 	c.logger.Debugf("%v", envVars)

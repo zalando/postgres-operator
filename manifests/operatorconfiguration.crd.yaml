@@ -470,6 +470,8 @@ spec:
                     type: string
                   logical_backup_s3_secret_access_key:
                     type: string
+                  logical_backup_s3_access_secret_name:
+                    type: string
                   logical_backup_s3_sse:
                     type: string
                   logical_backup_s3_retention_time:
