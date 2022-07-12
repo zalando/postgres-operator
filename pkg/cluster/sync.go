@@ -723,13 +723,15 @@ func (c *Cluster) updateSecret(
 	}
 	pwdUser := userMap[userKey]
 	secretName := util.NameFromMeta(secret.ObjectMeta)
-	excludedRoleTypes := []spec.RoleOrigin{spec.RoleOriginSystem, spec.RoleOriginInfrastructure, spec.RoleOriginConnectionPooler}
+	excludedRoleTypes := []spec.RoleOrigin{spec.RoleOriginSystem, spec.RoleOriginInfrastructure, spec.RoleOriginConnectionPooler, spec.RoleOriginStream}
 
 	// if password rotation is enabled update password and username if rotation interval has been passed
+	// exclude Postgres superuser from rotation
 	if (c.OpConfig.EnablePasswordRotation && !pwdUser.IsDbOwner &&
 		util.SliceContains(excludedRoleTypes, pwdUser.Origin)) ||
-		util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) ||
-		util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+		((util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) ||
+			util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername)) &&
+			secretUsername != constants.SuperuserKeyName) {
 
 		// initialize password rotation setting first rotation date
 		nextRotationDateStr = string(secret.Data["nextRotation"])
@@ -776,6 +778,12 @@ func (c *Cluster) updateSecret(
 					}
 				}
 			}
+
+			//TODO: when passwords of connection pooler are rotated, pooler pods have to be replaced
+			// if pwdUser.Origin == spec.RoleOriginConnectionPooler {
+
+			//TODO: when passwords of stream user are rotated, stream resources have to be replaced
+			// if pwdUser.Origin == spec.RoleOriginStream {
 
 			updateSecret = true
 			updateSecretMsg = fmt.Sprintf("updating secret %q due to password rotation - next rotation date: %s", secretName, nextRotationDateStr)
@@ -858,16 +866,6 @@ func (c *Cluster) syncRoles() (err error) {
 	for _, cachedUser := range c.pgUsersCache {
 		if _, exists := c.pgUsers[cachedUser.Name]; !exists {
 			userNames = append(userNames, cachedUser.Name)
-		}
-	}
-
-	// add pooler user to list of pgUsers, too
-	// to check if the pooler user exists or has to be created
-	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {
-		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
-		userNames = append(userNames, connectionPoolerUser.Name)
-		if _, exists := c.pgUsers[connectionPoolerUser.Name]; !exists {
-			c.pgUsers[connectionPoolerUser.Name] = connectionPoolerUser
 		}
 	}
 

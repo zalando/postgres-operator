@@ -1119,10 +1119,6 @@ func (c *Cluster) initSystemUsers() {
 			Password:  util.RandomPassword(constants.PasswordLength),
 		}
 
-		if _, exists := c.pgUsers[username]; !exists {
-			c.pgUsers[username] = connectionPoolerUser
-		}
-
 		if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; !exists {
 			c.systemUsers[constants.ConnectionPoolerUserKeyName] = connectionPoolerUser
 		}
@@ -1133,15 +1129,15 @@ func (c *Cluster) initSystemUsers() {
 	if len(c.Spec.Streams) > 0 {
 		username := constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
 		streamUser := spec.PgUser{
-			Origin:    spec.RoleOriginSystem,
+			Origin:    spec.RoleOriginStream,
 			Name:      username,
 			Namespace: c.Namespace,
 			Flags:     []string{constants.RoleFlagLogin, constants.RoleFlagReplication},
 			Password:  util.RandomPassword(constants.PasswordLength),
 		}
 
-		if _, exists := c.pgUsers[username]; !exists {
-			c.pgUsers[username] = streamUser
+		if _, exists := c.systemUsers[username]; !exists {
+			c.systemUsers[username] = streamUser
 		}
 	}
 }

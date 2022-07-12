@@ -33,6 +33,7 @@ const (
 	RoleOriginSystem
 	RoleOriginBootstrap
 	RoleOriginConnectionPooler
+	RoleOriginStream
 )
 
 type syncUserOperation int
