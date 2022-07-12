@@ -728,7 +728,7 @@ func (c *Cluster) updateSecret(
 	// if password rotation is enabled update password and username if rotation interval has been passed
 	// exclude Postgres superuser from rotation
 	if (c.OpConfig.EnablePasswordRotation && !pwdUser.IsDbOwner &&
-		util.SliceContains(excludedRoleTypes, pwdUser.Origin)) ||
+		!util.SliceContains(excludedRoleTypes, pwdUser.Origin)) ||
 		((util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) ||
 			util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername)) &&
 			secretUsername != constants.SuperuserKeyName) {
