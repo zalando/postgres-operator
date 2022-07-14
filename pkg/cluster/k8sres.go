@@ -183,45 +183,44 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 	return nil
 }
 
-func (c *Cluster) enforceMaxRequests(resources *v1.ResourceRequirements) error {
+func (c *Cluster) enforceMaxResourceRequests(resources *v1.ResourceRequirements) error {
 	var (
-		isMax bool
-		err   error
-		msg   string
+		isSmaller bool
+		err       error
+		msg       string
 	)
 
-	// setting limits too low can cause unnecessary evictions / OOM kills
 	cpuRequest := resources.Requests[v1.ResourceCPU]
 	maxCPURequest := c.OpConfig.MaxCPURequest
 	if maxCPURequest != "" {
-		isMax, err = util.IsGreaterQuantity(cpuRequest.String(), maxCPURequest)
+		isSmaller, err = util.IsSmallerQuantity(maxCPURequest, cpuRequest.String())
 		if err != nil {
-			return fmt.Errorf("could not compare defined CPU limit %s for %q container with configured maximum value %s: %v",
+			return fmt.Errorf("could not compare defined CPU request %s for %q container with configured maximum value %s: %v",
 				cpuRequest.String(), constants.PostgresContainerName, maxCPURequest, err)
 		}
-		if isMax {
-			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required maximum %s and will be increased",
+		if isSmaller {
+			msg = fmt.Sprintf("defined CPU request %s for %q container is above allowed maximum %s and will be decreased",
 				cpuRequest.String(), constants.PostgresContainerName, maxCPURequest)
 			c.logger.Warningf(msg)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
-			resources.Limits[v1.ResourceCPU], _ = resource.ParseQuantity(maxCPURequest)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceRequest", msg)
+			resources.Requests[v1.ResourceCPU], _ = resource.ParseQuantity(maxCPURequest)
 		}
 	}
 
 	memoryRequest := resources.Requests[v1.ResourceMemory]
 	maxMemoryRequest := c.OpConfig.MaxMemoryRequest
 	if maxMemoryRequest != "" {
-		isMax, err = util.IsGreaterQuantity(memoryRequest.String(), maxMemoryRequest)
+		isSmaller, err = util.IsSmallerQuantity(maxMemoryRequest, memoryRequest.String())
 		if err != nil {
-			return fmt.Errorf("could not compare defined memory limit %s for %q container with configured maximum value %s: %v",
+			return fmt.Errorf("could not compare defined memory request %s for %q container with configured maximum value %s: %v",
 				memoryRequest.String(), constants.PostgresContainerName, maxMemoryRequest, err)
 		}
-		if isMax {
-			msg = fmt.Sprintf("defined memory limit %s for %q container is below required maximum %s and will be increased",
+		if isSmaller {
+			msg = fmt.Sprintf("defined memory request %s for %q container is above allowed maximum %s and will be decreased",
 				memoryRequest.String(), constants.PostgresContainerName, maxMemoryRequest)
 			c.logger.Warningf(msg)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
-			resources.Limits[v1.ResourceMemory], _ = resource.ParseQuantity(maxMemoryRequest)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceRequest", msg)
+			resources.Requests[v1.ResourceMemory], _ = resource.ParseQuantity(maxMemoryRequest)
 		}
 	}
 
@@ -302,7 +301,7 @@ func (c *Cluster) generateResourceRequirements(
 	}
 
 	if containerName == constants.PostgresContainerName {
-		if err = c.enforceMaxRequests(&result); err != nil {
+		if err = c.enforceMaxResourceRequests(&result); err != nil {
 			return nil, fmt.Errorf("could not enforce maximum resource limits: %v", err)
 		}
 	}

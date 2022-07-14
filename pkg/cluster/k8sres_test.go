@@ -2297,12 +2297,12 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		ClusterLabels:        map[string]string{"application": "spilo"},
 		ClusterNameLabel:     clusterNameLabel,
 		DefaultCPURequest:    "100m",
-		MaxCPURequest:        "300m",
 		DefaultCPULimit:      "1",
-		DefaultMemoryRequest: "100Mi",
-		MaxMemoryRequest:     "300Mi",
-		DefaultMemoryLimit:   "500Mi",
+		MaxCPURequest:        "250m",
 		MinCPULimit:          "250m",
+		DefaultMemoryRequest: "100Mi",
+		DefaultMemoryLimit:   "500Mi",
+		MaxMemoryRequest:     "300Mi",
 		MinMemoryLimit:       "250Mi",
 		PodRoleLabel:         roleLabel,
 	}
@@ -2565,6 +2565,30 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			expectedResources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "10Mi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+			},
+		},
+		{
+			subTest: "test generation of max resources when empty in manifest",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: "500m", Memory: "500Mi"},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: "500m", Memory: "500Mi"},
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "250m", Memory: "300Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "250m", Memory: "500Mi"},
 			},
 		},
 	}
