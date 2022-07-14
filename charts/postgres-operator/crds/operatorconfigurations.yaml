@@ -321,6 +321,7 @@ spec:
                     type: string
                     enum:
                       - "ebs"
+                      - "mixed"
                       - "pvc"
                       - "off"
                     default: "pvc"

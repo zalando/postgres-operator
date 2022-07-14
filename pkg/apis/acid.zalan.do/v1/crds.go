@@ -1429,6 +1429,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Raw: []byte(`"ebs"`),
 									},
 									{
+										Raw: []byte(`"mixed"`),
+									},
+									{
 										Raw: []byte(`"pvc"`),
 									},
 									{
