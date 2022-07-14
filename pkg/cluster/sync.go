@@ -717,6 +717,12 @@ func (c *Cluster) updateSecret(
 	} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
 		userKey = constants.ReplicationUserKeyName
 		userMap = c.systemUsers
+	} else if secretUsername == constants.ConnectionPoolerUserName {
+		userKey = constants.ConnectionPoolerUserName
+		userMap = c.systemUsers
+	} else if secretUsername == constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix {
+		userKey = constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
+		userMap = c.systemUsers
 	} else {
 		userKey = secretUsername
 		userMap = c.pgUsers
@@ -763,6 +769,7 @@ func (c *Cluster) updateSecret(
 				// whenever there is a rotation, check if old rotation users can be deleted
 				*retentionUsers = append(*retentionUsers, secretUsername)
 			} else {
+				c.logger.Infof("need to replace pods")
 				// when passwords of system users are rotated in place, pods have to be replaced
 				if pwdUser.Origin == spec.RoleOriginSystem {
 					pods, err := c.listPods()
@@ -778,7 +785,11 @@ func (c *Cluster) updateSecret(
 
 				// when passwords of connection pooler are rotated in place, pooler pods have to be replaced
 				if pwdUser.Origin == spec.RoleOriginConnectionPooler {
-					poolerPods, err := c.listPoolerPods()
+					listOptions := metav1.ListOptions{
+						LabelSelector: c.poolerLabelsSet(true).String(),
+					}
+					poolerPods, err := c.listPoolerPods(listOptions)
+					c.logger.Infof("will mark %d pooler pods", len(poolerPods))
 					if err != nil {
 						return fmt.Errorf("could not list pods of the pooler deployment - abort password rotation: %v", err)
 					}
@@ -790,8 +801,9 @@ func (c *Cluster) updateSecret(
 				}
 
 				// when passwords of stream user are rotated in place, rolling update in FES deployment must be triggered
-				//if pwdUser.Origin == spec.RoleOriginStream {
-
+				if pwdUser.Origin == spec.RoleOriginStream {
+					c.logger.Warnf("secret of stream user %q changed", constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix)
+				}
 			}
 			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
 			secret.Data["nextRotation"] = []byte(nextRotationDateStr)

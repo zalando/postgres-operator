@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/r3labs/diff"
 	"github.com/sirupsen/logrus"
@@ -20,6 +21,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
 // ConnectionPoolerObjects K8s objects that are belong to connection pooler
@@ -451,16 +453,11 @@ func (c *Cluster) shouldCreateLoadBalancerForPoolerService(role PostgresRole, sp
 	}
 }
 
-func (c *Cluster) listPoolerPods() ([]v1.Pod, error) {
-	listOptions := metav1.ListOptions{
-		LabelSelector: c.poolerLabelsSet(true).String(),
-	}
-
+func (c *Cluster) listPoolerPods(listOptions metav1.ListOptions) ([]v1.Pod, error) {
 	pods, err := c.KubeClient.Pods(c.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return nil, fmt.Errorf("could not get list of pooler pods: %v", err)
 	}
-
 	return pods.Items, nil
 }
 
@@ -842,6 +839,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 	var (
 		deployment    *appsv1.Deployment
 		newDeployment *appsv1.Deployment
+		pods          []v1.Pod
 		service       *v1.Service
 		newService    *v1.Service
 		err           error
@@ -929,6 +927,34 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			return nil, err
 		}
 		c.ConnectionPooler[role].Deployment = deployment
+	}
+
+	// check if pooler pods must be replaced due to secret update
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(c.connectionPoolerLabels(role, true).MatchLabels).String(),
+	}
+	pods, err = c.listPoolerPods(listOptions)
+	if err != nil {
+		return nil, err
+	}
+	for i, pod := range pods {
+		if c.getRollingUpdateFlagFromPod(&pod) {
+			podName := util.NameFromMeta(pods[i].ObjectMeta)
+			err := retryutil.Retry(1*time.Second, 5*time.Second,
+				func() (bool, error) {
+					err2 := c.KubeClient.Pods(podName.Namespace).Delete(
+						context.TODO(),
+						podName.Name,
+						c.deleteOptions)
+					if err2 != nil {
+						return false, err2
+					}
+					return true, nil
+				})
+			if err != nil {
+				return nil, fmt.Errorf("could not delete pooler pod: %v", err)
+			}
+		}
 	}
 
 	if service, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
