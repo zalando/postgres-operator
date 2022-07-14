@@ -300,14 +300,15 @@ func (c *Cluster) generateResourceRequirements(
 		}
 	}
 
-	if containerName == constants.PostgresContainerName {
-		if err = c.enforceMaxResourceRequests(&result); err != nil {
-			return nil, fmt.Errorf("could not enforce maximum resource limits: %v", err)
-		}
-	}
-
 	if c.OpConfig.SetMemoryRequestToLimit {
 		setMemoryRequestToLimit(&result, containerName, c.logger)
+	}
+
+	// enforce maximum cpu and memory requests for Postgres containers only
+	if containerName == constants.PostgresContainerName {
+		if err = c.enforceMaxResourceRequests(&result); err != nil {
+			return nil, fmt.Errorf("could not enforce maximum resource requests: %v", err)
+		}
 	}
 
 	return &result, nil

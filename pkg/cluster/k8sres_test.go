@@ -2290,15 +2290,16 @@ func TestGenerateResourceRequirements(t *testing.T) {
 	sidecarName := "postgres-exporter"
 
 	// two test cases will call enforceMinResourceLimits which emits 2 events per call
-	// hence bufferSize of 4 is required
-	newEventRecorder := record.NewFakeRecorder(4)
+	// two test cases will call enforceMaxResourceRequests which emits 2 events per call
+	// hence bufferSize of 12 is required
+	newEventRecorder := record.NewFakeRecorder(12)
 
 	configResources := config.Resources{
 		ClusterLabels:        map[string]string{"application": "spilo"},
 		ClusterNameLabel:     clusterNameLabel,
 		DefaultCPURequest:    "100m",
 		DefaultCPULimit:      "1",
-		MaxCPURequest:        "250m",
+		MaxCPURequest:        "300m",
 		MinCPULimit:          "250m",
 		DefaultMemoryRequest: "100Mi",
 		DefaultMemoryLimit:   "500Mi",
@@ -2434,6 +2435,10 @@ func TestGenerateResourceRequirements(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{Memory: "200Mi"},
+						ResourceLimits:   acidv1.ResourceDescription{Memory: "300Mi"},
+					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
 						Size: "1G",
@@ -2441,8 +2446,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "500Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "300Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "300Mi"},
 			},
 		},
 		{
@@ -2568,7 +2573,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			},
 		},
 		{
-			subTest: "test generation of max resources when empty in manifest",
+			subTest: "test enforcing max cpu and memory requests",
 			config: config.Config{
 				Resources:               configResources,
 				PodManagementPolicy:     "ordered_ready",
@@ -2584,11 +2589,40 @@ func TestGenerateResourceRequirements(t *testing.T) {
 						ResourceRequests: acidv1.ResourceDescription{CPU: "500m", Memory: "500Mi"},
 						ResourceLimits:   acidv1.ResourceDescription{CPU: "500m", Memory: "500Mi"},
 					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "250m", Memory: "300Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "250m", Memory: "500Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: "300m", Memory: "300Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "500m", Memory: "500Mi"},
+			},
+		},
+		{
+			subTest: "test enforcing max memory requests with SetMemoryRequestToLimit flag and default values",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: true,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					// using defaults cpu 100m/1, memory 100Mi/500Mi
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "300Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
 			},
 		},
 	}
