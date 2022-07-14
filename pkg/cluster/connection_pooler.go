@@ -73,27 +73,36 @@ func needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 		*spec.EnableReplicaConnectionPooler
 }
 
+// when listing pooler k8s objects
+func (c *Cluster) poolerLabelsSet(addExtraLabels bool) labels.Set {
+	poolerLabels := c.labelsSet(addExtraLabels)
+
+	// TODO should be config values
+	poolerLabels["application"] = "db-connection-pooler"
+
+	return poolerLabels
+}
+
 // Return connection pooler labels selector, which should from one point of view
 // inherit most of the labels from the cluster itself, but at the same time
 // have e.g. different `application` label, so that recreatePod operation will
 // not interfere with it (it lists all the pods via labels, and if there would
 // be no difference, it will recreate also pooler pods).
 func (c *Cluster) connectionPoolerLabels(role PostgresRole, addExtraLabels bool) *metav1.LabelSelector {
-	poolerLabels := c.labelsSet(addExtraLabels)
+	poolerLabelsSet := c.poolerLabelsSet(addExtraLabels)
 
 	// TODO should be config values
-	poolerLabels["application"] = "db-connection-pooler"
-	poolerLabels["connection-pooler"] = c.connectionPoolerName(role)
+	poolerLabelsSet["connection-pooler"] = c.connectionPoolerName(role)
 
 	if addExtraLabels {
 		extraLabels := map[string]string{}
 		extraLabels[c.OpConfig.PodRoleLabel] = string(role)
 
-		poolerLabels = labels.Merge(poolerLabels, extraLabels)
+		poolerLabelsSet = labels.Merge(poolerLabelsSet, extraLabels)
 	}
 
 	return &metav1.LabelSelector{
-		MatchLabels:      poolerLabels,
+		MatchLabels:      poolerLabelsSet,
 		MatchExpressions: nil,
 	}
 }
@@ -440,6 +449,19 @@ func (c *Cluster) shouldCreateLoadBalancerForPoolerService(role PostgresRole, sp
 	default:
 		panic(fmt.Sprintf("Unknown role %v", role))
 	}
+}
+
+func (c *Cluster) listPoolerPods() ([]v1.Pod, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: c.poolerLabelsSet(true).String(),
+	}
+
+	pods, err := c.KubeClient.Pods(c.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return nil, fmt.Errorf("could not get list of pooler pods: %v", err)
+	}
+
+	return pods.Items, nil
 }
 
 //delete connection pooler

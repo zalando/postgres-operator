@@ -762,28 +762,39 @@ func (c *Cluster) updateSecret(
 
 				// whenever there is a rotation, check if old rotation users can be deleted
 				*retentionUsers = append(*retentionUsers, secretUsername)
+			} else {
+				// when passwords of system users are rotated in place, pods have to be replaced
+				if pwdUser.Origin == spec.RoleOriginSystem {
+					pods, err := c.listPods()
+					if err != nil {
+						return fmt.Errorf("could not list pods of the statefulset - abort password rotation: %v", err)
+					}
+					for _, pod := range pods {
+						if err = c.markRollingUpdateFlagForPod(&pod, "replace pod due to password rotation of system user "+secretUsername); err != nil {
+							c.logger.Warnf("marking pod for rolling update due to password rotation failed: %v", err)
+						}
+					}
+				}
+
+				// when passwords of connection pooler are rotated in place, pooler pods have to be replaced
+				if pwdUser.Origin == spec.RoleOriginConnectionPooler {
+					poolerPods, err := c.listPoolerPods()
+					if err != nil {
+						return fmt.Errorf("could not list pods of the pooler deployment - abort password rotation: %v", err)
+					}
+					for _, poolerPod := range poolerPods {
+						if err = c.markRollingUpdateFlagForPod(&poolerPod, "replace pooler pod due to password rotation of pooler user "+secretUsername); err != nil {
+							c.logger.Warnf("marking pooler pod for rolling update due to password rotation failed: %v", err)
+						}
+					}
+				}
+
+				// when passwords of stream user are rotated in place, rolling update in FES deployment must be triggered
+				//if pwdUser.Origin == spec.RoleOriginStream {
+
 			}
 			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
 			secret.Data["nextRotation"] = []byte(nextRotationDateStr)
-
-			// when passwords of system users are rotated, pods have to be replaced
-			if pwdUser.Origin == spec.RoleOriginSystem {
-				pods, err := c.listPods()
-				if err != nil {
-					return fmt.Errorf("could not list pods of the statefulset - abort password rotation: %v", err)
-				}
-				for _, pod := range pods {
-					if err = c.markRollingUpdateFlagForPod(&pod, "replace pod due to password rotation of system user "+secretUsername); err != nil {
-						c.logger.Warnf("marking pod for rolling update due to password rotation failed: %v", err)
-					}
-				}
-			}
-
-			//TODO: when passwords of connection pooler are rotated, pooler pods have to be replaced
-			// if pwdUser.Origin == spec.RoleOriginConnectionPooler {
-
-			//TODO: when passwords of stream user are rotated, stream resources have to be replaced
-			// if pwdUser.Origin == spec.RoleOriginStream {
 
 			updateSecret = true
 			updateSecretMsg = fmt.Sprintf("updating secret %q due to password rotation - next rotation date: %s", secretName, nextRotationDateStr)
