@@ -155,11 +155,12 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **set_memory_request_to_limit**
   Set `memory_request` to `memory_limit` for all Postgres clusters (the default
-  value is also increased). This prevents certain cases of memory overcommitment
-  at the cost of overprovisioning memory and potential scheduling problems for
-  containers with high memory limits due to the lack of memory on Kubernetes
-  cluster nodes. This affects all containers created by the operator (Postgres,
-  connection pooler, logical backup, scalyr sidecar, and other sidecars except 
+  value is also increased but configured `max_memory_request` can not be
+  bypassed). This prevents certain cases of memory overcommitment at the cost
+  of overprovisioning memory and potential scheduling problems for containers
+  with high memory limits due to the lack of memory on Kubernetes cluster
+  nodes. This affects all containers created by the operator (Postgres,
+  connection pooler, logical backup, scalyr sidecar, and other sidecars except
   **sidecars** defined in the operator configuration); to set resources for the
   operator's own container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
   The default is `false`.
@@ -507,6 +508,12 @@ CRD-based configuration.
 * **default_memory_limit**
   memory limits for the Postgres containers, unless overridden by cluster-specific
   settings. The default is `500Mi`.
+
+* **max_cpu_request**
+  optional upper boundary for CPU request
+
+* **max_memory_request**
+  optional upper boundary for memory request
 
 * **min_cpu_limit**
   hard CPU minimum what we consider to be required to properly run Postgres

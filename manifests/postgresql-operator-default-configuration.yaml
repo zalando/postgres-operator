@@ -108,6 +108,8 @@ configuration:
     default_cpu_request: 100m
     default_memory_limit: 500Mi
     default_memory_request: 100Mi
+    # max_cpu_request: "1"
+    # max_memory_request: 4Gi
     # min_cpu_limit: 250m
     # min_memory_limit: 250Mi
   timeouts:

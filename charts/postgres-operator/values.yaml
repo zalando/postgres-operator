@@ -212,6 +212,12 @@ configPostgresPodResources:
   default_memory_limit: 500Mi
   # memory request value for the postgres containers
   default_memory_request: 100Mi
+  # optional upper boundary for CPU request
+  # max_cpu_request: "1"
+
+  # optional upper boundary for memory request
+  # max_memory_request: 4Gi
+
   # hard CPU minimum required to properly run a Postgres cluster
   min_cpu_limit: 250m
   # hard memory minimum required to properly run a Postgres cluster

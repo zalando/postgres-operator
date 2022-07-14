@@ -89,10 +89,10 @@ data:
   # master_pod_move_timeout: 20m
   # max_instances: "-1"
   # min_instances: "-1"
+  # max_cpu_request: "1"
+  # max_memory_request: 4Gi
   # min_cpu_limit: 250m
   # min_memory_limit: 250Mi
-  # max_cpu_request: 300m
-  # max_memory_request: 300Mi
   # minimal_major_version: "9.6"
   # node_readiness_label: "status:ready"
   # node_readiness_label_merge: "OR"
