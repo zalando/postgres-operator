@@ -197,8 +197,8 @@ type CloneDescription struct {
 	S3Endpoint        string `json:"s3_endpoint,omitempty"`
 	S3AccessKeyId     string `json:"s3_access_key_id,omitempty"`
 	S3SecretAccessKey string `json:"s3_secret_access_key,omitempty"`
-	S3ForcePathStyle  *bool  `json:"s3_force_path_style,omitempty" defaults:"false"`	
-	TimelineID 		  string `json:"clone_target_timeline" defaults:"latest"`
+	S3ForcePathStyle  *bool  `json:"s3_force_path_style,omitempty" defaults:"false"`
+	TimelineID  int32  `json:"clone_target_timeline" defaults:"latest"`
 }
 
 // Sidecar defines a container to be run in the same pod as the Postgres container.
