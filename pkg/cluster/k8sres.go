@@ -1909,7 +1909,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		}
 
 		if description.TimelineID != "" {
-			result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIMELINE", Value: description.TimelineID})
+			result = append(result, v1.EnvVar{Name: "WAL_TIMELINE_ID", Value: description.TimelineID})
 		}
 	}
 
