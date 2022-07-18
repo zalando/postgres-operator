@@ -66,12 +66,12 @@ var cloneClusterDescriptions = []struct {
 	in    *CloneDescription
 	err   error
 }{
-	{"cluster name invalid but EndTimeSet is not empty", &CloneDescription{"foo+bar", "", "NotEmpty", "", "", "", "", nil, ""}, nil},
-	{"expect error as cluster name does not match DNS-1035", &CloneDescription{"foo+bar", "", "", "", "", "", "", nil, ""},
+	{"cluster name invalid but EndTimeSet is not empty", &CloneDescription{"foo+bar", "", "NotEmpty", "", "", "", "", nil, 0}, nil},
+	{"expect error as cluster name does not match DNS-1035", &CloneDescription{"foo+bar", "", "", "", "", "", "", nil, 0},
 		errors.New(`clone cluster name must confirm to DNS-1035, regex used for validation is "^[a-z]([-a-z0-9]*[a-z0-9])?$"`)},
-	{"expect error as cluster name is too long", &CloneDescription{"foobar123456789012345678901234567890123456789012345678901234567890", "", "", "", "", "", "", nil, ""},
+	{"expect error as cluster name is too long", &CloneDescription{"foobar123456789012345678901234567890123456789012345678901234567890", "", "", "", "", "", "", nil, 0},
 		errors.New("clone cluster name must be no longer than 63 characters")},
-	{"common cluster name", &CloneDescription{"foobar", "", "", "", "", "", "", nil, ""}, nil},
+	{"common cluster name", &CloneDescription{"foobar", "", "", "", "", "", "", nil, 0}, nil},
 }
 
 var maintenanceWindows = []struct {
