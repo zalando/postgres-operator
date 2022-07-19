@@ -1012,9 +1012,10 @@ class EndToEndTestCase(unittest.TestCase):
         self.evantuallyEqual(check_version_14, "14", "Version was not upgrade to 14")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_min_resource_limits(self):
+    def test_resource_generation(self):
         '''
-        Lower resource limits below configured minimum and let operator fix it
+        Lower resource limits below configured minimum and let operator fix it.
+        It will try to raise requests to limits which is capped with max_memory_request.
         '''
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
@@ -1023,17 +1024,20 @@ class EndToEndTestCase(unittest.TestCase):
         _, replica_nodes = k8s.get_pg_nodes(cluster_label)
         self.assertNotEqual(replica_nodes, [])
 
-        # configure minimum boundaries for CPU and memory limits
+        # configure maximum memory request and minimum boundaries for CPU and memory limits
+        maxMemoryRequest = '300Mi'
         minCPULimit = '503m'
         minMemoryLimit = '502Mi'
 
-        patch_min_resource_limits = {
+        patch_pod_resources = {
             "data": {
+                "max_memory_request": maxMemoryRequest,
                 "min_cpu_limit": minCPULimit,
-                "min_memory_limit": minMemoryLimit
+                "min_memory_limit": minMemoryLimit,
+                "set_memory_request_to_limit": "true"
             }
         }
-        k8s.update_config(patch_min_resource_limits, "Minimum resource test")
+        k8s.update_config(patch_pod_resources, "Pod resource test")
 
         # lower resource limits below minimum
         pg_patch_resources = {
@@ -1059,18 +1063,20 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
-        def verify_pod_limits():
+        def verify_pod_resources():
             pods = k8s.api.core_v1.list_namespaced_pod('default', label_selector="cluster-name=acid-minimal-cluster,application=spilo").items
             if len(pods) < 2:
                 return False
 
-            r = pods[0].spec.containers[0].resources.limits['memory'] == minMemoryLimit
+            r = pods[0].spec.containers[0].resources.requests['memory'] == maxMemoryRequest
+            r = r and pods[0].spec.containers[0].resources.limits['memory'] == minMemoryLimit
             r = r and pods[0].spec.containers[0].resources.limits['cpu'] == minCPULimit
+            r = r and pods[1].spec.containers[0].resources.requests['memory'] == maxMemoryRequest
             r = r and pods[1].spec.containers[0].resources.limits['memory'] == minMemoryLimit
             r = r and pods[1].spec.containers[0].resources.limits['cpu'] == minCPULimit
             return r
 
-        self.eventuallyTrue(verify_pod_limits, "Pod limits where not adjusted")
+        self.eventuallyTrue(verify_pod_resources, "Pod resources where not adjusted")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_multi_namespace_support(self):
