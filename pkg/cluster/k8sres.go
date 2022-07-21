@@ -195,7 +195,7 @@ func (c *Cluster) enforceMaxResourceRequests(resources *v1.ResourceRequirements)
 		return fmt.Errorf("could not compare defined CPU request %s for %q container with configured maximum value %s: %v",
 			cpuRequest.String(), constants.PostgresContainerName, maxCPURequest, err)
 	}
-	resources.Requests[v1.ResourceCPU], _ = resource.ParseQuantity(maxCPU)
+	resources.Requests[v1.ResourceCPU] = maxCPU
 
 	memoryRequest := resources.Requests[v1.ResourceMemory]
 	maxMemoryRequest := c.OpConfig.MaxMemoryRequest
@@ -204,7 +204,7 @@ func (c *Cluster) enforceMaxResourceRequests(resources *v1.ResourceRequirements)
 		return fmt.Errorf("could not compare defined memory request %s for %q container with configured maximum value %s: %v",
 			memoryRequest.String(), constants.PostgresContainerName, maxMemoryRequest, err)
 	}
-	resources.Requests[v1.ResourceMemory], _ = resource.ParseQuantity(maxMemory)
+	resources.Requests[v1.ResourceMemory] = maxMemory
 
 	return nil
 }
