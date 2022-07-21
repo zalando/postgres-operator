@@ -367,3 +367,15 @@ func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 
 	return request.Cmp(limit) == -1, nil
 }
+
+func MinResource(requestStr, crequestStr string) (string, error) {
+	isSmaller, err := IsSmallerQuantity(requestStr, crequestStr)
+	if err != nil {
+		return "", err
+	}
+	if isSmaller {
+		return requestStr, nil
+	}
+
+	return crequestStr, nil
+}
