@@ -371,11 +371,8 @@ func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 func MinResource(requestStr, crequestStr string) (resource.Quantity, error) {
 
 	isSmaller, err := IsSmallerQuantity(requestStr, crequestStr)
-	if err != nil {
-		return resource.Quantity{}, err
-	}
-	if isSmaller {
-		request, err := resource.ParseQuantity(crequestStr)
+	if isSmaller && err == nil {
+		request, err := resource.ParseQuantity(requestStr)
 		if err != nil {
 			return request, err
 		}
