@@ -376,9 +376,15 @@ func MinResource(requestStr, crequestStr string) (resource.Quantity, error) {
 	}
 	if isSmaller {
 		request, err := resource.ParseQuantity(crequestStr)
-		return request, err
+		if err != nil {
+			return request, err
+		}
+		return request, nil
 	}
 
 	configRequest, err := resource.ParseQuantity(crequestStr)
-	return configRequest, err
+	if err != nil {
+		return configRequest, err
+	}
+	return configRequest, nil
 }
