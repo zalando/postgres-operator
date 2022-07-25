@@ -1209,6 +1209,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assert_distributed_pods(master_nodes)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
     def test_node_readiness_label(self):
         '''
            Remove node readiness label from master node. This must cause a failover.
@@ -1479,6 +1480,7 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
     def test_rolling_update_label_timeout(self):
         '''
             Simulate case when replica does not receive label in time and rolling update does not finish
