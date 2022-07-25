@@ -741,6 +741,13 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.LogicalBackupEnv != nil {
+		in, out := &in.LogicalBackupEnv, &out.LogicalBackupEnv
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.StandbyCluster != nil {
 		in, out := &in.StandbyCluster, &out.StandbyCluster
 		*out = new(StandbyDescription)

@@ -74,6 +74,7 @@ type PostgresSpec struct {
 	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
 	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
 	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
+	LogicalBackupEnv      []v1.EnvVar                 `json:"logicalBackupEnv,omitempty"`
 	StandbyCluster        *StandbyDescription         `json:"standby,omitempty"`
 	PodAnnotations        map[string]string           `json:"podAnnotations,omitempty"`
 	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`

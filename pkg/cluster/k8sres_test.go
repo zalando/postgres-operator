@@ -864,6 +864,80 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 }
 
+func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
+	testName := "TestGenerateLogicalBackupPodEnvVars"
+	tests := []struct {
+		subTest        string
+		opConfig       config.Config
+		expectedValues []ExpectedValue
+		pgsql          acidv1.Postgresql
+	}{
+		{
+			subTest: "will set CLUSTER_NAME_LABEL env",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel: "test",
+				},
+			},
+			expectedValues: []ExpectedValue{
+				{
+					envIndex:       1,
+					envVarConstant: "CLUSTER_NAME_LABEL",
+					envVarValue:    "test",
+				},
+			},
+		},
+		{
+			subTest: "will set CUSTOM_VALUE env by logicalBackupEnv",
+			pgsql: acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					LogicalBackupEnv: []v1.EnvVar{
+						{
+							Name:  "CUSTOM_VALUE",
+							Value: "my-scope-label",
+						},
+					},
+				},
+			},
+			expectedValues: []ExpectedValue{
+				{
+					envIndex:       17,
+					envVarConstant: "CUSTOM_VALUE",
+					envVarValue:    "my-scope-label",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		c.Postgresql = tt.pgsql
+		actualEnvs := c.generateLogicalBackupPodEnvVars()
+
+		for _, ev := range tt.expectedValues {
+			env := actualEnvs[ev.envIndex]
+
+			if env.Name != ev.envVarConstant {
+				t.Errorf("%s %s: expected env name %s, have %s instead",
+					testName, tt.subTest, ev.envVarConstant, env.Name)
+			}
+
+			if ev.envVarValueRef != nil {
+				if !reflect.DeepEqual(env.ValueFrom, ev.envVarValueRef) {
+					t.Errorf("%s %s: expected env value reference %#v, have %#v instead",
+						testName, tt.subTest, ev.envVarValueRef, env.ValueFrom)
+				}
+				continue
+			}
+
+			if env.Value != ev.envVarValue {
+				t.Errorf("%s %s: expected env value %s, have %s instead",
+					testName, tt.subTest, ev.envVarValue, env.Value)
+			}
+		}
+	}
+}
+
 func TestGetNumberOfInstances(t *testing.T) {
 	testName := "TestGetNumberOfInstances"
 	tests := []struct {
