@@ -368,9 +368,9 @@ func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 	return request.Cmp(limit) == -1, nil
 }
 
-func MinResource(requestStr, crequestStr string) (resource.Quantity, error) {
+func MinResource(requestStr, maxRequestStr string) (resource.Quantity, error) {
 
-	isSmaller, err := IsSmallerQuantity(requestStr, crequestStr)
+	isSmaller, err := IsSmallerQuantity(requestStr, maxRequestStr)
 	if isSmaller && err == nil {
 		request, err := resource.ParseQuantity(requestStr)
 		if err != nil {
@@ -379,9 +379,9 @@ func MinResource(requestStr, crequestStr string) (resource.Quantity, error) {
 		return request, nil
 	}
 
-	configRequest, err := resource.ParseQuantity(crequestStr)
+	maxRequest, err := resource.ParseQuantity(maxRequestStr)
 	if err != nil {
-		return configRequest, err
+		return maxRequest, err
 	}
-	return configRequest, nil
+	return maxRequest, nil
 }
