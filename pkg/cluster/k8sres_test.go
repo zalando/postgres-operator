@@ -550,36 +550,53 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			envVarValue:    "s3://another-bucket",
 		},
 		{
-			envIndex:       19,
-			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
-			envVarValue:    "",
-		},
-		{
 			envIndex:       20,
 			envVarConstant: "CLONE_AWS_ENDPOINT",
 			envVarValue:    "s3.eu-central-1.amazonaws.com",
 		},
+		{
+			envIndex:       19,
+			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "",
+		},
+	}
+	expectedCloneEnvWithPrefixSpec := []ExpectedValue{
+		{
+			envIndex:       20,
+			envVarConstant: "CLONE_WALE_S3_PREFIX",
+			envVarValue:    "s3://another-bucket",
+		},
+		{
+			envIndex:       16,
+			envVarConstant: "clone_aws_endpoint",
+			envVarValue:    "s3.eu-west-1.amazonaws.com",
+		},
+		{
+			envIndex:       15,
+			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "spec-env-test",
+		},
 	}
 	expectedCloneEnvConfigMap := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       19,
 			envVarConstant: "CLONE_WAL_S3_BUCKET",
 			envVarValue:    "global-s3-bucket",
 		},
 		{
-			envIndex:       17,
+			envIndex:       20,
 			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    fmt.Sprintf("/%s", dummyUUID),
 		},
 		{
-			envIndex:       21,
+			envIndex:       15,
 			envVarConstant: "clone_aws_endpoint",
 			envVarValue:    "s3.eu-west-1.amazonaws.com",
 		},
 	}
 	expectedCloneEnvSecret := []ExpectedValue{
 		{
-			envIndex:       21,
+			envIndex:       15,
 			envVarConstant: "clone_aws_access_key_id",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -593,12 +610,12 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 	expectedStandbyEnvSecret := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       18,
 			envVarConstant: "STANDBY_WALE_GS_PREFIX",
 			envVarValue:    "gs://some/path/",
 		},
 		{
-			envIndex:       20,
+			envIndex:       17,
 			envVarConstant: "standby_google_application_credentials",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -761,15 +778,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			},
 		},
 		{
-			subTest: "will set CLONE_ parameters from spec and not global config or pod environment config map",
-			opConfig: config.Config{
-				Resources: config.Resources{
-					PodEnvironmentConfigMap: spec.NamespacedName{
-						Name: testPodEnvironmentConfigMapName,
-					},
-				},
-				WALES3Bucket: "global-s3-bucket",
-			},
+			subTest:  "will set CLONE_ parameters from spec, if nothing env is set",
+			opConfig: config.Config{},
 			cloneDescription: &acidv1.CloneDescription{
 				ClusterName:  "test-cluster",
 				EndTimestamp: "somewhen",
@@ -779,6 +789,35 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			},
 			standbyDescription: &acidv1.StandbyDescription{},
 			expectedValues:     expectedCloneEnvSpec,
+		},
+		{
+			subTest: "will set CLONE_ parameters from spec and override scope prefix",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentConfigMap: spec.NamespacedName{
+						Name: testPodEnvironmentConfigMapName,
+					},
+				},
+			},
+			pgsql: acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					Env: []v1.EnvVar{
+						{
+							Name:  "CLONE_WAL_BUCKET_SCOPE_PREFIX",
+							Value: "spec-env-test",
+						},
+					},
+				},
+			},
+			cloneDescription: &acidv1.CloneDescription{
+				ClusterName:  "test-cluster",
+				EndTimestamp: "somewhen",
+				UID:          dummyUUID,
+				S3WalPath:    "s3://another-bucket",
+				S3Endpoint:   "s3.eu-central-1.amazonaws.com",
+			},
+			standbyDescription: &acidv1.StandbyDescription{},
+			expectedValues:     expectedCloneEnvWithPrefixSpec,
 		},
 		{
 			subTest: "will set CLONE_AWS_ENDPOINT parameter from pod environment config map",
@@ -835,36 +874,39 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		c := newMockCluster(tt.opConfig)
-		pgsql := tt.pgsql
-		pgsql.Spec.Clone = tt.cloneDescription
-		pgsql.Spec.StandbyCluster = tt.standbyDescription
-		c.Postgresql = pgsql
+		t.Run(tt.subTest, func(t *testing.T) {
+			c := newMockCluster(tt.opConfig)
+			pgsql := tt.pgsql
+			pgsql.Spec.Clone = tt.cloneDescription
+			pgsql.Spec.StandbyCluster = tt.standbyDescription
+			c.Postgresql = pgsql
+	
+			actualEnvs, err := c.generateSpiloPodEnvVars(&pgsql.Spec, types.UID(dummyUUID), exampleSpiloConfig)
+			assert.NoError(t, err)
 
-		actualEnvs, err := c.generateSpiloPodEnvVars(&pgsql.Spec, types.UID(dummyUUID), exampleSpiloConfig)
-		assert.NoError(t, err)
+			for _, ev := range tt.expectedValues {
+				env := actualEnvs[ev.envIndex]
 
-		for _, ev := range tt.expectedValues {
-			env := actualEnvs[ev.envIndex]
-
-			if env.Name != ev.envVarConstant {
-				t.Errorf("%s %s: expected env name %s, have %s instead",
-					testName, tt.subTest, ev.envVarConstant, env.Name)
-			}
-
-			if ev.envVarValueRef != nil {
-				if !reflect.DeepEqual(env.ValueFrom, ev.envVarValueRef) {
-					t.Errorf("%s %s: expected env value reference %#v, have %#v instead",
-						testName, tt.subTest, ev.envVarValueRef, env.ValueFrom)
+				if env.Name != ev.envVarConstant {
+					t.Errorf("%s %s: expected env name %s, have %s instead",
+						testName, tt.subTest, ev.envVarConstant, env.Name)
 				}
-				continue
+
+				if ev.envVarValueRef != nil {
+					if !reflect.DeepEqual(env.ValueFrom, ev.envVarValueRef) {
+						t.Errorf("%s %s: expected env value reference %#v, have %#v instead",
+							testName, tt.subTest, ev.envVarValueRef, env.ValueFrom)
+					}
+					continue
+				}
+
+				if env.Value != ev.envVarValue {
+					t.Errorf("%s %s: expected env value %s, have %s instead",
+						testName, tt.subTest, ev.envVarValue, env.Value)
+				}
 			}
 
-			if env.Value != ev.envVarValue {
-				t.Errorf("%s %s: expected env value %s, have %s instead",
-					testName, tt.subTest, ev.envVarValue, env.Value)
-			}
-		}
+		})
 	}
 }
 
@@ -1060,19 +1102,21 @@ func TestCloneEnv(t *testing.T) {
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	for _, tt := range tests {
-		envs := cluster.generateCloneEnvironment(tt.cloneOpts)
+		t.Run(tt.subTest, func(t *testing.T) {
+			envs := cluster.generateCloneEnvironment(tt.cloneOpts)
 
-		env := envs[tt.envPos]
+			env := envs[tt.envPos]
 
-		if env.Name != tt.env.Name {
-			t.Errorf("%s %s: Expected env name %s, have %s instead",
-				testName, tt.subTest, tt.env.Name, env.Name)
-		}
+			if env.Name != tt.env.Name {
+				t.Errorf("%s %s: Expected env name %s, have %s instead",
+					testName, tt.subTest, tt.env.Name, env.Name)
+			}
 
-		if env.Value != tt.env.Value {
-			t.Errorf("%s %s: Expected env value %s, have %s instead",
-				testName, tt.subTest, tt.env.Value, env.Value)
-		}
+			if env.Value != tt.env.Value {
+				t.Errorf("%s %s: Expected env value %s, have %s instead",
+					testName, tt.subTest, tt.env.Value, env.Value)
+			}
+		})
 	}
 }
 

@@ -628,11 +628,11 @@ order (e.g. a variable defined in 4. overrides a variable with the same name
 in 5.):
 
 1. Assigned by the operator
-2. Clone section (with WAL settings from operator config when `s3_wal_path` is empty)
-3. Standby section
-4. `env` section in cluster manifest
-5. Pod environment secret via operator config
-6. Pod environment config map via operator config
+2. `env` section in cluster manifest
+3. Pod environment secret via operator config
+4. Pod environment config map via operator config
+5. Clone section (with WAL settings from operator config when `s3_wal_path` is empty)
+6. Standby section
 7. WAL and logical backup settings from operator config
 
 ### Via ConfigMap

@@ -904,15 +904,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	if c.patroniKubernetesUseConfigMaps() {
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_USE_CONFIGMAPS", Value: "true"})
 	}
-
-	if spec.Clone != nil && spec.Clone.ClusterName != "" {
-		envVars = append(envVars, c.generateCloneEnvironment(spec.Clone)...)
-	}
-
-	if spec.StandbyCluster != nil {
-		envVars = append(envVars, c.generateStandbyEnvironment(spec.StandbyCluster)...)
-	}
-
+	
 	// fetch cluster-specific variables that will override all subsequent global variables
 	if len(spec.Env) > 0 {
 		envVars = appendEnvVars(envVars, spec.Env...)
@@ -933,6 +925,14 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		return nil, err
 	}
 	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
+
+	if spec.Clone != nil && spec.Clone.ClusterName != "" {
+		envVars = append(envVars, c.generateCloneEnvironment(spec.Clone)...)
+	}
+
+	if spec.StandbyCluster != nil {
+		envVars = append(envVars, c.generateStandbyEnvironment(spec.StandbyCluster)...)
+	}
 
 	// global variables derived from operator configuration
 	opConfigEnvVars := make([]v1.EnvVar, 0)
