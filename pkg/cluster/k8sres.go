@@ -183,6 +183,32 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 	return nil
 }
 
+func (c *Cluster) enforceMaxResourceRequests(resources *v1.ResourceRequirements) error {
+	var (
+		err error
+	)
+
+	cpuRequest := resources.Requests[v1.ResourceCPU]
+	maxCPURequest := c.OpConfig.MaxCPURequest
+	maxCPU, err := util.MinResource(maxCPURequest, cpuRequest.String())
+	if err != nil {
+		return fmt.Errorf("could not compare defined CPU request %s for %q container with configured maximum value %s: %v",
+			cpuRequest.String(), constants.PostgresContainerName, maxCPURequest, err)
+	}
+	resources.Requests[v1.ResourceCPU] = maxCPU
+
+	memoryRequest := resources.Requests[v1.ResourceMemory]
+	maxMemoryRequest := c.OpConfig.MaxMemoryRequest
+	maxMemory, err := util.MinResource(maxMemoryRequest, memoryRequest.String())
+	if err != nil {
+		return fmt.Errorf("could not compare defined memory request %s for %q container with configured maximum value %s: %v",
+			memoryRequest.String(), constants.PostgresContainerName, maxMemoryRequest, err)
+	}
+	resources.Requests[v1.ResourceMemory] = maxMemory
+
+	return nil
+}
+
 func setMemoryRequestToLimit(resources *v1.ResourceRequirements, containerName string, logger *logrus.Entry) {
 
 	requests := resources.Requests[v1.ResourceMemory]
@@ -258,6 +284,13 @@ func (c *Cluster) generateResourceRequirements(
 
 	if c.OpConfig.SetMemoryRequestToLimit {
 		setMemoryRequestToLimit(&result, containerName, c.logger)
+	}
+
+	// enforce maximum cpu and memory requests for Postgres containers only
+	if containerName == constants.PostgresContainerName {
+		if err = c.enforceMaxResourceRequests(&result); err != nil {
+			return nil, fmt.Errorf("could not enforce maximum resource requests: %v", err)
+		}
 	}
 
 	return &result, nil

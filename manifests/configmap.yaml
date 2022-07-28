@@ -90,6 +90,8 @@ data:
   # master_pod_move_timeout: 20m
   # max_instances: "-1"
   # min_instances: "-1"
+  # max_cpu_request: "1"
+  # max_memory_request: 4Gi
   # min_cpu_limit: 250m
   # min_memory_limit: 250Mi
   # minimal_major_version: "9.6"
