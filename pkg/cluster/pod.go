@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sort"
 	"strconv"
 	"time"
@@ -210,36 +209,6 @@ func (c *Cluster) movePodFromEndOfLifeNode(pod *v1.Pod) (*v1.Pod, error) {
 	c.logger.Infof("pod %q moved from node %q to node %q", podName, pod.Spec.NodeName, newPod.Spec.NodeName)
 
 	return newPod, nil
-}
-
-func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
-
-	// Wait until at least one replica pod will come up
-	if err := c.waitForAnyReplicaLabelReady(); err != nil {
-		c.logger.Warningf("could not find at least one ready replica: %v", err)
-	}
-
-	replicas, err := c.getRolePods(Replica)
-	if err != nil {
-		return nil, fmt.Errorf("could not get replica pods: %v", err)
-	}
-
-	if len(replicas) == 0 {
-		c.logger.Warningf("no available master candidates, migration will cause longer downtime of Postgres cluster")
-		return nil, nil
-	}
-
-	for i, pod := range replicas {
-		// look for replicas running on live nodes. Ignore errors when querying the nodes.
-		if pod.Spec.NodeName != oldNodeName {
-			eol, err := c.podIsEndOfLife(&pod)
-			if err == nil && !eol {
-				return &replicas[i], nil
-			}
-		}
-	}
-	c.logger.Warningf("no available master candidates on live nodes")
-	return &replicas[rand.Intn(len(replicas))], nil
 }
 
 // MigrateMasterPod migrates master pod via failover to a replica
