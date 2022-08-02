@@ -245,9 +245,9 @@ func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
 // MigrateMasterPod migrates master pod via failover to a replica
 func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	var (
-		masterCandidatePod *v1.Pod
-		err                error
-		eol                bool
+		masterCandidateName spec.NamespacedName
+		err                 error
+		eol                 bool
 	)
 
 	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(context.TODO(), podName.Name, metav1.GetOptions{})
@@ -283,11 +283,17 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 	// We may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case.
 	if *c.Statefulset.Spec.Replicas > 1 {
-		if masterCandidatePod, err = c.masterCandidate(oldMaster.Spec.NodeName); err != nil {
+		if masterCandidateName, err = c.getSwitchoverCandidate(oldMaster); err != nil {
 			return fmt.Errorf("could not find suitable replica pod as candidate for failover: %v", err)
 		}
 	} else {
 		c.logger.Warningf("migrating single pod cluster %q, this will cause downtime of the Postgres cluster until pod is back", c.clusterName())
+	}
+
+	masterCandidatePod, err := c.KubeClient.Pods(masterCandidateName.Namespace).Get(context.TODO(), masterCandidateName.Name, metav1.GetOptions{})
+
+	if err != nil {
+		return fmt.Errorf("could not get master candidate pod: %v", err)
 	}
 
 	// there are two cases for each postgres cluster that has its master pod on the node to migrate from:
@@ -306,7 +312,6 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
 
-	masterCandidateName := util.NameFromMeta(masterCandidatePod.ObjectMeta)
 	err = retryutil.Retry(1*time.Minute, 5*time.Minute,
 		func() (bool, error) {
 			err := c.Switchover(oldMaster, masterCandidateName)
