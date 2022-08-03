@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 configuration:
-{{ toYaml .Values.configGeneral | indent 2 }}
+{{ tpl (toYaml .Values.configGeneral) . | indent 2 }}
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
   major_version_upgrade:
