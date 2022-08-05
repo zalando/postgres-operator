@@ -1,5 +1,4 @@
 #pattern  filter=crypt diff=crypt merge=crypt
-charts/postgres-operator/values.yaml filter=crypt diff=crypt merge=crypt
 charts/postgres-operator/values-crr-dev.yaml filter=crypt diff=crypt merge=crypt
 charts/postgres-operator/values-crr-prod.yaml filter=crypt diff=crypt merge=crypt
 charts/postgres-operator/values-ctr-dev.yaml filter=crypt diff=crypt merge=crypt
