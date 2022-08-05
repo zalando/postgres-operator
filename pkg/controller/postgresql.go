@@ -225,7 +225,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	switch event.EventType {
 	case EventAdd:
 		if clusterFound {
-			lg.Infof("recieved add event for already existing Postgres cluster")
+			lg.Infof("received add event for already existing Postgres cluster")
 			return
 		}
 
@@ -505,8 +505,6 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 		// We will not get multiple Add events for the same cluster
 		c.queueClusterEvent(nil, pg, EventAdd)
 	}
-
-	return
 }
 
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
@@ -521,8 +519,6 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 		}
 		c.queueClusterEvent(pgOld, pgNew, EventUpdate)
 	}
-
-	return
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {
@@ -530,8 +526,6 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 	if pg != nil {
 		c.queueClusterEvent(pg, nil, EventDelete)
 	}
-
-	return
 }
 
 func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
@@ -550,7 +544,8 @@ func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
   Ensures the pod service account and role bindings exists in a namespace
   before a PG cluster is created there so that a user does not have to deploy
   these credentials manually.  StatefulSets require the service account to
-  create pods; Patroni requires relevant RBAC bindings to access endpoints.
+  create pods; Patroni requires relevant RBAC bindings to access endpoints
+  or config maps.
 
   The operator does not sync accounts/role bindings after creation.
 */

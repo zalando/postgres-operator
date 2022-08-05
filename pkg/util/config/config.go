@@ -14,11 +14,13 @@ import (
 
 // CRD describes CustomResourceDefinition specific configuration parameters
 type CRD struct {
-	ReadyWaitInterval   time.Duration `name:"ready_wait_interval" default:"4s"`
-	ReadyWaitTimeout    time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod        time.Duration `name:"resync_period" default:"30m"`
-	RepairPeriod        time.Duration `name:"repair_period" default:"5m"`
-	EnableCRDValidation *bool         `name:"enable_crd_validation" default:"true"`
+	ReadyWaitInterval     time.Duration `name:"ready_wait_interval" default:"4s"`
+	ReadyWaitTimeout      time.Duration `name:"ready_wait_timeout" default:"30s"`
+	ResyncPeriod          time.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod          time.Duration `name:"repair_period" default:"5m"`
+	EnableCRDRegistration *bool         `name:"enable_crd_registration" default:"true"`
+	EnableCRDValidation   *bool         `name:"enable_crd_validation" default:"true"`
+	CRDCategories         []string      `name:"crd_categories" default:"all"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
@@ -40,6 +42,7 @@ type Resources struct {
 	InheritedLabels               []string            `name:"inherited_labels" default:""`
 	InheritedAnnotations          []string            `name:"inherited_annotations" default:""`
 	DownscalerAnnotations         []string            `name:"downscaler_annotations"`
+	IgnoredAnnotations            []string            `name:"ignored_annotations"`
 	ClusterNameLabel              string              `name:"cluster_name_label" default:"cluster-name"`
 	DeleteAnnotationDateKey       string              `name:"delete_annotation_date_key"`
 	DeleteAnnotationNameKey       string              `name:"delete_annotation_name_key"`
@@ -51,12 +54,17 @@ type Resources struct {
 	DefaultMemoryLimit            string              `name:"default_memory_limit" default:"500Mi"`
 	MinCPULimit                   string              `name:"min_cpu_limit" default:"250m"`
 	MinMemoryLimit                string              `name:"min_memory_limit" default:"250Mi"`
+	MaxCPURequest                 string              `name:"max_cpu_request"`
+	MaxMemoryRequest              string              `name:"max_memory_request"`
 	PodEnvironmentConfigMap       spec.NamespacedName `name:"pod_environment_configmap"`
 	PodEnvironmentSecret          string              `name:"pod_environment_secret"`
 	NodeReadinessLabel            map[string]string   `name:"node_readiness_label" default:""`
-	MaxInstances                  int32               `name:"max_instances" default:"-1"`
-	MinInstances                  int32               `name:"min_instances" default:"-1"`
+	NodeReadinessLabelMerge       string              `name:"node_readiness_label_merge" default:"OR"`
 	ShmVolume                     *bool               `name:"enable_shm_volume" default:"true"`
+
+	MaxInstances                      int32  `name:"max_instances" default:"-1"`
+	MinInstances                      int32  `name:"min_instances" default:"-1"`
+	IgnoreInstanceLimitsAnnotationKey string `name:"ignore_instance_limits_annotation_key"`
 }
 
 type InfrastructureRole struct {
@@ -98,6 +106,10 @@ type Auth struct {
 	InfrastructureRolesDefs       string                `name:"infrastructure_roles_secrets"`
 	SuperUsername                 string                `name:"super_username" default:"postgres"`
 	ReplicationUsername           string                `name:"replication_username" default:"standby"`
+	AdditionalOwnerRoles          []string              `name:"additional_owner_roles" default:""`
+	EnablePasswordRotation        bool                  `name:"enable_password_rotation" default:"false"`
+	PasswordRotationInterval      uint32                `name:"password_rotation_interval" default:"90"`
+	PasswordRotationUserRetention uint32                `name:"password_rotation_user_retention" default:"180"`
 }
 
 // Scalyr holds the configuration for the Scalyr Agent sidecar for log shipping:
@@ -114,7 +126,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.6.3"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.8.2"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
 	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
@@ -122,6 +134,7 @@ type LogicalBackup struct {
 	LogicalBackupS3AccessKeyID                string `name:"logical_backup_s3_access_key_id" default:""`
 	LogicalBackupS3SecretAccessKey            string `name:"logical_backup_s3_secret_access_key" default:""`
 	LogicalBackupS3SSE                        string `name:"logical_backup_s3_sse" default:""`
+	LogicalBackupS3RetentionTime              string `name:"logical_backup_s3_retention_time" default:""`
 	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
 }
@@ -152,7 +165,7 @@ type Config struct {
 	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
 	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-13:2.0-p7"`
+	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-14:2.1-p6"`
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
@@ -167,6 +180,7 @@ type Config struct {
 	KubeIAMRole                            string            `name:"kube_iam_role"`
 	WALGSBucket                            string            `name:"wal_gs_bucket"`
 	GCPCredentials                         string            `name:"gcp_credentials"`
+	WALAZStorageAccount                    string            `name:"wal_az_storage_account"`
 	AdditionalSecretMount                  string            `name:"additional_secret_mount"`
 	AdditionalSecretMountPath              string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
 	EnableEBSGp3Migration                  bool              `name:"enable_ebs_gp3_migration" default:"false"`
@@ -182,7 +196,9 @@ type Config struct {
 	EnablePostgresTeamCRD                  bool              `name:"enable_postgres_team_crd" default:"false"`
 	EnablePostgresTeamCRDSuperusers        bool              `name:"enable_postgres_team_crd_superusers" default:"false"`
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
+	EnableMasterPoolerLoadBalancer         bool              `name:"enable_master_pooler_load_balancer" default:"false"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
+	EnableReplicaPoolerLoadBalancer        bool              `name:"enable_replica_pooler_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
@@ -203,15 +219,19 @@ type Config struct {
 	TeamAPIRoleConfiguration               map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
 	PodTerminateGracePeriod                time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	PodManagementPolicy                    string            `name:"pod_management_policy" default:"ordered_ready"`
-	ProtectedRoles                         []string          `name:"protected_role_names" default:"admin"`
+	ProtectedRoles                         []string          `name:"protected_role_names" default:"admin,cron_admin"`
 	PostgresSuperuserTeams                 []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
+	EnableCrossNamespaceSecret             bool              `name:"enable_cross_namespace_secret" default:"false"`
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"`
-	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.5"`
-	TargetMajorVersion                     string            `name:"target_major_version" default:"13"`
+	MajorVersionUpgradeTeamAllowList       []string          `name:"major_version_upgrade_team_allow_list" default:""`
+	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.6"`
+	TargetMajorVersion                     string            `name:"target_major_version" default:"14"`
+	PatroniAPICheckInterval                time.Duration     `name:"patroni_api_check_interval" default:"1s"`
+	PatroniAPICheckTimeout                 time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 }
 
 // MustMarshal marshals the config or panics
@@ -278,7 +298,7 @@ func validate(cfg *Config) (err error) {
 	}
 
 	if cfg.ConnectionPooler.User == cfg.SuperUsername {
-		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		msg := "connection pool user is not allowed to be the same as super user, username: %s"
 		err = fmt.Errorf(msg, cfg.ConnectionPooler.User)
 	}
 

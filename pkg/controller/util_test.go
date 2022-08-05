@@ -7,6 +7,7 @@ import (
 
 	b64 "encoding/base64"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -90,21 +91,21 @@ func TestClusterWorkerID(t *testing.T) {
 // not exist, or empty) and the old format.
 func TestOldInfrastructureRoleFormat(t *testing.T) {
 	var testTable = []struct {
-		secretName     spec.NamespacedName
-		expectedRoles  map[string]spec.PgUser
-		expectedErrors []error
+		secretName    spec.NamespacedName
+		expectedRoles map[string]spec.PgUser
+		expectedError error
 	}{
 		{
 			// empty secret name
 			spec.NamespacedName{},
-			nil,
+			map[string]spec.PgUser{},
 			nil,
 		},
 		{
 			// secret does not exist
 			spec.NamespacedName{Namespace: v1.NamespaceDefault, Name: "null"},
 			map[string]spec.PgUser{},
-			[]error{fmt.Errorf(`could not get infrastructure roles secret default/null: NotFound`)},
+			fmt.Errorf(`could not get infrastructure roles secret default/null: NotFound`),
 		},
 		{
 			spec.NamespacedName{
@@ -129,7 +130,7 @@ func TestOldInfrastructureRoleFormat(t *testing.T) {
 		},
 	}
 	for _, test := range testTable {
-		roles, errors := utilTestController.getInfrastructureRoles(
+		roles, err := utilTestController.getInfrastructureRoles(
 			[]*config.InfrastructureRole{
 				&config.InfrastructureRole{
 					SecretName:  test.secretName,
@@ -140,22 +141,9 @@ func TestOldInfrastructureRoleFormat(t *testing.T) {
 				},
 			})
 
-		if len(errors) != len(test.expectedErrors) {
+		if err != nil && err.Error() != test.expectedError.Error() {
 			t.Errorf("expected error '%v' does not match the actual error '%v'",
-				test.expectedErrors, errors)
-		}
-
-		for idx := range errors {
-			err := errors[idx]
-			expectedErr := test.expectedErrors[idx]
-
-			if err != expectedErr {
-				if err != nil && expectedErr != nil && err.Error() == expectedErr.Error() {
-					continue
-				}
-				t.Errorf("expected error '%v' does not match the actual error '%v'",
-					expectedErr, err)
-			}
+				test.expectedError, err)
 		}
 
 		if !reflect.DeepEqual(roles, test.expectedRoles) {
@@ -169,9 +157,8 @@ func TestOldInfrastructureRoleFormat(t *testing.T) {
 // corresponding secrets. Here we test the new format.
 func TestNewInfrastructureRoleFormat(t *testing.T) {
 	var testTable = []struct {
-		secrets        []spec.NamespacedName
-		expectedRoles  map[string]spec.PgUser
-		expectedErrors []error
+		secrets       []spec.NamespacedName
+		expectedRoles map[string]spec.PgUser
 	}{
 		// one secret with one configmap
 		{
@@ -196,7 +183,6 @@ func TestNewInfrastructureRoleFormat(t *testing.T) {
 					Flags:    []string{"createdb"},
 				},
 			},
-			nil,
 		},
 		// multiple standalone secrets
 		{
@@ -224,7 +210,6 @@ func TestNewInfrastructureRoleFormat(t *testing.T) {
 					MemberOf: []string{"new-test-inrole2"},
 				},
 			},
-			nil,
 		},
 	}
 	for _, test := range testTable {
@@ -239,27 +224,8 @@ func TestNewInfrastructureRoleFormat(t *testing.T) {
 			})
 		}
 
-		roles, errors := utilTestController.getInfrastructureRoles(definitions)
-		if len(errors) != len(test.expectedErrors) {
-			t.Errorf("expected error does not match the actual error:\n%+v\n%+v",
-				test.expectedErrors, errors)
-
-			// Stop and do not do any further checks
-			return
-		}
-
-		for idx := range errors {
-			err := errors[idx]
-			expectedErr := test.expectedErrors[idx]
-
-			if err != expectedErr {
-				if err != nil && expectedErr != nil && err.Error() == expectedErr.Error() {
-					continue
-				}
-				t.Errorf("expected error '%v' does not match the actual error '%v'",
-					expectedErr, err)
-			}
-		}
+		roles, err := utilTestController.getInfrastructureRoles(definitions)
+		assert.NoError(t, err)
 
 		if !reflect.DeepEqual(roles, test.expectedRoles) {
 			t.Errorf("expected roles output/the actual:\n%#v\n%#v",

@@ -19,6 +19,7 @@ import (
 	"github.com/motomux/pretty"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"golang.org/x/crypto/pbkdf2"
@@ -322,6 +323,20 @@ func testNil(values ...*int32) bool {
 	return false
 }
 
+// ToIntStr converts int to IntOrString type
+func ToIntStr(val int) *intstr.IntOrString {
+	b := intstr.FromInt(val)
+	return &b
+}
+
+// Bool2Int converts bool to int
+func Bool2Int(flag bool) int {
+	if flag {
+		return 1
+	}
+	return 0
+}
+
 // MaxInt32 : Return maximum of two integers provided via pointers. If one value
 // is not defined, return the other one. If both are not defined, result is also
 // undefined, caller needs to check for that.
@@ -351,4 +366,22 @@ func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 	}
 
 	return request.Cmp(limit) == -1, nil
+}
+
+func MinResource(maxRequestStr, requestStr string) (resource.Quantity, error) {
+
+	isSmaller, err := IsSmallerQuantity(maxRequestStr, requestStr)
+	if isSmaller && err == nil {
+		maxRequest, err := resource.ParseQuantity(maxRequestStr)
+		if err != nil {
+			return maxRequest, err
+		}
+		return maxRequest, nil
+	}
+
+	request, err := resource.ParseQuantity(requestStr)
+	if err != nil {
+		return request, err
+	}
+	return request, nil
 }

@@ -57,18 +57,16 @@ Flatten nested config options when ConfigMap is used as ConfigTarget
 */}}
 {{- define "flattenValuesForConfigMap" }}
 {{- range $key, $value := . }}
-    {{- if or (kindIs "string" $value) (kindIs "int" $value) }}
-{{ $key }}: {{ $value | quote }}
-    {{- end }}
     {{- if kindIs "slice" $value }}
 {{ $key }}: {{ join "," $value | quote }}
-    {{- end }}
-    {{- if kindIs "map" $value }}
+    {{- else if kindIs "map" $value }}
         {{- $list := list }}
         {{- range $subKey, $subValue := $value }}
             {{- $list = append $list (printf "%s:%s" $subKey $subValue) }}
 {{ $key }}: {{ join "," $list | quote }}
         {{- end }}
+    {{- else }}
+{{ $key }}: {{ $value | quote }}
     {{- end }}
 {{- end }}
 {{- end }}

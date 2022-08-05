@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Compose, Zalando SE
+Copyright 2022 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@ import (
 	"fmt"
 
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -63,6 +64,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Acid().V1().PostgresTeams().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("postgresqls"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Acid().V1().Postgresqls().Informer()}, nil
+
+		// Group=zalando.org, Version=v1
+	case zalandoorgv1.SchemeGroupVersion.WithResource("fabriceventstreams"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Zalando().V1().FabricEventStreams().Informer()}, nil
 
 	}
 

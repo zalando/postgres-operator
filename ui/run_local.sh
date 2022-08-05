@@ -19,10 +19,13 @@ default_operator_ui_config='{
   "nat_gateways_visible": false,
   "resources_visible": true,
   "users_visible": true,
-  "cost_ebs": 0.119,
+  "cost_ebs": 0.0952,
+  "cost_iops": 0.006,
+  "cost_throughput": 0.0476,
   "cost_core": 0.0575,
   "cost_memory": 0.014375,
   "postgresql_versions": [
+    "14",
     "13",
     "12",
     "11"

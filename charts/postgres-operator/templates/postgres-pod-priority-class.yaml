@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
   name: {{ .Values.podPriorityClassName }}
+  namespace: {{ .Release.Namespace }}
 preemptionPolicy: PreemptLowerPriority
 globalDefault: false
 value: 1000000

@@ -7,7 +7,7 @@ features and tests.
 
 Postgres Operator is written in Go. Use the [installation instructions](https://golang.org/doc/install#install)
 if you don't have Go on your system. You won't be able to compile the operator
-with Go older than 1.15. We recommend installing [the latest one](https://golang.org/dl/).
+with Go older than 1.17. We recommend installing [the latest one](https://golang.org/dl/).
 
 Go projects expect their source code and all the dependencies to be located
 under the [GOPATH](https://github.com/golang/go/wiki/GOPATH). Normally, one
@@ -72,20 +72,30 @@ make docker
 
 # kind
 make docker
-kind load docker-image <image> --name <kind-cluster-name>
+kind load docker-image registry.opensource.zalan.do/acid/postgres-operator:${TAG} --name <kind-cluster-name>
 ```
 
-Then create a new Postgres Operator deployment. You can reuse the provided
-manifest but replace the version and tag. Don't forget to also apply
+Then create a new Postgres Operator deployment.
+
+### Deploying manually with manifests and kubectl
+
+You can reuse the provided manifest but replace the version and tag. Don't forget to also apply
 configuration and RBAC manifests first, e.g.:
 
 ```bash
 kubectl create -f manifests/configmap.yaml
 kubectl create -f manifests/operator-service-account-rbac.yaml
-sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml | kubectl create  -f -
+sed -e "s/\(image\:.*\:\).*$/\1$TAG/" -e "s/\(imagePullPolicy\:\).*$/\1 Never/" manifests/postgres-operator.yaml | kubectl create  -f -
 
 # check if the operator is coming up
 kubectl get pod -l name=postgres-operator
+```
+
+### Deploying with Helm chart
+
+Yoy can reuse the provided Helm chart to deploy local operator build with the following command:
+```bash
+helm install postgres-operator ./charts/postgres-operator --namespace zalando-operator --set image.tag=${TAG} --set image.pullPolicy=Never
 ```
 
 ## Code generation
@@ -176,7 +186,7 @@ go get -u github.com/derekparker/delve/cmd/dlv
 
 ```
 RUN apk --no-cache add go git musl-dev
-RUN go get github.com/derekparker/delve/cmd/dlv
+RUN go get -d github.com/derekparker/delve/cmd/dlv
 ```
 
 * Update the `Makefile` to build the project with debugging symbols. For that
@@ -207,6 +217,13 @@ dlv connect 127.0.0.1:DLV_PORT
 ```
 
 ## Unit tests
+
+Prerequisites:
+
+```bash
+make deps
+make mocks
+```
 
 To run all unit tests, you can simply do:
 
@@ -267,7 +284,7 @@ the standard Docker `bridge` network. The kind cluster is deleted if tests
 finish successfully or on each new run in case it still exists.
 
 End-to-end tests are executed automatically during builds (for more details,
-see the [README](../e2e/README.md) in the `e2e` folder):
+see the [README](https://github.com/zalando/postgres-operator/blob/master/e2e/README.md) in the `e2e` folder):
 
 ```bash
 make e2e
@@ -291,35 +308,35 @@ parameters (with exceptions for certain Patroni/Postgres options) and
 variables if you feel a per-cluster configuration is necessary.
 
 Note: If one option is defined in the operator configuration and in the cluster
-[manifest](../manifests/complete-postgres-manifest.yaml), the latter takes
+[manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/complete-postgres-manifest.yaml), the latter takes
 precedence.
 
 ### Go code
 
 Update the following Go files that obtain the configuration parameter from the
 manifest files:
-* [operator_configuration_type.go](../pkg/apis/acid.zalan.do/v1/operator_configuration_type.go)
-* [operator_config.go](../pkg/controller/operator_config.go)
-* [config.go](../pkg/util/config/config.go)
+* [operator_configuration_type.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/operator_configuration_type.go)
+* [operator_config.go](https://github.com/zalando/postgres-operator/blob/master/pkg/controller/operator_config.go)
+* [config.go](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go)
 
-Postgres manifest parameters are defined in the [api package](../pkg/apis/acid.zalan.do/v1/postgresql_type.go).
-The operator behavior has to be implemented at least in [k8sres.go](../pkg/cluster/k8sres.go).
-Validation of CRD parameters is controlled in [crds.go](../pkg/apis/acid.zalan.do/v1/crds.go).
+Postgres manifest parameters are defined in the [api package](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/postgresql_type.go).
+The operator behavior has to be implemented at least in [k8sres.go](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/k8sres.go).
+Validation of CRD parameters is controlled in [crds.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/crds.go).
 Please, reflect your changes in tests, for example in:
-* [config_test.go](../pkg/util/config/config_test.go)
-* [k8sres_test.go](../pkg/cluster/k8sres_test.go)
-* [util_test.go](../pkg/apis/acid.zalan.do/v1/util_test.go)
+* [config_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config_test.go)
+* [k8sres_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/k8sres_test.go)
+* [util_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/util_test.go)
 
 ### Updating manifest files
 
 For the CRD-based configuration, please update the following files:
-* the default [OperatorConfiguration](../manifests/postgresql-operator-default-configuration.yaml)
-* the CRD's [validation](../manifests/operatorconfiguration.crd.yaml)
-* the CRD's validation in the [Helm chart](../charts/postgres-operator/crds/operatorconfigurations.yaml)
+* the default [OperatorConfiguration](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+* the CRD's [validation](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml)
+* the CRD's validation in the [Helm chart](https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator/crds/operatorconfigurations.yaml)
 
-Add new options also to the Helm chart's [values file](../charts/postgres-operator/values.yaml) file.
+Add new options also to the Helm chart's [values file](https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator/values.yaml) file.
 It follows the OperatorConfiguration CRD layout. Nested values will be flattened for the ConfigMap.
-Last but no least, update the [ConfigMap](../manifests/configmap.yaml) manifest example as well.
+Last but no least, update the [ConfigMap](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml) manifest example as well.
 
 ### Updating documentation
 

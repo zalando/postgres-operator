@@ -10,6 +10,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,25 +25,24 @@ func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, con
 	return config, nil
 }
 
-func int32ToPointer(value int32) *int32 {
-	return &value
-}
-
 // importConfigurationFromCRD is a transitional function that converts CRD configuration to the one based on the configmap
 func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigurationData) *config.Config {
 	result := &config.Config{}
 
 	// general config
+	result.EnableCRDRegistration = util.CoalesceBool(fromCRD.EnableCRDRegistration, util.True())
 	result.EnableCRDValidation = util.CoalesceBool(fromCRD.EnableCRDValidation, util.True())
+	result.CRDCategories = util.CoalesceStrArr(fromCRD.CRDCategories, []string{"all"})
 	result.EnableLazySpiloUpgrade = fromCRD.EnableLazySpiloUpgrade
 	result.EnablePgVersionEnvVar = fromCRD.EnablePgVersionEnvVar
 	result.EnableSpiloWalPathCompat = fromCRD.EnableSpiloWalPathCompat
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
-	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-13:2.0-p7")
+	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-14:2.1-p6")
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
+	result.IgnoreInstanceLimitsAnnotationKey = fromCRD.IgnoreInstanceLimitsAnnotationKey
 	result.ResyncPeriod = util.CoalesceDuration(time.Duration(fromCRD.ResyncPeriod), "30m")
 	result.RepairPeriod = util.CoalesceDuration(time.Duration(fromCRD.RepairPeriod), "5m")
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
@@ -53,11 +53,16 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// user config
 	result.SuperUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.SuperUsername, "postgres")
 	result.ReplicationUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.ReplicationUsername, "standby")
+	result.AdditionalOwnerRoles = fromCRD.PostgresUsersConfiguration.AdditionalOwnerRoles
+	result.EnablePasswordRotation = fromCRD.PostgresUsersConfiguration.EnablePasswordRotation
+	result.PasswordRotationInterval = util.CoalesceUInt32(fromCRD.PostgresUsersConfiguration.PasswordRotationInterval, 90)
+	result.PasswordRotationUserRetention = util.CoalesceUInt32(fromCRD.PostgresUsersConfiguration.DeepCopy().PasswordRotationUserRetention, 180)
 
 	// major version upgrade config
 	result.MajorVersionUpgradeMode = util.Coalesce(fromCRD.MajorVersionUpgrade.MajorVersionUpgradeMode, "off")
-	result.MinimalMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.MinimalMajorVersion, "9.5")
-	result.TargetMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.TargetMajorVersion, "13")
+	result.MajorVersionUpgradeTeamAllowList = fromCRD.MajorVersionUpgrade.MajorVersionUpgradeTeamAllowList
+	result.MinimalMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.MinimalMajorVersion, "9.6")
+	result.TargetMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.TargetMajorVersion, "14")
 
 	// kubernetes config
 	result.CustomPodAnnotations = fromCRD.Kubernetes.CustomPodAnnotations
@@ -82,6 +87,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableSidecars = util.CoalesceBool(fromCRD.Kubernetes.EnableSidecars, util.True())
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
+	result.EnableCrossNamespaceSecret = fromCRD.Kubernetes.EnableCrossNamespaceSecret
 
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
 	if fromCRD.Kubernetes.InfrastructureRolesDefs != nil {
@@ -103,15 +109,18 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.InheritedLabels = fromCRD.Kubernetes.InheritedLabels
 	result.InheritedAnnotations = fromCRD.Kubernetes.InheritedAnnotations
 	result.DownscalerAnnotations = fromCRD.Kubernetes.DownscalerAnnotations
+	result.IgnoredAnnotations = fromCRD.Kubernetes.IgnoredAnnotations
 	result.ClusterNameLabel = util.Coalesce(fromCRD.Kubernetes.ClusterNameLabel, "cluster-name")
 	result.DeleteAnnotationDateKey = fromCRD.Kubernetes.DeleteAnnotationDateKey
 	result.DeleteAnnotationNameKey = fromCRD.Kubernetes.DeleteAnnotationNameKey
 	result.NodeReadinessLabel = fromCRD.Kubernetes.NodeReadinessLabel
+	result.NodeReadinessLabelMerge = fromCRD.Kubernetes.NodeReadinessLabelMerge
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
 	result.PodManagementPolicy = util.Coalesce(fromCRD.Kubernetes.PodManagementPolicy, "ordered_ready")
 	result.MasterPodMoveTimeout = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout), "10m")
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity
 	result.PodAntiAffinityTopologyKey = util.Coalesce(fromCRD.Kubernetes.PodAntiAffinityTopologyKey, "kubernetes.io/hostname")
+	result.PodToleration = fromCRD.Kubernetes.PodToleration
 
 	// Postgres Pod resources
 	result.DefaultCPURequest = util.Coalesce(fromCRD.PostgresPodResources.DefaultCPURequest, "100m")
@@ -120,6 +129,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.DefaultMemoryLimit = util.Coalesce(fromCRD.PostgresPodResources.DefaultMemoryLimit, "500Mi")
 	result.MinCPULimit = util.Coalesce(fromCRD.PostgresPodResources.MinCPULimit, "250m")
 	result.MinMemoryLimit = util.Coalesce(fromCRD.PostgresPodResources.MinMemoryLimit, "250Mi")
+	result.MaxCPURequest = fromCRD.PostgresPodResources.MaxCPURequest
+	result.MaxMemoryRequest = fromCRD.PostgresPodResources.MaxMemoryRequest
 
 	// timeout config
 	result.ResourceCheckInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ResourceCheckInterval), "3s")
@@ -128,11 +139,15 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodDeletionWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PodDeletionWaitTimeout), "10m")
 	result.ReadyWaitInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ReadyWaitInterval), "4s")
 	result.ReadyWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ReadyWaitTimeout), "30s")
+	result.PatroniAPICheckInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PatroniAPICheckInterval), "1s")
+	result.PatroniAPICheckTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PatroniAPICheckTimeout), "5s")
 
 	// load balancer config
 	result.DbHostedZone = util.Coalesce(fromCRD.LoadBalancer.DbHostedZone, "db.example.com")
 	result.EnableMasterLoadBalancer = fromCRD.LoadBalancer.EnableMasterLoadBalancer
+	result.EnableMasterPoolerLoadBalancer = fromCRD.LoadBalancer.EnableMasterPoolerLoadBalancer
 	result.EnableReplicaLoadBalancer = fromCRD.LoadBalancer.EnableReplicaLoadBalancer
+	result.EnableReplicaPoolerLoadBalancer = fromCRD.LoadBalancer.EnableReplicaPoolerLoadBalancer
 	result.CustomServiceAnnotations = fromCRD.LoadBalancer.CustomServiceAnnotations
 	result.MasterDNSNameFormat = fromCRD.LoadBalancer.MasterDNSNameFormat
 	result.ReplicaDNSNameFormat = fromCRD.LoadBalancer.ReplicaDNSNameFormat
@@ -145,6 +160,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.KubeIAMRole = fromCRD.AWSGCP.KubeIAMRole
 	result.WALGSBucket = fromCRD.AWSGCP.WALGSBucket
 	result.GCPCredentials = fromCRD.AWSGCP.GCPCredentials
+	result.WALAZStorageAccount = fromCRD.AWSGCP.WALAZStorageAccount
 	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
 	result.AdditionalSecretMountPath = util.Coalesce(fromCRD.AWSGCP.AdditionalSecretMountPath, "/meta/credentials")
 	result.EnableEBSGp3Migration = fromCRD.AWSGCP.EnableEBSGp3Migration
@@ -152,7 +168,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.6.3")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.8.2")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
 	result.LogicalBackupS3Region = fromCRD.LogicalBackup.S3Region
@@ -160,6 +176,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupS3AccessKeyID = fromCRD.LogicalBackup.S3AccessKeyID
 	result.LogicalBackupS3SecretAccessKey = fromCRD.LogicalBackup.S3SecretAccessKey
 	result.LogicalBackupS3SSE = fromCRD.LogicalBackup.S3SSE
+	result.LogicalBackupS3RetentionTime = fromCRD.LogicalBackup.RetentionTime
 	result.LogicalBackupGoogleApplicationCredentials = fromCRD.LogicalBackup.GoogleApplicationCredentials
 	result.LogicalBackupJobPrefix = util.Coalesce(fromCRD.LogicalBackup.JobPrefix, "logical-backup-")
 
@@ -176,7 +193,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.TeamAdminRole = fromCRD.TeamsAPI.TeamAdminRole
 	result.PamRoleName = util.Coalesce(fromCRD.TeamsAPI.PamRoleName, "zalandos")
 	result.PamConfiguration = util.Coalesce(fromCRD.TeamsAPI.PamConfiguration, "https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees")
-	result.ProtectedRoles = util.CoalesceStrArr(fromCRD.TeamsAPI.ProtectedRoles, []string{"admin"})
+	result.ProtectedRoles = util.CoalesceStrArr(fromCRD.TeamsAPI.ProtectedRoles, []string{"admin", "cron_admin"})
 	result.PostgresSuperuserTeams = fromCRD.TeamsAPI.PostgresSuperuserTeams
 	result.EnablePostgresTeamCRD = fromCRD.TeamsAPI.EnablePostgresTeamCRD
 	result.EnablePostgresTeamCRDSuperusers = fromCRD.TeamsAPI.EnablePostgresTeamCRDSuperusers
@@ -201,11 +218,11 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// so ensure default values here.
 	result.ConnectionPooler.NumberOfInstances = util.CoalesceInt32(
 		fromCRD.ConnectionPooler.NumberOfInstances,
-		int32ToPointer(2))
+		k8sutil.Int32ToPointer(2))
 
 	result.ConnectionPooler.NumberOfInstances = util.MaxInt32(
 		result.ConnectionPooler.NumberOfInstances,
-		int32ToPointer(2))
+		k8sutil.Int32ToPointer(2))
 
 	result.ConnectionPooler.Schema = util.Coalesce(
 		fromCRD.ConnectionPooler.Schema,
@@ -216,7 +233,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		constants.ConnectionPoolerUserName)
 
 	if result.ConnectionPooler.User == result.SuperUsername {
-		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		msg := "connection pool user is not allowed to be the same as super user, username: %s"
 		panic(fmt.Errorf(msg, result.ConnectionPooler.User))
 	}
 
@@ -246,7 +263,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	result.ConnectionPooler.MaxDBConnections = util.CoalesceInt32(
 		fromCRD.ConnectionPooler.MaxDBConnections,
-		int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
+		k8sutil.Int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
 
 	return result
 }

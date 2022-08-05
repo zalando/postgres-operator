@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
@@ -149,12 +151,13 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
-	if _, ok := c.podSubscribers[podName]; !ok {
+	ch, ok := c.podSubscribers[podName]
+	if !ok {
 		panic("subscriber for pod '" + podName.String() + "' is not found")
 	}
 
-	close(c.podSubscribers[podName])
 	delete(c.podSubscribers, podName)
+	close(ch)
 }
 
 func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan PodEvent {
@@ -348,10 +351,59 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 	return nil
 }
 
+func (c *Cluster) getPatroniConfig(pod *v1.Pod) (acidv1.Patroni, map[string]string, error) {
+	var (
+		patroniConfig acidv1.Patroni
+		pgParameters  map[string]string
+	)
+	podName := util.NameFromMeta(pod.ObjectMeta)
+	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
+		func() (bool, error) {
+			var err error
+			patroniConfig, pgParameters, err = c.patroni.GetConfig(pod)
+
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+	)
+
+	if err != nil {
+		return acidv1.Patroni{}, nil, fmt.Errorf("could not get Postgres config from pod %s: %v", podName, err)
+	}
+
+	return patroniConfig, pgParameters, nil
+}
+
+func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) {
+	var memberData patroni.MemberData
+	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
+		func() (bool, error) {
+			var err error
+			memberData, err = c.patroni.GetMemberData(pod)
+
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		return patroni.MemberData{}, fmt.Errorf("could not get member data: %v", err)
+	}
+	if memberData.State == "creating replica" {
+		return patroni.MemberData{}, fmt.Errorf("replica currently being initialized")
+	}
+
+	return memberData, nil
+}
+
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
+	stopCh := make(chan struct{})
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
-	stopChan := make(chan struct{})
+	defer close(stopCh)
 
 	err := retryutil.Retry(1*time.Second, 5*time.Second,
 		func() (bool, error) {
@@ -371,7 +423,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	if err := c.waitForPodDeletion(ch); err != nil {
 		return nil, err
 	}
-	pod, err := c.waitForPodLabel(ch, stopChan, nil)
+	pod, err := c.waitForPodLabel(ch, stopCh, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -379,53 +431,9 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	return pod, nil
 }
 
-func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
-
-	/*
-	 Operator should not re-create pods if there is at least one replica being bootstrapped
-	 because Patroni might use other replicas to take basebackup from (see Patroni's "clonefrom" tag).
-
-	 XXX operator cannot forbid replica re-init, so we might still fail if re-init is started
-	 after this check succeeds but before a pod is re-created
-	*/
-	for _, pod := range pods {
-		c.logger.Debugf("name=%s phase=%s ip=%s", pod.Name, pod.Status.Phase, pod.Status.PodIP)
-	}
-
-	for _, pod := range pods {
-
-		var data patroni.MemberData
-
-		err := retryutil.Retry(1*time.Second, 5*time.Second,
-			func() (bool, error) {
-				var err error
-				data, err = c.patroni.GetMemberData(&pod)
-
-				if err != nil {
-					return false, err
-				}
-				return true, nil
-			},
-		)
-
-		if err != nil {
-			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
-			return false
-		} else if data.State == "creating replica" {
-			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
-			return false
-		}
-	}
-	return true
-}
-
 func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.NamespacedName) error {
 	c.setProcessName("starting to recreate pods")
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods))
-
-	if !c.isSafeToRecreatePods(pods) {
-		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initialized")
-	}
 
 	var (
 		masterPod, newMasterPod *v1.Pod
@@ -440,7 +448,7 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 			continue
 		}
 
-		podName := util.NameFromMeta(pod.ObjectMeta)
+		podName := util.NameFromMeta(pods[i].ObjectMeta)
 		newPod, err := c.recreatePod(podName)
 		if err != nil {
 			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
@@ -459,8 +467,13 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 		// 1. we have not observed a new master pod when re-creating former replicas
 		// 2. we know possible switchover targets even when no replicas were recreated
 		if newMasterPod == nil && len(replicas) > 0 {
-			if err := c.Switchover(masterPod, masterCandidate(replicas)); err != nil {
-				c.logger.Warningf("could not perform switch over: %v", err)
+			masterCandidate, err := c.getSwitchoverCandidate(masterPod)
+			if err != nil {
+				// do not recreate master now so it will keep the update flag and switchover will be retried on next sync
+				return fmt.Errorf("skipping switchover: %v", err)
+			}
+			if err := c.Switchover(masterPod, masterCandidate); err != nil {
+				return fmt.Errorf("could not perform switch over: %v", err)
 			}
 		} else if newMasterPod == nil && len(replicas) == 0 {
 			c.logger.Warningf("cannot perform switch over before re-creating the pod: no replicas")
@@ -473,6 +486,54 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 	}
 
 	return nil
+}
+
+func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, error) {
+
+	var members []patroni.ClusterMember
+	candidates := make([]patroni.ClusterMember, 0)
+	syncCandidates := make([]patroni.ClusterMember, 0)
+
+	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
+		func() (bool, error) {
+			var err error
+			members, err = c.patroni.GetClusterMembers(master)
+
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		return spec.NamespacedName{}, fmt.Errorf("failed to get Patroni cluster members: %s", err)
+	}
+
+	for _, member := range members {
+		if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && member.State == "running" {
+			candidates = append(candidates, member)
+			if PostgresRole(member.Role) == SyncStandby {
+				syncCandidates = append(syncCandidates, member)
+			}
+		}
+	}
+
+	// pick candidate with lowest lag
+	// if sync_standby replicas were found assume synchronous_mode is enabled and ignore other candidates list
+	if len(syncCandidates) > 0 {
+		sort.Slice(syncCandidates, func(i, j int) bool {
+			return syncCandidates[i].Lag < syncCandidates[j].Lag
+		})
+		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
+	}
+	if len(candidates) > 0 {
+		sort.Slice(candidates, func(i, j int) bool {
+			return candidates[i].Lag < candidates[j].Lag
+		})
+		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
+	}
+
+	return spec.NamespacedName{}, fmt.Errorf("no switchover candidate found")
 }
 
 func (c *Cluster) podIsEndOfLife(pod *v1.Pod) (bool, error) {

@@ -14,11 +14,14 @@ import (
 type PostgresRole string
 
 const (
-	// Master role
-	Master PostgresRole = "master"
-
-	// Replica role
+	// spilo roles
+	Master  PostgresRole = "master"
 	Replica PostgresRole = "replica"
+
+	// roles returned by Patroni cluster endpoint
+	Leader        PostgresRole = "leader"
+	StandbyLeader PostgresRole = "standby_leader"
+	SyncStandby   PostgresRole = "sync_standby"
 )
 
 // PodEventType represents the type of a pod-related event
@@ -72,7 +75,7 @@ type ClusterStatus struct {
 
 type TemplateParams map[string]interface{}
 
-type InstallFunction func(schema string, user string, role PostgresRole) error
+type InstallFunction func(schema string, user string) error
 
 type SyncReason []string
 
