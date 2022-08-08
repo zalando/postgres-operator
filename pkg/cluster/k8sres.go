@@ -102,8 +102,9 @@ func (c *Cluster) serviceAddress(role PostgresRole) string {
 		return service.ObjectMeta.Name
 	}
 
-	c.logger.Warningf("No service for role %s", role)
-	return ""
+	defaultAddress := c.serviceName(role)
+	c.logger.Warningf("No service for role %s - defaulting to %s", role, defaultAddress)
+	return defaultAddress
 }
 
 func (c *Cluster) servicePort(role PostgresRole) int32 {
