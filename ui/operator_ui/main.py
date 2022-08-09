@@ -525,7 +525,8 @@ def get_postgresqls():
             'namespaced_name': namespace + '/' + name,
             'full_name': namespace + '/' + name + ('/' + uid if uid else ''),
             'status': status,
-            'num_elb': spec.get('enableMasterLoadBalancer', 0) + spec.get('enableReplicaLoadBalancer', 0),
+            'num_elb': spec.get('enableMasterLoadBalancer', 0) + spec.get('enableReplicaLoadBalancer', 0) + \
+                       spec.get('enableMasterPoolerLoadBalancer', 0) + spec.get('enableReplicaPoolerLoadBalancer', 0),
         }
         for cluster in these(
             read_postgresqls(
@@ -708,6 +709,28 @@ def update_postgresql(namespace: str, cluster: str):
     else:
         if 'enableMasterLoadBalancer' in o['spec']:
             del o['spec']['enableMasterLoadBalancer']
+
+    if 'enableReplicaPoolerLoadBalancer' in postgresql['spec']:
+        rlb = postgresql['spec']['enableReplicaPoolerLoadBalancer']
+        if not rlb:
+            if 'enableReplicaPoolerLoadBalancer' in o['spec']:
+                del o['spec']['enableReplicaPoolerLoadBalancer']
+        else:
+            spec['enableReplicaPoolerLoadBalancer'] = True
+    else:
+        if 'enableReplicaPoolerLoadBalancer' in o['spec']:
+            del o['spec']['enableReplicaPoolerLoadBalancer']
+
+    if 'enableMasterPoolerLoadBalancer' in postgresql['spec']:
+        rlb = postgresql['spec']['enableMasterPoolerLoadBalancer']
+        if not rlb:
+            if 'enableMasterPoolerLoadBalancer' in o['spec']:
+                del o['spec']['enableMasterPoolerLoadBalancer']
+        else:
+            spec['enableMasterPoolerLoadBalancer'] = True
+    else:
+        if 'enableMasterPoolerLoadBalancer' in o['spec']:
+            del o['spec']['enableMasterPoolerLoadBalancer']
 
     if 'users' in postgresql['spec']:
         spec['users'] = postgresql['spec']['users']
