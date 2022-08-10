@@ -217,6 +217,12 @@ configPostgresPodResources:
   default_memory_limit: 500Mi
   # memory request value for the postgres containers
   default_memory_request: 100Mi
+  # optional upper boundary for CPU request
+  # max_cpu_request: "1"
+
+  # optional upper boundary for memory request
+  # max_memory_request: 4Gi
+
   # hard CPU minimum required to properly run a Postgres cluster
   min_cpu_limit: 250m
   # hard memory minimum required to properly run a Postgres cluster
@@ -386,7 +392,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-22"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-24"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode
