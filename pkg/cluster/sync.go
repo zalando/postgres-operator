@@ -783,7 +783,7 @@ func (c *Cluster) updateSecret(
 					}
 				}
 
-				// when passwords of connection pooler are rotated in place, pooler pods have to be replaced
+				// when password of connection pooler is rotated in place, pooler pods have to be replaced
 				if pwdUser.Origin == spec.RoleOriginConnectionPooler {
 					listOptions := metav1.ListOptions{
 						LabelSelector: c.poolerLabelsSet(true).String(),
@@ -800,7 +800,7 @@ func (c *Cluster) updateSecret(
 					}
 				}
 
-				// when passwords of stream user are rotated in place, rolling update in FES deployment must be triggered
+				// when password of stream user is rotated in place, it should trigger rolling update in FES deployment
 				if pwdUser.Origin == spec.RoleOriginStream {
 					c.logger.Warnf("secret of stream user %q changed", constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix)
 				}
