@@ -628,10 +628,10 @@ func TestServiceAnnotations(t *testing.T) {
 func TestClusterName(t *testing.T) {
 	for _, tt := range clusterNames {
 		t.Run(tt.about, func(t *testing.T) {
-			name, err := extractClusterName(tt.in, tt.inTeam)
+			name, err := ExtractClusterName(tt.in, tt.inTeam)
 			if err != nil {
 				if tt.err == nil || err.Error() != tt.err.Error() {
-					t.Errorf("extractClusterName expected error: %v, got: %v", tt.err, err)
+					t.Errorf("ExtractClusterName expected error: %v, got: %v", tt.err, err)
 				}
 				return
 			} else if tt.err != nil {

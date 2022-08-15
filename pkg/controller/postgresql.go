@@ -231,15 +231,19 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		lg.Infof("creating a new Postgres cluster")
 
+		if cl.OpConfig.EnableTeamIdClustername {
+			if _, err := acidv1.ExtractClusterName(cl.ObjectMeta.Name, cl.Spec.TeamID); err != nil {
+				c.clusterCreateFailed(cl, err, lg)
+				return
+			}
+		}
+
 		cl = c.addCluster(lg, clusterName, event.NewSpec)
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
 		if err := cl.Create(); err != nil {
-			cl.Error = fmt.Sprintf("could not create cluster: %v", err)
-			lg.Error(cl.Error)
-			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Create", "%v", cl.Error)
-
+			c.clusterCreateFailed(cl, err, lg)
 			return
 		}
 
@@ -317,6 +321,13 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		lg.Infof("cluster has been synced")
 	}
+}
+
+func (c *Controller) clusterCreateFailed(cl *cluster.Cluster, err error, lg *logrus.Entry) {
+	cl.Status = acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusInvalid}
+	cl.Error = fmt.Sprintf("could not create cluster: %v", err)
+	lg.Error(cl.Error)
+	c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Create", "%v", cl.Error)
 }
 
 func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, wg *sync.WaitGroup) {

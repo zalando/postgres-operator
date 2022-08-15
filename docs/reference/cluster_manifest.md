@@ -53,8 +53,7 @@ Those parameters are grouped under the `metadata` top-level key.
 These parameters are grouped directly under  the `spec` key in the manifest.
 
 * **teamId**
-  name of the team the cluster belongs to. Changing it after the cluster
-  creation is not supported. Required field.
+  name of the team the cluster belongs to. Required field.
 
 * **numberOfInstances**
   total number of  instances for a given cluster. The operator parameters

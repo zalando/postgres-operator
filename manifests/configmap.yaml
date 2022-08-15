@@ -57,6 +57,7 @@ data:
   # enable_shm_volume: "true"
   # enable_sidecars: "true"
   enable_spilo_wal_path_compat: "true"
+  enable_team_id_clustername: "false"
   enable_team_member_deprecation: "false"
   # enable_team_superuser: "false"
   enable_teams_api: "false"

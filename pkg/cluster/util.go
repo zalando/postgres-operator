@@ -244,7 +244,12 @@ func getPostgresContainer(podSpec *v1.PodSpec) (pgContainer v1.Container) {
 func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	if teamID == "" {
-		return nil, fmt.Errorf("no teamId specified")
+		msg := "no teamId specified"
+		if c.OpConfig.EnableTeamIdClustername {
+			return nil, fmt.Errorf(msg)
+		}
+		c.logger.Warnf(msg)
+		return nil, nil
 	}
 
 	members := []string{}

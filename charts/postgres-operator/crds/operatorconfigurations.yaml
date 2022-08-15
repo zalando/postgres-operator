@@ -88,6 +88,9 @@ spec:
               enable_spilo_wal_path_compat:
                 type: boolean
                 default: false
+              enable_team_id_clustername:
+                type: boolean
+                default: false
               etcd_host:
                 type: string
                 default: ""
