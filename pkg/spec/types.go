@@ -32,7 +32,8 @@ const (
 	RoleOriginTeamsAPI
 	RoleOriginSystem
 	RoleOriginBootstrap
-	RoleConnectionPooler
+	RoleOriginConnectionPooler
+	RoleOriginStream
 )
 
 type syncUserOperation int
@@ -194,7 +195,7 @@ func (r RoleOrigin) String() string {
 		return "system role"
 	case RoleOriginBootstrap:
 		return "bootstrapped role"
-	case RoleConnectionPooler:
+	case RoleOriginConnectionPooler:
 		return "connection pooler role"
 	default:
 		panic(fmt.Sprintf("bogus role origin value %d", r))
