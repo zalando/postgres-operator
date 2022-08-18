@@ -226,7 +226,7 @@ type Config struct {
 	EnableCrossNamespaceSecret             bool              `name:"enable_cross_namespace_secret" default:"false"`
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
-	EnableTeamIdClustername                bool              `name:"enable_team_id_clustername" default:"false"`
+	EnableTeamIdClusternamePrefix          bool              `name:"enable_team_id_clustername_prefix" default:"false"`
 	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"`
 	MajorVersionUpgradeTeamAllowList       []string          `name:"major_version_upgrade_team_allow_list" default:""`
 	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.6"`

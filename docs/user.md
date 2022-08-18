@@ -45,8 +45,8 @@ Make sure, the `spec` section of the manifest contains at least a `teamId`, the
 The minimum volume size to run the `postgresql` resource on Elastic Block
 Storage (EBS) is `1Gi`.
 
-Note, that when `enable_team_id_clustername` is set to `true` the name of the
-cluster must start with the `teamId` and `-`. At Zalando we use team IDs
+Note, that when `enable_team_id_clustername_prefix` is set to `true` the name
+of the cluster must start with the `teamId` and `-`. At Zalando we use team IDs
 (nicknames) to lower chances of duplicate cluster names and colliding entities.
 The team ID would also be used to query an API to get all members of a team
 and create [database roles](#teams-api-roles) for them. Besides, the maximum

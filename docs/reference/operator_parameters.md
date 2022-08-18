@@ -92,7 +92,7 @@ Those are top-level keys, containing both leaf keys and groups.
 * **enable_spilo_wal_path_compat**
   enables backwards compatible path between Spilo 12 and Spilo 13+ images. The default is `false`.
 
-* **enable_team_id_clustername**
+* **enable_team_id_clustername_prefix**
   To lower the risk of name clashes between clusters of different teams you
   can turn on this flag and the operator will only allow new clusters that start
   with the `teamId` (from `spec`) plus `-`. Default is `false`.
