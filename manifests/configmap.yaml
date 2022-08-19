@@ -61,6 +61,7 @@ data:
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
+  # etcd_host_version: "v2"
   external_traffic_policy: "Cluster"
   # gcp_credentials: ""
   # ignored_annotations: ""

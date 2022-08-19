@@ -97,6 +97,11 @@ Those are top-level keys, containing both leaf keys and groups.
   Patroni native Kubernetes support is used. The default is empty (use
   Kubernetes-native DCS).
 
+* **etcd_host_version**
+  Etcd version string for Patroni. Available versions are `v2` (default) or `v3`.
+  See [Patroni documentation](https://patroni.readthedocs.io/en/latest/SETTINGS.html#etcd)
+  for more information.
+
 * **kubernetes_use_configmaps**
   Select if setup uses endpoints (default), or configmaps to manage leader when
   DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to

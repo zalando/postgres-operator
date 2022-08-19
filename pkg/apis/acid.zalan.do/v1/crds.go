@@ -1115,6 +1115,17 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"etcd_host": {
 						Type: "string",
 					},
+					"etcd_host_version": {
+						Type: "string",
+						Enum: []apiextv1.JSON{
+							{
+								Raw: []byte(`"v2"`),
+							},
+							{
+								Raw: []byte(`"v3"`),
+							},
+						},
+					},
 					"ignore_instance_limits_annotation_key": {
 						Type: "string",
 					},
