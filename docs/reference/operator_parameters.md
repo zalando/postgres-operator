@@ -94,8 +94,8 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **enable_team_id_clustername_prefix**
   To lower the risk of name clashes between clusters of different teams you
-  can turn on this flag and the operator will only allow new clusters that start
-  with the `teamId` (from `spec`) plus `-`. Default is `false`.
+  can turn on this flag and the operator will sync only clusters where the
+  name starts with the `teamId` (from `spec`) plus `-`. Default is `false`.
 
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when

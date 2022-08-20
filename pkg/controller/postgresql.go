@@ -242,13 +242,14 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		cl, err = c.addCluster(lg, clusterName, event.NewSpec)
 		if err != nil {
-			lg.Errorf("could not create cluster: %v", err)
+			lg.Errorf("creation of cluster is blocked: %v", err)
 			return
 		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
-		if err := cl.Create(); err != nil {
+		err = cl.Create()
+		if err != nil {
 			cl.Status = acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusInvalid}
 			cl.Error = fmt.Sprintf("could not create cluster: %v", err)
 			lg.Error(cl.Error)
@@ -265,7 +266,8 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			return
 		}
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Update(event.OldSpec, event.NewSpec); err != nil {
+		err = cl.Update(event.OldSpec, event.NewSpec)
+		if err != nil {
 			cl.Error = fmt.Sprintf("could not update cluster: %v", err)
 			lg.Error(cl.Error)
 
@@ -318,13 +320,14 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		if !clusterFound {
 			cl, err = c.addCluster(lg, clusterName, event.NewSpec)
 			if err != nil {
-				lg.Errorf("could not sync cluster: %v", err)
+				lg.Errorf("syncing of cluster is blocked: %v", err)
 				return
 			}
 		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Sync(event.NewSpec); err != nil {
+		err = cl.Sync(event.NewSpec)
+		if err != nil {
 			cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
 			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Sync", "%v", cl.Error)
 			lg.Error(cl.Error)

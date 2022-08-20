@@ -33,7 +33,7 @@ configGeneral:
   enable_shm_volume: true
   # enables backwards compatible path between Spilo 12 and Spilo 13+ images
   enable_spilo_wal_path_compat: false
-  # on cluster creation operator can verify that name starts with teamId
+  # operator will sync only clusters where name starts with teamId prefix
   enable_team_id_clustername_prefix: false
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
