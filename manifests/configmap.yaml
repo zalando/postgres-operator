@@ -52,6 +52,7 @@ data:
   # enable_pod_disruption_budget: "true"
   # enable_postgres_team_crd: "false"
   # enable_postgres_team_crd_superusers: "false"
+  enable_readiness_probe: "false"
   enable_replica_load_balancer: "false"
   enable_replica_pooler_load_balancer: "false"
   # enable_shm_volume: "true"

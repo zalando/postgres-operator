@@ -59,6 +59,7 @@ configuration:
     enable_init_containers: true
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
+    enable_readiness_probe: false
     enable_sidecars: true
     # ignored_annotations:
     # - k8s.v1.cni.cncf.io/network-status

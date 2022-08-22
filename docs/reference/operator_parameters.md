@@ -484,6 +484,14 @@ configuration they are grouped under the `kubernetes` key.
   of stateful sets of PG clusters. The default is `ordered_ready`, the second
   possible value is `parallel`.
 
+* **enable_readiness_probe**
+  the operator can set a readiness probe on the statefulset for the database
+  pods with `InitialDelaySeconds: 6`, `PeriodSeconds: 10`, `TimeoutSeconds: 5`,
+  `SuccessThreshold: 1` and `FailureThreshold: 3`. When enabling readiness
+  probes it is recommended to switch the `pod_management_policy` to `parallel`
+  to avoid unneccesary waiting times in case of multiple instances failing.
+  The default is `false`.
+
 * **storage_resize_mode**
   defines how operator handles the difference between the requested volume size and
     the actual size. Available options are:

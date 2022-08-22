@@ -211,6 +211,9 @@ spec:
                   enable_pod_disruption_budget:
                     type: boolean
                     default: true
+                  enable_readiness_probe:
+                    type: boolean
+                    default: false
                   enable_sidecars:
                     type: boolean
                     default: true
