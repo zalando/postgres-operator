@@ -9,7 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -404,7 +404,7 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	return result
 }
 
-func (c *Cluster) createPodDisruptionBudget() (*policybeta1.PodDisruptionBudget, error) {
+func (c *Cluster) createPodDisruptionBudget() (*policyv1.PodDisruptionBudget, error) {
 	podDisruptionBudgetSpec := c.generatePodDisruptionBudget()
 	podDisruptionBudget, err := c.KubeClient.
 		PodDisruptionBudgets(podDisruptionBudgetSpec.Namespace).
@@ -418,7 +418,7 @@ func (c *Cluster) createPodDisruptionBudget() (*policybeta1.PodDisruptionBudget,
 	return podDisruptionBudget, nil
 }
 
-func (c *Cluster) updatePodDisruptionBudget(pdb *policybeta1.PodDisruptionBudget) error {
+func (c *Cluster) updatePodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
 	if c.PodDisruptionBudget == nil {
 		return fmt.Errorf("there is no pod disruption budget in the cluster")
 	}
@@ -602,6 +602,6 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 }
 
 // GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget
-func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
+func (c *Cluster) GetPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
 }

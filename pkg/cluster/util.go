@@ -14,7 +14,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -159,7 +159,7 @@ func metaAnnotationsPatch(annotations map[string]string) ([]byte, error) {
 	}{&meta})
 }
 
-func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpdate bool, reason string) {
+func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate bool, reason string) {
 	if isUpdate {
 		c.logger.Infof("pod disruption budget %q has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {

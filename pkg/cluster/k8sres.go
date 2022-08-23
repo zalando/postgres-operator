@@ -13,7 +13,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1985,7 +1985,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	return result
 }
 
-func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget {
+func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 
@@ -1994,14 +1994,14 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 		minAvailable = intstr.FromInt(0)
 	}
 
-	return &policybeta1.PodDisruptionBudget{
+	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.podDisruptionBudgetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
 			Annotations: c.annotationsSet(nil),
 		},
-		Spec: policybeta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: c.roleLabelsSet(false, Master),
