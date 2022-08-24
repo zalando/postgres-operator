@@ -228,35 +228,36 @@ type OperatorLogicalBackupConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
-	EnableCRDRegistration      *bool                              `json:"enable_crd_registration,omitempty"`
-	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
-	CRDCategories              []string                           `json:"crd_categories,omitempty"`
-	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
-	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
-	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
-	EtcdHost                   string                             `json:"etcd_host,omitempty"`
-	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
-	DockerImage                string                             `json:"docker_image,omitempty"`
-	Workers                    uint32                             `json:"workers,omitempty"`
-	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
-	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
-	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
-	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
-	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
-	SidecarContainers          []v1.Container                     `json:"sidecars,omitempty"`
-	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
-	MajorVersionUpgrade        MajorVersionUpgradeConfiguration   `json:"major_version_upgrade"`
-	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
-	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
-	Timeouts                   OperatorTimeouts                   `json:"timeouts"`
-	LoadBalancer               LoadBalancerConfiguration          `json:"load_balancer"`
-	AWSGCP                     AWSGCPConfiguration                `json:"aws_or_gcp"`
-	OperatorDebug              OperatorDebugConfiguration         `json:"debug"`
-	TeamsAPI                   TeamsAPIConfiguration              `json:"teams_api"`
-	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
-	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
-	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
-	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	EnableCRDRegistration         *bool                              `json:"enable_crd_registration,omitempty"`
+	EnableCRDValidation           *bool                              `json:"enable_crd_validation,omitempty"`
+	CRDCategories                 []string                           `json:"crd_categories,omitempty"`
+	EnableLazySpiloUpgrade        bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
+	EnablePgVersionEnvVar         bool                               `json:"enable_pgversion_env_var,omitempty"`
+	EnableSpiloWalPathCompat      bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
+	EnableTeamIdClusternamePrefix bool                               `json:"enable_team_id_clustername_prefix,omitempty"`
+	EtcdHost                      string                             `json:"etcd_host,omitempty"`
+	KubernetesUseConfigMaps       bool                               `json:"kubernetes_use_configmaps,omitempty"`
+	DockerImage                   string                             `json:"docker_image,omitempty"`
+	Workers                       uint32                             `json:"workers,omitempty"`
+	ResyncPeriod                  Duration                           `json:"resync_period,omitempty"`
+	RepairPeriod                  Duration                           `json:"repair_period,omitempty"`
+	SetMemoryRequestToLimit       bool                               `json:"set_memory_request_to_limit,omitempty"`
+	ShmVolume                     *bool                              `json:"enable_shm_volume,omitempty"`
+	SidecarImages                 map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
+	SidecarContainers             []v1.Container                     `json:"sidecars,omitempty"`
+	PostgresUsersConfiguration    PostgresUsersConfiguration         `json:"users"`
+	MajorVersionUpgrade           MajorVersionUpgradeConfiguration   `json:"major_version_upgrade"`
+	Kubernetes                    KubernetesMetaConfiguration        `json:"kubernetes"`
+	PostgresPodResources          PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
+	Timeouts                      OperatorTimeouts                   `json:"timeouts"`
+	LoadBalancer                  LoadBalancerConfiguration          `json:"load_balancer"`
+	AWSGCP                        AWSGCPConfiguration                `json:"aws_or_gcp"`
+	OperatorDebug                 OperatorDebugConfiguration         `json:"debug"`
+	TeamsAPI                      TeamsAPIConfiguration              `json:"teams_api"`
+	LoggingRESTAPI                LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
+	Scalyr                        ScalyrConfiguration                `json:"scalyr"`
+	LogicalBackup                 OperatorLogicalBackupConfiguration `json:"logical_backup"`
+	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
 
 	MinInstances                      int32  `json:"min_instances,omitempty"`
 	MaxInstances                      int32  `json:"max_instances,omitempty"`

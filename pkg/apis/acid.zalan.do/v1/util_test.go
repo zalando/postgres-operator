@@ -330,28 +330,10 @@ var unmarshalCluster = []struct {
 				Clone: &CloneDescription{
 					ClusterName: "acid-batman",
 				},
-				ClusterName: "testcluster1",
 			},
 			Error: "",
 		},
 		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"pod_priority_class_name":"spilo-pod-priority","volume":{"size":"5Gi","storageClass":"SSD", "subPath": "subdir"},"enableShmVolume":false,"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"acid","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["Mon:01:00-06:00","Sat:00:00-04:00","05:00-05:15"],"clone":{"cluster":"acid-batman"}},"status":{"PostgresClusterStatus":""}}`),
-		err:     nil},
-	{
-		about: "example with teamId set in input",
-		in:    []byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "teapot-testcluster1"}, "spec": {"teamId": "acid"}}`),
-		out: Postgresql{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Postgresql",
-				APIVersion: "acid.zalan.do/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "teapot-testcluster1",
-			},
-			Spec:   PostgresSpec{TeamID: "acid"},
-			Status: PostgresStatus{PostgresClusterStatus: ClusterStatusInvalid},
-			Error:  errors.New("name must match {TEAM}-{NAME} format").Error(),
-		},
-		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"teapot-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":null},"status":{"PostgresClusterStatus":"Invalid"}}`),
 		err:     nil},
 	{
 		about: "example with clone",
@@ -369,7 +351,6 @@ var unmarshalCluster = []struct {
 				Clone: &CloneDescription{
 					ClusterName: "team-batman",
 				},
-				ClusterName: "testcluster1",
 			},
 			Error: "",
 		},
@@ -391,7 +372,6 @@ var unmarshalCluster = []struct {
 				StandbyCluster: &StandbyDescription{
 					S3WalPath: "s3://custom/path/to/bucket/",
 				},
-				ClusterName: "testcluster1",
 			},
 			Error: "",
 		},
@@ -628,10 +608,10 @@ func TestServiceAnnotations(t *testing.T) {
 func TestClusterName(t *testing.T) {
 	for _, tt := range clusterNames {
 		t.Run(tt.about, func(t *testing.T) {
-			name, err := extractClusterName(tt.in, tt.inTeam)
+			name, err := ExtractClusterName(tt.in, tt.inTeam)
 			if err != nil {
 				if tt.err == nil || err.Error() != tt.err.Error() {
-					t.Errorf("extractClusterName expected error: %v, got: %v", tt.err, err)
+					t.Errorf("ExtractClusterName expected error: %v, got: %v", tt.err, err)
 				}
 				return
 			} else if tt.err != nil {

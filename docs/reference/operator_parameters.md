@@ -92,6 +92,11 @@ Those are top-level keys, containing both leaf keys and groups.
 * **enable_spilo_wal_path_compat**
   enables backwards compatible path between Spilo 12 and Spilo 13+ images. The default is `false`.
 
+* **enable_team_id_clustername_prefix**
+  To lower the risk of name clashes between clusters of different teams you
+  can turn on this flag and the operator will sync only clusters where the
+  name starts with the `teamId` (from `spec`) plus `-`. Default is `false`.
+
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
   Patroni native Kubernetes support is used. The default is empty (use

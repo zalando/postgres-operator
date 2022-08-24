@@ -158,7 +158,15 @@ func (c *Controller) acquireInitialListOfClusters() error {
 	return nil
 }
 
-func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) *cluster.Cluster {
+func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) (*cluster.Cluster, error) {
+
+	if c.opConfig.EnableTeamIdClusternamePrefix {
+		if _, err := acidv1.ExtractClusterName(clusterName.Name, pgSpec.Spec.TeamID); err != nil {
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusInvalid)
+			return nil, err
+		}
+	}
+
 	cl := cluster.New(c.makeClusterConfig(), c.KubeClient, *pgSpec, lg, c.eventRecorder)
 	cl.Run(c.stopCh)
 	teamName := strings.ToLower(cl.Spec.TeamID)
@@ -171,12 +179,13 @@ func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedNam
 	c.clusterLogs[clusterName] = ringlog.New(c.opConfig.RingLogLines)
 	c.clusterHistory[clusterName] = ringlog.New(c.opConfig.ClusterHistoryEntries)
 
-	return cl
+	return cl, nil
 }
 
 func (c *Controller) processEvent(event ClusterEvent) {
 	var clusterName spec.NamespacedName
 	var clHistory ringlog.RingLogger
+	var err error
 
 	lg := c.logger.WithField("worker", event.WorkerID)
 
@@ -216,7 +225,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			c.mergeDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 		}
 
-		if err := c.submitRBACCredentials(event); err != nil {
+		if err = c.submitRBACCredentials(event); err != nil {
 			c.logger.Warnf("pods and/or Patroni may misfunction due to the lack of permissions: %v", err)
 		}
 
@@ -231,15 +240,20 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		lg.Infof("creating a new Postgres cluster")
 
-		cl = c.addCluster(lg, clusterName, event.NewSpec)
+		cl, err = c.addCluster(lg, clusterName, event.NewSpec)
+		if err != nil {
+			lg.Errorf("creation of cluster is blocked: %v", err)
+			return
+		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
-		if err := cl.Create(); err != nil {
+		err = cl.Create()
+		if err != nil {
+			cl.Status = acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusInvalid}
 			cl.Error = fmt.Sprintf("could not create cluster: %v", err)
 			lg.Error(cl.Error)
 			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Create", "%v", cl.Error)
-
 			return
 		}
 
@@ -252,7 +266,8 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			return
 		}
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Update(event.OldSpec, event.NewSpec); err != nil {
+		err = cl.Update(event.OldSpec, event.NewSpec)
+		if err != nil {
 			cl.Error = fmt.Sprintf("could not update cluster: %v", err)
 			lg.Error(cl.Error)
 
@@ -303,11 +318,16 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
-			cl = c.addCluster(lg, clusterName, event.NewSpec)
+			cl, err = c.addCluster(lg, clusterName, event.NewSpec)
+			if err != nil {
+				lg.Errorf("syncing of cluster is blocked: %v", err)
+				return
+			}
 		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Sync(event.NewSpec); err != nil {
+		err = cl.Sync(event.NewSpec)
+		if err != nil {
 			cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
 			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Sync", "%v", cl.Error)
 			lg.Error(cl.Error)

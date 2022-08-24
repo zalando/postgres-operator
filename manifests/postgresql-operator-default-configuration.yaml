@@ -11,6 +11,7 @@ configuration:
   enable_pgversion_env_var: true
   # enable_shm_volume: true
   enable_spilo_wal_path_compat: false
+  enable_team_id_clustername_prefix: false
   etcd_host: ""
   # ignore_instance_limits_annotation_key: ""
   # kubernetes_use_configmaps: false

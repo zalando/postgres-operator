@@ -1112,6 +1112,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enable_spilo_wal_path_compat": {
 						Type: "boolean",
 					},
+					"enable_team_id_clustername_prefix": {
+						Type: "boolean",
+					},
 					"etcd_host": {
 						Type: "string",
 					},
