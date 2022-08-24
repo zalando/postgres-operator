@@ -759,10 +759,13 @@ func TestServiceAnnotations(t *testing.T) {
 func TestInitSystemUsers(t *testing.T) {
 	testName := "Test system users initialization"
 
-	// default cluster without connection pooler
+	// default cluster without connection pooler and event streams
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; exist {
 		t.Errorf("%s, connection pooler user is present", testName)
+	}
+	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; exist {
+		t.Errorf("%s, stream user is present", testName)
 	}
 
 	// cluster with connection pooler
@@ -804,6 +807,23 @@ func TestInitSystemUsers(t *testing.T) {
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers["pooler"]; !exist {
 		t.Errorf("%s, System users are not allowed to be a connection pool user", testName)
+	}
+
+	// cluster with streams
+	cl.Spec.Streams = []acidv1.Stream{
+		{
+			ApplicationId: "test-app",
+			Database:      "test_db",
+			Tables: map[string]acidv1.StreamTable{
+				"data.test_table": acidv1.StreamTable{
+					EventType: "test_event",
+				},
+			},
+		},
+	}
+	cl.initSystemUsers()
+	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; !exist {
+		t.Errorf("%s, stream user is not present", testName)
 	}
 }
 

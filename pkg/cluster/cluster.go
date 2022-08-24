@@ -1136,8 +1136,8 @@ func (c *Cluster) initSystemUsers() {
 			Password:  util.RandomPassword(constants.PasswordLength),
 		}
 
-		if _, exists := c.systemUsers[username]; !exists {
-			c.systemUsers[username] = streamUser
+		if _, exists := c.systemUsers[constants.EventStreamUserKeyName]; !exists {
+			c.systemUsers[constants.EventStreamUserKeyName] = streamUser
 		}
 	}
 }

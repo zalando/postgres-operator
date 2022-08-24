@@ -715,12 +715,16 @@ func (c *Cluster) updateSecret(
 	} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
 		userKey = constants.ReplicationUserKeyName
 		userMap = c.systemUsers
-	} else if secretUsername == constants.ConnectionPoolerUserName {
-		userKey = constants.ConnectionPoolerUserName
-		userMap = c.systemUsers
-	} else if secretUsername == constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix {
-		userKey = constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
-		userMap = c.systemUsers
+	} else if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; !exists {
+		if secretUsername == c.systemUsers[constants.ConnectionPoolerUserKeyName].Name {
+			userKey = constants.ConnectionPoolerUserName
+			userMap = c.systemUsers
+		}
+	} else if _, exists := c.systemUsers[constants.EventStreamUserKeyName]; !exists {
+		if secretUsername == c.systemUsers[constants.EventStreamUserKeyName].Name {
+			userKey = constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
+			userMap = c.systemUsers
+		}
 	} else {
 		userKey = secretUsername
 		userMap = c.pgUsers
