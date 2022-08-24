@@ -809,6 +809,13 @@ func TestInitSystemUsers(t *testing.T) {
 		t.Errorf("%s, System users are not allowed to be a connection pool user", testName)
 	}
 
+	// using stream user in manifest but no streams defined should be treated like normal robot user
+	cl.Spec.Users = map[string]acidv1.UserFlags{"fes_user": []string{}}
+	cl.initSystemUsers()
+	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; exist {
+		t.Errorf("%s, stream user is present", testName)
+	}
+
 	// cluster with streams
 	cl.Spec.Streams = []acidv1.Stream{
 		{
