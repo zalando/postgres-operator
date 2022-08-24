@@ -277,7 +277,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return nil
 	}
 
-	if masterCandidatePod, err = c.movePodFromEndOfLifeNode(masterCandidatePod); err != nil {
+	if _, err = c.movePodFromEndOfLifeNode(masterCandidatePod); err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
 
