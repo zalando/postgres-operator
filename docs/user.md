@@ -222,7 +222,7 @@ the user name, password etc. The secret itself is referenced by the
 above list them separately.
 
 ```yaml
-apiVersion: acid.zalan.do/v1
+apiVersion: "acid.zalan.do/v1"
 kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-configuration
