@@ -40,7 +40,7 @@ var (
 	namespace   string = "default"
 	appId       string = "test-app"
 	dbName      string = "foo"
-	fesUser     string = constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
+	fesUser     string = fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
 	fesName     string = fmt.Sprintf("%s-%s", clusterName, appId)
 	slotName    string = fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
 
@@ -55,7 +55,7 @@ var (
 		},
 		Spec: acidv1.PostgresSpec{
 			Databases: map[string]string{
-				dbName: dbName + constants.UserRoleNameSuffix,
+				dbName: fmt.Sprintf("%s%s", dbName, constants.UserRoleNameSuffix),
 			},
 			Streams: []acidv1.Stream{
 				{

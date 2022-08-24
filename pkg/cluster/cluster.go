@@ -1127,7 +1127,7 @@ func (c *Cluster) initSystemUsers() {
 	// replication users for event streams are another exception
 	// the operator will create one replication user for all streams
 	if len(c.Spec.Streams) > 0 {
-		username := constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
+		username := fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
 		streamUser := spec.PgUser{
 			Origin:    spec.RoleOriginStream,
 			Name:      username,
@@ -1155,9 +1155,9 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		constants.WriterRoleNameSuffix: constants.ReaderRoleNameSuffix,
 	}
 	defaultUsers := map[string]string{
-		constants.OwnerRoleNameSuffix + constants.UserRoleNameSuffix:  constants.OwnerRoleNameSuffix,
-		constants.ReaderRoleNameSuffix + constants.UserRoleNameSuffix: constants.ReaderRoleNameSuffix,
-		constants.WriterRoleNameSuffix + constants.UserRoleNameSuffix: constants.WriterRoleNameSuffix,
+		fmt.Sprintf("%s%s", constants.OwnerRoleNameSuffix, constants.UserRoleNameSuffix):  constants.OwnerRoleNameSuffix,
+		fmt.Sprintf("%s%s", constants.ReaderRoleNameSuffix, constants.UserRoleNameSuffix): constants.ReaderRoleNameSuffix,
+		fmt.Sprintf("%s%s", constants.WriterRoleNameSuffix, constants.UserRoleNameSuffix): constants.WriterRoleNameSuffix,
 	}
 
 	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
@@ -1218,7 +1218,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 				c.logger.Warn("secretNamespace ignored because enable_cross_namespace_secret set to false. Creating secrets in cluster namespace.")
 			}
 		}
-		roleName := prefix + defaultRole
+		roleName := fmt.Sprintf("%s%s", prefix, defaultRole)
 
 		flags := []string{constants.RoleFlagNoLogin}
 		if defaultRole[len(defaultRole)-5:] == constants.UserRoleNameSuffix {
@@ -1236,7 +1236,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 			adminRole = admin
 			isOwner = true
 		} else {
-			adminRole = prefix + constants.OwnerRoleNameSuffix
+			adminRole = fmt.Sprintf("%s%s", prefix, constants.OwnerRoleNameSuffix)
 		}
 
 		newRole := spec.PgUser{

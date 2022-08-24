@@ -46,7 +46,7 @@ type ConnectionPoolerObjects struct {
 func (c *Cluster) connectionPoolerName(role PostgresRole) string {
 	name := c.Name + "-pooler"
 	if role == Replica {
-		name = name + "-repl"
+		name = fmt.Sprintf("%s-%s", name, "repl")
 	}
 	return name
 }

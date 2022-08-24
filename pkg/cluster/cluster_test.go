@@ -810,7 +810,8 @@ func TestInitSystemUsers(t *testing.T) {
 	}
 
 	// using stream user in manifest but no streams defined should be treated like normal robot user
-	cl.Spec.Users = map[string]acidv1.UserFlags{"fes_user": []string{}}
+	streamUser := fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
+	cl.Spec.Users = map[string]acidv1.UserFlags{streamUser: []string{}}
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; exist {
 		t.Errorf("%s, stream user is present", testName)

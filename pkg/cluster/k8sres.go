@@ -80,7 +80,7 @@ func (c *Cluster) statefulSetName() string {
 func (c *Cluster) endpointName(role PostgresRole) string {
 	name := c.Name
 	if role == Replica {
-		name = name + "-repl"
+		name = fmt.Sprintf("%s-%s", name, "repl")
 	}
 
 	return name
@@ -89,7 +89,7 @@ func (c *Cluster) endpointName(role PostgresRole) string {
 func (c *Cluster) serviceName(role PostgresRole) string {
 	name := c.Name
 	if role == Replica {
-		name = name + "-repl"
+		name = fmt.Sprintf("%s-%s", name, "repl")
 	}
 
 	return name
@@ -2238,7 +2238,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
-	return trimCronjobName(c.OpConfig.LogicalBackupJobPrefix + c.clusterName().Name)
+	return trimCronjobName(fmt.Sprintf("%s%s", c.OpConfig.LogicalBackupJobPrefix, c.clusterName().Name))
 }
 
 // Return an array of ownerReferences to make an arbitraty object dependent on
