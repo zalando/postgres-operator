@@ -715,12 +715,16 @@ func (c *Cluster) updateSecret(
 	} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
 		userKey = constants.ReplicationUserKeyName
 		userMap = c.systemUsers
-	} else if secretUsername == constants.ConnectionPoolerUserName {
-		userKey = constants.ConnectionPoolerUserName
-		userMap = c.systemUsers
-	} else if secretUsername == constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix {
-		userKey = constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
-		userMap = c.systemUsers
+	} else if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; exists {
+		if secretUsername == c.systemUsers[constants.ConnectionPoolerUserKeyName].Name {
+			userKey = constants.ConnectionPoolerUserName
+			userMap = c.systemUsers
+		}
+	} else if _, exists := c.systemUsers[constants.EventStreamUserKeyName]; exists {
+		if secretUsername == c.systemUsers[constants.EventStreamUserKeyName].Name {
+			userKey = fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
+			userMap = c.systemUsers
+		}
 	} else {
 		userKey = secretUsername
 		userMap = c.pgUsers
@@ -816,7 +820,7 @@ func (c *Cluster) rotatePasswordInSecret(
 		// create rotation user if role is not listed for in-place password update
 		if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
 			rotationUser := secretPgUser
-			newRotationUsername := secretUsername + currentTime.Format("060102")
+			newRotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format("060102"))
 			rotationUser.Name = newRotationUsername
 			rotationUser.MemberOf = []string{secretUsername}
 			(*rotationUsers)[newRotationUsername] = rotationUser
@@ -976,7 +980,7 @@ func (c *Cluster) syncDatabases() error {
 	for preparedDatabaseName := range c.Spec.PreparedDatabases {
 		_, exists := currentDatabases[preparedDatabaseName]
 		if !exists {
-			createDatabases[preparedDatabaseName] = preparedDatabaseName + constants.OwnerRoleNameSuffix
+			createDatabases[preparedDatabaseName] = fmt.Sprintf("%s%s", preparedDatabaseName, constants.OwnerRoleNameSuffix)
 			preparedDatabases = append(preparedDatabases, preparedDatabaseName)
 		}
 	}
@@ -1077,9 +1081,9 @@ func (c *Cluster) syncPreparedSchemas(databaseName string, preparedSchemas map[s
 	if createPreparedSchemas, equal := util.SubstractStringSlices(schemas, currentSchemas); !equal {
 		for _, schemaName := range createPreparedSchemas {
 			owner := constants.OwnerRoleNameSuffix
-			dbOwner := databaseName + owner
+			dbOwner := fmt.Sprintf("%s%s", databaseName, owner)
 			if preparedSchemas[schemaName].DefaultRoles == nil || *preparedSchemas[schemaName].DefaultRoles {
-				owner = databaseName + "_" + schemaName + owner
+				owner = fmt.Sprintf("%s_%s%s", databaseName, schemaName, owner)
 			} else {
 				owner = dbOwner
 			}
