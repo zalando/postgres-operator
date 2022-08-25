@@ -507,12 +507,10 @@ func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) la
 
 func (c *Cluster) dnsName(role PostgresRole) string {
 	var dnsString string
-	clusterName := c.Spec.ClusterName
-
 	if role == Master {
-		dnsString = c.masterDNSName(clusterName)
+		dnsString = c.masterDNSName()
 	} else {
-		dnsString = c.replicaDNSName(clusterName)
+		dnsString = c.replicaDNSName()
 	}
 
 	// when cluster name starts with teamId prefix create an extra DNS entry
@@ -530,16 +528,16 @@ func (c *Cluster) dnsName(role PostgresRole) string {
 	return dnsString
 }
 
-func (c *Cluster) masterDNSName(clusterName string) string {
+func (c *Cluster) masterDNSName() string {
 	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
-		"cluster", clusterName,
+		"cluster", c.Spec.ClusterName,
 		"namespace", c.Namespace,
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
-func (c *Cluster) replicaDNSName(clusterName string) string {
+func (c *Cluster) replicaDNSName() string {
 	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
-		"cluster", clusterName,
+		"cluster", c.Spec.ClusterName,
 		"namespace", c.Namespace,
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
