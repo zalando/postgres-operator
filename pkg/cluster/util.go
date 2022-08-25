@@ -506,33 +506,50 @@ func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) la
 }
 
 func (c *Cluster) dnsName(role PostgresRole) string {
-	var dnsName string
-	clusterName := c.Name
-	clusterNameWithoutTeamPrefix, _ := acidv1.ExtractClusterName(c.Name, c.Spec.TeamID)
-	if clusterNameWithoutTeamPrefix != "" {
-		clusterName = clusterNameWithoutTeamPrefix
+	var dnsString string
+	clusterNames := make([]string, 0)
+	clusterNames = append(clusterNames, c.Spec.ClusterName)
+
+	// when cluster name starts with teamId prefix create an extra DNS entry
+	// to support the old format when prefix contraint was enabled (but is disabled now)
+	if !c.OpConfig.EnableTeamIdClusternamePrefix {
+		clusterNameWithoutTeamPrefix, _ := acidv1.ExtractClusterName(c.Name, c.Spec.TeamID)
+		if clusterNameWithoutTeamPrefix != "" {
+			clusterNames = append(clusterNames, clusterNameWithoutTeamPrefix)
+		}
 	}
+
 	if role == Master {
-		dnsName = c.masterDNSName(clusterName)
+		dnsString = c.masterDNSName(clusterNames)
 	} else {
-		dnsName = c.replicaDNSName(clusterName)
+		dnsString = c.replicaDNSName(clusterNames)
 	}
 
-	return dnsName
+	return dnsString
 }
 
-func (c *Cluster) masterDNSName(clusterName string) string {
-	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
-		"cluster", clusterName,
-		"team", c.teamName(),
-		"hostedzone", c.OpConfig.DbHostedZone))
+func (c *Cluster) masterDNSName(clusterNames []string) string {
+	dnsNames := make([]string, 0)
+	for _, clusterName := range clusterNames {
+		dnsNames = append(dnsNames, strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
+			"cluster", clusterName,
+			"team", c.teamName(),
+			"hostedzone", c.OpConfig.DbHostedZone)))
+	}
+
+	return strings.Join(dnsNames, ",")
 }
 
-func (c *Cluster) replicaDNSName(clusterName string) string {
-	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
-		"cluster", clusterName,
-		"team", c.teamName(),
-		"hostedzone", c.OpConfig.DbHostedZone))
+func (c *Cluster) replicaDNSName(clusterNames []string) string {
+	dnsNames := make([]string, 0)
+	for _, clusterName := range clusterNames {
+		dnsNames = append(dnsNames, strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
+			"cluster", clusterName,
+			"team", c.teamName(),
+			"hostedzone", c.OpConfig.DbHostedZone)))
+	}
+
+	return strings.Join(dnsNames, ",")
 }
 
 func (c *Cluster) credentialSecretName(username string) string {
