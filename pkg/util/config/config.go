@@ -206,8 +206,8 @@ type Config struct {
 	StorageResizeMode                      string            `name:"storage_resize_mode" default:"pvc"`
 	EnableLoadBalancer                     *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
 	ExternalTrafficPolicy                  string            `name:"external_traffic_policy" default:"Cluster"`
-	MasterDNSNameFormat                    StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
-	ReplicaDNSNameFormat                   StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	MasterDNSNameFormat                    StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{namespace}.{hostedzone}"`
+	ReplicaDNSNameFormat                   StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{namespace}.{hostedzone}"`
 	PDBNameFormat                          StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
 	EnablePodDisruptionBudget              *bool             `name:"enable_pod_disruption_budget" default:"true"`
 	EnableInitContainers                   *bool             `name:"enable_init_containers" default:"true"`

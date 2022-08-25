@@ -152,7 +152,7 @@ specified explicitly.
 
 The operator automatically generates a password for each manifest role and
 places it in the secret named
-`{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do` in the
+`{username}.{clustername}.credentials.postgresql.acid.zalan.do` in the
 same namespace as the cluster. This way, the application running in the
 K8s cluster and connecting to Postgres can obtain the password right from the
 secret, without ever sharing it outside of the cluster.
@@ -182,7 +182,7 @@ be in the form of `namespace.username`.
 
 For such usernames, the secret is created in the given namespace and its name is
 of the following form,
-`{namespace}.{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do`
+`{namespace}.{username}.{clustername}.credentials.postgresql.acid.zalan.do`
 
 ### Infrastructure roles
 
