@@ -269,9 +269,9 @@ configLoadBalancer:
   # define external traffic policy for the load balancer
   external_traffic_policy: "Cluster"
   # defines the DNS name string template for the master load balancer cluster
-  master_dns_name_format: "{cluster}.{team}.{hostedzone}"
+  master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
   # defines the DNS name string template for the replica load balancer cluster
-  replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
+  replica_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
 
 # options to aid debugging of the operator itself
 configDebug:

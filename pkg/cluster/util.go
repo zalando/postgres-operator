@@ -507,49 +507,48 @@ func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) la
 
 func (c *Cluster) dnsName(role PostgresRole) string {
 	var dnsString string
-	clusterNames := make([]string, 0)
-	clusterNames = append(clusterNames, c.Spec.ClusterName)
+	clusterName := c.Spec.ClusterName
+
+	if role == Master {
+		dnsString = c.masterDNSName(clusterName)
+	} else {
+		dnsString = c.replicaDNSName(clusterName)
+	}
 
 	// when cluster name starts with teamId prefix create an extra DNS entry
 	// to support the old format when prefix contraint was enabled (but is disabled now)
 	if !c.OpConfig.EnableTeamIdClusternamePrefix {
 		clusterNameWithoutTeamPrefix, _ := acidv1.ExtractClusterName(c.Name, c.Spec.TeamID)
 		if clusterNameWithoutTeamPrefix != "" {
-			clusterNames = append(clusterNames, clusterNameWithoutTeamPrefix)
+			if role == Replica {
+				clusterNameWithoutTeamPrefix = fmt.Sprintf("%s-repl", clusterNameWithoutTeamPrefix)
+			}
+			dnsString = fmt.Sprintf("%s,%s", dnsString, c.oldDNSFormat(clusterNameWithoutTeamPrefix))
 		}
-	}
-
-	if role == Master {
-		dnsString = c.masterDNSName(clusterNames)
-	} else {
-		dnsString = c.replicaDNSName(clusterNames)
 	}
 
 	return dnsString
 }
 
-func (c *Cluster) masterDNSName(clusterNames []string) string {
-	dnsNames := make([]string, 0)
-	for _, clusterName := range clusterNames {
-		dnsNames = append(dnsNames, strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
-			"cluster", clusterName,
-			"team", c.teamName(),
-			"hostedzone", c.OpConfig.DbHostedZone)))
-	}
-
-	return strings.Join(dnsNames, ",")
+func (c *Cluster) masterDNSName(clusterName string) string {
+	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
+		"cluster", clusterName,
+		"namespace", c.Namespace,
+		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
-func (c *Cluster) replicaDNSName(clusterNames []string) string {
-	dnsNames := make([]string, 0)
-	for _, clusterName := range clusterNames {
-		dnsNames = append(dnsNames, strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
-			"cluster", clusterName,
-			"team", c.teamName(),
-			"hostedzone", c.OpConfig.DbHostedZone)))
-	}
+func (c *Cluster) replicaDNSName(clusterName string) string {
+	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
+		"cluster", clusterName,
+		"namespace", c.Namespace,
+		"hostedzone", c.OpConfig.DbHostedZone))
+}
 
-	return strings.Join(dnsNames, ",")
+func (c *Cluster) oldDNSFormat(clusterName string) string {
+	return fmt.Sprintf("%s.%s.%s",
+		clusterName,
+		c.teamName(),
+		c.OpConfig.DbHostedZone)
 }
 
 func (c *Cluster) credentialSecretName(username string) string {

@@ -617,15 +617,15 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
 
 * **master_dns_name_format** defines the DNS name string template for the
   master load balancer cluster.  The default is
-  `{cluster}.{team}.{hostedzone}`, where `{cluster}` is replaced by the cluster
-  name, `{team}` is replaced with the team name and `{hostedzone}` is replaced
+  `{cluster}.{namespace}.{hostedzone}`, where `{cluster}` is replaced by the cluster
+  name, `{namespace}` is replaced with the namespace and `{hostedzone}` is replaced
   with the hosted zone (the value of the `db_hosted_zone` parameter). No other
   placeholders are allowed.
 
 * **replica_dns_name_format** defines the DNS name string template for the
   replica load balancer cluster.  The default is
-  `{cluster}-repl.{team}.{hostedzone}`, where `{cluster}` is replaced by the
-  cluster name, `{team}` is replaced with the team name and `{hostedzone}` is
+  `{cluster}-repl.{namespace}.{hostedzone}`, where `{cluster}` is replaced by the
+  cluster name, `{namespace}` is replaced with the namespace and `{hostedzone}` is
   replaced with the hosted zone (the value of the `db_hosted_zone` parameter).
   No other placeholders are allowed.
 
