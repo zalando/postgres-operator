@@ -505,16 +505,32 @@ func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) la
 	return lbls
 }
 
-func (c *Cluster) masterDNSName() string {
+func (c *Cluster) dnsName(role PostgresRole) string {
+	var dnsName string
+	clusterName := c.Name
+	clusterNameWithoutTeamPrefix, _ := acidv1.ExtractClusterName(c.Name, c.Spec.TeamID)
+	if clusterNameWithoutTeamPrefix != "" {
+		clusterName = clusterNameWithoutTeamPrefix
+	}
+	if role == Master {
+		dnsName = c.masterDNSName(clusterName)
+	} else {
+		dnsName = c.replicaDNSName(clusterName)
+	}
+
+	return dnsName
+}
+
+func (c *Cluster) masterDNSName(clusterName string) string {
 	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
-		"cluster", c.Spec.ClusterName,
+		"cluster", clusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
-func (c *Cluster) replicaDNSName() string {
+func (c *Cluster) replicaDNSName(clusterName string) string {
 	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
-		"cluster", c.Spec.ClusterName,
+		"cluster", clusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }

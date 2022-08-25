@@ -1814,12 +1814,7 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 	}
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
-		var dnsName string
-		if role == Master {
-			dnsName = c.masterDNSName()
-		} else {
-			dnsName = c.replicaDNSName()
-		}
+		dnsName := c.dnsName(role)
 
 		// Just set ELB Timeout annotation with default value, if it does not
 		// have a cutom value
