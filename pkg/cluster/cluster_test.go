@@ -587,7 +587,7 @@ func TestServiceAnnotations(t *testing.T) {
 			clusterAnnotations:         make(map[string]string),
 			operatorAnnotations:        make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test.test.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test.test.db.example.com,test.test.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 			},
 		},
@@ -723,7 +723,7 @@ func TestServiceAnnotations(t *testing.T) {
 			clusterAnnotations:          make(map[string]string),
 			operatorAnnotations:         make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.test.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-repl.test.db.example.com,test-repl.test.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 			},
 		},
@@ -751,11 +751,6 @@ func TestServiceAnnotations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.about, func(t *testing.T) {
 			cl.OpConfig.EnableTeamIdClusternamePrefix = tt.enableTeamIdClusterPrefix
-			if tt.enableTeamIdClusterPrefix {
-				cl.Postgresql.Spec.ClusterName = "test"
-			} else {
-				cl.Postgresql.Spec.ClusterName = "acid-test"
-			}
 
 			cl.OpConfig.CustomServiceAnnotations = tt.operatorAnnotations
 			cl.OpConfig.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerOC
@@ -764,6 +759,7 @@ func TestServiceAnnotations(t *testing.T) {
 			cl.OpConfig.ReplicaDNSNameFormat = "{cluster}-repl.{namespace}.{hostedzone}"
 			cl.OpConfig.DbHostedZone = "db.example.com"
 
+			cl.Postgresql.Spec.ClusterName = ""
 			cl.Postgresql.Spec.TeamID = "acid"
 			cl.Postgresql.Spec.ServiceAnnotations = tt.clusterAnnotations
 			cl.Postgresql.Spec.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerSpec
