@@ -19,7 +19,7 @@ func (c *Controller) ClusterStatus(team, namespace, cluster string) (*cluster.Cl
 
 	clusterName := spec.NamespacedName{
 		Namespace: namespace,
-		Name:      team + "-" + cluster,
+		Name:      cluster,
 	}
 
 	c.clustersMu.RLock()

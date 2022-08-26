@@ -36,6 +36,9 @@ type PostgresSpec struct {
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
 
+	// deprecated field storing cluster name without teamId prefix
+	ClusterName string `json:"-"`
+
 	SpiloRunAsUser  *int64 `json:"spiloRunAsUser,omitempty"`
 	SpiloRunAsGroup *int64 `json:"spiloRunAsGroup,omitempty"`
 	SpiloFSGroup    *int64 `json:"spiloFSGroup,omitempty"`
@@ -62,7 +65,6 @@ type PostgresSpec struct {
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
 	Clone                 *CloneDescription           `json:"clone,omitempty"`
-	ClusterName           string                      `json:"-"`
 	Databases             map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
 	SchedulerName         *string                     `json:"schedulerName,omitempty"`

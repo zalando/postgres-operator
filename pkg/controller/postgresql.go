@@ -159,24 +159,16 @@ func (c *Controller) acquireInitialListOfClusters() error {
 }
 
 func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) (*cluster.Cluster, error) {
-	var (
-		extractedClusterName string
-		err                  error
-	)
-
 	if c.opConfig.EnableTeamIdClusternamePrefix {
-		if extractedClusterName, err = acidv1.ExtractClusterName(clusterName.Name, pgSpec.Spec.TeamID); err != nil {
+		if _, err := acidv1.ExtractClusterName(clusterName.Name, pgSpec.Spec.TeamID); err != nil {
 			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusInvalid)
 			return nil, err
 		}
-	} else {
-		extractedClusterName = clusterName.Name
 	}
 
 	cl := cluster.New(c.makeClusterConfig(), c.KubeClient, *pgSpec, lg, c.eventRecorder)
 	cl.Run(c.stopCh)
 	teamName := strings.ToLower(cl.Spec.TeamID)
-	cl.ClusterName = extractedClusterName
 
 	defer c.clustersMu.Unlock()
 	c.clustersMu.Lock()

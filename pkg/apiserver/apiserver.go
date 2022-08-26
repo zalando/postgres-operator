@@ -195,7 +195,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 		clusterNamesPerTeam := make(map[string][]string)
 		for team, clusters := range s.controller.TeamClusterList() {
 			for _, cluster := range clusters {
-				clusterNamesPerTeam[team] = append(clusterNamesPerTeam[team], cluster.Name[len(team)+1:])
+				clusterNamesPerTeam[team] = append(clusterNamesPerTeam[team], cluster.Name)
 			}
 		}
 		resp, err = clusterNamesPerTeam, nil
