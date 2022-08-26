@@ -6,7 +6,7 @@ import (
 
 const (
 	clusterStatusTest        = "/clusters/test_namespace/testcluster/"
-	clusterStatusNumericTest = "/clusters/test_namespace/testcluster/"
+	clusterStatusNumericTest = "/clusters/test_namespace-1/testcluster/"
 	clusterLogsTest          = "/clusters/test_namespace/testcluster/logs/"
 	teamTest                 = "/clusters/test-id/"
 )
