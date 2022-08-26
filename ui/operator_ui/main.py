@@ -666,71 +666,20 @@ def update_postgresql(namespace: str, cluster: str):
 
         spec['volume']['throughput'] = throughput
 
-    if 'enableConnectionPooler' in postgresql['spec']:
-        cp = postgresql['spec']['enableConnectionPooler']
-        if not cp:
-            if 'enableConnectionPooler' in o['spec']:
-                del o['spec']['enableConnectionPooler']
-        else:
-            spec['enableConnectionPooler'] = True
-    else:
-        if 'enableConnectionPooler' in o['spec']:
-            del o['spec']['enableConnectionPooler']
+    additional_specs = ['enableMasterLoadBalancer',
+                        'enableReplicaLoadBalancer',
+                        'enableConnectionPooler',
+                        'enableReplicaConnectionPooler',
+                        'enableMasterPoolerLoadBalancer',
+                        'enableReplicaPoolerLoadBalancer',
+                        ]
 
-    if 'enableReplicaConnectionPooler' in postgresql['spec']:
-        cp = postgresql['spec']['enableReplicaConnectionPooler']
-        if not cp:
-            if 'enableReplicaConnectionPooler' in o['spec']:
-                del o['spec']['enableReplicaConnectionPooler']
+    for var in additional_specs:
+        if postgresql['spec'].get(var):
+            spec[var] = True
         else:
-            spec['enableReplicaConnectionPooler'] = True
-    else:
-        if 'enableReplicaConnectionPooler' in o['spec']:
-            del o['spec']['enableReplicaConnectionPooler']
-
-    if 'enableReplicaLoadBalancer' in postgresql['spec']:
-        rlb = postgresql['spec']['enableReplicaLoadBalancer']
-        if not rlb:
-            if 'enableReplicaLoadBalancer' in o['spec']:
-                del o['spec']['enableReplicaLoadBalancer']
-        else:
-            spec['enableReplicaLoadBalancer'] = True
-    else:
-        if 'enableReplicaLoadBalancer' in o['spec']:
-            del o['spec']['enableReplicaLoadBalancer']
-
-    if 'enableMasterLoadBalancer' in postgresql['spec']:
-        rlb = postgresql['spec']['enableMasterLoadBalancer']
-        if not rlb:
-            if 'enableMasterLoadBalancer' in o['spec']:
-                del o['spec']['enableMasterLoadBalancer']
-        else:
-            spec['enableMasterLoadBalancer'] = True
-    else:
-        if 'enableMasterLoadBalancer' in o['spec']:
-            del o['spec']['enableMasterLoadBalancer']
-
-    if 'enableReplicaPoolerLoadBalancer' in postgresql['spec']:
-        rlb = postgresql['spec']['enableReplicaPoolerLoadBalancer']
-        if not rlb:
-            if 'enableReplicaPoolerLoadBalancer' in o['spec']:
-                del o['spec']['enableReplicaPoolerLoadBalancer']
-        else:
-            spec['enableReplicaPoolerLoadBalancer'] = True
-    else:
-        if 'enableReplicaPoolerLoadBalancer' in o['spec']:
-            del o['spec']['enableReplicaPoolerLoadBalancer']
-
-    if 'enableMasterPoolerLoadBalancer' in postgresql['spec']:
-        rlb = postgresql['spec']['enableMasterPoolerLoadBalancer']
-        if not rlb:
-            if 'enableMasterPoolerLoadBalancer' in o['spec']:
-                del o['spec']['enableMasterPoolerLoadBalancer']
-        else:
-            spec['enableMasterPoolerLoadBalancer'] = True
-    else:
-        if 'enableMasterPoolerLoadBalancer' in o['spec']:
-            del o['spec']['enableMasterPoolerLoadBalancer']
+            if var in o['spec']:
+                del o['spec'][var]
 
     if 'users' in postgresql['spec']:
         spec['users'] = postgresql['spec']['users']
