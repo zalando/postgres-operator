@@ -92,11 +92,11 @@ func (c *Controller) GetStatus() *spec.ControllerStatus {
 }
 
 // ClusterLogs dumps cluster ring logs
-func (c *Controller) ClusterLogs(team, namespace, name string) ([]*spec.LogEntry, error) {
+func (c *Controller) ClusterLogs(namespace, name string) ([]*spec.LogEntry, error) {
 
 	clusterName := spec.NamespacedName{
 		Namespace: namespace,
-		Name:      team + "-" + name,
+		Name:      name,
 	}
 
 	c.clustersMu.RLock()
@@ -215,11 +215,11 @@ func (c *Controller) WorkerStatus(workerID uint32) (*cluster.WorkerStatus, error
 }
 
 // ClusterHistory dumps history of cluster changes
-func (c *Controller) ClusterHistory(team, namespace, name string) ([]*spec.Diff, error) {
+func (c *Controller) ClusterHistory(namespace, name string) ([]*spec.Diff, error) {
 
 	clusterName := spec.NamespacedName{
 		Namespace: namespace,
-		Name:      team + "-" + name,
+		Name:      name,
 	}
 
 	c.clustersMu.RLock()
