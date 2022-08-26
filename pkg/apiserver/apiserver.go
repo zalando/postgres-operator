@@ -31,7 +31,7 @@ type controllerInformer interface {
 	GetOperatorConfig() *config.Config
 	GetStatus() *spec.ControllerStatus
 	TeamClusterList() map[string][]spec.NamespacedName
-	ClusterStatus(team, namespace, cluster string) (*cluster.ClusterStatus, error)
+	ClusterStatus(namespace, cluster string) (*cluster.ClusterStatus, error)
 	ClusterLogs(team, namespace, cluster string) ([]*spec.LogEntry, error)
 	ClusterHistory(team, namespace, cluster string) ([]*spec.Diff, error)
 	ClusterDatabasesMap() map[string][]string
@@ -170,7 +170,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 
 	if matches := util.FindNamedStringSubmatch(clusterStatusURL, req.URL.Path); matches != nil {
 		namespace := matches["namespace"]
-		resp, err = s.controller.ClusterStatus(matches["team"], namespace, matches["cluster"])
+		resp, err = s.controller.ClusterStatus(namespace, matches["cluster"])
 	} else if matches := util.FindNamedStringSubmatch(teamURL, req.URL.Path); matches != nil {
 		teamClusters := s.controller.TeamClusterList()
 		clusters, found := teamClusters[matches["team"]]

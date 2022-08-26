@@ -15,7 +15,7 @@ import (
 )
 
 // ClusterStatus provides status of the cluster
-func (c *Controller) ClusterStatus(team, namespace, cluster string) (*cluster.ClusterStatus, error) {
+func (c *Controller) ClusterStatus(namespace, cluster string) (*cluster.ClusterStatus, error) {
 
 	clusterName := spec.NamespacedName{
 		Namespace: namespace,
