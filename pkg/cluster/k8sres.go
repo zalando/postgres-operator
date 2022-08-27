@@ -2022,7 +2022,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		resourceRequirements *v1.ResourceRequirements
 	)
 
-    spec := &c.Spec
+	spec := &c.Spec
 
 	// NB: a cron job creates standard batch jobs according to schedule; these batch jobs manage pods and clean-up
 
@@ -2068,7 +2068,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	annotations := c.generatePodAnnotations(&c.Spec)
 
-    tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = c.generatePodTemplate(
