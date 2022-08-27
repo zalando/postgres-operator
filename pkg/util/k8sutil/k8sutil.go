@@ -8,8 +8,8 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
+	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 
 	apiacidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	zalandoclient "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
@@ -63,7 +63,7 @@ type KubernetesClient struct {
 	rbacv1.RoleBindingsGetter
 	policyv1.PodDisruptionBudgetsGetter
 	apiextv1.CustomResourceDefinitionsGetter
-	clientbatchv1beta1.CronJobsGetter
+	clientbatchv1.CronJobsGetter
 	acidv1.OperatorConfigurationsGetter
 	acidv1.PostgresTeamsGetter
 	acidv1.PostgresqlsGetter
@@ -159,7 +159,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1()
-	kubeClient.CronJobsGetter = client.BatchV1beta1()
+	kubeClient.CronJobsGetter = client.BatchV1()
 	kubeClient.EventsGetter = client.CoreV1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
@@ -224,12 +224,12 @@ func SamePDB(cur, new *apipolicyv1.PodDisruptionBudget) (match bool, reason stri
 	return
 }
 
-func getJobImage(cronJob *batchv1beta1.CronJob) string {
+func getJobImage(cronJob *batchv1.CronJob) string {
 	return cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 }
 
 // SameLogicalBackupJob compares Specs of logical backup cron jobs
-func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
+func SameLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string) {
 
 	if cur.Spec.Schedule != new.Spec.Schedule {
 		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",

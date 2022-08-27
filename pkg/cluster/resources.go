@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -546,7 +546,7 @@ func (c *Cluster) createLogicalBackupJob() (err error) {
 	return nil
 }
 
-func (c *Cluster) patchLogicalBackupJob(newJob *batchv1beta1.CronJob) error {
+func (c *Cluster) patchLogicalBackupJob(newJob *batchv1.CronJob) error {
 	c.setProcessName("patching logical backup job")
 
 	patchData, err := specPatch(newJob.Spec)
