@@ -64,7 +64,7 @@ new
 
               a.btn.btn-small.btn-warning(
                 if='{ clusterExists }'
-                href='/#/status/{ namespace.state }/{ team }-{ name }'
+                href='/#/status/{ namespace.state }/{ name }'
               )
                 | Cluster exists (show status)
 
@@ -137,10 +137,10 @@ new
                 input.form-control(
                   ref='name'
                   type='text'
-                  placeholder='new-cluster (can be { 53 - team.length - 1 } characters long)'
+                  placeholder='new-cluster (can be 53 characters long)'
                   title='Database cluster name, must be a valid hostname component'
                   pattern='[a-z0-9]+[a-z0-9\-]+[a-z0-9]+'
-                  maxlength='{ 53 - team.length - 1 }'
+                  maxlength=53
                   required
                   value='{ name }'
                   onchange='{ nameChange }'
@@ -520,7 +520,7 @@ new
       apiVersion: "acid.zalan.do/v1"
 
       metadata:
-        name: "{{ team }}-{{ name }}"
+        name: "{{ name }}"
         namespace: "{{ namespace.state }}"
         labels:
           team: {{ team }}
@@ -670,13 +670,12 @@ new
     this.updateDNSName = () => {
       this.dnsName = this.config.dns_format_string.format(
         this.name,
-        this.team,
         this.namespace.state,
       )
     }
 
     this.updateClusterName = () => {
-      this.clusterName = (this.team + '-' + this.name).toLowerCase()
+      this.clusterName = (this.name).toLowerCase()
       this.checkClusterExists()
       this.updateDNSName()
     }
@@ -950,7 +949,7 @@ new
         this.team = ''
       }
 
-      this.clusterName = (this.name + '-' + this.team).toLowerCase()
+      this.clusterName = (this.name + '-').toLowerCase()
       this.volumeSize = 10
       this.instanceCount = 1
       this.ranges = {}

@@ -14,7 +14,7 @@ export TARGET_NAMESPACE="${TARGET_NAMESPACE-*}"
 
 default_operator_ui_config='{
   "docs_link":"https://postgres-operator.readthedocs.io/en/latest/",
-  "dns_format_string": "{1}-{0}.{2}",
+  "dns_format_string": "{0}.{1}",
   "databases_visible": true,
   "nat_gateways_visible": false,
   "resources_visible": true,

@@ -59,6 +59,7 @@ type WorkerStatus struct {
 type ClusterStatus struct {
 	Team                string
 	Cluster             string
+	Namespace           string
 	MasterService       *v1.Service
 	ReplicaService      *v1.Service
 	MasterEndpoint      *v1.Endpoints
