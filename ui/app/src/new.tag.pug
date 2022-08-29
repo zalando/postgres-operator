@@ -137,10 +137,10 @@ new
                 input.form-control(
                   ref='name'
                   type='text'
-                  placeholder='new-cluster (can be { 53 - team.length - 1 } characters long)'
+                  placeholder='new-cluster (can be 53 characters long)'
                   title='Database cluster name, must be a valid hostname component'
                   pattern='[a-z0-9]+[a-z0-9\-]+[a-z0-9]+'
-                  maxlength='{ 53 - team.length - 1 }'
+                  maxlength=53
                   required
                   value='{ name }'
                   onchange='{ nameChange }'
