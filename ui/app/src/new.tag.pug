@@ -670,7 +670,6 @@ new
     this.updateDNSName = () => {
       this.dnsName = this.config.dns_format_string.format(
         this.name,
-        this.team,
         this.namespace.state,
       )
     }
@@ -950,7 +949,7 @@ new
         this.team = ''
       }
 
-      this.clusterName = (this.name + '-' + this.team).toLowerCase()
+      this.clusterName = (this.name + '-').toLowerCase()
       this.volumeSize = 10
       this.instanceCount = 1
       this.ranges = {}
