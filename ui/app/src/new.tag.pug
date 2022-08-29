@@ -64,7 +64,7 @@ new
 
               a.btn.btn-small.btn-warning(
                 if='{ clusterExists }'
-                href='/#/status/{ namespace.state }/{ team }-{ name }'
+                href='/#/status/{ namespace.state }/{ name }'
               )
                 | Cluster exists (show status)
 
@@ -520,7 +520,7 @@ new
       apiVersion: "acid.zalan.do/v1"
 
       metadata:
-        name: "{{ team }}-{{ name }}"
+        name: "{{ name }}"
         namespace: "{{ namespace.state }}"
         labels:
           team: {{ team }}
