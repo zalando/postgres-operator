@@ -723,14 +723,14 @@ func (c *Cluster) updateSecret(
 	// use system user when pooler is enabled and pooler user is specfied in manifest
 	if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; exists {
 		if secretUsername == c.systemUsers[constants.ConnectionPoolerUserKeyName].Name {
-			userKey = constants.ConnectionPoolerUserName
+			userKey = constants.ConnectionPoolerUserKeyName
 			userMap = c.systemUsers
 		}
 	}
 	// use system user when streams are defined and fes_user is specfied in manifest
 	if _, exists := c.systemUsers[constants.EventStreamUserKeyName]; exists {
 		if secretUsername == c.systemUsers[constants.EventStreamUserKeyName].Name {
-			userKey = fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
+			userKey = constants.EventStreamUserKeyName
 			userMap = c.systemUsers
 		}
 	}

@@ -286,6 +286,17 @@ func TestUpdateSecret(t *testing.T) {
 			Databases:                      map[string]string{dbname: dbowner},
 			Users:                          map[string]acidv1.UserFlags{"foo": {}, dbowner: {}},
 			UsersWithInPlaceSecretRotation: []string{dbowner},
+			Streams: []acidv1.Stream{
+				{
+					ApplicationId: appId,
+					Database:      dbname,
+					Tables: map[string]acidv1.StreamTable{
+						"data.foo": acidv1.StreamTable{
+							EventType: "stream-type-b",
+						},
+					},
+				},
+			},
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
@@ -297,6 +308,8 @@ func TestUpdateSecret(t *testing.T) {
 		Config{
 			OpConfig: config.Config{
 				Auth: config.Auth{
+					SuperUsername:                 "postgres",
+					ReplicationUsername:           "standby",
 					SecretNameTemplate:            secretTemplate,
 					EnablePasswordRotation:        true,
 					PasswordRotationInterval:      1,
@@ -312,8 +325,9 @@ func TestUpdateSecret(t *testing.T) {
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
 	cluster.pgUsers = map[string]spec.PgUser{}
-	cluster.initRobotUsers()
 
+	// init all users
+	cluster.initUsers()
 	// create secrets
 	cluster.syncSecrets()
 	// initialize rotation with current time
@@ -321,22 +335,33 @@ func TestUpdateSecret(t *testing.T) {
 
 	dayAfterTomorrow := time.Now().AddDate(0, 0, 2)
 
-	for username := range cluster.Spec.Users {
-		pgUser := cluster.pgUsers[username]
+	allUsers := make(map[string]spec.PgUser)
+	for userName, pgUser := range cluster.pgUsers {
+		allUsers[userName] = pgUser
+	}
+	for _, systemUser := range cluster.systemUsers {
+		allUsers[systemUser.Name] = systemUser
+	}
 
+	for username, pgUser := range allUsers {
 		// first, get the secret
-		secret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+		secretName := cluster.credentialSecretName(username)
+		secret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		assert.NoError(t, err)
 		secretPassword := string(secret.Data["password"])
 
 		// now update the secret setting a next rotation date (tomorrow + interval)
 		cluster.updateSecret(username, secret, &rotationUsers, &retentionUsers, dayAfterTomorrow)
-		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		assert.NoError(t, err)
 
 		// check that passwords are different
 		rotatedPassword := string(updatedSecret.Data["password"])
 		if secretPassword == rotatedPassword {
+			// passwords for system users should not have been rotated
+			if pgUser.Origin != spec.RoleOriginManifest {
+				continue
+			}
 			t.Errorf("%s: password unchanged in updated secret for %s", testName, username)
 		}
 
