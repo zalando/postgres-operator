@@ -91,14 +91,14 @@ func (c *Cluster) syncPostgresConfig(requiredPatroniConfig acidv1.Patroni) (bool
 			continue
 		}
 
-		requiresRestart, err := c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePatroniConfig, requiredPatroniConfig, effectivePgParameters, requiredPgParameters)
+		configPatched, _, err := c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePatroniConfig, requiredPatroniConfig, effectivePgParameters, requiredPgParameters)
 		if err != nil {
 			errorMsg = fmt.Sprintf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 			continue
 		}
 
 		// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used
-		return requiresRestart, nil
+		return configPatched, nil
 	}
 
 	return false, fmt.Errorf(errorMsg)
