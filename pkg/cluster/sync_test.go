@@ -256,10 +256,13 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		_, requirePrimaryRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
+		configPatched, requirePrimaryRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
 		assert.NoError(t, err)
+		if configPatched != true {
+			t.Errorf("%s - %s: expected config update did not happen", testName, tt.subtest)
+		}
 		if requirePrimaryRestart != tt.restartPrimary {
-			t.Errorf("%s - %s: unexpect master restart strategy, got %v, expected %v", testName, tt.subtest, requirePrimaryRestart, tt.restartPrimary)
+			t.Errorf("%s - %s: wrong master restart strategy, got restart %v, expected restart %v", testName, tt.subtest, requirePrimaryRestart, tt.restartPrimary)
 		}
 	}
 }

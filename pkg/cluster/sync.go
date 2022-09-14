@@ -435,23 +435,21 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 	}
 
-	// restart instances if required
+	// restart instances if it is still pending
 	remainingPods := make([]*v1.Pod, 0)
-	if configPatched {
-		skipRole := Master
-		if restartPrimaryFirst {
-			skipRole = Replica
+	skipRole := Master
+	if restartPrimaryFirst {
+		skipRole = Replica
+	}
+	for i, pod := range pods {
+		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+		if role == skipRole {
+			remainingPods = append(remainingPods, &pods[i])
+			continue
 		}
-		for i, pod := range pods {
-			role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-			if role == skipRole {
-				remainingPods = append(remainingPods, &pods[i])
-				continue
-			}
-			if err = c.restartInstance(&pod, restartWait); err != nil {
-				c.logger.Errorf("%v", err)
-				isSafeToRecreatePods = false
-			}
+		if err = c.restartInstance(&pod, restartWait); err != nil {
+			c.logger.Errorf("%v", err)
+			isSafeToRecreatePods = false
 		}
 	}
 
