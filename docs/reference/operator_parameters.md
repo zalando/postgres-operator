@@ -28,6 +28,7 @@ configuration.
   and change it.
 
   To test the CRD-based configuration locally, use the following
+
   ```bash
   kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
   kubectl create -f manifests/postgresql-operator-default-configuration.yaml
