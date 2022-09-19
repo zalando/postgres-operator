@@ -15,7 +15,7 @@ CRDs set `enable_crd_registration` config option to `false`.
 
 CRDs are defined with a `openAPIV3Schema` structural schema against which new
 manifests of [`postgresql`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql.crd.yaml) or [`OperatorConfiguration`](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml)
-resources will be validated. On creation you can bypass the validation with 
+resources will be validated. On creation you can bypass the validation with
 `kubectl create --validate=false`.
 
 By default, the operator will register the CRDs in the `all` category so
@@ -515,6 +515,9 @@ configuration:
   kubernetes:
     enable_pod_antiaffinity: true
 ```
+
+By default the type of pod anti affinity is `requiredDuringSchedulingIgnoredDuringExecution`,
+you can switch to  `preferredDuringSchedulingIgnoredDuringExecution` by setting `pod_antiaffinity_preferred_during_scheduling: true`.
 
 By default the topology key for the pod anti affinity is set to
 `kubernetes.io/hostname`, you can set another topology key e.g.
@@ -1091,7 +1094,7 @@ data:
   USE_WALG_BACKUP: "true"
   USE_WALG_RESTORE: "true"
   CLONE_USE_WALG_RESTORE: "true"
-  WALG_AZ_PREFIX: "azure://container-name/$(SCOPE)/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version) 
+  WALG_AZ_PREFIX: "azure://container-name/$(SCOPE)/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version)
 ```
 
 3. Setup your operator configuration values. With the `psql-backup-creds`

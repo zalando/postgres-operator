@@ -490,17 +490,27 @@ func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinit
 	}
 }
 
-func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1.Affinity) *v1.Affinity {
+func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1.Affinity, preferredDuringScheduling bool) *v1.Affinity {
 	// generate pod anti-affinity to avoid multiple pods of the same Postgres cluster in the same topology , e.g. node
-	podAffinity := v1.Affinity{
-		PodAntiAffinity: &v1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
-				LabelSelector: &metav1.LabelSelector{
-					MatchLabels: labels,
-				},
-				TopologyKey: topologyKey,
-			}},
+
+	podAffinityTerm := v1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
 		},
+		TopologyKey: topologyKey,
+	}
+
+	podAffinity := v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{},
+	}
+
+	if preferredDuringScheduling {
+		podAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []v1.WeightedPodAffinityTerm{{
+			Weight:          1,
+			PodAffinityTerm: podAffinityTerm,
+		}}
+	} else {
+		podAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []v1.PodAffinityTerm{podAffinityTerm}
 	}
 
 	if nodeAffinity != nil && nodeAffinity.NodeAffinity != nil {
@@ -721,6 +731,7 @@ func (c *Cluster) generatePodTemplate(
 	shmVolume *bool,
 	podAntiAffinity bool,
 	podAntiAffinityTopologyKey string,
+	podAntiAffinityPreferredDuringScheduling bool,
 	additionalSecretMount string,
 	additionalSecretMountPath string,
 	additionalVolumes []acidv1.AdditionalVolume,
@@ -761,7 +772,12 @@ func (c *Cluster) generatePodTemplate(
 	}
 
 	if podAntiAffinity {
-		podSpec.Affinity = generatePodAffinity(labels, podAntiAffinityTopologyKey, nodeAffinity)
+		podSpec.Affinity = generatePodAffinity(
+			labels,
+			podAntiAffinityTopologyKey,
+			nodeAffinity,
+			podAntiAffinityPreferredDuringScheduling,
+		)
 	} else if nodeAffinity != nil {
 		podSpec.Affinity = nodeAffinity
 	}
@@ -1364,6 +1380,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		mountShmVolumeNeeded(c.OpConfig, spec),
 		c.OpConfig.EnablePodAntiAffinity,
 		c.OpConfig.PodAntiAffinityTopologyKey,
+		c.OpConfig.PodAntiAffinityPreferredDuringScheduling,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		additionalVolumes)
@@ -2087,6 +2104,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		util.False(),
 		false,
 		"",
+		false,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		[]acidv1.AdditionalVolume{}); err != nil {

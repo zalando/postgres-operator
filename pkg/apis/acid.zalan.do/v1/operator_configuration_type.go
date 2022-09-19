@@ -90,15 +90,16 @@ type KubernetesMetaConfiguration struct {
 	NodeReadinessLabelMerge                string                       `json:"node_readiness_label_merge,omitempty"`
 	CustomPodAnnotations                   map[string]string            `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
-	PodToleration              map[string]string   `json:"toleration,omitempty"`
-	PodEnvironmentConfigMap    spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
-	PodEnvironmentSecret       string              `json:"pod_environment_secret,omitempty"`
-	PodPriorityClassName       string              `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout       Duration            `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey string              `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy        string              `json:"pod_management_policy,omitempty"`
-	EnableCrossNamespaceSecret bool                `json:"enable_cross_namespace_secret,omitempty"`
+	PodToleration                            map[string]string   `json:"toleration,omitempty"`
+	PodEnvironmentConfigMap                  spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
+	PodEnvironmentSecret                     string              `json:"pod_environment_secret,omitempty"`
+	PodPriorityClassName                     string              `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout                     Duration            `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity                    bool                `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodAntiAffinityPreferredDuringScheduling bool                `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
+	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
+	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
