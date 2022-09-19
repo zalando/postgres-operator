@@ -204,10 +204,10 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 
 	// simulate existing config that differs from cluster.Spec
 	tests := []struct {
-		subtest       string
-		patroni       acidv1.Patroni
-		pgParams      map[string]string
-		restartMaster bool
+		subtest        string
+		patroni        acidv1.Patroni
+		pgParams       map[string]string
+		restartPrimary bool
 	}{
 		{
 			subtest: "Patroni and Postgresql.Parameters differ - restart replica first",
@@ -218,7 +218,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 				"log_min_duration_statement": "500", // desired 200
 				"max_connections":            "100", // desired 50
 			},
-			restartMaster: false,
+			restartPrimary: false,
 		},
 		{
 			subtest: "multiple Postgresql.Parameters differ - restart replica first",
@@ -229,7 +229,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 				"log_min_duration_statement": "500", // desired 200
 				"max_connections":            "100", // desired 50
 			},
-			restartMaster: false,
+			restartPrimary: false,
 		},
 		{
 			subtest: "desired max_connections bigger - restart replica first",
@@ -240,7 +240,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 				"log_min_duration_statement": "200",
 				"max_connections":            "30", // desired 50
 			},
-			restartMaster: false,
+			restartPrimary: false,
 		},
 		{
 			subtest: "desired max_connections smaller - restart master first",
@@ -251,15 +251,18 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 				"log_min_duration_statement": "200",
 				"max_connections":            "100", // desired 50
 			},
-			restartMaster: true,
+			restartPrimary: true,
 		},
 	}
 
 	for _, tt := range tests {
-		requireMasterRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
+		configPatched, requirePrimaryRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
 		assert.NoError(t, err)
-		if requireMasterRestart != tt.restartMaster {
-			t.Errorf("%s - %s: unexpect master restart strategy, got %v, expected %v", testName, tt.subtest, requireMasterRestart, tt.restartMaster)
+		if configPatched != true {
+			t.Errorf("%s - %s: expected config update did not happen", testName, tt.subtest)
+		}
+		if requirePrimaryRestart != tt.restartPrimary {
+			t.Errorf("%s - %s: wrong master restart strategy, got restart %v, expected restart %v", testName, tt.subtest, requirePrimaryRestart, tt.restartPrimary)
 		}
 	}
 }
