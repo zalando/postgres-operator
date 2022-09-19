@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var requireMasterRestartWhenDecreased = []string{
+var requirePrimaryRestartWhenDecreased = []string{
 	"max_connections",
 	"max_prepared_transactions",
 	"max_locks_per_transaction",
@@ -278,8 +278,9 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 
 func (c *Cluster) syncStatefulSet() error {
 	var (
-		restartWait        uint32
-		restartMasterFirst bool
+		restartWait         uint32
+		configPatched       bool
+		restartPrimaryFirst bool
 	)
 	podsToRecreate := make([]v1.Pod, 0)
 	isSafeToRecreatePods := true
@@ -420,22 +421,24 @@ func (c *Cluster) syncStatefulSet() error {
 		// do not attempt a restart
 		if !reflect.DeepEqual(patroniConfig, acidv1.Patroni{}) || len(pgParameters) > 0 {
 			// compare config returned from Patroni with what is specified in the manifest
-			restartMasterFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, c.Spec.Patroni, pgParameters, c.Spec.Parameters)
+			configPatched, restartPrimaryFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, c.Spec.Patroni, pgParameters, c.Spec.Parameters)
 			if err != nil {
 				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", pods[i].Name, err)
 				continue
 			}
 
 			// it could take up to LoopWait to apply the config
-			time.Sleep(time.Duration(restartWait)*time.Second + time.Second*2)
-			break
+			if configPatched {
+				time.Sleep(time.Duration(restartWait)*time.Second + time.Second*2)
+				break
+			}
 		}
 	}
 
-	// restart instances if required
+	// restart instances if it is still pending
 	remainingPods := make([]*v1.Pod, 0)
 	skipRole := Master
-	if restartMasterFirst {
+	if restartPrimaryFirst {
 		skipRole = Replica
 	}
 	for i, pod := range pods {
@@ -474,6 +477,7 @@ func (c *Cluster) syncStatefulSet() error {
 			c.logger.Warningf("postpone pod recreation until next sync")
 		}
 	}
+
 	return nil
 }
 
@@ -533,10 +537,11 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) have changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectivePatroniConfig, desiredPatroniConfig acidv1.Patroni, effectivePgParameters, desiredPgParameters map[string]string) (bool, error) {
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectivePatroniConfig, desiredPatroniConfig acidv1.Patroni, effectivePgParameters, desiredPgParameters map[string]string) (bool, bool, error) {
 	configToSet := make(map[string]interface{})
 	parametersToSet := make(map[string]string)
-	restartMaster := make([]bool, 0)
+	restartPrimary := make([]bool, 0)
+	configPatched := false
 	requiresMasterRestart := false
 
 	// compare effective and desired Patroni config options
@@ -581,22 +586,23 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 		effectiveValue := effectivePgParameters[desiredOption]
 		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
 			parametersToSet[desiredOption] = desiredValue
-			if util.SliceContains(requireMasterRestartWhenDecreased, desiredOption) {
+			if util.SliceContains(requirePrimaryRestartWhenDecreased, desiredOption) {
 				effectiveValueNum, errConv := strconv.Atoi(effectiveValue)
 				desiredValueNum, errConv2 := strconv.Atoi(desiredValue)
 				if errConv != nil || errConv2 != nil {
 					continue
 				}
 				if effectiveValueNum > desiredValueNum {
-					restartMaster = append(restartMaster, true)
+					restartPrimary = append(restartPrimary, true)
 					continue
 				}
 			}
-			restartMaster = append(restartMaster, false)
+			restartPrimary = append(restartPrimary, false)
 		}
 	}
 
-	if !util.SliceContains(restartMaster, false) && len(configToSet) == 0 {
+	// check if there exist only config updates that require a restart of the primary
+	if !util.SliceContains(restartPrimary, false) && len(configToSet) == 0 {
 		requiresMasterRestart = true
 	}
 
@@ -605,7 +611,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 
 	if len(configToSet) == 0 {
-		return false, nil
+		return configPatched, requiresMasterRestart, nil
 	}
 
 	configToSetJson, err := json.Marshal(configToSet)
@@ -619,10 +625,11 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
 		podName, configToSetJson)
 	if err = c.patroni.SetConfig(pod, configToSet); err != nil {
-		return requiresMasterRestart, fmt.Errorf("could not patch postgres parameters within pod %s: %v", podName, err)
+		return configPatched, requiresMasterRestart, fmt.Errorf("could not patch postgres parameters within pod %s: %v", podName, err)
 	}
+	configPatched = true
 
-	return requiresMasterRestart, nil
+	return configPatched, requiresMasterRestart, nil
 }
 
 func (c *Cluster) syncSecrets() error {
