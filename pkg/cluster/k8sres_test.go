@@ -161,6 +161,7 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 const (
 	testPodEnvironmentConfigMapName      = "pod_env_cm"
 	testPodEnvironmentSecretName         = "pod_env_sc"
+	testCronjobEnvironmentSecretName     = "pod_env_sc"
 	testPodEnvironmentObjectNotExists    = "idonotexist"
 	testPodEnvironmentSecretNameAPIError = "pod_env_sc_apierror"
 	testResourceCheckInterval            = 3
@@ -399,6 +400,85 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 	for _, tt := range tests {
 		c := newMockCluster(tt.opConfig)
 		vars, err := c.getPodEnvironmentSecretVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
+		if !reflect.DeepEqual(vars, tt.envVars) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				testName, tt.subTest, tt.envVars, vars)
+		}
+		if tt.err != nil {
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s %s: expected error `%v` but got `%v`",
+					testName, tt.subTest, tt.err, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s %s: expected no error but got error: `%v`",
+					testName, tt.subTest, err)
+			}
+		}
+	}
+
+}
+
+// Test if the keys of an existing secret are properly referenced
+func TestCronjobEnvironmentSecretVariables(t *testing.T) {
+	testName := "TestCronjobEnvironmentSecretVariables"
+	tests := []struct {
+		subTest  string
+		opConfig config.Config
+		envVars  []v1.EnvVar
+		err      error
+	}{
+		{
+			subTest: "No CronjobEnvironmentSecret configured",
+			envVars: []v1.EnvVar{},
+		},
+		{
+			subTest: "Secret referenced by CronjobEnvironmentSecret does not exist",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCronjobEnvironmentSecret: "idonotexist",
+				},
+			},
+			err: fmt.Errorf("could not read Secret CronjobEnvironmentSecretName: Secret PodEnvironmentSecret not found"),
+		},
+		{
+			subTest: "Cronjob environment vars reference all keys from secret configured by CronjobEnvironmentSecret",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCronjobEnvironmentSecret: testCronjobEnvironmentSecretName,
+				},
+			},
+			envVars: []v1.EnvVar{
+				{
+					Name: "minio_access_key",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testCronjobEnvironmentSecretName,
+							},
+							Key: "minio_access_key",
+						},
+					},
+				},
+				{
+					Name: "minio_secret_key",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testCronjobEnvironmentSecretName,
+							},
+							Key: "minio_secret_key",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		vars, err := c.getCronjobEnvironmentSecretVariables()
 		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 		if !reflect.DeepEqual(vars, tt.envVars) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",

@@ -224,6 +224,7 @@ type OperatorLogicalBackupConfiguration struct {
 	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
+	CronjobEnvironmentSecret     string `json:"logical_backup_cronjob_environment_secret,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config
@@ -264,5 +265,5 @@ type OperatorConfigurationData struct {
 	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
 }
 
-//Duration shortens this frequently used name
+// Duration shortens this frequently used name
 type Duration time.Duration

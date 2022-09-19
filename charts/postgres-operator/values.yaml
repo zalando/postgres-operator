@@ -350,6 +350,8 @@ configLogicalBackup:
   logical_backup_s3_retention_time: ""
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
+  # secret to be used as reference for env variables in cronjob
+  logical_backup_cronjob_environment_secret: ""
 
 # automate creation of human users with teams API service
 configTeamsApi:

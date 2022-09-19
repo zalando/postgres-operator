@@ -1638,6 +1638,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type:    "string",
 								Pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$",
 							},
+							"logical_backup_cronjob_environment_secret": {
+								Type: "string",
+							},
 						},
 					},
 					"debug": {
