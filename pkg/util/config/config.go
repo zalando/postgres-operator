@@ -137,6 +137,9 @@ type LogicalBackup struct {
 	LogicalBackupS3RetentionTime              string `name:"logical_backup_s3_retention_time" default:""`
 	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
+	LogicalBackupStorageAccountName           string `name:"logical_backup_storage_account_name" default:""`
+	LogicalBackupStorageContainer             string `name:"logical_backup_storage_container" default:""`
+	LogicalBackupStorageAccountKey            string `name:"logical_backup_storage_account_key" default:""`
 }
 
 // Operator options for connection pooler
