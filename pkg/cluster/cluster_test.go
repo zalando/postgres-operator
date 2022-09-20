@@ -6,9 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -61,7 +60,6 @@ var cl = New(
 )
 
 func TestStatefulSetAnnotations(t *testing.T) {
-	testName := "CheckStatefulsetAnnotations"
 	spec := acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: &acidv1.Resources{
@@ -74,19 +72,59 @@ func TestStatefulSetAnnotations(t *testing.T) {
 	}
 	ss, err := cl.generateStatefulSet(&spec)
 	if err != nil {
-		t.Errorf("in %s no statefulset created %v", testName, err)
+		t.Errorf("in %s no statefulset created %v", t.Name(), err)
 	}
 	if ss != nil {
 		annotation := ss.ObjectMeta.GetAnnotations()
 		if _, ok := annotation["downscaler/downtime_replicas"]; !ok {
-			t.Errorf("in %s respective annotation not found on sts", testName)
+			t.Errorf("in %s respective annotation not found on sts", t.Name())
 		}
 	}
+}
 
+func TestStatefulSetUpdateWithEnv(t *testing.T) {
+	oldSpec := &acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: &acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+	}
+	oldSS, err := cl.generateStatefulSet(oldSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	newSpec := oldSpec.DeepCopy()
+	newSS, err := cl.generateStatefulSet(newSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	if !reflect.DeepEqual(oldSS, newSS) {
+		t.Errorf("in %s StatefulSet's must be equal", t.Name())
+	}
+
+	newSpec.Env = []v1.EnvVar{
+		{
+			Name:  "CUSTOM_ENV_VARIABLE",
+			Value: "data",
+		},
+	}
+	newSS, err = cl.generateStatefulSet(newSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	if reflect.DeepEqual(oldSS, newSS) {
+		t.Errorf("in %s StatefulSet's must be not equal", t.Name())
+	}
 }
 
 func TestInitRobotUsers(t *testing.T) {
-	testName := "TestInitRobotUsers"
 	tests := []struct {
 		manifestUsers map[string]acidv1.UserFlags
 		infraRoles    map[string]spec.PgUser
@@ -130,22 +168,20 @@ func TestInitRobotUsers(t *testing.T) {
 		cl.pgUsers = tt.infraRoles
 		if err := cl.initRobotUsers(); err != nil {
 			if tt.err == nil {
-				t.Errorf("%s got an unexpected error: %v", testName, err)
+				t.Errorf("%s got an unexpected error: %v", t.Name(), err)
 			}
 			if err.Error() != tt.err.Error() {
-				t.Errorf("%s expected error %v, got %v", testName, tt.err, err)
+				t.Errorf("%s expected error %v, got %v", t.Name(), tt.err, err)
 			}
 		} else {
 			if !reflect.DeepEqual(cl.pgUsers, tt.result) {
-				t.Errorf("%s expected: %#v, got %#v", testName, tt.result, cl.pgUsers)
+				t.Errorf("%s expected: %#v, got %#v", t.Name(), tt.result, cl.pgUsers)
 			}
 		}
 	}
 }
 
 func TestInitAdditionalOwnerRoles(t *testing.T) {
-	testName := "TestInitAdditionalOwnerRoles"
-
 	manifestUsers := map[string]acidv1.UserFlags{"foo_owner": {}, "bar_owner": {}, "app_user": {}}
 	expectedUsers := map[string]spec.PgUser{
 		"foo_owner": {Origin: spec.RoleOriginManifest, Name: "foo_owner", Namespace: cl.Namespace, Password: "f123", Flags: []string{"LOGIN"}, IsDbOwner: true, MemberOf: []string{"cron_admin", "part_man"}},
@@ -158,7 +194,7 @@ func TestInitAdditionalOwnerRoles(t *testing.T) {
 
 	// this should set IsDbOwner field for manifest users
 	if err := cl.initRobotUsers(); err != nil {
-		t.Errorf("%s could not init manifest users", testName)
+		t.Errorf("%s could not init manifest users", t.Name())
 	}
 
 	// now assign additional roles to owners
@@ -169,7 +205,7 @@ func TestInitAdditionalOwnerRoles(t *testing.T) {
 		expectedPgUser := expectedUsers[username]
 		if !util.IsEqualIgnoreOrder(expectedPgUser.MemberOf, existingPgUser.MemberOf) {
 			t.Errorf("%s unexpected membership of user %q: expected member of %#v, got member of %#v",
-				testName, username, expectedPgUser.MemberOf, existingPgUser.MemberOf)
+				t.Name(), username, expectedPgUser.MemberOf, existingPgUser.MemberOf)
 		}
 	}
 }
@@ -195,11 +231,9 @@ func (m *mockTeamsAPIClient) setMembers(members []string) {
 
 // Test adding a member of a product team owning a particular DB cluster
 func TestInitHumanUsers(t *testing.T) {
-
 	var mockTeamsAPI mockTeamsAPIClient
 	cl.oauthTokenGetter = &mockOAuthTokenGetter{}
 	cl.teamsAPIClient = &mockTeamsAPI
-	testName := "TestInitHumanUsers"
 
 	// members of a product team are granted superuser rights for DBs of their team
 	cl.OpConfig.EnableTeamSuperuser = true
@@ -232,11 +266,11 @@ func TestInitHumanUsers(t *testing.T) {
 		cl.pgUsers = tt.existingRoles
 		mockTeamsAPI.setMembers(tt.teamRoles)
 		if err := cl.initHumanUsers(); err != nil {
-			t.Errorf("%s got an unexpected error %v", testName, err)
+			t.Errorf("%s got an unexpected error %v", t.Name(), err)
 		}
 
 		if !reflect.DeepEqual(cl.pgUsers, tt.result) {
-			t.Errorf("%s expects %#v, got %#v", testName, tt.result, cl.pgUsers)
+			t.Errorf("%s expects %#v, got %#v", t.Name(), tt.result, cl.pgUsers)
 		}
 	}
 }
@@ -264,12 +298,10 @@ func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *te
 
 // Test adding members of maintenance teams that get superuser rights for all PG databases
 func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
-
 	var mockTeamsAPI mockTeamsAPIClientMultipleTeams
 	cl.oauthTokenGetter = &mockOAuthTokenGetter{}
 	cl.teamsAPIClient = &mockTeamsAPI
 	cl.OpConfig.EnableTeamSuperuser = false
-	testName := "TestInitHumanUsersWithSuperuserTeams"
 
 	cl.OpConfig.EnableTeamsAPI = true
 	cl.OpConfig.PamRoleName = "zalandos"
@@ -371,17 +403,16 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 		cl.OpConfig.PostgresSuperuserTeams = tt.superuserTeams
 
 		if err := cl.initHumanUsers(); err != nil {
-			t.Errorf("%s got an unexpected error %v", testName, err)
+			t.Errorf("%s got an unexpected error %v", t.Name(), err)
 		}
 
 		if !reflect.DeepEqual(cl.pgUsers, tt.result) {
-			t.Errorf("%s expects %#v, got %#v", testName, tt.result, cl.pgUsers)
+			t.Errorf("%s expects %#v, got %#v", t.Name(), tt.result, cl.pgUsers)
 		}
 	}
 }
 
 func TestPodAnnotations(t *testing.T) {
-	testName := "TestPodAnnotations"
 	tests := []struct {
 		subTest  string
 		operator map[string]string
@@ -428,13 +459,13 @@ func TestPodAnnotations(t *testing.T) {
 		for k, v := range annotations {
 			if observed, expected := v, tt.merged[k]; observed != expected {
 				t.Errorf("%v expects annotation value %v for key %v, but found %v",
-					testName+"/"+tt.subTest, expected, observed, k)
+					t.Name()+"/"+tt.subTest, expected, observed, k)
 			}
 		}
 		for k, v := range tt.merged {
 			if observed, expected := annotations[k], v; observed != expected {
 				t.Errorf("%v expects annotation value %v for key %v, but found %v",
-					testName+"/"+tt.subTest, expected, observed, k)
+					t.Name()+"/"+tt.subTest, expected, observed, k)
 			}
 		}
 	}
@@ -780,22 +811,20 @@ func TestServiceAnnotations(t *testing.T) {
 }
 
 func TestInitSystemUsers(t *testing.T) {
-	testName := "Test system users initialization"
-
 	// default cluster without connection pooler and event streams
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; exist {
-		t.Errorf("%s, connection pooler user is present", testName)
+		t.Errorf("%s, connection pooler user is present", t.Name())
 	}
 	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; exist {
-		t.Errorf("%s, stream user is present", testName)
+		t.Errorf("%s, stream user is present", t.Name())
 	}
 
 	// cluster with connection pooler
 	cl.Spec.EnableConnectionPooler = boolToPointer(true)
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; !exist {
-		t.Errorf("%s, connection pooler user is not present", testName)
+		t.Errorf("%s, connection pooler user is not present", t.Name())
 	}
 
 	// superuser is not allowed as connection pool user
@@ -807,7 +836,7 @@ func TestInitSystemUsers(t *testing.T) {
 
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers["pooler"]; !exist {
-		t.Errorf("%s, Superuser is not allowed to be a connection pool user", testName)
+		t.Errorf("%s, Superuser is not allowed to be a connection pool user", t.Name())
 	}
 
 	// neither protected users are
@@ -819,7 +848,7 @@ func TestInitSystemUsers(t *testing.T) {
 
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers["pooler"]; !exist {
-		t.Errorf("%s, Protected user are not allowed to be a connection pool user", testName)
+		t.Errorf("%s, Protected user are not allowed to be a connection pool user", t.Name())
 	}
 
 	delete(cl.systemUsers, "pooler")
@@ -829,7 +858,7 @@ func TestInitSystemUsers(t *testing.T) {
 
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers["pooler"]; !exist {
-		t.Errorf("%s, System users are not allowed to be a connection pool user", testName)
+		t.Errorf("%s, System users are not allowed to be a connection pool user", t.Name())
 	}
 
 	// using stream user in manifest but no streams defined should be treated like normal robot user
@@ -837,7 +866,7 @@ func TestInitSystemUsers(t *testing.T) {
 	cl.Spec.Users = map[string]acidv1.UserFlags{streamUser: []string{}}
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; exist {
-		t.Errorf("%s, stream user is present", testName)
+		t.Errorf("%s, stream user is present", t.Name())
 	}
 
 	// cluster with streams
@@ -846,7 +875,7 @@ func TestInitSystemUsers(t *testing.T) {
 			ApplicationId: "test-app",
 			Database:      "test_db",
 			Tables: map[string]acidv1.StreamTable{
-				"data.test_table": acidv1.StreamTable{
+				"data.test_table": {
 					EventType: "test_event",
 				},
 			},
@@ -854,24 +883,22 @@ func TestInitSystemUsers(t *testing.T) {
 	}
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; !exist {
-		t.Errorf("%s, stream user is not present", testName)
+		t.Errorf("%s, stream user is not present", t.Name())
 	}
 }
 
 func TestPreparedDatabases(t *testing.T) {
-	testName := "TestDefaultPreparedDatabase"
-
 	cl.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{}
 	cl.initPreparedDatabaseRoles()
 
 	for _, role := range []string{"acid_test_owner", "acid_test_reader", "acid_test_writer",
 		"acid_test_data_owner", "acid_test_data_reader", "acid_test_data_writer"} {
 		if _, exist := cl.pgUsers[role]; !exist {
-			t.Errorf("%s, default role %q for prepared database not present", testName, role)
+			t.Errorf("%s, default role %q for prepared database not present", t.Name(), role)
 		}
 	}
 
-	testName = "TestPreparedDatabaseWithSchema"
+	testName := "TestPreparedDatabaseWithSchema"
 
 	cl.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{
 		"foo": {
@@ -1109,7 +1136,6 @@ func newService(ann map[string]string, svcT v1.ServiceType, lbSr []string) *v1.S
 }
 
 func TestCompareServices(t *testing.T) {
-	testName := "TestCompareServices"
 	cluster := Cluster{
 		Config: Config{
 			OpConfig: config.Config{
@@ -1410,16 +1436,16 @@ func TestCompareServices(t *testing.T) {
 			match, reason := cluster.compareServices(tt.current, tt.new)
 			if match && !tt.match {
 				t.Logf("match=%v current=%v, old=%v reason=%s", match, tt.current.Annotations, tt.new.Annotations, reason)
-				t.Errorf("%s - expected services to do not match: %q and %q", testName, tt.current, tt.new)
+				t.Errorf("%s - expected services to do not match: %q and %q", t.Name(), tt.current, tt.new)
 				return
 			}
 			if !match && tt.match {
-				t.Errorf("%s - expected services to be the same: %q and %q", testName, tt.current, tt.new)
+				t.Errorf("%s - expected services to be the same: %q and %q", t.Name(), tt.current, tt.new)
 				return
 			}
 			if !match && !tt.match {
 				if !strings.HasPrefix(reason, tt.reason) {
-					t.Errorf("%s - expected reason prefix %s, found %s", testName, tt.reason, reason)
+					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
 					return
 				}
 			}
