@@ -127,6 +127,8 @@ the developer's laptop (and not in a docker container).
 
 ## Debugging the operator
 
+### Remote operator debugging
+
 There is a web interface in the operator to observe its internal state. The
 operator listens on port 8080. It is possible to expose it to the
 `localhost:8080` by doing:
@@ -176,7 +178,7 @@ Docker container. It's possible with [gdb](https://www.gnu.org/software/gdb/)
 and [delve](https://github.com/derekparker/delve). Since the latter one is a
 specialized debugger for Go, we will use it as an example. To use it you need:
 
-* Install delve locally
+* Install `delve` locally
 
 ```bash
 go get -u github.com/derekparker/delve/cmd/dlv
@@ -197,7 +199,7 @@ RUN go get -d github.com/derekparker/delve/cmd/dlv
 -gcflags "-N -l"
 ```
 
-* Run `postgres-operator` under the delve. For that you need to replace
+* Run `postgres-operator` under the `delve`. For that you need to replace
   `ENTRYPOINT` with the following `CMD`:
 
 ```
@@ -216,6 +218,49 @@ kubectl port-forward POD_NAME DLV_PORT:DLV_PORT
 dlv connect 127.0.0.1:DLV_PORT
 ```
 
+### Local operator debugging
+
+For the full operator functionality, launched as a binary file in the local IDE,
+its interaction with the PotsgreSQL database and operator services deployed inside the
+Kubernetes cluster are required.
+
+Since the operator needs access to headless services that can't to be exposed using the `kubectl port-forward` command,
+it is proposed to use the [telepresence](https://www.telepresence.io/) project for this case.
+
+* Install the telepresence binary according the [installation](https://www.telepresence.io/docs/latest/install/) guide.
+
+* Install `telepresence` infrastructure into the Kubernetes cluster
+
+```bash
+telepresence helm install
+```
+
+* Run local `telepresence` services 
+
+> **Note:** Running of this command will require you to have local OS administrative rights.
+
+```bash
+telepresence connect
+```
+
+Next, apply configuration and RBAC manifests, e.g.:
+
+> **Note:** By default, RBAC configuration is utilizing `defult` namespace for ServiceAccount and ClusterRoleBinding objects. Change this namespaces if needed.
+
+```bash
+kubectl create -f manifests/configmap.yaml
+kubectl create -f manifests/operator-service-account-rbac.yaml
+```
+
+Set the `OPERATOR_NAMESPACE` environment variable to point the namespace where `ServiceAccount` object and `ConfigMap`
+with operator configuration have been created.
+
+Run operator binary inside the IDE with the following program arguments:
+
+```bash
+go run cmd/main.go --kubeconfig=<path to kubeconfig file> --outofcluster
+```
+
 ## Unit tests
 
 Prerequisites:
@@ -231,7 +276,7 @@ To run all unit tests, you can simply do:
 go test ./pkg/...
 ```
 
-In case if you need to debug your unit test, it's possible to use delve:
+In case if you need to debug your unit test, it's possible to use `delve`:
 
 ```bash
 dlv test ./pkg/util/retryutil/
