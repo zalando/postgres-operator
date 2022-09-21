@@ -117,10 +117,10 @@ func (c *Cluster) majorVersionUpgrade() error {
 			var result string
 			if resultIdCheck != "0" {
 				c.logger.Infof("User id was identified as: %s, hence default user is non-root already", resultIdCheck)
-				result, err = c.ExecCommand(podName, "/bin/bash", "-c", upgradeCommand)
+				result, err = c.ExecCommand(podName, "/bin/bash", "-o", "pipefail", "-c", upgradeCommand)
 			} else {
 				c.logger.Infof("User id was identified as: %s, using su to reach the postgres user", resultIdCheck)
-				result, err = c.ExecCommand(podName, "/bin/su", "postgres", "-c", upgradeCommand)
+				result, err = c.ExecCommand(podName, "/bin/su", "postgres", "-o", "pipefail", "-c", upgradeCommand)
 			}
 			if err != nil {
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "Upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
