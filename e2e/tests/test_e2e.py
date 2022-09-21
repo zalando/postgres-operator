@@ -1442,6 +1442,10 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 3,
             "Found incorrect number of rotation users", 10, 5)
 
+        # test that rotation_user can connect to the database
+        self.eventuallyEqual(lambda: len(self.query_database_with_user(leader.metadata.name, "postgres", "SELECT 1", "foo_user")), 1,
+            "Could not connect to the database with rotation user {}".format(rotation_user), 10, 5)
+
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped 
         enable_password_rotation = {
@@ -1988,6 +1992,29 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             q = exec_query.format(query, db_name)
+            q = "su postgres -c \"{}\"".format(q)
+            result = k8s.exec_with_kubectl(pod_name, q)
+            result_set = clean_list(result.stdout.split(b'\n'))
+        except Exception as ex:
+            print('Error on query execution: {}'.format(ex))
+            print('Stdout: {}'.format(result.stdout))
+            print('Stderr: {}'.format(result.stderr))
+
+        return result_set
+
+    def query_database_with_user(self, pod_name, db_name, query, user_name):
+        '''
+           Query database and return result as a list
+        '''
+        k8s = self.k8s
+        result_set = []
+        exec_query = r"PGPASSWORD={} psql -h localhost -U {} -tAq -c \"{}\" -d {}"
+
+        try:
+            user_secret = k8s.get_secret(user_name)
+            secret_user = str(base64.b64decode(user_secret.data["username"]), 'utf-8')
+            secret_pw = str(base64.b64decode(user_secret.data["password"]), 'utf-8')
+            q = exec_query.format(secret_pw, secret_user, query, db_name)
             q = "su postgres -c \"{}\"".format(q)
             result = k8s.exec_with_kubectl(pod_name, q)
             result_set = clean_list(result.stdout.split(b'\n'))

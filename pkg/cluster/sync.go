@@ -818,10 +818,11 @@ func (c *Cluster) rotatePasswordInSecret(
 
 	// update password and next rotation date if configured interval has passed
 	if currentTime.After(nextRotationDate) {
-		newPassword := []byte(util.RandomPassword(constants.PasswordLength))
 		// create rotation user if role is not listed for in-place password update
 		if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
-			secret.Data["username"] = []byte(fmt.Sprintf("%s%s", secretUsername, currentTime.Format("060102")))
+			rotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format("060102"))
+			secret.Data["username"] = []byte(rotationUsername)
+			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, rotationUsername)
 			// whenever there is a rotation, check if old rotation users can be deleted
 			*retentionUsers = append(*retentionUsers, secretUsername)
 		} else {
@@ -858,10 +859,10 @@ func (c *Cluster) rotatePasswordInSecret(
 
 			// when password of stream user is rotated in place, it should trigger rolling update in FES deployment
 			if roleOrigin == spec.RoleOriginStream {
-				c.logger.Warnf("secret of stream user %s changed", constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix)
+				c.logger.Warnf("password in secret of stream user %s changed", constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix)
 			}
 		}
-		secret.Data["password"] = newPassword
+		secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
 		secret.Data["nextRotation"] = []byte(nextRotationDateStr)
 		updateSecretMsg = fmt.Sprintf("updating secret %s due to password rotation - next rotation date: %s", secretName, nextRotationDateStr)
 	}
