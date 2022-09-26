@@ -750,13 +750,13 @@ grouped under the `logical_backup` key.
   [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Default: "30 00 \* \* \*"
 
-* **logical_backup_storage_account_name**
+* **logical_backup_azure_storage_account_name**
   Storage account name used to upload logical backups to when using Azure. Default: ""
 
-* **logical_backup_storage_container**
+* **logical_backup_azure_storage_container**
   Storage container used to upload logical backups to when using Azure. Default: ""
 
-* **logical_backup_storage_account_key**
+* **logical_backup_azure_storage_account_key**
   Storage account key used to authenticate with Azure when uploading logical backups. Default: ""
 
 ## Debugging the operator

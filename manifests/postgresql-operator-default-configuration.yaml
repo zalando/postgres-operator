@@ -160,9 +160,9 @@ configuration:
     logical_backup_s3_sse: "AES256"
     # logical_backup_s3_retention_time: ""
     logical_backup_schedule: "30 00 * * *"
-    # logical_backup_storage_account_name: ""
-    # logical_backup_storage_container: ""
-    # logical_backup_storage_account_key: ""
+    # logical_backup_azure_storage_account_name: ""
+    # logical_backup_azure_storage_container: ""
+    # logical_backup_azure_storage_account_key: ""
   debug:
     debug_logging: true
     enable_database_access: true

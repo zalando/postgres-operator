@@ -224,9 +224,9 @@ type OperatorLogicalBackupConfiguration struct {
 	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
-	StorageAccountName           string `json:"logical_backup_storage_account_name,omitempty"`
-	StorageContainer             string `json:"logical_backup_storage_container,omitempty"`
-	StorageAccountKey            string `json:"logical_backup_storage_account_key,omitempty"`
+	AzureStorageAccountName      string `json:"logical_backup_azure_storage_account_name,omitempty"`
+	AzureStorageContainer        string `json:"logical_backup_azure_storage_container,omitempty"`
+	AzureStorageAccountKey       string `json:"logical_backup_azure_storage_account_key,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config
