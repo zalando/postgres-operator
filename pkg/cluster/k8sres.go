@@ -2058,6 +2058,12 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 				Value: description.StandbyPort,
 			})
 		}
+		if description.StandbyPrimarySlotName != "" {
+			result = append(result, v1.EnvVar{
+				Name:  "STANDBY_PRIMARY_SLOT_NAME",
+				Value: description.StandbyPrimarySlotName,
+			})
+		}
 	} else {
 		c.logger.Info("standby cluster streaming from WAL location")
 		if description.S3WalPath != "" {

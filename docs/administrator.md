@@ -1156,6 +1156,7 @@ the `STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
 
 Alternatively, standby clusters can also stream from a remote primary cluster.
 You have to specify the host address. Port is optional and defaults to 5432.
+Moreover, you can also specify a replication slot of the primary.
 Note, that only one of the options (`s3_wal_path`, `gs_wal_path`,
 `standby_host`) can be present under the `standby` top-level key.
 

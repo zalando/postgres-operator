@@ -901,6 +901,15 @@ spec:
   standby:
     standby_host: "acid-minimal-cluster.default"
     standby_port: "5433"
+    standby_primary_slot_name: "slot"
+```
+
+If needed, one can also specify the slot on the primary to use for replication.
+
+```yaml
+spec:
+  standby:
+    standby_primary_slot_name: "slot"
 ```
 
 Note, that the pods and services use the same role labels like for normal clusters:

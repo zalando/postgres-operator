@@ -746,6 +746,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"standby_port": {
 								Type: "string",
 							},
+							"standby_primary_slot_name": {
+								Type: "string",
+							},
 						},
 						OneOf: []apiextv1.JSONSchemaProps{
 							apiextv1.JSONSchemaProps{Required: []string{"s3_wal_path"}},

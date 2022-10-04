@@ -477,6 +477,8 @@ spec:
                     type: string
                   standby_port:
                     type: string
+                  standby_primary_slot_name:
+                    type: string
                 oneOf:
                 - required:
                   - s3_wal_path

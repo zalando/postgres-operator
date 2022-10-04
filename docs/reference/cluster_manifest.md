@@ -430,6 +430,9 @@ if the `standby` key is present.
   TCP port on which the primary is listening for connections. Patroni will
   use `"5432"` if not set.
 
+* **standby_primary_slot_name**
+  replication slot on the primary.
+
 ## Volume properties
 
 Those parameters are grouped under the `volume` top-level key and define the
