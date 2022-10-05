@@ -234,6 +234,36 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	return nil
 }
 
+func (c *Cluster) syncHorizontalPodAutoscalerV1(newSpec *acidv1.Postgresql) error {
+	c.setProcessName("syncing horizontal pod autoscaler v1")
+
+	newHpa, err := c.generateHorizontalPodAutoscalerV1(&newSpec.Spec)
+	if err != nil {
+		return fmt.Errorf("could not generate horizontal pod autoscaler v1: %v", err)
+	}
+	err = c.updateHorizontalPodAutoscalerV1(newHpa)
+	if err != nil {
+		return fmt.Errorf("could not update horizontal pod autoscaler v1: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncHorizontalPodAutoscalerV2(newSpec *acidv1.Postgresql) error {
+	c.setProcessName("syncing horizontal pod autoscaler v2")
+
+	newHpa, err := c.generateHorizontalPodAutoscalerV2(&newSpec.Spec)
+	if err != nil {
+		return fmt.Errorf("could not generate horizontal pod autoscaler v2: %v", err)
+	}
+	err = c.updateHorizontalPodAutoscalerV2(newHpa)
+	if err != nil {
+		return fmt.Errorf("could not update horizontal pod autoscaler v2: %v", err)
+	}
+
+	return nil
+}
+
 func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	var (
 		pdb *policybeta1.PodDisruptionBudget

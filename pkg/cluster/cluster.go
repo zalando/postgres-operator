@@ -28,6 +28,8 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/users"
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingApiV1 "k8s.io/api/autoscaling/v1"
+	autoscalingApiV2 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -62,6 +64,8 @@ type kubeResources struct {
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
+	HorizontalPodAutoscalerV1 *autoscalingApiV1.HorizontalPodAutoscaler
+	HorizontalPodAutoscalerV2 *autoscalingApiV2.HorizontalPodAutoscaler
 	//Pods are treated separately
 	//PVCs are treated separately
 }
@@ -320,6 +324,23 @@ func (c *Cluster) Create() error {
 	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 
 	c.logger.Info("waiting for the cluster being ready")
+
+	hpav1, err := c.createHorizontalPodAutoscalerV1()
+	if err != nil {
+		return fmt.Errorf("could not create HPAV1: %v", err)
+	}
+
+	if hpav1 != nil {
+		c.logger.Info("Created Horizontal Pod Autoscaler V1: %q ", util.NameFromMeta(hpav1.ObjectMeta))
+	}
+
+	hpav2, err := c.createHorizontalPodAutoscalerV2()
+	if err != nil {
+		return fmt.Errorf("could not create HPAV2: %v", err)
+	}
+	if hpav2 != nil {
+		c.logger.Info("Created Horizontal Pod Autoscaler V2 : %q ", util.NameFromMeta(hpav2.ObjectMeta))
+	}
 
 	if err = c.waitStatefulsetPodsReady(); err != nil {
 		c.logger.Errorf("failed to create cluster: %v", err)
@@ -854,6 +875,22 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	if oldSpec.Spec.HorizontalPodAutoscalerV1 != newSpec.Spec.HorizontalPodAutoscalerV1 {
+		c.logger.Debug("syncing horizontal pod autoscaler v1")
+		if err := c.syncHorizontalPodAutoscalerV1(newSpec); err != nil {
+			c.logger.Errorf("could not sync horizontal pod autoscaler v1: %v", err)
+			updateFailed = true
+		}
+	}
+
+	if oldSpec.Spec.HorizontalPodAutoscalerV2 != newSpec.Spec.HorizontalPodAutoscalerV2 {
+		c.logger.Debug("syncing horizontal pod autoscaler v2")
+		if err := c.syncHorizontalPodAutoscalerV2(newSpec); err != nil {
+			c.logger.Errorf("could not sync horizontal pod autoscaler v2: %v", err)
+			updateFailed = true
+		}
+	}
+
 	// logical backup job
 	func() {
 
@@ -988,6 +1025,14 @@ func (c *Cluster) Delete() {
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
 		c.logger.Warningf("could not delete pod disruption budget: %v", err)
+	}
+
+	if err := c.deleteHorizontalPodAutoscalerV1(); err != nil {
+		c.logger.Warningf("could not delete horizontal pod autoscaler v1: %v", err)
+	}
+
+	if err := c.deleteHorizontalPodAutoscalerV2(); err != nil {
+		c.logger.Warningf("could not delete horizontal pod autoscaler v1: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {

@@ -453,6 +453,92 @@ spec:
                 items:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+              horizontalPodAutoscalerV1:
+                type: object
+                required:
+                  - kind
+                  - apiVersion
+                  - spec
+                properties:
+                  kind:
+                    type: string
+                    enum:
+                      - HorizontalPodAutoscaler
+                  apiVersion:
+                    type: string
+                    enum:
+                      - autoscaling/v1
+                  metadata:
+                    type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                  spec:
+                    x-kubernetes-preserve-unknown-fields: true
+                    type: object
+                    required:
+                      - maxReplicas
+                      - minReplicas
+                      - scaleTargetRef
+                    properties:
+                      maxReplicas:
+                        type: integer
+                      minReplicas:
+                        type: integer
+                      scaleTargetRef:
+                        type: object
+                        required:
+                          - kind
+                          - apiVersion
+                          - name
+                        properties:
+                          kind:
+                            type: string
+                          apiVersion:
+                            type: string
+                          name:
+                            type: string
+              horizontalPodAutoscalerV2:
+                type: object
+                required:
+                  - kind
+                  - apiVersion
+                  - spec
+                properties:
+                  kind:
+                    type: string
+                    enum:
+                      - HorizontalPodAutoscaler
+                  apiVersion:
+                    type: string
+                    enum:
+                      - autoscaling/v2
+                  metadata:
+                    type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                  spec:
+                    x-kubernetes-preserve-unknown-fields: true
+                    type: object
+                    required:
+                      - maxReplicas
+                      - minReplicas
+                      - scaleTargetRef
+                    properties:
+                      maxReplicas:
+                        type: integer
+                      minReplicas:
+                        type: integer
+                      scaleTargetRef:
+                        type: object
+                        required:
+                          - kind
+                          - apiVersion
+                          - name
+                        properties:
+                          kind:
+                            type: string
+                          apiVersion:
+                            type: string
+                          name:
+                            type: string
               spiloRunAsUser:
                 type: integer
               spiloRunAsGroup:

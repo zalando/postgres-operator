@@ -12,6 +12,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingApiV1 "k8s.io/api/autoscaling/v1"
+	autoscalingApiV2 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -615,6 +617,42 @@ func generateContainer(
 			Capabilities:             additionalPodCapabilities,
 		},
 	}
+}
+
+func (c *Cluster) generateHorizontalPodAutoscalerV1(spec *acidv1.PostgresSpec) (*autoscalingApiV1.HorizontalPodAutoscaler, error) {
+	hpa := spec.HorizontalPodAutoscalerV1
+
+	if hpa == nil {
+		return nil, nil
+	} else if *hpa.Spec.MinReplicas < 1 {
+		return nil, fmt.Errorf("minReplicas cannot be less than 1")
+	} else if (hpa.Spec.ScaleTargetRef.APIVersion == "" || hpa.Spec.ScaleTargetRef.Kind == "" || hpa.Spec.ScaleTargetRef.Name == "") {
+		return nil, fmt.Errorf("the scaledTargetRef object has one or many invalid fields")
+	}
+
+	return &autoscalingApiV1.HorizontalPodAutoscaler{
+		TypeMeta: hpa.TypeMeta,
+		ObjectMeta: hpa.ObjectMeta,
+		Spec: hpa.Spec,
+	}, nil
+}
+
+func (c *Cluster) generateHorizontalPodAutoscalerV2(spec *acidv1.PostgresSpec) (*autoscalingApiV2.HorizontalPodAutoscaler, error) {
+	hpa := spec.HorizontalPodAutoscalerV2
+
+	if hpa == nil {
+		return nil, nil
+	} else if *hpa.Spec.MinReplicas < 1 {
+		return nil, fmt.Errorf("minReplicas cannot be less than 1")
+	} else if (hpa.Spec.ScaleTargetRef.APIVersion == "" || hpa.Spec.ScaleTargetRef.Kind == "" || hpa.Spec.ScaleTargetRef.Name == "") {
+		return nil, fmt.Errorf("the scaledTargetRef object has one or many invalid fields")
+	}
+
+	return &autoscalingApiV2.HorizontalPodAutoscaler{
+		TypeMeta: hpa.TypeMeta,
+		ObjectMeta: hpa.ObjectMeta,
+		Spec: hpa.Spec,
+	}, nil
 }
 
 func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar,

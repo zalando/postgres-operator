@@ -29,6 +29,8 @@ package v1
 
 import (
 	config "github.com/zalando/postgres-operator/pkg/util/config"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -779,6 +781,16 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.HorizontalPodAutoscalerV1 != nil {
+		in, out := &in.HorizontalPodAutoscalerV1, &out.HorizontalPodAutoscalerV1
+		*out = new(autoscalingv1.HorizontalPodAutoscaler)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.HorizontalPodAutoscalerV2 != nil {
+		in, out := &in.HorizontalPodAutoscalerV2, &out.HorizontalPodAutoscalerV2
+		*out = new(v2beta1.HorizontalPodAutoscaler)
+		(*in).DeepCopyInto(*out)
+
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]corev1.EnvVar, len(*in))

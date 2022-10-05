@@ -5,6 +5,8 @@ package v1
 import (
 	"time"
 
+	autoscalingApiV1 "k8s.io/api/autoscaling/v1"
+	autoscalingApiV2 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -83,6 +85,10 @@ type PostgresSpec struct {
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 	Streams               []Stream                    `json:"streams,omitempty"`
 	Env                   []v1.EnvVar                 `json:"env,omitempty"`
+
+	// Integrating the HPA
+	HorizontalPodAutoscalerV1 *autoscalingApiV1.HorizontalPodAutoscaler `json:"horizontalPodAutoscalerV1,omitempty"`
+	HorizontalPodAutoscalerV2 *autoscalingApiV2.HorizontalPodAutoscaler `json:"horizontalPodAutoscalerV2,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`

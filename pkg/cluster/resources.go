@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingApiV1 "k8s.io/api/autoscaling/v1"
+	autoscalingApiV2 "k8s.io/api/autoscaling/v2beta1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -260,6 +262,162 @@ func (c *Cluster) deleteStatefulSet() error {
 	if err := c.deletePersistentVolumeClaims(); err != nil {
 		return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
 	}
+
+	return nil
+}
+
+func (c *Cluster) createHorizontalPodAutoscalerV1() (*autoscalingApiV1.HorizontalPodAutoscaler, error){
+	c.setProcessName("creating HorizontalPodAutoscalerV1")
+
+	hpa, err :=  c.generateHorizontalPodAutoscalerV1(&c.Spec)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if hpa == nil {
+		return nil, nil
+	}
+
+	hpa, err = c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(hpa.ObjectMeta.Namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create HPA V1: %v", err)
+	}
+
+	c.HorizontalPodAutoscalerV1 = hpa
+
+	return hpa, err
+
+}
+
+func (c *Cluster) updateHorizontalPodAutoscalerV1(hpa *autoscalingApiV1.HorizontalPodAutoscaler) error {
+	// The HPA V1 was not defined and we need to create one
+	if c.HorizontalPodAutoscalerV1 == nil && hpa != nil {
+		newHpa, err := c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(hpa.Namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("could not create horizontal pod autoscaler v1: %v", err)
+		}
+
+		c.HorizontalPodAutoscalerV1 = newHpa
+		return nil
+	}
+
+	// The HPA V1 was defined but we need to delete it
+	if c.HorizontalPodAutoscalerV1 != nil && hpa == nil {
+		err := c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(c.HorizontalPodAutoscalerV1.Namespace).Delete(context.TODO(), c.HorizontalPodAutoscalerV1.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("could not create horizontal pod autoscaler v1: %v", err)
+		}
+
+		c.HorizontalPodAutoscalerV1 = nil
+		return nil
+	}
+
+	// The HPA V1 was defined and we need to update it with the new info.
+	newHpa, err := c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(hpa.Namespace).Update(context.TODO(), hpa, metav1.UpdateOptions{})
+
+	if err != nil {
+		return fmt.Errorf("could not update horizontal pod autoscaler v1: %v", err)
+	}
+
+	c.HorizontalPodAutoscalerV1 = newHpa
+
+	return nil
+}
+
+func (c *Cluster) deleteHorizontalPodAutoscalerV1() error {
+	c.setProcessName("deleting horizontalpodautoscalerv1")
+	c.logger.Debugln("deleting horizontalpodautoscalerv1")
+
+	if c.HorizontalPodAutoscalerV1 == nil {
+		return fmt.Errorf("there is no horizontalpodautoscalerv1 in the cluster")
+	}
+
+	err := c.KubeClient.HorizontalPodAutoscalersGetterV1.HorizontalPodAutoscalers(c.HorizontalPodAutoscalerV1.Namespace).Delete(context.TODO(), c.HorizontalPodAutoscalerV1.Name, c.deleteOptions)
+	if err != nil {
+		return err
+	}
+	c.logger.Infof("horizontalpodautoscalerv1 %q has been deleted", util.NameFromMeta(c.HorizontalPodAutoscalerV1.ObjectMeta))
+	c.HorizontalPodAutoscalerV1 = nil
+
+	return nil
+}
+
+
+func (c *Cluster) createHorizontalPodAutoscalerV2() (*autoscalingApiV2.HorizontalPodAutoscaler, error){
+	c.setProcessName("creating HorizontalPodAutoscalerV2")
+
+	hpa, err :=  c.generateHorizontalPodAutoscalerV2(&c.Spec)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if hpa == nil {
+		return nil, nil
+	}
+
+	hpa, err = c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(hpa.ObjectMeta.Namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create HPA V2: %v", err)
+	}
+
+	c.HorizontalPodAutoscalerV2 = hpa
+
+	return hpa, err
+}
+
+func (c *Cluster) updateHorizontalPodAutoscalerV2(hpa *autoscalingApiV2.HorizontalPodAutoscaler) error {
+	// The HPA V2 was not defined and we need to create one
+	if c.HorizontalPodAutoscalerV2 == nil && hpa != nil {
+		newHpa, err := c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(hpa.Namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("could not create horizontal pod autoscaler v2: %v", err)
+		}
+
+		c.HorizontalPodAutoscalerV2 = newHpa
+		return nil
+	}
+
+	// The HPA V2 was defined but we need to delete it
+	if c.HorizontalPodAutoscalerV2 != nil && hpa == nil {
+		err := c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(c.HorizontalPodAutoscalerV2.Namespace).Delete(context.TODO(), c.HorizontalPodAutoscalerV2.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("could not create horizontal pod autoscaler v2: %v", err)
+		}
+
+		c.HorizontalPodAutoscalerV2 = nil
+		return nil
+	}
+
+	// The HPA V2 was defined and we need to update it with the new info.
+	newHpa, err := c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(hpa.Namespace).Update(context.TODO(), hpa, metav1.UpdateOptions{})
+
+	if err != nil {
+		return fmt.Errorf("could not update horizontal pod autoscaler v2: %v", err)
+	}
+
+	c.HorizontalPodAutoscalerV2 = newHpa
+
+	return nil
+}
+
+func (c *Cluster) deleteHorizontalPodAutoscalerV2() error {
+	c.setProcessName("deleting horizontalpodautoscalerv2")
+	c.logger.Debugln("deleting horizontalpodautoscalerv2")
+
+	if c.HorizontalPodAutoscalerV2 == nil {
+		return fmt.Errorf("there is no horizontalpodautoscalerv2 in the cluster")
+	}
+
+	err := c.KubeClient.HorizontalPodAutoscalersGetterV2.HorizontalPodAutoscalers(c.HorizontalPodAutoscalerV2.Namespace).Delete(context.TODO(), c.HorizontalPodAutoscalerV2.Name, c.deleteOptions)
+	if err != nil {
+		return err
+	}
+	c.logger.Infof("horizontalpodautoscalerv2 %q has been deleted", util.NameFromMeta(c.HorizontalPodAutoscalerV2.ObjectMeta))
+	c.HorizontalPodAutoscalerV2 = nil
 
 	return nil
 }

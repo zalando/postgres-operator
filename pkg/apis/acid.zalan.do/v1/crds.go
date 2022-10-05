@@ -706,6 +706,114 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"horizontalPodAutoscalerV1": {
+						Type: "object",
+						Required: []string{"kind", "apiVersion", "spec"},
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"kind": {
+								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(`"HorizontalPodAutoscaler"`),
+									},
+								},
+							},
+							"apiVersion": {
+								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(`"autoscaling/v1"`),
+									},
+								},
+							},
+							"metadata": {
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
+							"spec": {
+								Type:     "object",
+								XPreserveUnknownFields: util.True(),
+								Required: []string{"maxReplicas", "minReplicas", "scaleTargetRef"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"maxReplicas": {
+										Type: "integer",
+									},
+									"minReplicas": {
+										Type: "integer",
+									},
+									"scaleTargetRef": {
+										Type: "object",
+										Required: []string{"kind", "apiVersion", "name"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"kind": {
+												Type: "string",
+											},
+											"apiVersion": {
+												Type: "string",
+											},
+											"name": {
+												Type: "string",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					"horizontalPodAutoscalerV2": {
+						Type: "object",
+						Required: []string{"kind", "apiVersion", "spec"},
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"kind": {
+								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(`"HorizontalPodAutoscaler"`),
+									},
+								},
+							},
+							"apiVersion": {
+								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(`"autoscaling/v2"`),
+									},
+								},
+							},
+							"metadata": {
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
+							"spec": {
+								Type:     "object",
+								XPreserveUnknownFields: util.True(),
+								Required: []string{"maxReplicas", "minReplicas", "scaleTargetRef"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"maxReplicas": {
+										Type: "integer",
+									},
+									"minReplicas": {
+										Type: "integer",
+									},
+									"scaleTargetRef": {
+										Type: "object",
+										Required: []string{"kind", "apiVersion", "name"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"kind": {
+												Type: "string",
+											},
+											"apiVersion": {
+												Type: "string",
+											},
+											"name": {
+												Type: "string",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 					"spiloRunAsUser": {
 						Type: "integer",
 					},
