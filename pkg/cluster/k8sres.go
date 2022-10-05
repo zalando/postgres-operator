@@ -1119,17 +1119,18 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 
 func generateSpiloReadinessProbe() *v1.Probe {
 	return &v1.Probe{
+		FailureThreshold: 3,
 		Handler: v1.Handler{
 			HTTPGet: &v1.HTTPGetAction{
-				Path: "/readiness",
-				Port: intstr.IntOrString{IntVal: patroni.ApiPort},
+				Path:   "/readiness",
+				Port:   intstr.IntOrString{IntVal: patroni.ApiPort},
+				Scheme: v1.URISchemeHTTP,
 			},
 		},
 		InitialDelaySeconds: 6,
 		PeriodSeconds:       10,
-		TimeoutSeconds:      5,
 		SuccessThreshold:    1,
-		FailureThreshold:    3,
+		TimeoutSeconds:      5,
 	}
 }
 
@@ -1280,7 +1281,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	)
 
 	// Patroni responds 200 to probe only if it either owns the leader lock or postgres is running and DCS is accessible
-	spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
+	if c.OpConfig.EnableReadinessProbe {
+		spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
+	}
 
 	// generate container specs for sidecars specified in the cluster manifest
 	clusterSpecificSidecars := []v1.Container{}

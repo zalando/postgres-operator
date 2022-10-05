@@ -129,6 +129,8 @@ configKubernetes:
   enable_pod_antiaffinity: false
   # toggles PDB to set to MinAvailabe 0 or 1
   enable_pod_disruption_budget: true
+  # toogles readiness probe for database pods
+  enable_readiness_probe: false
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
 

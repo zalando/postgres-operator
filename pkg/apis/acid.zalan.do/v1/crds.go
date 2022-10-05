@@ -1275,6 +1275,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_pod_disruption_budget": {
 								Type: "boolean",
 							},
+							"enable_readiness_probe": {
+								Type: "boolean",
+							},
 							"enable_sidecars": {
 								Type: "boolean",
 							},
