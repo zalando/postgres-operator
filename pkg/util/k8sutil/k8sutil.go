@@ -18,7 +18,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/spec"
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	apipolicyv1 "k8s.io/api/policy/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -61,7 +61,7 @@ type KubernetesClient struct {
 	appsv1.StatefulSetsGetter
 	appsv1.DeploymentsGetter
 	rbacv1.RoleBindingsGetter
-	policyv1beta1.PodDisruptionBudgetsGetter
+	policyv1.PodDisruptionBudgetsGetter
 	apiextv1.CustomResourceDefinitionsGetter
 	clientbatchv1beta1.CronJobsGetter
 	acidv1.OperatorConfigurationsGetter
@@ -156,7 +156,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.NamespacesGetter = client.CoreV1()
 	kubeClient.StatefulSetsGetter = client.AppsV1()
 	kubeClient.DeploymentsGetter = client.AppsV1()
-	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
+	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1()
 	kubeClient.CronJobsGetter = client.BatchV1beta1()
@@ -214,7 +214,7 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 }
 
 // SamePDB compares the PodDisruptionBudgets
-func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason string) {
+func SamePDB(cur, new *apipolicyv1.PodDisruptionBudget) (match bool, reason string) {
 	//TODO: improve comparison
 	match = reflect.DeepEqual(new.Spec, cur.Spec)
 	if !match {

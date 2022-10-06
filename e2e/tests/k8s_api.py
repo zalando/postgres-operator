@@ -25,7 +25,7 @@ class K8sApi:
         self.apps_v1 = client.AppsV1Api()
         self.batch_v1_beta1 = client.BatchV1beta1Api()
         self.custom_objects_api = client.CustomObjectsApi()
-        self.policy_v1_beta1 = client.PolicyV1beta1Api()
+        self.policy_v1 = client.PolicyV1Api()
         self.storage_v1_api = client.StorageV1Api()
 
 
@@ -179,7 +179,7 @@ class K8s:
         return len(self.api.apps_v1.list_namespaced_deployment(namespace, label_selector=labels).items)
 
     def count_pdbs_with_label(self, labels, namespace='default'):
-        return len(self.api.policy_v1_beta1.list_namespaced_pod_disruption_budget(
+        return len(self.api.policy_v1.list_namespaced_pod_disruption_budget(
             namespace, label_selector=labels).items)
 
     def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
@@ -471,7 +471,7 @@ class K8sBase:
         return len(self.api.apps_v1.list_namespaced_deployment(namespace, label_selector=labels).items)
 
     def count_pdbs_with_label(self, labels, namespace='default'):
-        return len(self.api.policy_v1_beta1.list_namespaced_pod_disruption_budget(
+        return len(self.api.policy_v1.list_namespaced_pod_disruption_budget(
             namespace, label_selector=labels).items)
 
     def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):

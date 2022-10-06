@@ -19,7 +19,7 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset
 	acidClientSet := fakeacidv1.NewSimpleClientset()
 
 	return k8sutil.KubernetesClient{
-		PodDisruptionBudgetsGetter: clientSet.PolicyV1beta1(),
+		PodDisruptionBudgetsGetter: clientSet.PolicyV1(),
 		ServicesGetter:             clientSet.CoreV1(),
 		StatefulSetsGetter:         clientSet.AppsV1(),
 		PostgresqlsGetter:          acidClientSet.AcidV1(),

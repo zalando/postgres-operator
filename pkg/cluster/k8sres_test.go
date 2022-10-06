@@ -21,7 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1979,7 +1979,7 @@ func TestSidecars(t *testing.T) {
 func TestGeneratePodDisruptionBudget(t *testing.T) {
 	tests := []struct {
 		c   *Cluster
-		out policyv1beta1.PodDisruptionBudget
+		out policyv1.PodDisruptionBudget
 	}{
 		// With multiple instances.
 		{
@@ -1991,13 +1991,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
@@ -2015,13 +2015,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
@@ -2039,13 +2039,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
@@ -2063,13 +2063,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-databass-budget",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},

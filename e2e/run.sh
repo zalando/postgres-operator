@@ -9,7 +9,7 @@ IFS=$'\n\t'
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 readonly spilo_image="registry.opensource.zalan.do/acid/spilo-14-e2e:0.1"
-readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:0.3"
+readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:0.4"
 
 export GOPATH=${GOPATH-~/go}
 export PATH=${GOPATH}/bin:$PATH
