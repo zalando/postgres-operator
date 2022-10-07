@@ -29,7 +29,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -2017,7 +2016,7 @@ func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (hos
 	return
 }
 
-func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
+func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	var (
 		err                  error
@@ -2108,7 +2107,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	// configure a cron job
 
-	jobTemplateSpec := batchv1beta1.JobTemplateSpec{
+	jobTemplateSpec := batchv1.JobTemplateSpec{
 		Spec: jobSpec,
 	}
 
@@ -2117,17 +2116,17 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		schedule = c.OpConfig.LogicalBackupSchedule
 	}
 
-	cronJob := &batchv1beta1.CronJob{
+	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.getLogicalBackupJobName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
 			Annotations: c.annotationsSet(nil),
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
 			JobTemplate:       jobTemplateSpec,
-			ConcurrencyPolicy: batchv1beta1.ForbidConcurrent,
+			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 		},
 	}
 

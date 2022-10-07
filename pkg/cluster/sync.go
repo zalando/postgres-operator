@@ -15,7 +15,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1145,8 +1145,8 @@ func (c *Cluster) syncExtensions(extensions map[string]string) error {
 
 func (c *Cluster) syncLogicalBackupJob() error {
 	var (
-		job        *batchv1beta1.CronJob
-		desiredJob *batchv1beta1.CronJob
+		job        *batchv1.CronJob
+		desiredJob *batchv1.CronJob
 		err        error
 	)
 	c.setProcessName("syncing the logical backup job")
