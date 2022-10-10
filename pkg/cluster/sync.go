@@ -104,18 +104,19 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		c.logger.Debug("syncing roles")
 		if err = c.syncRoles(); err != nil {
-			err = fmt.Errorf("could not sync roles: %v", err)
-			return err
+			// remember all cached users in c.pgUsers
+			for cachedUserName, cachedUser := range c.pgUsersCache {
+				c.pgUsers[cachedUserName] = cachedUser
+			}
+			c.logger.Errorf("could not sync roles: %v", err)
 		}
 		c.logger.Debug("syncing databases")
 		if err = c.syncDatabases(); err != nil {
-			err = fmt.Errorf("could not sync databases: %v", err)
-			return err
+			c.logger.Errorf("could not sync databases: %v", err)
 		}
 		c.logger.Debug("syncing prepared databases with schemas")
 		if err = c.syncPreparedDatabases(); err != nil {
-			err = fmt.Errorf("could not sync prepared database: %v", err)
-			return err
+			c.logger.Errorf("could not sync prepared database: %v", err)
 		}
 	}
 
@@ -933,10 +934,7 @@ func (c *Cluster) syncRoles() (err error) {
 		}
 	}
 
-	// copy map for ProduceSyncRequests to include also system users
-	for userName, pgUser := range c.pgUsers {
-		newUsers[userName] = pgUser
-	}
+	// search also for system users
 	for _, systemUser := range c.systemUsers {
 		userNames = append(userNames, systemUser.Name)
 		newUsers[systemUser.Name] = systemUser
@@ -950,11 +948,19 @@ func (c *Cluster) syncRoles() (err error) {
 	// update pgUsers where a deleted role was found
 	// so that they are skipped in ProduceSyncRequests
 	for _, dbUser := range dbUsers {
-		if originalUser, exists := deletedUsers[dbUser.Name]; exists {
-			recreatedUser := c.pgUsers[originalUser]
+		originalUsername, foundDeletedUser := deletedUsers[dbUser.Name]
+		// check if original user does not exist in dbUsers
+		_, originalUserAlreadyExists := dbUsers[originalUsername]
+		if foundDeletedUser && !originalUserAlreadyExists {
+			recreatedUser := c.pgUsers[originalUsername]
 			recreatedUser.Deleted = true
-			c.pgUsers[originalUser] = recreatedUser
+			c.pgUsers[originalUsername] = recreatedUser
 		}
+	}
+
+	// last but not least copy pgUsers to newUsers to send to ProduceSyncRequests
+	for _, pgUser := range c.pgUsers {
+		newUsers[pgUser.Name] = pgUser
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, newUsers)

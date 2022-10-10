@@ -250,6 +250,8 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(enable_postgres_team_crd)
 
+        # add team and member to custom-team-membership
+        # contains already elephant user
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresteams', 'custom-team-membership',
@@ -300,6 +302,13 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
             "Database role of replaced member in PostgresTeam not renamed", 10, 5)
 
+        # create fake deletion user so operator fails renaming
+        # but altering role to NOLOGIN will succeed
+        create_fake_deletion_user = """
+            CREATE USER tester_delete_me NOLOGIN;
+        """
+        self.query_database(leader.metadata.name, "postgres", create_fake_deletion_user)
+
         # re-add additional member and check if the role is renamed back
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
@@ -317,11 +326,44 @@ class EndToEndTestCase(unittest.TestCase):
         user_query = """
             SELECT rolname
               FROM pg_catalog.pg_roles
-             WHERE (rolname = 'kind' AND rolcanlogin)
-                OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
+             WHERE rolname = 'kind' AND rolcanlogin;
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 1,
+            "Database role of recreated member in PostgresTeam not renamed back to original name", 10, 5)
+
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname IN ('tester','tester_delete_me') AND NOT rolcanlogin;
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
-            "Database role of recreated member in PostgresTeam not renamed back to original name", 10, 5)
+            "Database role of replaced member in PostgresTeam not denied from login", 10, 5)
+
+        # re-add other additional member, operator should grant LOGIN back to tester
+        # but nothing happens to deleted role
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresteams', 'custom-team-membership',
+        {
+            'spec': {
+                'additionalMembers': {
+                    'e2e': [
+                        'kind',
+                        'tester'
+                    ]
+                },
+            }
+        })
+
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE (rolname IN ('tester', 'kind')
+               AND rolcanlogin)
+                OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 3,
+            "Database role of deleted member in PostgresTeam not removed when recreated manually", 10, 5)
 
         # revert config change
         revert_resync = {
@@ -1204,8 +1246,9 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # node affinity change should cause another rolling update and relocation of replica
-            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
