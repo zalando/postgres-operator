@@ -231,7 +231,8 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 			parameters[fields[0]] = fields[1]
 		}
 
-		if strings.HasSuffix(rolname, c.OpConfig.RoleDeletionSuffix) {
+		// consider NOLOGIN roles with deleted suffix as deprecated users
+		if strings.HasSuffix(rolname, c.OpConfig.RoleDeletionSuffix) && !rolcanlogin {
 			roldeleted = true
 		}
 
