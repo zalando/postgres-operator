@@ -836,9 +836,12 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 	for _, tt := range tests {
 		c := newMockCluster(tt.opConfig)
-		c.Postgresql = tt.pgsql
-		actualEnvs := c.generateSpiloPodEnvVars(
-			types.UID(dummyUUID), exampleSpiloConfig, tt.cloneDescription, tt.standbyDescription)
+		pgsql := tt.pgsql
+		pgsql.Spec.Clone = tt.cloneDescription
+		pgsql.Spec.StandbyCluster = tt.standbyDescription
+		c.Postgresql = pgsql
+
+		actualEnvs := c.generateSpiloPodEnvVars(&pgsql.Spec, types.UID(dummyUUID), exampleSpiloConfig)
 
 		for _, ev := range tt.expectedValues {
 			env := actualEnvs[ev.envIndex]

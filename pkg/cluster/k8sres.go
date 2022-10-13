@@ -797,10 +797,9 @@ func (c *Cluster) generatePodTemplate(
 
 // generatePodEnvVars generates environment variables for the Spilo Pod
 func (c *Cluster) generateSpiloPodEnvVars(
+	spec *acidv1.PostgresSpec,
 	uid types.UID,
-	spiloConfiguration string,
-	cloneDescription *acidv1.CloneDescription,
-	standbyDescription *acidv1.StandbyDescription) []v1.EnvVar {
+	spiloConfiguration string) []v1.EnvVar {
 
 	// hard-coded set of environment variables we need
 	// to guarantee core functionality of the operator
@@ -906,17 +905,17 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_USE_CONFIGMAPS", Value: "true"})
 	}
 
-	if cloneDescription != nil && cloneDescription.ClusterName != "" {
-		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
+	if spec.Clone != nil && spec.Clone.ClusterName != "" {
+		envVars = append(envVars, c.generateCloneEnvironment(spec.Clone)...)
 	}
 
-	if standbyDescription != nil {
-		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
+	if spec.StandbyCluster != nil {
+		envVars = append(envVars, c.generateStandbyEnvironment(spec.StandbyCluster)...)
 	}
 
 	// fetch cluster-specific variables that will override all subsequent global variables
-	if len(c.Spec.Env) > 0 {
-		envVars = appendEnvVars(envVars, c.Spec.Env...)
+	if len(spec.Env) > 0 {
+		envVars = appendEnvVars(envVars, spec.Env...)
 	}
 
 	// fetch variables from custom environment Secret
@@ -1186,11 +1185,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate environment variables for the spilo container
-	spiloEnvVars := c.generateSpiloPodEnvVars(
-		c.Postgresql.GetUID(),
-		spiloConfiguration,
-		spec.Clone,
-		spec.StandbyCluster)
+	spiloEnvVars := c.generateSpiloPodEnvVars(spec, c.Postgresql.GetUID(), spiloConfiguration)
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
