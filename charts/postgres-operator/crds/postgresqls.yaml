@@ -320,6 +320,8 @@ spec:
               patroni:
                 type: object
                 properties:
+                  failsafe_mode:
+                    type: boolean
                   initdb:
                     type: object
                     additionalProperties:

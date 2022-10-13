@@ -566,6 +566,9 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != effectivePatroniConfig.TTL {
 		configToSet["ttl"] = desiredPatroniConfig.TTL
 	}
+	if desiredPatroniConfig.FailsafeMode != effectivePatroniConfig.FailsafeMode {
+		configToSet["failsafe_mode"] = desiredPatroniConfig.FailsafeMode
+	}
 
 	// check if specified slots exist in config and if they differ
 	slotsToSet := make(map[string]map[string]string)
