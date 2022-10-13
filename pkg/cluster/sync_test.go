@@ -276,7 +276,6 @@ func TestUpdateSecret(t *testing.T) {
 	dbname := "app"
 	dbowner := "appowner"
 	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
-	rotationUsers := make(spec.PgUserMap)
 	retentionUsers := make([]string, 0)
 
 	// define manifest users and enable rotation for dbowner
@@ -339,8 +338,8 @@ func TestUpdateSecret(t *testing.T) {
 	dayAfterTomorrow := time.Now().AddDate(0, 0, 2)
 
 	allUsers := make(map[string]spec.PgUser)
-	for userName, pgUser := range cluster.pgUsers {
-		allUsers[userName] = pgUser
+	for _, pgUser := range cluster.pgUsers {
+		allUsers[pgUser.Name] = pgUser
 	}
 	for _, systemUser := range cluster.systemUsers {
 		allUsers[systemUser.Name] = systemUser
@@ -354,7 +353,7 @@ func TestUpdateSecret(t *testing.T) {
 		secretPassword := string(secret.Data["password"])
 
 		// now update the secret setting a next rotation date (tomorrow + interval)
-		cluster.updateSecret(username, secret, &rotationUsers, &retentionUsers, dayAfterTomorrow)
+		cluster.updateSecret(username, secret, &retentionUsers, dayAfterTomorrow)
 		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		assert.NoError(t, err)
 
@@ -386,9 +385,9 @@ func TestUpdateSecret(t *testing.T) {
 			if secretUsername != rotatedUsername {
 				t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, rotatedUsername, secretUsername)
 			}
-
-			if len(rotationUsers) != 1 && len(retentionUsers) != 1 {
-				t.Errorf("%s: unexpected number of users to rotate - expected only %s, found %d", testName, username, len(rotationUsers))
+			// whenever there's a rotation the retentionUsers list is extended or updated
+			if len(retentionUsers) != 1 {
+				t.Errorf("%s: unexpected number of users to drop - expected only %s, found %d", testName, username, len(retentionUsers))
 			}
 		}
 	}
