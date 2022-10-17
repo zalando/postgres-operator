@@ -227,6 +227,11 @@ type OperatorLogicalBackupConfiguration struct {
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
 }
 
+// PatroniConfiguration defines configuration for Patroni
+type PatroniConfiguration struct {
+	EnableFailsafeMode bool `json:"enable_failsafe_mode,omitempty"`
+}
+
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
 	EnableCRDRegistration         *bool                              `json:"enable_crd_registration,omitempty"`
@@ -259,11 +264,12 @@ type OperatorConfigurationData struct {
 	Scalyr                        ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup                 OperatorLogicalBackupConfiguration `json:"logical_backup"`
 	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	Patroni                       PatroniConfiguration               `json:"patroni_configuration"`
 
 	MinInstances                      int32  `json:"min_instances,omitempty"`
 	MaxInstances                      int32  `json:"max_instances,omitempty"`
 	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
 }
 
-//Duration shortens this frequently used name
+// Duration shortens this frequently used name
 type Duration time.Duration

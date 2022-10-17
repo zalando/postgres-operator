@@ -234,6 +234,7 @@ type Config struct {
 	TargetMajorVersion                     string            `name:"target_major_version" default:"14"`
 	PatroniAPICheckInterval                time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                 time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
+	EnablePatroniFailsafeMode              bool              `name:"enable_patroni_failsafe_mode" default:"false"`
 }
 
 // MustMarshal marshals the config or panics
