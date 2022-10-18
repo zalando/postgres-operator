@@ -550,6 +550,11 @@ func (in *Patroni) DeepCopyInto(out *Patroni) {
 			(*out)[key] = outVal
 		}
 	}
+	if in.FailsafeMode != nil {
+		in, out := &in.FailsafeMode, &out.FailsafeMode
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

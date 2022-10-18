@@ -171,7 +171,7 @@ type Patroni struct {
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
 	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:"1"`
-	FailsafeMode          bool                         `json:"failsafe_mode,omitempty"`
+	FailsafeMode          *bool                        `json:"failsafe_mode,omitempty"`
 }
 
 // StandbyDescription contains remote primary config or s3/gs wal path

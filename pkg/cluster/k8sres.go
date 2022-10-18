@@ -379,7 +379,11 @@ PatroniInitDBParams:
 	if patroni.SynchronousNodeCount >= 1 {
 		config.Bootstrap.DCS.SynchronousNodeCount = patroni.SynchronousNodeCount
 	}
-	config.Bootstrap.DCS.FailsafeMode = opConfig.EnablePatroniFailsafeMode || patroni.FailsafeMode
+	if patroni.FailsafeMode != nil {
+		config.Bootstrap.DCS.FailsafeMode = *patroni.FailsafeMode
+	} else {
+		config.Bootstrap.DCS.FailsafeMode = opConfig.EnablePatroniFailsafeMode
+	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
 

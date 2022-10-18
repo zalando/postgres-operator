@@ -101,7 +101,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				SynchronousModeStrict: true,
 				SynchronousNodeCount:  1,
 				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
-				FailsafeMode:          true,
+				FailsafeMode:          util.True(),
 			},
 			opConfig: &config.Config{
 				Auth: config.Auth{
@@ -119,6 +119,34 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 					PamRoleName: "zalandos",
 				},
 				EnablePatroniFailsafeMode: true,
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
+		},
+		{
+			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "14"},
+			patroni: &acidv1.Patroni{
+				FailsafeMode: util.False(),
+			},
+			opConfig: &config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+				EnablePatroniFailsafeMode: true,
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+		},
+		{
+			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "14"},
+			patroni: &acidv1.Patroni{
+				FailsafeMode: util.True(),
+			},
+			opConfig: &config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+				EnablePatroniFailsafeMode: false,
 			},
 			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
 		},
