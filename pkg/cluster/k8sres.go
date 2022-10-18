@@ -799,7 +799,7 @@ func (c *Cluster) generatePodTemplate(
 func (c *Cluster) generateSpiloPodEnvVars(
 	spec *acidv1.PostgresSpec,
 	uid types.UID,
-	spiloConfiguration string) []v1.EnvVar {
+	spiloConfiguration string) ([]v1.EnvVar, error) {
 
 	// hard-coded set of environment variables we need
 	// to guarantee core functionality of the operator
@@ -922,7 +922,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	// that will override all subsequent global variables
 	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
 	if err != nil {
-		c.logger.Warningf("%v", err)
+		return nil, err
 	}
 	envVars = appendEnvVars(envVars, secretEnvVarsList...)
 
@@ -930,7 +930,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	// that will override all subsequent global variables
 	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
 	if err != nil {
-		c.logger.Warningf("%v", err)
+		return nil, err
 	}
 	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
 
@@ -966,7 +966,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 
 	envVars = appendEnvVars(envVars, opConfigEnvVars...)
 
-	return envVars
+	return envVars, nil
 }
 
 func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
@@ -1185,7 +1185,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate environment variables for the spilo container
-	spiloEnvVars := c.generateSpiloPodEnvVars(spec, c.Postgresql.GetUID(), spiloConfiguration)
+	spiloEnvVars, err := c.generateSpiloPodEnvVars(spec, c.Postgresql.GetUID(), spiloConfiguration)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate Spilo env vars: %v", err)
+	}
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
