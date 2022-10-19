@@ -104,10 +104,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		c.logger.Debug("syncing roles")
 		if err = c.syncRoles(); err != nil {
-			// remember all cached users in c.pgUsers
-			for cachedUserName, cachedUser := range c.pgUsersCache {
-				c.pgUsers[cachedUserName] = cachedUser
-			}
 			c.logger.Errorf("could not sync roles: %v", err)
 		}
 		c.logger.Debug("syncing databases")
