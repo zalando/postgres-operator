@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -222,7 +223,13 @@ type mockTeamsAPIClient struct {
 }
 
 func (m *mockTeamsAPIClient) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
-	return &teams.Team{Members: m.members}, statusCode, nil
+	if len(m.members) > 0 {
+		return &teams.Team{Members: m.members}, http.StatusOK, nil
+	}
+
+	// when members are not set handle this as an error for this mock API
+	// just makes it easier to test behavior when teams API is unavailable
+	return nil, http.StatusInternalServerError, fmt.Errorf("mocked error of mock Teams API for team %q", teamID)
 }
 
 func (m *mockTeamsAPIClient) setMembers(members []string) {
@@ -237,32 +244,52 @@ func TestInitHumanUsers(t *testing.T) {
 
 	// members of a product team are granted superuser rights for DBs of their team
 	cl.OpConfig.EnableTeamSuperuser = true
-
 	cl.OpConfig.EnableTeamsAPI = true
+	cl.OpConfig.EnableTeamMemberDeprecation = true
 	cl.OpConfig.PamRoleName = "zalandos"
 	cl.Spec.TeamID = "test"
+	cl.Spec.Users = map[string]acidv1.UserFlags{"bar": []string{}}
 
 	tests := []struct {
 		existingRoles map[string]spec.PgUser
 		teamRoles     []string
 		result        map[string]spec.PgUser
+		err           error
 	}{
 		{
 			existingRoles: map[string]spec.PgUser{"foo": {Name: "foo", Origin: spec.RoleOriginTeamsAPI,
-				Flags: []string{"NOLOGIN"}}, "bar": {Name: "bar", Flags: []string{"NOLOGIN"}}},
+				Flags: []string{"LOGIN"}}, "bar": {Name: "bar", Flags: []string{"LOGIN"}}},
 			teamRoles: []string{"foo"},
 			result: map[string]spec.PgUser{"foo": {Name: "foo", Origin: spec.RoleOriginTeamsAPI,
 				MemberOf: []string{cl.OpConfig.PamRoleName}, Flags: []string{"LOGIN", "SUPERUSER"}},
-				"bar": {Name: "bar", Flags: []string{"NOLOGIN"}}},
+				"bar": {Name: "bar", Flags: []string{"LOGIN"}}},
+			err: fmt.Errorf("could not init human users: cannot initialize members for team %q who owns the Postgres cluster: could not get list of team members for team %q: could not get team info for team %q: mocked error of mock Teams API for team %q", cl.Spec.TeamID, cl.Spec.TeamID, cl.Spec.TeamID, cl.Spec.TeamID),
 		},
 		{
 			existingRoles: map[string]spec.PgUser{},
 			teamRoles:     []string{"admin", replicationUserName},
 			result:        map[string]spec.PgUser{},
+			err:           nil,
 		},
 	}
 
 	for _, tt := range tests {
+		// set pgUsers so that initUsers sets up pgUsersCache with team roles
+		cl.pgUsers = tt.existingRoles
+
+		// initUsers calls initHumanUsers which should fail
+		// because no members are set for mocked teams API
+		if err := cl.initUsers(); err != nil {
+			// check that at least team roles are remembered in c.pgUsers
+			if len(cl.pgUsers) < len(tt.teamRoles) {
+				t.Errorf("%s unexpected size of pgUsers: expected at least %d, got %d", t.Name(), len(tt.teamRoles), len(cl.pgUsers))
+			}
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s expected error %v, got %v", t.Name(), err, tt.err)
+			}
+		}
+
+		// set pgUsers again to test initHumanUsers with working teams API
 		cl.pgUsers = tt.existingRoles
 		mockTeamsAPI.setMembers(tt.teamRoles)
 		if err := cl.initHumanUsers(); err != nil {
@@ -288,12 +315,12 @@ type mockTeamsAPIClientMultipleTeams struct {
 func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
 	for _, team := range m.teams {
 		if team.teamID == teamID {
-			return &teams.Team{Members: team.members}, statusCode, nil
+			return &teams.Team{Members: team.members}, http.StatusOK, nil
 		}
 	}
 
 	// should not be reached if a slice with teams is populated correctly
-	return nil, statusCode, nil
+	return nil, http.StatusInternalServerError, fmt.Errorf("mocked error of mock Teams API")
 }
 
 // Test adding members of maintenance teams that get superuser rights for all PG databases
