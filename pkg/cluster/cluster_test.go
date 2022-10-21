@@ -228,8 +228,9 @@ func (m *mockTeamsAPIClient) TeamInfo(teamID, token string) (tm *teams.Team, sta
 	}
 
 	// when members are not set handle this as an error for this mock API
-	// just makes it easier to test behavior when teams API is unavailable
-	return nil, http.StatusInternalServerError, fmt.Errorf("mocked error of mock Teams API for team %q", teamID)
+	// makes it easier to test behavior when teams API is unavailable
+	return nil, http.StatusInternalServerError,
+		fmt.Errorf("mocked %d error of mock Teams API for team %q", http.StatusInternalServerError, teamID)
 }
 
 func (m *mockTeamsAPIClient) setMembers(members []string) {
@@ -319,8 +320,10 @@ func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *te
 		}
 	}
 
-	// should not be reached if a slice with teams is populated correctly
-	return nil, http.StatusInternalServerError, fmt.Errorf("mocked error of mock Teams API")
+	// when given teamId is not found in teams return StatusNotFound
+	// the operator should only return a warning in this case and not error out (#1842)
+	return nil, http.StatusNotFound,
+		fmt.Errorf("mocked %d error of mock Teams API for team %q", http.StatusNotFound, teamID)
 }
 
 // Test adding members of maintenance teams that get superuser rights for all PG databases
@@ -415,6 +418,16 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 					Parameters: map[string]string(nil)}},
 			superuserTeams: []string{"postgres_superusers"},
 			teams:          []mockTeam{teamA},
+			result: map[string]spec.PgUser{
+				"postgres_superuser": userA,
+			},
+		},
+		// case 4: the team does not exist which should not return an error
+		{
+			ownerTeam:      "acid",
+			existingRoles:  map[string]spec.PgUser{},
+			superuserTeams: []string{"postgres_superusers"},
+			teams:          []mockTeam{teamA, teamB, teamTest},
 			result: map[string]spec.PgUser{
 				"postgres_superuser": userA,
 			},
