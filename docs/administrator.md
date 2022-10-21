@@ -1099,9 +1099,10 @@ and `pod-env-overrides` resources applied to your cluster, ensure that the opera
 is set up like the following:
 ```yml
 ...
-aws_or_gcp:
+kubernetes:
   pod_environment_secret: "psql-backup-creds"
   pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
+aws_or_gcp:
   wal_az_storage_account: "postgresbackupsbucket28302F2"  # name of storage account to save the WAL-G logs
 ...
 ```

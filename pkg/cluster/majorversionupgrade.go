@@ -57,10 +57,10 @@ func (c *Cluster) isUpgradeAllowedForTeam(owningTeam string) bool {
 }
 
 /*
-  Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
+Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
 
-  Manual upgrade means, it is triggered by the user via manifest version change
-  Full upgrade means, operator also determines the minimal version used accross all clusters and upgrades violators.
+Manual upgrade means, it is triggered by the user via manifest version change
+Full upgrade means, operator also determines the minimal version used accross all clusters and upgrades violators.
 */
 func (c *Cluster) majorVersionUpgrade() error {
 
@@ -105,8 +105,8 @@ func (c *Cluster) majorVersionUpgrade() error {
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
-			upgradeCommand := fmt.Sprintf("/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
-			
+			upgradeCommand := fmt.Sprintf("set -o pipefail && /usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
+
 			c.logger.Debugf("checking if the spilo image runs with root or non-root (check for user id=0)")
 			resultIdCheck, errIdCheck := c.ExecCommand(podName, "/bin/bash", "-c", "/usr/bin/id -u")
 			if errIdCheck != nil {
@@ -117,10 +117,10 @@ func (c *Cluster) majorVersionUpgrade() error {
 			var result string
 			if resultIdCheck != "0" {
 				c.logger.Infof("User id was identified as: %s, hence default user is non-root already", resultIdCheck)
-				result, err = c.ExecCommand(podName, "/bin/bash", "-o", "pipefail", "-c", upgradeCommand)
+				result, err = c.ExecCommand(podName, "/bin/bash", "-c", upgradeCommand)
 			} else {
 				c.logger.Infof("User id was identified as: %s, using su to reach the postgres user", resultIdCheck)
-				result, err = c.ExecCommand(podName, "/bin/su", "postgres", "-o", "pipefail", "-c", upgradeCommand)
+				result, err = c.ExecCommand(podName, "/bin/su", "postgres", "-c", upgradeCommand)
 			}
 			if err != nil {
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "Upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)

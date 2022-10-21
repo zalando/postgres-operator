@@ -841,7 +841,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		pgsql.Spec.StandbyCluster = tt.standbyDescription
 		c.Postgresql = pgsql
 
-		actualEnvs := c.generateSpiloPodEnvVars(&pgsql.Spec, types.UID(dummyUUID), exampleSpiloConfig)
+		actualEnvs, err := c.generateSpiloPodEnvVars(&pgsql.Spec, types.UID(dummyUUID), exampleSpiloConfig)
+		assert.NoError(t, err)
 
 		for _, ev := range tt.expectedValues {
 			env := actualEnvs[ev.envIndex]
