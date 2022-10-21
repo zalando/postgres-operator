@@ -264,7 +264,8 @@ func TestInitHumanUsers(t *testing.T) {
 			result: map[string]spec.PgUser{"foo": {Name: "foo", Origin: spec.RoleOriginTeamsAPI,
 				MemberOf: []string{cl.OpConfig.PamRoleName}, Flags: []string{"LOGIN", "SUPERUSER"}},
 				"bar": {Name: "bar", Flags: []string{"LOGIN"}}},
-			err: fmt.Errorf("could not init human users: cannot initialize members for team %q who owns the Postgres cluster: could not get list of team members for team %q: could not get team info for team %q: mocked error of mock Teams API for team %q", cl.Spec.TeamID, cl.Spec.TeamID, cl.Spec.TeamID, cl.Spec.TeamID),
+			err: fmt.Errorf("could not init human users: cannot initialize members for team %q who owns the Postgres cluster: could not get list of team members for team %q: could not get team info for team %q: mocked %d error of mock Teams API for team %q",
+				cl.Spec.TeamID, cl.Spec.TeamID, cl.Spec.TeamID, http.StatusInternalServerError, cl.Spec.TeamID),
 		},
 		{
 			existingRoles: map[string]spec.PgUser{},
