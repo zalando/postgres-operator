@@ -204,11 +204,12 @@ type CloneDescription struct {
 
 // Sidecar defines a container to be run in the same pod as the Postgres container.
 type Sidecar struct {
-	*Resources  `json:"resources,omitempty"`
-	Name        string             `json:"name,omitempty"`
-	DockerImage string             `json:"image,omitempty"`
-	Ports       []v1.ContainerPort `json:"ports,omitempty"`
-	Env         []v1.EnvVar        `json:"env,omitempty"`
+	*Resources      `json:"resources,omitempty"`
+	Name            string              `json:"name,omitempty"`
+	DockerImage     string              `json:"image,omitempty"`
+	Ports           []v1.ContainerPort  `json:"ports,omitempty"`
+	Env             []v1.EnvVar         `json:"env,omitempty"`
+	SecurityContext *v1.SecurityContext `json:"securityContext,omitempty"`
 }
 
 // UserFlags defines flags (such as superuser, nologin) that could be assigned to individual users

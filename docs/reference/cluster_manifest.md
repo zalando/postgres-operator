@@ -464,6 +464,10 @@ defined in the sidecar dictionary:
   [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container)
   for each sidecar container. Optional.
 
+* **securityContext**
+  a [Kubernetes SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)
+  for each sidecar container. Optional.
+
 ### Requests
 
 CPU and memory requests for the sidecar container.

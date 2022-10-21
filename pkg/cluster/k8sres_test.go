@@ -1801,6 +1801,8 @@ func TestSidecars(t *testing.T) {
 		}
 	}
 
+	trueValue := true
+
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
 			PgVersion: "12.1",
@@ -1830,6 +1832,10 @@ func TestSidecars(t *testing.T) {
 			acidv1.Sidecar{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
+			},
+			acidv1.Sidecar{
+				Name:            "security-context-sidecar",
+				SecurityContext: &v1.SecurityContext{AllowPrivilegeEscalation: &trueValue},
 			},
 		},
 	}
@@ -1921,7 +1927,7 @@ func TestSidecars(t *testing.T) {
 	}
 
 	// deduplicated sidecars and Patroni
-	assert.Equal(t, 7, len(s.Spec.Template.Spec.Containers), "wrong number of containers")
+	assert.Equal(t, 8, len(s.Spec.Template.Spec.Containers), "wrong number of containers")
 
 	// cluster specific sidecar
 	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
@@ -1976,6 +1982,16 @@ func TestSidecars(t *testing.T) {
 		ImagePullPolicy: v1.PullIfNotPresent,
 		Env:             scalyrEnv,
 		VolumeMounts:    mounts,
+	})
+
+	// securityContext sidecar
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "security-context-sidecar",
+		Env:             env,
+		Resources:       generateKubernetesResources("200m", "500m", "0.7Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		VolumeMounts:    mounts,
+		SecurityContext: &v1.SecurityContext{AllowPrivilegeEscalation: &trueValue},
 	})
 
 }
