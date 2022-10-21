@@ -75,6 +75,37 @@ func needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 		*spec.EnableReplicaConnectionPooler
 }
 
+func (c *Cluster) needConnectionPoolerUser(oldSpec, newSpec *acidv1.PostgresSpec) bool {
+	// return true if pooler is needed AND was not disabled before OR user name differs
+	return (needMasterConnectionPoolerWorker(newSpec) || needReplicaConnectionPoolerWorker(newSpec)) &&
+		((!needMasterConnectionPoolerWorker(oldSpec) &&
+			!needReplicaConnectionPoolerWorker(oldSpec)) ||
+			c.poolerUser(oldSpec) != c.poolerUser(newSpec))
+}
+
+func (c *Cluster) poolerUser(spec *acidv1.PostgresSpec) string {
+	connectionPoolerSpec := spec.ConnectionPooler
+	if connectionPoolerSpec == nil {
+		connectionPoolerSpec = &acidv1.ConnectionPooler{}
+	}
+	// Using superuser as pooler user is not a good idea. First of all it's
+	// not going to be synced correctly with the current implementation,
+	// and second it's a bad practice.
+	username := c.OpConfig.ConnectionPooler.User
+
+	isSuperUser := connectionPoolerSpec.User == c.OpConfig.SuperUsername
+	isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
+		connectionPoolerSpec.User, "connection pool role")
+
+	if !isSuperUser && !isProtectedUser {
+		username = util.Coalesce(
+			connectionPoolerSpec.User,
+			c.OpConfig.ConnectionPooler.User)
+	}
+
+	return username
+}
+
 // when listing pooler k8s objects
 func (c *Cluster) poolerLabelsSet(addExtraLabels bool) labels.Set {
 	poolerLabels := c.labelsSet(addExtraLabels)
