@@ -38,6 +38,7 @@ type Interface interface {
 	Restart(server *v1.Pod) error
 	GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, error)
 	SetConfig(server *v1.Pod, config map[string]interface{}) error
+	RewriteConfig(server *v1.Pod, config map[string]interface{}) error
 }
 
 // Patroni API client
@@ -78,6 +79,42 @@ func apiURL(masterPod *v1.Pod) (string, error) {
 }
 
 func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer) (err error) {
+	request, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return fmt.Errorf("could not create request: %v", err)
+	}
+
+	if p.logger != nil {
+		p.logger.Debugf("making %s http request: %s", method, request.URL.String())
+	}
+
+	resp, err := p.httpClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("could not make request: %v", err)
+	}
+	defer func() {
+		if err2 := resp.Body.Close(); err2 != nil {
+			if err != nil {
+				err = fmt.Errorf("could not close request: %v, prior error: %v", err2, err)
+			} else {
+				err = fmt.Errorf("could not close request: %v", err2)
+			}
+			return
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("could not read response: %v", err)
+		}
+
+		return fmt.Errorf("patroni returned '%s'", string(bodyBytes))
+	}
+	return nil
+}
+
+func (p *Patroni) httpPut(method string, url string, body *bytes.Buffer) (err error) {
 	request, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return fmt.Errorf("could not create request: %v", err)
@@ -176,6 +213,19 @@ func (p *Patroni) SetConfig(server *v1.Pod, config map[string]interface{}) error
 		return err
 	}
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
+}
+
+func (p *Patroni) RewriteConfig(server *v1.Pod, config map[string]interface{}) error {
+	buf := &bytes.Buffer{}
+	err := json.NewEncoder(buf).Encode(config)
+	if err != nil {
+		return fmt.Errorf("could not encode json: %v", err)
+	}
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return err
+	}
+	return p.httpPut(http.MethodPut, apiURLString+configPath, buf)
 }
 
 // ClusterMembers array of cluster members from Patroni API

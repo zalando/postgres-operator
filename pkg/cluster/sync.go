@@ -541,6 +541,45 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	configPatched := false
 	requiresMasterRestart := false
 
+	for slotName, _ := range effectivePatroniConfig.Slots {
+		if _, exists := desiredPatroniConfig.Slots[slotName]; exists {
+			continue
+		}
+
+		configToRewrite := make(map[string]interface{})
+		configToRewrite["loop_wait"] = effectivePatroniConfig.LoopWait
+		configToRewrite["maximum_lag_on_failover"] = effectivePatroniConfig.MaximumLagOnFailover
+		configToRewrite["pg_hba"] = effectivePatroniConfig.PgHba
+		configToRewrite["retry_timeout"] = effectivePatroniConfig.RetryTimeout
+		configToRewrite["synchronous_mode"] = effectivePatroniConfig.SynchronousMode
+		configToRewrite["synchronous_mode_strict"] = effectivePatroniConfig.SynchronousModeStrict
+		configToRewrite["ttl"] = effectivePatroniConfig.TTL
+		configToRewrite["postgresql"] = map[string]interface{}{constants.PatroniPGParametersParameterName: effectivePgParameters}
+
+		slotsToRewrite := make(map[string]map[string]string)
+		for slotName, desiredSlot := range desiredPatroniConfig.Slots {
+			slotsToRewrite[slotName] = desiredSlot
+		}
+
+		if len(slotsToRewrite) > 0 {
+			configToRewrite["slots"] = slotsToRewrite
+		}
+
+		configToRewriteJson, err := json.Marshal(configToRewrite)
+		if err != nil {
+			c.logger.Debugf("could not convert config rewrite to JSON: %v", err)
+		}
+
+		podName := util.NameFromMeta(pod.ObjectMeta)
+		c.logger.Debugf("rewrite Postgres config via Patroni API on pod %s with following options: %s",
+			podName, configToRewriteJson)
+		if err = c.patroni.RewriteConfig(pod, configToRewrite); err != nil {
+			return configPatched, requiresMasterRestart, fmt.Errorf("could not rewrite postgres parameters within pod %s: %v", podName, err)
+		}
+
+		break
+	}
+
 	// compare effective and desired Patroni config options
 	if desiredPatroniConfig.LoopWait > 0 && desiredPatroniConfig.LoopWait != effectivePatroniConfig.LoopWait {
 		configToSet["loop_wait"] = desiredPatroniConfig.LoopWait
