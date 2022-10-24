@@ -59,7 +59,7 @@ type patroniDCS struct {
 	SynchronousNodeCount     uint32                       `json:"synchronous_node_count,omitempty"`
 	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
 	Slots                    map[string]map[string]string `json:"slots,omitempty"`
-	FailsafeMode             bool                         `json:"failsafe_mode,omitempty"`
+	FailsafeMode             *bool                        `json:"failsafe_mode,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -380,8 +380,8 @@ PatroniInitDBParams:
 		config.Bootstrap.DCS.SynchronousNodeCount = patroni.SynchronousNodeCount
 	}
 	if patroni.FailsafeMode != nil {
-		config.Bootstrap.DCS.FailsafeMode = *patroni.FailsafeMode
-	} else {
+		config.Bootstrap.DCS.FailsafeMode = patroni.FailsafeMode
+	} else if opConfig.EnablePatroniFailsafeMode != nil {
 		config.Bootstrap.DCS.FailsafeMode = opConfig.EnablePatroniFailsafeMode
 	}
 

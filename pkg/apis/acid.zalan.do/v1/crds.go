@@ -1461,6 +1461,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"patroni": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"failsafe_mode": {
+								Type: "boolean",
+							},
+						},
+					},
 					"postgres_pod_resources": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{

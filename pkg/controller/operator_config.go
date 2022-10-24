@@ -78,7 +78,6 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.SpiloRunAsUser = fromCRD.Kubernetes.SpiloRunAsUser
 	result.SpiloRunAsGroup = fromCRD.Kubernetes.SpiloRunAsGroup
 	result.SpiloFSGroup = fromCRD.Kubernetes.SpiloFSGroup
-	result.EnablePatroniFailsafeMode = fromCRD.Patroni.EnableFailsafeMode
 	result.AdditionalPodCapabilities = fromCRD.Kubernetes.AdditionalPodCapabilities
 	result.ClusterDomain = util.Coalesce(fromCRD.Kubernetes.ClusterDomain, "cluster.local")
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
@@ -216,6 +215,9 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ScalyrMemoryRequest = fromCRD.Scalyr.ScalyrMemoryRequest
 	result.ScalyrCPULimit = fromCRD.Scalyr.ScalyrCPULimit
 	result.ScalyrMemoryLimit = fromCRD.Scalyr.ScalyrMemoryLimit
+
+	// Patroni config
+	result.EnablePatroniFailsafeMode = util.CoalesceBool(fromCRD.Patroni.FailsafeMode, util.False())
 
 	// Connection pooler. Looks like we can't use defaulting in CRD before 1.17,
 	// so ensure default values here.

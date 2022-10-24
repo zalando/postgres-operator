@@ -229,7 +229,7 @@ type OperatorLogicalBackupConfiguration struct {
 
 // PatroniConfiguration defines configuration for Patroni
 type PatroniConfiguration struct {
-	EnableFailsafeMode bool `json:"enable_failsafe_mode,omitempty"`
+	FailsafeMode *bool `json:"failsafe_mode,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config
@@ -264,7 +264,7 @@ type OperatorConfigurationData struct {
 	Scalyr                        ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup                 OperatorLogicalBackupConfiguration `json:"logical_backup"`
 	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
-	Patroni                       PatroniConfiguration               `json:"patroni_configuration"`
+	Patroni                       PatroniConfiguration               `json:"patroni"`
 
 	MinInstances                      int32  `json:"min_instances,omitempty"`
 	MaxInstances                      int32  `json:"max_instances,omitempty"`

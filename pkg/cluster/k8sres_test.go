@@ -118,7 +118,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				Auth: config.Auth{
 					PamRoleName: "zalandos",
 				},
-				EnablePatroniFailsafeMode: true,
+				EnablePatroniFailsafeMode: util.True(),
 			},
 			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
 		},
@@ -132,9 +132,9 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				Auth: config.Auth{
 					PamRoleName: "zalandos",
 				},
-				EnablePatroniFailsafeMode: true,
+				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":false}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
@@ -146,7 +146,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				Auth: config.Auth{
 					PamRoleName: "zalandos",
 				},
-				EnablePatroniFailsafeMode: false,
+				EnablePatroniFailsafeMode: util.False(),
 			},
 			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
 		},
