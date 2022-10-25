@@ -151,6 +151,7 @@ data:
   # spilo_runasuser: 101
   # spilo_runasgroup: 103
   # spilo_fsgroup: 103
+  # pod_fs_group_change_policy: OnRootMismatch
   spilo_privileged: "false"
   storage_resize_mode: "pvc"
   super_username: postgres

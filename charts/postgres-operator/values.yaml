@@ -193,12 +193,18 @@ configKubernetes:
   secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
   # sharing unix socket of PostgreSQL (`pg_socket`) with the sidecars
   share_pgsocket_with_sidecars: false
+
   # set user and group for the spilo container (required to run Spilo as non-root process)
   # spilo_runasuser: 101
   # spilo_runasgroup: 103
 
   # group ID with write-access to volumes (required to run Spilo as non-root process)
   # spilo_fsgroup: 103
+
+  # Configure volume permission and the ownership change policy for Pods
+  # Valid options are undefined, OnRootMismatch, Always
+  # See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#configure-volume-permission-and-ownership-change-policy-for-pods
+  # pod_fs_group_change_policy: OnRootMismatch
 
   # whether the Spilo container should run in privileged mode
   spilo_privileged: false
