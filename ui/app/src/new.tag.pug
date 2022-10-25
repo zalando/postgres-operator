@@ -228,7 +228,7 @@ new
                       )
                       |
                       | Master
-                  li(if='{ [undefined, true].includes(config.replica_load_balancer_visible) }')
+                  li(if='{ [undefined, true].includes(config.replica_load_balancer_visible) && instanceCount > 1 }')
                     label
                       input(
                         type='checkbox'
@@ -251,7 +251,7 @@ new
                       )
                       |
                       | Master
-                  li(if='{ [undefined, true].includes(config.replica_connection_pooler_visible) }')
+                  li(if='{ [undefined, true].includes(config.replica_connection_pooler_visible) && instanceCount > 1 }')
                     label
                       input(
                         type='checkbox'
@@ -274,7 +274,7 @@ new
                       )
                       |
                       | Master
-                  li(if='{ [undefined, true].includes(config.replica_pooler_load_balancer_visible) }')
+                  li(if='{ [undefined, true].includes(config.replica_pooler_load_balancer_visible) && instanceCount > 1 }')
                     label
                       input(
                         type='checkbox'
@@ -750,6 +750,11 @@ new
 
     this.instanceCountChange = e => {
       this.instanceCount = +e.target.value
+      if (this.instanceCount < 2) {	
+        this.enableReplicaLoadBalancer = false
+        this.enableReplicaConnectionPooler = false
+        this.enableReplicaPoolerLoadBalancer = false
+      }
     }
 
     this.checkClusterExists = () => (

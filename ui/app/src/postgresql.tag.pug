@@ -168,11 +168,13 @@ postgresql
                 this.progress.dnsName = data.metadata.name + '.' + data.metadata.namespace
               }
 
-              jQuery.get('/pooler/' + this.cluster_path).done(data => {
-                this.progress.pooler = {"url": ""}
-                this.update()
-              })
-
+              if (this.progress.poolerEnabled == true) {
+                jQuery.get('/pooler/' + this.cluster_path).done(data => {
+                  this.progress.pooler = {"url": ""}
+                  this.update()
+                })
+              }
+              
               this.update()
             })
           })
