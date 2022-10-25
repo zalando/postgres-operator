@@ -30,7 +30,7 @@ type Resources struct {
 	PodLabelWaitTimeout           time.Duration             `name:"pod_label_wait_timeout" default:"10m"`
 	PodDeletionWaitTimeout        time.Duration             `name:"pod_deletion_wait_timeout" default:"10m"`
 	PodTerminateGracePeriod       time.Duration             `name:"pod_terminate_grace_period" default:"5m"`
-	PodFsGroupChangePolicy        v1.PodFSGroupChangePolicy `name:"pod_fsgroupchangepolicy"`
+	PodFsGroupChangePolicy        v1.PodFSGroupChangePolicy `name:"pod_fs_group_change_policy"`
 	SpiloRunAsUser                *int64                    `name:"spilo_runasuser"`
 	SpiloRunAsGroup               *int64                    `name:"spilo_runasgroup"`
 	SpiloFSGroup                  *int64                    `name:"spilo_fsgroup"`
@@ -230,7 +230,7 @@ type Config struct {
 	ClusterHistoryEntries                    int                       `name:"cluster_history_entries" default:"1000"`
 	TeamAPIRoleConfiguration                 map[string]string         `name:"team_api_role_configuration" default:"log_statement:all"`
 	PodTerminateGracePeriod                  time.Duration             `name:"pod_terminate_grace_period" default:"5m"`
-	PodFsGroupChangePolicy                   v1.PodFSGroupChangePolicy `name:"pod_fsgroupchangepolicy"`
+	PodFsGroupChangePolicy                   v1.PodFSGroupChangePolicy `name:"pod_fs_group_change_policy"`
 	PodManagementPolicy                      string                    `name:"pod_management_policy" default:"ordered_ready"`
 	EnableReadinessProbe                     bool                      `name:"enable_readiness_probe" default:"false"`
 	ProtectedRoles                           []string                  `name:"protected_role_names" default:"admin,cron_admin"`

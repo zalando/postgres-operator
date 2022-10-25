@@ -309,7 +309,7 @@ spec:
                   pod_terminate_grace_period:
                     type: string
                     default: "5m"
-                  pod_fsgroupchangepolicy:
+                  pod_fs_group_change_policy:
                     type: string
                     enum:
                       - OnRootMismatch
