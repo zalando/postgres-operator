@@ -68,6 +68,8 @@ postgresqls
                   | IOPS (-3000 baseline): 0.006$
                   br
                   | Throughput (-125 baseline): 0.0476$
+                  br
+                  | 1 ELB: 21.96$
             th(stlye='width: 120px')
 
         tbody
@@ -87,7 +89,7 @@ postgresqls
             td { volume_size }
             td { iops }
             td { throughput }
-            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput) }$
+            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput, num_elb) }$
 
             td
 
@@ -167,7 +169,9 @@ postgresqls
                   | IOPS (-3000 baseline): 0.006$
                   br
                   | Throughput (-125 baseline): 0.0476$
-            th(stlye='width: 120px')
+                  br
+                  | 1 ELB: 21.96$
+            th(style='width: 120px')
 
         tbody
           tr(
@@ -188,7 +192,7 @@ postgresqls
             td { volume_size }
             td { iops }
             td { throughput }
-            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput) }$
+            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput, num_elb) }$
 
             td
 
@@ -263,10 +267,11 @@ postgresqls
       + '/' + encodeURI(cluster.name)
     )
 
-    const calcCosts = this.calcCosts = (nodes, cpu, memory, disk, iops, throughput) => {
+    const calcCosts = this.calcCosts = (nodes, cpu, memory, disk, iops, throughput, num_elb) => {
       podcount = Math.max(nodes, opts.config.min_pods)
       corecost = toCores(cpu) * opts.config.cost_core * 30.5 * 24
       memorycost = toMemory(memory) * opts.config.cost_memory * 30.5 * 24
+      elbcost = num_elb * opts.config.cost_elb * 30.5 * 24
       diskcost = toDisk(disk) * opts.config.cost_ebs
       iopscost = 0
       if (iops !== undefined && iops > opts.config.free_iops) {
@@ -283,7 +288,7 @@ postgresqls
         throughputcost = (throughput - opts.config.free_throughput) * opts.config.cost_throughput
       }
 
-      costs = podcount * (Math.max(corecost, memorycost) + diskcost + iopscost + throughputcost)
+      costs = podcount * (Math.max(corecost, memorycost) + diskcost + iopscost + throughputcost) + elbcost
        return costs.toFixed(2)
     }
 

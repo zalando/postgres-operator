@@ -101,6 +101,7 @@ COST_THROUGHPUT = float(getenv('COST_THROUGHPUT', 0.0476))  # MB/s per month abo
 # compute costs, i.e. https://www.ec2instances.info/?region=eu-central-1&selected=m5.2xlarge
 COST_CORE = float(getenv('COST_CORE', 0.0575))  # Core per hour m5.2xlarge / 8.
 COST_MEMORY = float(getenv('COST_MEMORY', 0.014375))  # Memory GB m5.2xlarge / 32.
+COST_ELB = float(getenv('COST_ELB', 0.03))     # per hour
 
 # maximum and limitation of IOPS and throughput 
 FREE_IOPS = float(getenv('FREE_IOPS', 3000)) 
@@ -334,6 +335,7 @@ DEFAULT_UI_CONFIG = {
     'cost_throughput': COST_THROUGHPUT,
     'cost_core': COST_CORE,
     'cost_memory': COST_MEMORY,
+    'cost_elb': COST_ELB,
     'min_pods': MIN_PODS,
     'free_iops': FREE_IOPS, 
     'free_throughput': FREE_THROUGHPUT,
@@ -523,6 +525,8 @@ def get_postgresqls():
             'namespaced_name': namespace + '/' + name,
             'full_name': namespace + '/' + name + ('/' + uid if uid else ''),
             'status': status,
+            'num_elb': spec.get('enableMasterLoadBalancer', 0) + spec.get('enableReplicaLoadBalancer', 0) + \
+                       spec.get('enableMasterPoolerLoadBalancer', 0) + spec.get('enableReplicaPoolerLoadBalancer', 0),
         }
         for cluster in these(
             read_postgresqls(
@@ -662,49 +666,20 @@ def update_postgresql(namespace: str, cluster: str):
 
         spec['volume']['throughput'] = throughput
 
-    if 'enableConnectionPooler' in postgresql['spec']:
-        cp = postgresql['spec']['enableConnectionPooler']
-        if not cp:
-            if 'enableConnectionPooler' in o['spec']:
-                del o['spec']['enableConnectionPooler']
-        else:
-            spec['enableConnectionPooler'] = True
-    else:
-        if 'enableConnectionPooler' in o['spec']:
-            del o['spec']['enableConnectionPooler']
+    additional_specs = ['enableMasterLoadBalancer',
+                        'enableReplicaLoadBalancer',
+                        'enableConnectionPooler',
+                        'enableReplicaConnectionPooler',
+                        'enableMasterPoolerLoadBalancer',
+                        'enableReplicaPoolerLoadBalancer',
+                        ]
 
-    if 'enableReplicaConnectionPooler' in postgresql['spec']:
-        cp = postgresql['spec']['enableReplicaConnectionPooler']
-        if not cp:
-            if 'enableReplicaConnectionPooler' in o['spec']:
-                del o['spec']['enableReplicaConnectionPooler']
+    for var in additional_specs:
+        if postgresql['spec'].get(var):
+            spec[var] = True
         else:
-            spec['enableReplicaConnectionPooler'] = True
-    else:
-        if 'enableReplicaConnectionPooler' in o['spec']:
-            del o['spec']['enableReplicaConnectionPooler']
-
-    if 'enableReplicaLoadBalancer' in postgresql['spec']:
-        rlb = postgresql['spec']['enableReplicaLoadBalancer']
-        if not rlb:
-            if 'enableReplicaLoadBalancer' in o['spec']:
-                del o['spec']['enableReplicaLoadBalancer']
-        else:
-            spec['enableReplicaLoadBalancer'] = True
-    else:
-        if 'enableReplicaLoadBalancer' in o['spec']:
-            del o['spec']['enableReplicaLoadBalancer']
-
-    if 'enableMasterLoadBalancer' in postgresql['spec']:
-        rlb = postgresql['spec']['enableMasterLoadBalancer']
-        if not rlb:
-            if 'enableMasterLoadBalancer' in o['spec']:
-                del o['spec']['enableMasterLoadBalancer']
-        else:
-            spec['enableMasterLoadBalancer'] = True
-    else:
-        if 'enableMasterLoadBalancer' in o['spec']:
-            del o['spec']['enableMasterLoadBalancer']
+            if var in o['spec']:
+                del o['spec'][var]
 
     if 'users' in postgresql['spec']:
         spec['users'] = postgresql['spec']['users']

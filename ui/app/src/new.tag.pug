@@ -216,40 +216,73 @@ new
                 )
 
             tr(if='{ [undefined, true].includes(config.master_load_balancer_visible) }')
-              td Master load balancer
+              td Enable load balancer
               td
-                label
-                  input(
-                    type='checkbox'
-                    value='{ enableMasterLoadBalancer }'
-                    onchange='{ toggleEnableMasterLoadBalancer }'
-                  )
-                  |
-                  | Enable master ELB
+                ul.ips
+                  li
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableMasterLoadBalancer }'
+                        onchange='{ toggleEnableMasterLoadBalancer }'
+                      )
+                      |
+                      | Master
+                  li(if='{ [undefined, true].includes(config.replica_load_balancer_visible) && instanceCount > 1 }')
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableReplicaLoadBalancer }'
+                        onchange='{ toggleEnableReplicaLoadBalancer }'
+                      )
+                      |
+                      | Replica
 
-            tr(if='{ [undefined, true].includes(config.replica_load_balancer_visible) }')
-              td Replica load balancer
+            tr(if='{ [undefined, true].includes(config.connection_pooler_visible) }')
+              td Enable connection pooler
               td
-                label
-                  input(
-                    type='checkbox'
-                    value='{ enableReplicaLoadBalancer }'
-                    onchange='{ toggleEnableReplicaLoadBalancer }'
-                  )
-                  |
-                  | Enable replica ELB
+                ul.ips
+                  li
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableConnectionPooler }'
+                        onchange='{ toggleEnableConnectionPooler }'
+                      )
+                      |
+                      | Master
+                  li(if='{ [undefined, true].includes(config.replica_connection_pooler_visible) && instanceCount > 1 }')
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableReplicaConnectionPooler }'
+                        onchange='{ toggleEnableReplicaConnectionPooler }'
+                      )
+                      |
+                      | Replica
 
-            tr
-              td Enable Connection Pool
+            tr(if='{ [undefined, true].includes(config.master_pooler_load_balancer_visible) }')
+              td Enable connection pooler load balancer
               td
-                label
-                  input(
-                    type='checkbox'
-                    value='{ enableConnectionPooler }'
-                    onchange='{ toggleEnableConnectionPooler }'
-                  )
-                  |
-                  | Enable Connection Pool (using PGBouncer)
+                ul.ips
+                  li
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableMasterPoolerLoadBalancer }'
+                        onchange='{ toggleEnableMasterPoolerLoadBalancer }'
+                      )
+                      |
+                      | Master
+                  li(if='{ [undefined, true].includes(config.replica_pooler_load_balancer_visible) && instanceCount > 1 }')
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableReplicaPoolerLoadBalancer }'
+                        onchange='{ toggleEnableReplicaPoolerLoadBalancer }'
+                      )
+                      |
+                      | Replica
 
             tr
               td Volume size
@@ -267,7 +300,7 @@ new
                   .input-group-addon
                     .input-units Gi
             tr
-              td 
+              td
               td Specify Iops and Throughput only if you need more than the default 3000 Iops and 125Mb/s EBS provides.
 
             tr
@@ -539,6 +572,15 @@ new
         {{#if enableConnectionPooler}}
         enableConnectionPooler: true
         {{/if}}
+        {{#if enableReplicaConnectionPooler}}
+        enableReplicaConnectionPooler: true
+        {{/if}}
+        {{#if enableMasterPoolerLoadBalancer}}
+        enableMasterPoolerLoadBalancer: true
+        {{/if}}
+        {{#if enableReplicaPoolerLoadBalancer}}
+        enableReplicaPoolerLoadBalancer: true
+        {{/if}}
         volume:
           size: "{{ volumeSize }}Gi"{{#if iops}}
           iops: {{ iops }}{{/if}}{{#if throughput}}
@@ -592,6 +634,9 @@ new
         enableMasterLoadBalancer: this.enableMasterLoadBalancer,
         enableReplicaLoadBalancer: this.enableReplicaLoadBalancer,
         enableConnectionPooler: this.enableConnectionPooler,
+        enableReplicaConnectionPooler: this.enableReplicaConnectionPooler,
+        enableMasterPoolerLoadBalancer: this.enableMasterPoolerLoadBalancer,
+        enableReplicaPoolerLoadBalancer: this.enableReplicaPoolerLoadBalancer,
         volumeSize: this.volumeSize,
         iops: this.iops,
         throughput: this.throughput,
@@ -655,6 +700,18 @@ new
       this.enableConnectionPooler = !this.enableConnectionPooler
     }
 
+    this.toggleEnableReplicaConnectionPooler = e => {
+      this.enableReplicaConnectionPooler = !this.enableReplicaConnectionPooler
+    }
+
+    this.toggleEnableMasterPoolerLoadBalancer = e => {
+      this.enableMasterPoolerLoadBalancer = !this.enableMasterPoolerLoadBalancer
+    }
+
+    this.toggleEnableReplicaPoolerLoadBalancer = e => {
+      this.enableReplicaPoolerLoadBalancer = !this.enableReplicaPoolerLoadBalancer
+    }
+
     this.volumeChange = e => {
       this.volumeSize = +e.target.value
     }
@@ -692,6 +749,11 @@ new
 
     this.instanceCountChange = e => {
       this.instanceCount = +e.target.value
+      if (this.instanceCount < 2) {	
+        this.enableReplicaLoadBalancer = false
+        this.enableReplicaConnectionPooler = false
+        this.enableReplicaPoolerLoadBalancer = false
+      }
     }
 
     this.checkClusterExists = () => (
@@ -957,6 +1019,9 @@ new
       this.enableMasterLoadBalancer = false
       this.enableReplicaLoadBalancer = false
       this.enableConnectionPooler = false
+      this.enableReplicaConnectionPooler = false
+      this.enableMasterPoolerLoadBalancer = false
+      this.enableReplicaPoolerLoadBalancer = false
 
       this.postgresqlVersion = this.postgresqlVersion = (
         this.config.postgresql_versions[0]
