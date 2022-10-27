@@ -38,7 +38,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p7
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
