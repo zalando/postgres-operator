@@ -2226,6 +2226,22 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
 	}
 
+	// fetch variables from custom environment Secret
+	// that will override all subsequent global variables
+	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
+	if err != nil {
+		return nil, err
+	}
+	envVars = appendEnvVars(envVars, secretEnvVarsList...)
+
+	// fetch variables from custom environment ConfigMap
+	// that will override all subsequent global variables
+	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
+	if err != nil {
+		return nil, err
+	}
+	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
+
 	c.logger.Debugf("Generated logical backup env vars")
 	c.logger.Debugf("%v", envVars)
 	return envVars
