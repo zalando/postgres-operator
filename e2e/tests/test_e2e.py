@@ -526,7 +526,7 @@ class EndToEndTestCase(unittest.TestCase):
             """ % (slot_to_remove)
             
             self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", deleted_slot_query)[0], 0,
-                "The replication slot cannot be deleted")       
+                "The replication slot cannot be deleted", 10, 5)       
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
