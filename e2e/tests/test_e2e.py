@@ -520,12 +520,12 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             deleted_slot_query = """
-                SELECT count(*)
+                SELECT slot_name
                   FROM pg_replication_slots
                  WHERE slot_name = '%s';
             """ % (slot_to_remove)
             
-            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", deleted_slot_query)[0], 0,
+            self.eventuallyEqual(lambda: len(self.query_database(replica.metadata.name, "postgres", deleted_slot_query)), 0,
                 "The replication slot cannot be deleted", 10, 5)       
 
         except timeout_decorator.TimeoutError:
