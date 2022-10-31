@@ -580,15 +580,6 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 
 	slotsToSet := make(map[string]interface{})
-	// check if specified slots exist in config and if they differ
-	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
-		if effectiveSlot, exists := effectivePatroniConfig.Slots[slotName]; exists {
-			if reflect.DeepEqual(desiredSlot, effectiveSlot) {
-				continue
-			}
-		}
-		slotsToSet[slotName] = desiredSlot
-	}
 	// check if there is any slot deletion
 	for slotName, effectiveSlot := range effectivePatroniConfig.Slots {
 		if desiredSlot, exists := desiredPatroniConfig.Slots[slotName]; exists {
@@ -597,6 +588,15 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 			}
 		}
 		slotsToSet[slotName] = nil
+	}
+	// check if specified slots exist in config and if they differ
+	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
+		if effectiveSlot, exists := effectivePatroniConfig.Slots[slotName]; exists {
+			if reflect.DeepEqual(desiredSlot, effectiveSlot) {
+				continue
+			}
+		}
+		slotsToSet[slotName] = desiredSlot
 	}
 	if len(slotsToSet) > 0 {
 		configToSet["slots"] = slotsToSet
