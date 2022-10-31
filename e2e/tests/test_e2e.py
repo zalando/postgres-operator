@@ -402,6 +402,9 @@ class EndToEndTestCase(unittest.TestCase):
                     "slots": {
                         "test_slot": {
                             "type": "physical"
+                        },
+                        "test_slot_2": {
+                            "type": "physical"
                         }
                     },
                     "ttl": 29,
@@ -496,6 +499,34 @@ class EndToEndTestCase(unittest.TestCase):
                 "Previous max_connections setting not applied on master", 10, 5)
             self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
                 "Previous max_connections setting not applied on replica", 10, 5)
+
+            # delete test_slot_2 from config
+            slot_to_remove = "test_slot_2"
+            pg_patch_slots = {
+                "spec": {
+                    "patroni": {
+                        "slots": {
+                            "test_slot": {
+                                "type": "physical"
+                            }
+                        }
+                    }
+                }
+            }
+
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_slots)
+            
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            deleted_slot_query = """
+                SELECT count(*)
+                  FROM pg_replication_slots
+                 WHERE slot_name = '%s';
+            """ % (slot_to_remove)
+            
+            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", deleted_slot_query)[0], 0,
+                "The replication slot cannot be deleted")       
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
