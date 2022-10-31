@@ -2230,7 +2230,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 	// that will override all subsequent global variables
 	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	envVars = appendEnvVars(envVars, secretEnvVarsList...)
 
@@ -2238,7 +2238,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 	// that will override all subsequent global variables
 	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
 
