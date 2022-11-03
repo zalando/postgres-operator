@@ -299,7 +299,7 @@ configAwsOrGcp:
   # Path to mount the above Secret in the filesystem of the container(s)
   # additional_secret_mount_path: "/some/dir"
 
-  # AWS region used to store ESB volumes
+  # AWS region used to store EBS volumes
   aws_region: eu-central-1
 
   # enable automatic migration on AWS from gp2 to gp3 volumes
