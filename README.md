@@ -61,7 +61,7 @@ We introduce the major version into the backup path to smoothen the [major versi
 The new operator configuration can set a compatibility flag *enable_spilo_wal_path_compat* to make Spilo look for wal segments in the current path but also old format paths.
 This comes at potential performance costs and should be disabled after a few days.
 
-The newest Spilo image is: `registry.opensource.zalan.do/acid/spilo-14:2.1-p6`
+The newest Spilo image is: `registry.opensource.zalan.do/acid/spilo-14:2.1-p7`
 
 The last Spilo 12 image is: `registry.opensource.zalan.do/acid/spilo-12:1.6-p5`
 
