@@ -577,7 +577,6 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	effectiveFailsafe := effectivePatroniConfig.FailsafeMode
 
 	if desiredFailsafe != nil {
-		c.logger.Info("desiredFailsafe is not nil")
 		if effectiveFailsafe == nil || *desiredFailsafe != *effectiveFailsafe {
 			configToSet["failsafe_mode"] = *desiredFailsafe
 		}
