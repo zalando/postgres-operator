@@ -1099,55 +1099,57 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									"repos": {
 										Type:     "array",
-										Items: &apiextv1.JSONSchemaPropsOrArray{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "string",
-											},
-										},
+										Nullable: true,
 										Required: []string{"name", "storage", "resource"},
 										MinItems: &min1int64,
 										XListType: &mapString,
 										XListMapKeys: []string{"name"},
-										Properties: map[string]apiextv1.JSONSchemaProps{
-											"name": {
-												Type: "string",
-												Pattern: "^repo[1-4]",
-											},
-											"storage": {
-												Type: "string",
-												Pattern: "^repo[1-4]",
-												Enum: []apiextv1.JSON{
-													{
-														Raw: []byte(`"s3"`),
-													},
-													{
-														Raw: []byte(`"gcs"`),
-													},
-													{
-														Raw: []byte(`"azure"`),
-													},
-												},
-											},
-											"resource": {
-												Type: "string",
-											},
-											"endpoint": {
-												Type: "string",
-											},
-											"region": {
-												Type: "string",
-											},
-											"schedule": {
+										Items: &apiextv1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1.JSONSchemaProps{
 												Type:     "object",
+												Required: []string{"secretname", "userkey", "passwordkey"},
 												Properties: map[string]apiextv1.JSONSchemaProps{
-													"full": {
-														Type:     "string",
+													"name": {
+														Type: "string",
+														Pattern: "^repo[1-4]",
 													},
-													"incr": {
-														Type:     "string",
+													"storage": {
+														Type: "string",
+														Pattern: "^repo[1-4]",
+														Enum: []apiextv1.JSON{
+															{
+																Raw: []byte(`"s3"`),
+															},
+															{
+																Raw: []byte(`"gcs"`),
+															},
+															{
+																Raw: []byte(`"azure"`),
+															},
+														},
 													},
-													"diff": {
-														Type:     "string",
+													"resource": {
+														Type: "string",
+													},
+													"endpoint": {
+														Type: "string",
+													},
+													"region": {
+														Type: "string",
+													},
+													"schedule": {
+														Type:     "object",
+														Properties: map[string]apiextv1.JSONSchemaProps{
+															"full": {
+																Type:     "string",
+															},
+															"incr": {
+																Type:     "string",
+															},
+															"diff": {
+																Type:     "string",
+															},
+														},
 													},
 												},
 											},
