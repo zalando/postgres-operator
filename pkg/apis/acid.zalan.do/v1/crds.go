@@ -1100,14 +1100,13 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									"repos": {
 										Type:     "array",
 										Nullable: true,
-										Required: []string{"name", "storage", "resource"},
 										MinItems: &min1int64,
 										XListType: &mapString,
 										XListMapKeys: []string{"name"},
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
 												Type:     "object",
-												Required: []string{"secretname", "userkey", "passwordkey"},
+												Required: []string{"name", "storage", "resource"},
 												Properties: map[string]apiextv1.JSONSchemaProps{
 													"name": {
 														Type: "string",
