@@ -1114,7 +1114,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 													},
 													"storage": {
 														Type: "string",
-														Pattern: "^repo[1-4]",
 														Enum: []apiextv1.JSON{
 															{
 																Raw: []byte(`"s3"`),
