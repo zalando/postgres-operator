@@ -648,6 +648,77 @@ spec:
                     type: string
                   throughput:
                     type: integer
+          backup:
+            type: object
+            properties:
+              pgbackrest:
+                type: object
+                properties:
+                  image:
+                    type: string
+                  configuration:
+                    type: object
+                    properties:
+                      secret:
+                        type: string
+                      parameters:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      protection:
+                        type: object
+                        properties:
+                          restore:
+                            type: boolean
+                  repos:
+                    type: array
+                    items:
+                      properties:
+                        name:
+                          type: string
+                          pattern: ^repo[1-4]
+                        storage:
+                          type: string
+                          enum:
+                            - "s3"
+                            - "gcs"
+                            - "azure"
+                        ressource:
+                          type: string
+                        endpoint:
+                          type: string
+                        region:
+                          type: string
+                        schedule:
+                          type: object
+                          properties:
+                            full:
+                              type: string
+                            incr:
+                              type: string
+                            diff:
+                              type: string
+                      required:
+                      - name
+                      - storage
+                      - ressource
+                      type: object
+                    minItems: 1
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  restore:
+                    type: object
+                    properties:
+                      repo:
+                        type: string
+                      options:
+                        type: array
+                        items:
+                          type: string
+                required:
+                  - image
+                  - repos
           status:
             type: object
             additionalProperties:
