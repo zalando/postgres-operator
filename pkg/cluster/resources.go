@@ -605,3 +605,50 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 func (c *Cluster) GetPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
 }
+
+func (c *Cluster) createPgbackrestConfig() (err error) {
+
+	c.setProcessName("creating a configmap for pgbackrest")
+
+	pgbackrestConfigmapSpec, err := c.generatepgbackrestConfigmap()
+	if err != nil {
+		return fmt.Errorf("could not generate pgbackrest configmap spec: %v", err)
+	}
+	c.logger.Debugf("Generated configmapSpec: %v", pgbackrestConfigmapSpec)
+
+	_, err = c.KubeClient.ConfigMaps(c.Namespace).Create(context.TODO(), pgbackrestConfigmapSpec, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("could not create pgbackrest config: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) updatePgbackrestConfig(cm *v1.ConfigMap) (err error) {
+
+	c.setProcessName("patching configmap for pgbackrest")
+
+	pgbackrestConfigmapSpec, err := c.generatepgbackrestConfigmap()
+	if err != nil {
+		return fmt.Errorf("could not generate pgbackrest configmap: %v", err)
+	}
+	c.logger.Debugf("Generated configmapSpec: %v", pgbackrestConfigmapSpec)
+	patchData, err := dataPatch(pgbackrestConfigmapSpec.Data)
+	if err != nil {
+		return fmt.Errorf("could not form patch for the pgbackrest configmap: %v", err)
+	}
+
+	// update the pgbackrest configmap
+	_, err = c.KubeClient.ConfigMaps(c.Namespace).Patch(
+		context.TODO(),
+		c.getPgbackrestConfigmapName(),
+		types.MergePatchType,
+		patchData,
+		metav1.PatchOptions{},
+		"")
+	if err != nil {
+		return fmt.Errorf("could not patch pgbackrest config: %v", err)
+	}
+
+	return nil
+}

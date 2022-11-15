@@ -64,6 +64,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
+	if err = c.syncPgbackrestConfig(); err != nil {
+		err = fmt.Errorf("could not sync pgbackrest config: %v", err)
+		return err
+	}
+
 	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
 	if err = c.syncVolumes(); err != nil {
 		return err
@@ -1298,6 +1303,20 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			return fmt.Errorf("could not fetch existing logical backup job: %v", err)
 		}
 	}
+	return nil
+}
 
+func (c *Cluster) syncPgbackrestConfig() error {
+	if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), c.getPgbackrestConfigmapName(), metav1.GetOptions{}); err == nil {
+		if err := c.updatePgbackrestConfig(cm); err != nil {
+			return fmt.Errorf("could not update a pgbackrest config: %v", err)
+		}
+		c.logger.Info("a pgbackrest config has been successfully updated")
+	} else {
+		if err := c.createPgbackrestConfig(); err != nil {
+			return fmt.Errorf("could not create a pgbackrest config: %v", err)
+		}
+		c.logger.Info("a pgbackrest config has been successfully created")
+	}
 	return nil
 }

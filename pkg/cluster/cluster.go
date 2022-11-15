@@ -358,6 +358,13 @@ func (c *Cluster) Create() error {
 		c.logger.Info("a k8s cron job for logical backup has been successfully created")
 	}
 
+	if c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		if err := c.createPgbackrestConfig(); err != nil {
+			return fmt.Errorf("could not create a pgbackrest config: %v", err)
+		}
+		c.logger.Info("a pgbackrest config has been successfully created")
+	}
+
 	if err := c.listResources(); err != nil {
 		c.logger.Errorf("could not list resources: %v", err)
 	}
@@ -905,6 +912,15 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 				return
 			}
 
+		}
+
+		if newSpec.Spec.Backup.Pgbackrest != nil {
+			if err := c.createPgbackrestConfig(); err != nil {
+				c.logger.Errorf("could not create a pgbackrest config: %v", err)
+				updateFailed = true
+				return
+			}
+			c.logger.Info("a pgbackrest config has been successfully created")
 		}
 
 		// apply schedule changes

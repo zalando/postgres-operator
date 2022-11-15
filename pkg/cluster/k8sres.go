@@ -2353,6 +2353,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return trimCronjobName(fmt.Sprintf("%s%s", c.OpConfig.LogicalBackupJobPrefix, c.clusterName().Name))
 }
+// getLogicalBackupJobName returns the name; the job itself may not exists
+func (c *Cluster) getPgbackrestConfigmapName() (jobName string) {
+	return fmt.Sprintf("%s-pgbackrest-config", c.Name)
+}
 
 // Return an array of ownerReferences to make an arbitraty object dependent on
 // the StatefulSet. Dependency is made on StatefulSet instead of PostgreSQL CRD
@@ -2387,4 +2391,34 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 		return path.Join(defaultDir, file)
 	}
 	return file
+}
+
+func (c *Cluster) generatepgbackrestConfigmap() (*v1.ConfigMap, error) {
+	config := "[db]\npg1-path = /home/postgres/pgdata/pgroot/data\npg1-port = 5432\npg1-socket-path = /var/run/postgresql/\n"
+	global := c.Postgresql.Spec.Backup.Pgbackrest.Global
+	if global != nil {
+		config += "\n[global]"
+		for k, v := range global {
+			config += fmt.Sprintf("\n%s = %s", k, v)
+		}
+	}
+	repos := c.Postgresql.Spec.Backup.Pgbackrest.Repos
+	if len(repos) >= 1 {
+		for _, repo := range repos {
+			config += fmt.Sprintf("\n%s-%s-bucket = %s", repo.Name, repo.Storage, repo.Resource)
+			config += fmt.Sprintf("\n%s-%s-endpoint = %s", repo.Name, repo.Storage, repo.Endpoint)
+			config += fmt.Sprintf("\n%s-%s-region = %s", repo.Name, repo.Storage, repo.Region)
+			config += fmt.Sprintf("\n%s-type = %s", repo.Name, repo.Storage)
+		}
+	}
+
+	data := map[string]string{"pgbackrest_instance.conf": config}
+	configmap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: c.Namespace,
+			Name:      c.getPgbackrestConfigmapName(),
+		},
+		Data: data,
+	}
+	return configmap, nil
 }

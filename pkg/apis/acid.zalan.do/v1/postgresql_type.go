@@ -91,6 +91,7 @@ type PostgresSpec struct {
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
 	PodPriorityClassNameOld string         `json:"pod_priority_class_name,omitempty"`
+	Backup                  *Backup        `json:"backup,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -259,4 +260,22 @@ type StreamTable struct {
 	EventType     string  `json:"eventType"`
 	IdColumn      *string `json:"idColumn,omitempty"`
 	PayloadColumn *string `json:"payloadColumn,omitempty"`
+}
+
+type Backup struct {
+	Pgbackrest *Pgbackrest `json:"pgbackrest"`
+}
+
+type Pgbackrest struct {
+	Global map[string]string `json:"global"`
+	Repos  []Repo            `json:"repos"`
+}
+
+type Repo struct {
+	Name     string            `json:"name"`
+	Storage  string            `json:"storage"`
+	Resource string            `json:"resource"`
+	Endpoint string            `json:"endpoint"`
+	Region   string            `json:"Region"`
+	Schedule map[string]string `json:"Schedule"`
 }
