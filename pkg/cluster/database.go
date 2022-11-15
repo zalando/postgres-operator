@@ -48,7 +48,7 @@ const (
 
 	getPublicationsSQL = `SELECT p.pubname, string_agg(pt.schemaname || '.' || pt.tablename, ', ' ORDER BY pt.schemaname, pt.tablename)
 	        FROM pg_publication p
-			JOIN pg_publication_tables pt ON pt.pubname = p.pubname
+			LEFT JOIN pg_publication_tables pt ON pt.pubname = p.pubname
 			GROUP BY p.pubname;`
 	createPublicationSQL = `CREATE PUBLICATION "%s" FOR TABLE %s WITH (publish = 'insert, update');`
 	alterPublicationSQL  = `ALTER PUBLICATION "%s" SET TABLE %s;`

@@ -273,6 +273,17 @@ func (c *Cluster) syncStreams() error {
 		return nil
 	}
 
+	// update config to set wal_level: logical
+	requiredPatroniConfig := c.Spec.Patroni
+	requiresRestart, err := c.syncPostgresConfig(requiredPatroniConfig)
+	if err != nil {
+		return fmt.Errorf("failed to snyc Postgres config for event streaming: %v", err)
+	}
+	if requiresRestart {
+		c.logger.Debugf("updated Postgres config. Server will be restarted and streams will get created during next sync")
+		return nil
+	}
+
 	// fetch different application IDs from streams section
 	// there will be a separate event stream resource for each ID
 	appIds := gatherApplicationIds(c.Spec.Streams)
@@ -282,7 +293,6 @@ func (c *Cluster) syncStreams() error {
 	slotsToSync := make(map[string]map[string]string)
 	publications := make(map[string]map[string]acidv1.StreamTable)
 
-	requiredPatroniConfig := c.Spec.Patroni
 	if len(requiredPatroniConfig.Slots) > 0 {
 		slots = requiredPatroniConfig.Slots
 	}
@@ -330,14 +340,9 @@ func (c *Cluster) syncStreams() error {
 	}
 
 	// add extra logical slots to Patroni config
-	c.logger.Debug("syncing Postgres config for logical decoding")
-	requiresRestart, err := c.syncPostgresConfig(requiredPatroniConfig)
+	_, err = c.syncPostgresConfig(requiredPatroniConfig)
 	if err != nil {
 		return fmt.Errorf("failed to snyc Postgres config for event streaming: %v", err)
-	}
-	if requiresRestart {
-		c.logger.Debugf("updated Postgres config. Server will be restarted and streams will get created during next sync")
-		return nil
 	}
 
 	// after Postgres was restarted we can create stream CRDs
