@@ -824,6 +824,12 @@ func (c *Cluster) generatePodTemplate(
 		addShmVolume(&podSpec)
 	}
 
+	if c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		configmapName := c.getPgbackrestConfigmapName()
+		secretName := c.Postgresql.Spec.Backup.Pgbackrest.Configuration.Secret
+		addPgbackrestConfigVolume(&podSpec, configmapName, secretName)
+	}
+
 	if podAntiAffinity {
 		podSpec.Affinity = podAffinity(
 			labels,
@@ -1729,6 +1735,49 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 	podSpec.Volumes = volumes
 }
 
+func addPgbackrestConfigVolume(podSpec *v1.PodSpec, configmapName string, secretName string) {
+
+	name := "pgbackrest-config"
+	path := "/etc/pgbackrest/conf.d"
+	defaultMode := int32(0640)
+	postgresContainerIdx := 0
+
+	volumes := append(podSpec.Volumes, v1.Volume{
+		Name: name,
+		VolumeSource: v1.VolumeSource{
+			Projected: &v1.ProjectedVolumeSource{
+				DefaultMode: &defaultMode,
+				Sources: []v1.VolumeProjection{
+					{ConfigMap: &v1.ConfigMapProjection{
+						LocalObjectReference: v1.LocalObjectReference{Name: configmapName},
+					},
+					},
+					{Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{Name: secretName},
+					},
+					},
+				},
+			},
+		},
+	})
+
+	for i, container := range podSpec.Containers {
+		if container.Name == constants.PostgresContainerName {
+			postgresContainerIdx = i
+		}
+	}
+
+	mounts := append(podSpec.Containers[postgresContainerIdx].VolumeMounts,
+		v1.VolumeMount{
+			Name:      name,
+			MountPath: path,
+		})
+
+	podSpec.Containers[postgresContainerIdx].VolumeMounts = mounts
+
+	podSpec.Volumes = volumes
+}
+
 func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string,
 	volumeSelector *metav1.LabelSelector) (*v1.PersistentVolumeClaim, error) {
 
@@ -2353,6 +2402,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return trimCronjobName(fmt.Sprintf("%s%s", c.OpConfig.LogicalBackupJobPrefix, c.clusterName().Name))
 }
+
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getPgbackrestConfigmapName() (jobName string) {
 	return fmt.Sprintf("%s-pgbackrest-config", c.Name)
@@ -2396,8 +2446,8 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 func (c *Cluster) generatepgbackrestConfigmap() (*v1.ConfigMap, error) {
 	config := "[db]\npg1-path = /home/postgres/pgdata/pgroot/data\npg1-port = 5432\npg1-socket-path = /var/run/postgresql/\n"
 	global := c.Postgresql.Spec.Backup.Pgbackrest.Global
+	config += "\n[global]"
 	if global != nil {
-		config += "\n[global]"
 		for k, v := range global {
 			config += fmt.Sprintf("\n%s = %s", k, v)
 		}

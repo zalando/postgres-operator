@@ -267,8 +267,9 @@ type Backup struct {
 }
 
 type Pgbackrest struct {
-	Global map[string]string `json:"global"`
-	Repos  []Repo            `json:"repos"`
+	Global        map[string]string `json:"global"`
+	Repos         []Repo            `json:"repos"`
+	Configuration Configuration     `json:"configuration"`
 }
 
 type Repo struct {
@@ -278,4 +279,8 @@ type Repo struct {
 	Endpoint string            `json:"endpoint"`
 	Region   string            `json:"Region"`
 	Schedule map[string]string `json:"Schedule"`
+}
+
+type Configuration struct {
+	Secret string `json:"secret"`
 }
