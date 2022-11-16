@@ -824,7 +824,7 @@ func (c *Cluster) generatePodTemplate(
 		addShmVolume(&podSpec)
 	}
 
-	if c.Postgresql.Spec.Backup.Pgbackrest != nil {
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
 		configmapName := c.getPgbackrestConfigmapName()
 		secretName := c.Postgresql.Spec.Backup.Pgbackrest.Configuration.Secret
 		addPgbackrestConfigVolume(&podSpec, configmapName, secretName)
