@@ -1,6 +1,6 @@
 apiVersion: v2
 name: postgres-operator
-version: 1.8.3
+version: 1.8.2
 appVersion: 1.8.2
 home: https://github.com/zalando/postgres-operator
 description: Postgres Operator creates and manages PostgreSQL clusters running in Kubernetes
