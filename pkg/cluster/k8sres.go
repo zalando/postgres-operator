@@ -963,6 +963,10 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, v1.EnvVar{Name: "ENABLE_WAL_PATH_COMPAT", Value: "true"})
 	}
 
+	if spec.Backup != nil && spec.Backup.Pgbackrest != nil {
+		envVars = append(envVars, v1.EnvVar{Name: "USE_PGBACKREST", Value: "true"})
+	}
+
 	if c.OpConfig.EnablePgVersionEnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
 	}

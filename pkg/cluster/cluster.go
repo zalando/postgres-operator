@@ -365,6 +365,10 @@ func (c *Cluster) Create() error {
 			return err
 		}
 		c.logger.Info("a pgbackrest config has been successfully synced")
+		if err = c.syncPgbackrestConfig(); err != nil {
+			err = fmt.Errorf("could not sync pgbackrest config: %v", err)
+			return err
+		}
 	}
 
 	if err := c.listResources(); err != nil {
