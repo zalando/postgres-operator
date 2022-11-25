@@ -40,6 +40,7 @@ const (
 	localHost                      = "127.0.0.1/32"
 	scalyrSidecarName              = "scalyr-sidecar"
 	logicalBackupContainerName     = "logical-backup"
+	pgbackrestContainerName        = "pgbackrest-backup"
 	connectionPoolerContainer      = "connection-pooler"
 	pgPort                         = 5432
 	operatorPort                   = 8080
@@ -1754,10 +1755,12 @@ func addPgbackrestConfigVolume(podSpec *v1.PodSpec, configmapName string, secret
 				Sources: []v1.VolumeProjection{
 					{ConfigMap: &v1.ConfigMapProjection{
 						LocalObjectReference: v1.LocalObjectReference{Name: configmapName},
+						Optional:             util.True(),
 					},
 					},
 					{Secret: &v1.SecretProjection{
 						LocalObjectReference: v1.LocalObjectReference{Name: secretName},
+						Optional:             util.True(),
 					},
 					},
 				},
@@ -2475,4 +2478,164 @@ func (c *Cluster) generatepgbackrestConfigmap() (*v1.ConfigMap, error) {
 		Data: data,
 	}
 	return configmap, nil
+}
+
+func (c *Cluster) generatePgbackrestJob(repo string, name string, schedule string) (*batchv1.CronJob, error) {
+
+	var (
+		err                  error
+		podTemplate          *v1.PodTemplateSpec
+		resourceRequirements *v1.ResourceRequirements
+	)
+
+	// NB: a cron job creates standard batch jobs according to schedule; these batch jobs manage pods and clean-up
+
+	c.logger.Debug("Generating pgbackrest pod template")
+
+	// allocate for the backup pod the same amount of resources as for normal DB pods
+	resourceRequirements, err = c.generateResourceRequirements(
+		c.Spec.Resources, makeDefaultResources(&c.OpConfig), pgbackrestContainerName)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
+	}
+
+	envVars := c.generatePgbbackrestPodEnvVars(name)
+	pgbackrestContainer := generateContainer(
+		pgbackrestContainerName,
+		&c.Postgresql.Spec.Backup.Pgbackrest.Image,
+		resourceRequirements,
+		envVars,
+		[]v1.VolumeMount{},
+		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
+		c.OpConfig.SpiloAllowPrivilegeEscalation,
+		nil,
+	)
+
+	labels := map[string]string{
+		c.OpConfig.ClusterNameLabel: c.Name,
+		"application":               "pgbackrest-backup",
+	}
+	podAffinityTerm := v1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+		TopologyKey: "kubernetes.io/hostname",
+	}
+	podAffinity := v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
+				Weight:          1,
+				PodAffinityTerm: podAffinityTerm,
+			},
+			},
+		}}
+
+	annotations := c.generatePodAnnotations(&c.Spec)
+
+	// re-use the method that generates DB pod templates
+	if podTemplate, err = c.generatePodTemplate(
+		c.Namespace,
+		labels,
+		annotations,
+		pgbackrestContainer,
+		[]v1.Container{},
+		[]v1.Container{},
+		&[]v1.Toleration{},
+		nil,
+		nil,
+		nil,
+		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
+		nil,
+		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		c.OpConfig.PodServiceAccountName,
+		c.OpConfig.KubeIAMRole,
+		"",
+		util.False(),
+		false,
+		"",
+		c.OpConfig.AdditionalSecretMount,
+		c.OpConfig.AdditionalSecretMountPath,
+		[]acidv1.AdditionalVolume{}); err != nil {
+		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
+	}
+
+	// overwrite specific params of logical backups pods
+	podTemplate.Spec.Affinity = &podAffinity
+	podTemplate.Spec.RestartPolicy = "Never" // affects containers within a pod
+
+	// configure a batch job
+
+	jobSpec := batchv1.JobSpec{
+		Template: *podTemplate,
+	}
+
+	// configure a cron job
+
+	jobTemplateSpec := batchv1.JobTemplateSpec{
+		Spec: jobSpec,
+	}
+
+	if schedule == "" {
+		schedule = c.OpConfig.LogicalBackupSchedule
+	}
+
+	cronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.getPgbackrestJobName(repo, name),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(nil),
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule:          schedule,
+			JobTemplate:       jobTemplateSpec,
+			ConcurrencyPolicy: batchv1.ForbidConcurrent,
+		},
+	}
+
+	return cronJob, nil
+}
+
+func (c *Cluster) generatePgbbackrestPodEnvVars(name string) []v1.EnvVar {
+
+	envVars := []v1.EnvVar{
+		{
+			Name:  "COMMAND",
+			Value: "backup",
+		},
+		{
+			Name:  "COMMAND_OPTS",
+			Value: fmt.Sprintf("--stanza=db --repo=1 --type=%s", name),
+		},
+		{
+			Name:  "COMPARE_HASH",
+			Value: "true",
+		},
+		{
+			Name:  "CONTAINER",
+			Value: "postgres",
+		},
+		{
+			Name: "NAMESPACE",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "SELECTOR",
+			Value: fmt.Sprintf("cluster-name=%s,spilo-role=master", c.Name),
+		},
+	}
+
+	c.logger.Debugf("Generated logical backup env vars")
+	c.logger.Debugf("%v", envVars)
+	return envVars
+}
+
+// getLogicalBackupJobName returns the name; the job itself may not exists
+func (c *Cluster) getPgbackrestJobName(repo string, name string) (jobName string) {
+	return trimCronjobName(fmt.Sprintf("%s-%s-%s-%s", "pgbackrest", c.clusterName().Name, repo, name))
 }

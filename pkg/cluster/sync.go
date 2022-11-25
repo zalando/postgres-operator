@@ -1320,3 +1320,25 @@ func (c *Cluster) syncPgbackrestConfig() error {
 	}
 	return nil
 }
+
+func (c *Cluster) syncPgbackrestJob() error {
+	repos := c.Postgresql.Spec.Backup.Pgbackrest.Repos
+	if len(repos) >= 1 {
+		for _, repo := range repos {
+			for name, schedule := range repo.Schedule {
+				if cj, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(context.TODO(), c.getPgbackrestJobName(repo.Name, name), metav1.GetOptions{}); err == nil {
+					if err := c.patchPgbackrestJob(cj, repo.Name, name, schedule); err != nil {
+						return fmt.Errorf("could not update a pgbackrest cronjob: %v", err)
+					}
+					c.logger.Info("a pgbackrest cronjob has been successfully updated")
+				} else {
+					if err := c.createPgbackrestJob(repo.Name, name, schedule); err != nil {
+						return fmt.Errorf("could not create a pgbackrest cronjob: %v", err)
+					}
+					c.logger.Info("a pgbackrest cronjob has been successfully created")
+				}
+			}
+		}
+	}
+	return nil
+}

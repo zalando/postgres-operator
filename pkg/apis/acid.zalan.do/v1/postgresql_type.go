@@ -267,6 +267,7 @@ type Backup struct {
 }
 
 type Pgbackrest struct {
+	Image         string            `json:"image"`
 	Global        map[string]string `json:"global"`
 	Repos         []Repo            `json:"repos"`
 	Configuration Configuration     `json:"configuration"`
@@ -277,8 +278,8 @@ type Repo struct {
 	Storage  string            `json:"storage"`
 	Resource string            `json:"resource"`
 	Endpoint string            `json:"endpoint"`
-	Region   string            `json:"Region"`
-	Schedule map[string]string `json:"Schedule"`
+	Region   string            `json:"region"`
+	Schedule map[string]string `json:"schedule"`
 }
 
 type Configuration struct {

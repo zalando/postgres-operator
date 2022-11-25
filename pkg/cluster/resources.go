@@ -652,3 +652,44 @@ func (c *Cluster) updatePgbackrestConfig(cm *v1.ConfigMap) (err error) {
 
 	return nil
 }
+
+func (c *Cluster) createPgbackrestJob(repo, name, schedule string) (err error) {
+
+	c.setProcessName("creating a k8s cron job for pgbackrest backups")
+	pgbackrestJobSpec, err := c.generatePgbackrestJob(repo, name, schedule)
+	if err != nil {
+		return fmt.Errorf("could not generate k8s cron job spec: %v", err)
+	}
+
+	c.logger.Debugf("Generated cronJobSpec: %v", pgbackrestJobSpec)
+
+	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(context.TODO(), pgbackrestJobSpec, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("could not create k8s cron job: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) patchPgbackrestJob(newJob *batchv1.CronJob, repo string, name string, schedule string) error {
+	c.setProcessName("patching logical backup job")
+
+	patchData, err := specPatch(newJob.Spec)
+	if err != nil {
+		return fmt.Errorf("could not form patch for the logical backup job: %v", err)
+	}
+
+	// update the backup job spec
+	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Patch(
+		context.TODO(),
+		c.getPgbackrestJobName(repo, name),
+		types.MergePatchType,
+		patchData,
+		metav1.PatchOptions{},
+		"")
+	if err != nil {
+		return fmt.Errorf("could not patch pgbackrest job: %v", err)
+	}
+
+	return nil
+}
