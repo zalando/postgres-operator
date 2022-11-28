@@ -65,6 +65,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	testName := "TestGenerateSpiloConfig"
+	testLogDirectory := "/path/to/logs"
 	tests := []struct {
 		subtest  string
 		pgParam  *acidv1.PostgresqlParam
@@ -103,6 +104,18 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 			role:     "zalandos",
 			opConfig: config.Config{},
 			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
+		},
+		{
+			subtest: "Patroni log configuration",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "9.6"},
+			patroni: &acidv1.Patroni{
+				Log: &acidv1.PatroniLog{
+					Dir: &testLogDirectory,
+				},
+			},
+			role:     "zalandos",
+			opConfig: config.Config{},
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/9.6/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}},"log":{"dir":"/path/to/logs"}}`,
 		},
 	}
 	for _, tt := range tests {
