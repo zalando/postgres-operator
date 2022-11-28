@@ -91,7 +91,7 @@ Please, report any issues discovered to https://github.com/zalando/postgres-oper
 
 - "Getting started with the Zalando Operator for PostgreSQL" by Daniel Westermann on [dbi services blog](https://blog.dbi-services.com/getting-started-with-the-zalando-operator-for-postgresql/), Mar. 2021.
 
-- "Our experience with Postgres Operator for Kubernetes by Zalando" by Nikolay Bogdanov on [flant blog](https://blog.flant.com/our-experience-with-postgres-operator-for-kubernetes-by-zalando/), Feb. 2021.
+- "Our experience with Postgres Operator for Kubernetes by Zalando" by Nikolay Bogdanov on [Palark blog](https://blog.palark.com/our-experience-with-postgres-operator-for-kubernetes-by-zalando/), Feb. 2021.
 
 - "How to set up continuous backups and monitoring" by Pål Kristensen on [GitHub](https://github.com/zalando/postgres-operator/issues/858#issuecomment-608136253), Mar. 2020.
 
