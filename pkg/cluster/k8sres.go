@@ -2616,6 +2616,10 @@ func (c *Cluster) generatePgbbackrestPodEnvVars(name string) []v1.EnvVar {
 			Value: "postgres",
 		},
 		{
+			Name:  "MODE",
+			Value: "pgbackrest",
+		},
+		{
 			Name: "NAMESPACE",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
