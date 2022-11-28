@@ -2453,7 +2453,7 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 func (c *Cluster) generatepgbackrestConfigmap() (*v1.ConfigMap, error) {
 	config := "[db]\npg1-path = /home/postgres/pgdata/pgroot/data\npg1-port = 5432\npg1-socket-path = /var/run/postgresql/\n"
 	global := c.Postgresql.Spec.Backup.Pgbackrest.Global
-	config += "\n[global]"
+	config += "\n[global]\nlog-path = /home/postgres/pgdata/pgbackrest/log"
 	if global != nil {
 		for k, v := range global {
 			config += fmt.Sprintf("\n%s = %s", k, v)

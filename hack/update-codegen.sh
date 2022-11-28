@@ -14,7 +14,7 @@ cleanup() {
     rm -rf "${GENERATED_PACKAGE_ROOT}"
 }
 trap "cleanup" EXIT SIGINT
-
+echo "${OPERATOR_PACKAGE_ROOT} - ${CODEGEN_PKG}"
 bash "${CODEGEN_PKG}/generate-groups.sh" all \
   "${OPERATOR_PACKAGE_ROOT}/pkg/generated" "${OPERATOR_PACKAGE_ROOT}/pkg/apis" \
   "acid.zalan.do:v1 zalando.org:v1" \
