@@ -1301,7 +1301,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
 		// this is combined with the FSGroup in the section above
 		// to give read access to the postgres user
-		defaultMode := int32(0640)
+		defaultMode := int32(0644)
 		mountPath := "/tls"
 		additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
 			Name:      spec.TLS.SecretName,
