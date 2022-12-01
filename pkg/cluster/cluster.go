@@ -314,7 +314,7 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
-	if c.Postgresql.Spec.Backup.Pgbackrest != nil {
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
 		if err = c.syncPgbackrestConfig(); err != nil {
 			err = fmt.Errorf("could not sync pgbackrest config: %v", err)
 			return err
@@ -366,7 +366,7 @@ func (c *Cluster) Create() error {
 		c.logger.Info("a k8s cron job for logical backup has been successfully created")
 	}
 
-	if c.Postgresql.Spec.Backup.Pgbackrest != nil {
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
 		if err := c.syncPgbackrestJob(); err != nil {
 			return fmt.Errorf("could not create a k8s cron job for pgbackrest: %v", err)
 		}
@@ -922,7 +922,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		}
 
-		if newSpec.Spec.Backup.Pgbackrest != nil {
+		if newSpec.Spec.Backup != nil && newSpec.Spec.Backup.Pgbackrest != nil {
 			if err := c.syncPgbackrestJob(); err != nil {
 				err = fmt.Errorf("could not create a k8s cron job for pgbackrest: %v", err)
 				updateFailed = true
