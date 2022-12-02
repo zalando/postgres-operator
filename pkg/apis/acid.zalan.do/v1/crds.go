@@ -503,6 +503,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"patroni": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"failsafe_mode": {
+								Type: "boolean",
+							},
 							"initdb": {
 								Type: "object",
 								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
@@ -1455,6 +1458,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"watched_namespace": {
 								Type: "string",
+							},
+						},
+					},
+					"patroni": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"failsafe_mode": {
+								Type: "boolean",
 							},
 						},
 					},

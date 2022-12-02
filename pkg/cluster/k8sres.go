@@ -59,6 +59,7 @@ type patroniDCS struct {
 	SynchronousNodeCount     uint32                       `json:"synchronous_node_count,omitempty"`
 	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
 	Slots                    map[string]map[string]string `json:"slots,omitempty"`
+	FailsafeMode             *bool                        `json:"failsafe_mode,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -296,7 +297,7 @@ func (c *Cluster) generateResourceRequirements(
 	return &result, nil
 }
 
-func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, EnablePgVersionEnvVar bool, logger *logrus.Entry) (string, error) {
+func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, opConfig *config.Config, logger *logrus.Entry) (string, error) {
 	config := spiloConfiguration{}
 
 	config.Bootstrap = pgBootstrap{}
@@ -378,6 +379,11 @@ PatroniInitDBParams:
 	if patroni.SynchronousNodeCount >= 1 {
 		config.Bootstrap.DCS.SynchronousNodeCount = patroni.SynchronousNodeCount
 	}
+	if patroni.FailsafeMode != nil {
+		config.Bootstrap.DCS.FailsafeMode = patroni.FailsafeMode
+	} else if opConfig.EnablePatroniFailsafeMode != nil {
+		config.Bootstrap.DCS.FailsafeMode = opConfig.EnablePatroniFailsafeMode
+	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
 
@@ -385,7 +391,7 @@ PatroniInitDBParams:
 	// setting postgresq.bin_dir in the SPILO_CONFIGURATION still works and takes precedence over PGVERSION
 	// so we add postgresq.bin_dir only if PGVERSION is unused
 	// see PR 222 in Spilo
-	if !EnablePgVersionEnvVar {
+	if !opConfig.EnablePgVersionEnvVar {
 		config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
 	}
 	if len(pg.Parameters) > 0 {
@@ -407,7 +413,7 @@ PatroniInitDBParams:
 	}
 
 	config.Bootstrap.Users = map[string]pgUser{
-		pamRoleName: {
+		opConfig.PamRoleName: {
 			Password: "",
 			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
 		},
@@ -1179,7 +1185,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 	}
 
-	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.OpConfig.EnablePgVersionEnvVar, c.logger)
+	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, &c.OpConfig, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
 	}

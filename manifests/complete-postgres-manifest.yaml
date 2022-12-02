@@ -109,6 +109,7 @@ spec:
       cpu: 500m
       memory: 500Mi
   patroni:
+    failsafe_mode: false
     initdb:
       encoding: "UTF8"
       locale: "en_US.UTF-8"

@@ -407,7 +407,8 @@ class EndToEndTestCase(unittest.TestCase):
                     "ttl": 29,
                     "loop_wait": 9,
                     "retry_timeout": 9,
-                    "synchronous_mode": True
+                    "synchronous_mode": True,
+                    "failsafe_mode": True,
                  }
             }
         }
@@ -434,6 +435,8 @@ class EndToEndTestCase(unittest.TestCase):
                             "retry_timeout not updated")
                 self.assertEqual(desired_config["synchronous_mode"], effective_config["synchronous_mode"],
                             "synchronous_mode not updated")
+                self.assertEqual(desired_config["failsafe_mode"], effective_config["failsafe_mode"],
+                            "failsafe_mode not updated")
                 return True
 
             # check if Patroni config has been updated

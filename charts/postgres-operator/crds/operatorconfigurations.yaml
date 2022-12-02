@@ -633,6 +633,12 @@ spec:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                     default: "100Mi"
+              patroni:
+                type: object
+                properties:
+                  failsafe_mode:
+                    type: boolean
+                    default: false
           status:
             type: object
             additionalProperties:

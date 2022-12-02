@@ -564,6 +564,21 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 		configToSet["ttl"] = desiredPatroniConfig.TTL
 	}
 
+	var desiredFailsafe *bool
+	if desiredPatroniConfig.FailsafeMode != nil {
+		desiredFailsafe = desiredPatroniConfig.FailsafeMode
+	} else if c.OpConfig.EnablePatroniFailsafeMode != nil {
+		desiredFailsafe = c.OpConfig.EnablePatroniFailsafeMode
+	}
+
+	effectiveFailsafe := effectivePatroniConfig.FailsafeMode
+
+	if desiredFailsafe != nil {
+		if effectiveFailsafe == nil || *desiredFailsafe != *effectiveFailsafe {
+			configToSet["failsafe_mode"] = *desiredFailsafe
+		}
+	}
+
 	// check if specified slots exist in config and if they differ
 	slotsToSet := make(map[string]map[string]string)
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {

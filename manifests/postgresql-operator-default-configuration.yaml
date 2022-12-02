@@ -198,3 +198,5 @@ configuration:
     connection_pooler_number_of_instances: 2
     # connection_pooler_schema: "pooler"
     # connection_pooler_user: "pooler"
+  patroni:
+    # failsafe_mode: "false"

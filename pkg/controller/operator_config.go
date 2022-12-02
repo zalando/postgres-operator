@@ -216,6 +216,9 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ScalyrCPULimit = fromCRD.Scalyr.ScalyrCPULimit
 	result.ScalyrMemoryLimit = fromCRD.Scalyr.ScalyrMemoryLimit
 
+	// Patroni config
+	result.EnablePatroniFailsafeMode = util.CoalesceBool(fromCRD.Patroni.FailsafeMode, util.False())
+
 	// Connection pooler. Looks like we can't use defaulting in CRD before 1.17,
 	// so ensure default values here.
 	result.ConnectionPooler.NumberOfInstances = util.CoalesceInt32(

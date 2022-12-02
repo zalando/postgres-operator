@@ -20,6 +20,7 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
@@ -147,20 +148,23 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	defaultPgParameters := map[string]string{
+		"log_min_duration_statement": "200",
+		"max_connections":            "50",
+	}
+	defaultPatroniParameters := acidv1.Patroni{
+		TTL: 20,
+	}
+
 	pg := acidv1.Postgresql{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
 			Namespace: namespace,
 		},
 		Spec: acidv1.PostgresSpec{
-			Patroni: acidv1.Patroni{
-				TTL: 20,
-			},
+			Patroni: defaultPatroniParameters,
 			PostgresqlParam: acidv1.PostgresqlParam{
-				Parameters: map[string]string{
-					"log_min_duration_statement": "200",
-					"max_connections":            "50",
-				},
+				Parameters: defaultPgParameters,
 			},
 			Volume: acidv1.Volume{
 				Size: "1Gi",
@@ -222,9 +226,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "multiple Postgresql.Parameters differ - restart replica first",
-			patroni: acidv1.Patroni{
-				TTL: 20,
-			},
+			patroni: defaultPatroniParameters,
 			pgParams: map[string]string{
 				"log_min_duration_statement": "500", // desired 200
 				"max_connections":            "100", // desired 50
@@ -233,9 +235,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "desired max_connections bigger - restart replica first",
-			patroni: acidv1.Patroni{
-				TTL: 20,
-			},
+			patroni: defaultPatroniParameters,
 			pgParams: map[string]string{
 				"log_min_duration_statement": "200",
 				"max_connections":            "30", // desired 50
@@ -244,9 +244,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "desired max_connections smaller - restart master first",
-			patroni: acidv1.Patroni{
-				TTL: 20,
-			},
+			patroni: defaultPatroniParameters,
 			pgParams: map[string]string{
 				"log_min_duration_statement": "200",
 				"max_connections":            "100", // desired 50
@@ -260,6 +258,109 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		assert.NoError(t, err)
 		if configPatched != true {
 			t.Errorf("%s - %s: expected config update did not happen", testName, tt.subtest)
+		}
+		if requirePrimaryRestart != tt.restartPrimary {
+			t.Errorf("%s - %s: wrong master restart strategy, got restart %v, expected restart %v", testName, tt.subtest, requirePrimaryRestart, tt.restartPrimary)
+		}
+	}
+
+	testsFailsafe := []struct {
+		subtest         string
+		operatorVal     *bool
+		effectiveVal    *bool
+		desiredVal      bool
+		shouldBePatched bool
+		restartPrimary  bool
+	}{
+		{
+			subtest:         "Not set in operator config, not set for pg cluster. Set to true in the pg config.",
+			operatorVal:     nil,
+			effectiveVal:    nil,
+			desiredVal:      true,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Not set in operator config, disabled for pg cluster. Set to true in the pg config.",
+			operatorVal:     nil,
+			effectiveVal:    util.False(),
+			desiredVal:      true,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Not set in operator config, not set for pg cluster. Set to false in the pg config.",
+			operatorVal:     nil,
+			effectiveVal:    nil,
+			desiredVal:      false,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Not set in operator config, enabled for pg cluster. Set to false in the pg config.",
+			operatorVal:     nil,
+			effectiveVal:    util.True(),
+			desiredVal:      false,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Enabled in operator config, not set for pg cluster. Set to false in the pg config.",
+			operatorVal:     util.True(),
+			effectiveVal:    nil,
+			desiredVal:      false,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Enabled in operator config, disabled for pg cluster. Set to true in the pg config.",
+			operatorVal:     util.True(),
+			effectiveVal:    util.False(),
+			desiredVal:      true,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Disabled in operator config, not set for pg cluster. Set to true in the pg config.",
+			operatorVal:     util.False(),
+			effectiveVal:    nil,
+			desiredVal:      true,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Disabled in operator config, enabled for pg cluster. Set to false in the pg config.",
+			operatorVal:     util.False(),
+			effectiveVal:    util.True(),
+			desiredVal:      false,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Disabled in operator config, enabled for pg cluster. Set to true in the pg config.",
+			operatorVal:     util.False(),
+			effectiveVal:    util.True(),
+			desiredVal:      true,
+			shouldBePatched: false, // should not require patching
+			restartPrimary:  true,
+		},
+	}
+
+	for _, tt := range testsFailsafe {
+		patroniConf := defaultPatroniParameters
+
+		if tt.operatorVal != nil {
+			cluster.OpConfig.EnablePatroniFailsafeMode = tt.operatorVal
+		}
+		if tt.effectiveVal != nil {
+			patroniConf.FailsafeMode = tt.effectiveVal
+		}
+		cluster.Spec.Patroni.FailsafeMode = &tt.desiredVal
+
+		configPatched, requirePrimaryRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, patroniConf, cluster.Spec.Patroni, defaultPgParameters, cluster.Spec.Parameters)
+		assert.NoError(t, err)
+		if configPatched != tt.shouldBePatched {
+			t.Errorf("%s - %s: expected update went wrong", testName, tt.subtest)
 		}
 		if requirePrimaryRestart != tt.restartPrimary {
 			t.Errorf("%s - %s: wrong master restart strategy, got restart %v, expected restart %v", testName, tt.subtest, requirePrimaryRestart, tt.restartPrimary)

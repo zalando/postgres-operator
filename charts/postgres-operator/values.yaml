@@ -409,6 +409,10 @@ configConnectionPooler:
   connection_pooler_default_cpu_limit: "1"
   connection_pooler_default_memory_limit: 100Mi
 
+configPatroni:
+  # enable Patroni DCS failsafe_mode feature
+  failsafe_mode: false
+
 # Zalando's internal CDC stream feature
 enableStreams: false
 
