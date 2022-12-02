@@ -674,7 +674,8 @@ func (c *Cluster) createPgbackrestJob(repo, name, schedule string) (err error) {
 func (c *Cluster) patchPgbackrestJob(newJob *batchv1.CronJob, repo string, name string, schedule string) error {
 	c.setProcessName("patching logical backup job")
 
-	patchData, err := specPatch(newJob.Spec)
+	newBackrestJob, err := c.generatePgbackrestJob(repo, name, schedule)
+	patchData, err := specPatch(newBackrestJob.Spec)
 	if err != nil {
 		return fmt.Errorf("could not form patch for the logical backup job: %v", err)
 	}

@@ -898,6 +898,27 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	// Pgrest backup job
+	func() {
+
+		if newSpec.Spec.Backup != nil && newSpec.Spec.Backup.Pgbackrest != nil {
+			if err := c.syncPgbackrestConfig(); err != nil {
+				err = fmt.Errorf("could not sync pgbackrest config: %v", err)
+				updateFailed = true
+				return
+			}
+			c.logger.Info("a pgbackrest config has been successfully created")
+			if err := c.syncPgbackrestJob(); err != nil {
+				err = fmt.Errorf("could not create a k8s cron job for pgbackrest: %v", err)
+				updateFailed = true
+				return
+			}
+			c.logger.Info("a k8s cron job for pgbackrest has been successfully created")
+		}
+
+	}()
+
+
 	// logical backup job
 	func() {
 
@@ -920,21 +941,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 				return
 			}
 
-		}
-
-		if newSpec.Spec.Backup != nil && newSpec.Spec.Backup.Pgbackrest != nil {
-			if err := c.syncPgbackrestJob(); err != nil {
-				err = fmt.Errorf("could not create a k8s cron job for pgbackrest: %v", err)
-				updateFailed = true
-				return
-			}
-			c.logger.Info("a k8s cron job for pgbackrest has been successfully created")
-			if err := c.syncPgbackrestConfig(); err != nil {
-				err = fmt.Errorf("could not sync pgbackrest config: %v", err)
-				updateFailed = true
-				return
-			}
-			c.logger.Info("a pgbackrest config has been successfully created")
 		}
 
 		// apply schedule changes
