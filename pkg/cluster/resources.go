@@ -518,7 +518,7 @@ func (c *Cluster) deleteSecret(uid types.UID, secret v1.Secret) error {
 		return fmt.Errorf("could not delete secret %q: %v", secretName, err)
 	}
 	c.logger.Infof("secret %q has been deleted", secretName)
-	c.Secrets[uid] = nil
+	delete(c.Secrets, uid)
 
 	return nil
 }
