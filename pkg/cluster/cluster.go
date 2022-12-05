@@ -914,10 +914,14 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 				return
 			}
 			c.logger.Info("a k8s cron job for pgbackrest has been successfully created")
+		} else {
+
+			if err := c.deletePgbackrestConfig(); err != nil {
+				c.logger.Warningf("could not delete pgbackrest config: %v", err)
+			}
 		}
 
 	}()
-
 
 	// logical backup job
 	func() {
@@ -1041,6 +1045,10 @@ func (c *Cluster) Delete() {
 	// deleting the cron job also removes pods and batch jobs it created
 	if err := c.deleteLogicalBackupJob(); err != nil {
 		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
+	}
+
+	if err := c.deletePgbackrestConfig(); err != nil {
+		c.logger.Warningf("could not delete pgbackrest config: %v", err)
 	}
 
 	if err := c.deleteStatefulSet(); err != nil {
