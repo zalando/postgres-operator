@@ -72,6 +72,9 @@ docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
 	echo "git describe $(shell git describe --tags --always --dirty)"
 	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
 
+build-multi-arch:
+	docker buildx build --platform linux/arm64,linux/amd64 --push -t "$(IMAGE):$(TAG)" -f ./${DOCKERDIR}/Dockerfile-multi-arch .
+
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.17.3 bash -c "make linux"
 
