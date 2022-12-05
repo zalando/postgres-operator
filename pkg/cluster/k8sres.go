@@ -2452,20 +2452,21 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 
 func (c *Cluster) generatepgbackrestConfigmap() (*v1.ConfigMap, error) {
 	config := "[db]\npg1-path = /home/postgres/pgdata/pgroot/data\npg1-port = 5432\npg1-socket-path = /var/run/postgresql/\n"
-	global := c.Postgresql.Spec.Backup.Pgbackrest.Global
 	config += "\n[global]\nlog-path = /home/postgres/pgdata/pgbackrest/log"
-	if global != nil {
-		for k, v := range global {
-			config += fmt.Sprintf("\n%s = %s", k, v)
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		if global := c.Postgresql.Spec.Backup.Pgbackrest.Global; global != nil {
+			for k, v := range global {
+				config += fmt.Sprintf("\n%s = %s", k, v)
+			}
 		}
-	}
-	repos := c.Postgresql.Spec.Backup.Pgbackrest.Repos
-	if len(repos) >= 1 {
-		for _, repo := range repos {
-			config += fmt.Sprintf("\n%s-%s-bucket = %s", repo.Name, repo.Storage, repo.Resource)
-			config += fmt.Sprintf("\n%s-%s-endpoint = %s", repo.Name, repo.Storage, repo.Endpoint)
-			config += fmt.Sprintf("\n%s-%s-region = %s", repo.Name, repo.Storage, repo.Region)
-			config += fmt.Sprintf("\n%s-type = %s", repo.Name, repo.Storage)
+		repos := c.Postgresql.Spec.Backup.Pgbackrest.Repos
+		if len(repos) >= 1 {
+			for _, repo := range repos {
+				config += fmt.Sprintf("\n%s-%s-bucket = %s", repo.Name, repo.Storage, repo.Resource)
+				config += fmt.Sprintf("\n%s-%s-endpoint = %s", repo.Name, repo.Storage, repo.Endpoint)
+				config += fmt.Sprintf("\n%s-%s-region = %s", repo.Name, repo.Storage, repo.Region)
+				config += fmt.Sprintf("\n%s-type = %s", repo.Name, repo.Storage)
+			}
 		}
 	}
 
