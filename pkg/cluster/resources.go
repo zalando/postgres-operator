@@ -637,7 +637,6 @@ func (c *Cluster) deletePgbackrestConfig() error {
 	return nil
 }
 
-
 func (c *Cluster) updatePgbackrestConfig(cm *v1.ConfigMap) (err error) {
 
 	c.setProcessName("patching configmap for pgbackrest")
@@ -709,12 +708,19 @@ func (c *Cluster) patchPgbackrestJob(newJob *batchv1.CronJob, repo string, name 
 	return nil
 }
 
-func (c *Cluster) deletePgbackrestJob(newJob *batchv1.CronJob, repo string, name string, schedule string) error {
+func (c *Cluster) deletePgbackrestJob() error {
 	c.setProcessName("deleting pgbackrest backup job")
-
-	err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(context.TODO(), c.getPgbackrestJobName(repo, name), c.deleteOptions)
-	if err != nil {
-		return fmt.Errorf("could not delete pgbackrest job: %v", err)
+	repos := []string{"repo1", "repo2", "repo3", "repo4"}
+	schedules := []string{"full", "incr", "diff"}
+	for _, repo := range repos {
+		for _, name := range schedules {
+			if _, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(context.TODO(), c.getPgbackrestJobName(repo, name), metav1.GetOptions{}); err == nil {
+				err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(context.TODO(), c.getPgbackrestJobName(repo, name), c.deleteOptions)
+				if err != nil {
+					return fmt.Errorf("could not delete pgbackrest job: %v", err)
+				}
+			}
+		}
 	}
 
 	return nil
