@@ -2,7 +2,6 @@ apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
   name: acid-upgrade-test
-  namespace: default
 spec:
   teamId: "acid"
   volume:
