@@ -1429,6 +1429,15 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	podAnnotations := c.generatePodAnnotations(spec)
 
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		initContainers = append(initContainers, v1.Container{
+			Name:         "pgbackrest-restore",
+			Image:        c.Postgresql.Spec.Backup.Pgbackrest.Image,
+			Env:          spiloEnvVars,
+			VolumeMounts: volumeMounts,
+		})
+	}
+
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
