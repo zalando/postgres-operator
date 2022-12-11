@@ -108,5 +108,8 @@ verify-codegen:
 codegen:
 	hack/update-codegen.sh
 
+lint:
+	golangci-lint run
+
 e2e: docker # build operator image to be tested
 	cd e2e; make e2etest
