@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -147,11 +148,11 @@ var requestsURLtc = []struct {
 }{
 	{
 		"coffee://localhost/",
-		fmt.Errorf(`get "coffee://localhost/teams/acid": unsupported protocol scheme "coffee"`),
+		&url.Error{Op: "Get", URL: "coffee://localhost/teams/acid", Err: fmt.Errorf("unsupported protocol scheme \"%s\"", "coffee")},
 	},
 	{
 		"http://192.168.0.%31/",
-		fmt.Errorf(`parse "http://192.168.0.%%31/teams/acid": invalid URL escape "%%31"`),
+		&url.Error{Op: "parse", URL: "http://192.168.0.%31/teams/acid", Err: fmt.Errorf("invalid URL escape \"%%31\"")},
 	},
 }
 

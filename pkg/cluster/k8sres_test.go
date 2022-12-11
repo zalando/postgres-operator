@@ -389,7 +389,7 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
 			},
-			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret API error"),
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: secret PodEnvironmentSecret API error"),
 		},
 		{
 			subTest: "Pod environment vars reference all keys from secret configured by PodEnvironmentSecret",
