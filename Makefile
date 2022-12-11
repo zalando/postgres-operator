@@ -48,7 +48,8 @@ SHELL := env PATH=$(PATH) $(SHELL)
 default: local
 
 clean:
-	rm -rf build mocks e2e/manifests docker/build scm-source.json
+	rm -rf build e2e/manifests docker/build scm-source.json
+	rm -f mocks/httpclient.go mocks/volumes.go
 
 local: ${SOURCES}
 	hack/verify-codegen.sh
