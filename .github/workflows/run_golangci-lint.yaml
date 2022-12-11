@@ -8,15 +8,18 @@ on:
 
 jobs:
   golangci:
-    name: lint
+    name: Golang code linting
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.17.13
+          go-version: 1.17
           cache: false
       - uses: actions/checkout@v3
-      - name: golangci-lint
+      - name: Make dependencies
+        run: make deps mocks
+      - name: run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.46.2
+          args: --timeout=5m --issues-exit-code=0 ./...
