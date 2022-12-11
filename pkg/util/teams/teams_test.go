@@ -147,7 +147,7 @@ var requestsURLtc = []struct {
 }{
 	{
 		"coffee://localhost/",
-		fmt.Errorf(`Get "coffee://localhost/teams/acid": unsupported protocol scheme "coffee"`),
+		fmt.Errorf(`get "coffee://localhost/teams/acid": unsupported protocol scheme "coffee"`),
 	},
 	{
 		"http://192.168.0.%31/",
@@ -193,7 +193,7 @@ type mockHTTPClient struct {
 type mockBody struct {
 }
 
-func (b *mockBody) Read(p []byte) (n int, err error) {
+func (b *mockBody) Read(_ []byte) (n int, err error) {
 	return 2, nil
 }
 

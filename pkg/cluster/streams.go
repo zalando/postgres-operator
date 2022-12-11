@@ -40,7 +40,7 @@ func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) er
 func (c *Cluster) deleteStreams() error {
 	c.setProcessName("deleting event streams")
 
-	// check if stream CRD is installed before trying a delete
+	// check if stream CRD is installed before trying to delete
 	_, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), constants.EventStreamCRDName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 		return nil
@@ -189,7 +189,7 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName string, i
 	}
 }
 
-func getEventStreamFlow(stream acidv1.Stream, payloadColumn *string) zalandov1.EventStreamFlow {
+func getEventStreamFlow(_ acidv1.Stream, payloadColumn *string) zalandov1.EventStreamFlow {
 	return zalandov1.EventStreamFlow{
 		Type:          constants.EventStreamFlowPgGenericType,
 		PayloadColumn: payloadColumn,

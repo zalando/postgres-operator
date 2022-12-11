@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/zalando/postgres-operator/pkg/util/constants"
-	httpclient "github.com/zalando/postgres-operator/pkg/util/httpclient"
+	"github.com/zalando/postgres-operator/pkg/util/httpclient"
 
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"

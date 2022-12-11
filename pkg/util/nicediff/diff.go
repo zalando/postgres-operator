@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package diff implements a linewise diff algorithm.
+// Package nicediff implements linewise diff algorithm.
 package nicediff
 
 import (
@@ -50,14 +50,14 @@ func Render(chunks []Chunk, skipEqual bool) string {
 	buf := new(strings.Builder)
 	for _, c := range chunks {
 		for _, line := range c.Added {
-			fmt.Fprintf(buf, "+%s\n", line)
+			_, _ = fmt.Fprintf(buf, "+%s\n", line)
 		}
 		for _, line := range c.Deleted {
-			fmt.Fprintf(buf, "-%s\n", line)
+			_, _ = fmt.Fprintf(buf, "-%s\n", line)
 		}
 		if !skipEqual {
 			for _, line := range c.Equal {
-				fmt.Fprintf(buf, " %s\n", line)
+				_, _ = fmt.Fprintf(buf, " %s\n", line)
 			}
 		}
 	}

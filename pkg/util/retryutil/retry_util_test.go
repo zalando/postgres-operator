@@ -50,7 +50,7 @@ func TestRetryWorkerOneFalse(t *testing.T) {
 }
 
 func TestRetryWorkerError(t *testing.T) {
-	fail := errors.New("Error")
+	fail := errors.New("error")
 
 	tick := &mockTicker{t, 0}
 	result := RetryWorker(1, 3, tick, func() (bool, error) {

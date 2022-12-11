@@ -78,7 +78,7 @@ func (c *Cluster) isProtectedUsername(username string) bool {
 }
 
 func (c *Cluster) isSystemUsername(username string) bool {
-	return (username == c.OpConfig.SuperUsername || username == c.OpConfig.ReplicationUsername)
+	return username == c.OpConfig.SuperUsername || username == c.OpConfig.ReplicationUsername
 }
 
 func isValidFlag(flag string) bool {
@@ -121,7 +121,7 @@ func normalizeUserFlags(userFlags []string) ([]string, error) {
 		}
 	}
 
-	flags := []string{}
+	var flags []string
 	for k := range uniqueFlags {
 		if k == constants.RoleFlagNoLogin || k == constants.RoleFlagLogin {
 			addLogin = false
@@ -159,7 +159,7 @@ func metaAnnotationsPatch(annotations map[string]string) ([]byte, error) {
 	}{&meta})
 }
 
-func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate bool, reason string) {
+func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate bool) {
 	if isUpdate {
 		c.logger.Infof("pod disruption budget %q has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
@@ -252,11 +252,11 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 		return nil, nil
 	}
 
-	members := []string{}
+	var members []string
 
 	if c.OpConfig.EnablePostgresTeamCRD && c.Config.PgTeamMap != nil {
 		c.logger.Debugf("fetching possible additional team members for team %q", teamID)
-		additionalMembers := []string{}
+		var additionalMembers []string
 
 		for team, membership := range *c.Config.PgTeamMap {
 			if team == teamID {
@@ -438,10 +438,6 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 	return err
 }
 
-func (c *Cluster) waitForAnyReplicaLabelReady() error {
-	return c._waitPodLabelsReady(true)
-}
-
 func (c *Cluster) waitForAllPodsLabelReady() error {
 	return c._waitPodLabelsReady(false)
 }
@@ -489,7 +485,7 @@ func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 		}
 	}
 
-	return labels.Set(lbls)
+	return lbls
 }
 
 func (c *Cluster) labelsSelector() *metav1.LabelSelector {

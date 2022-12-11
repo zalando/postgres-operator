@@ -222,7 +222,7 @@ type mockTeamsAPIClient struct {
 	members []string
 }
 
-func (m *mockTeamsAPIClient) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
+func (m *mockTeamsAPIClient) TeamInfo(teamID, _ string) (tm *teams.Team, statusCode int, err error) {
 	if len(m.members) > 0 {
 		return &teams.Team{Members: m.members}, http.StatusOK, nil
 	}
@@ -314,7 +314,7 @@ type mockTeamsAPIClientMultipleTeams struct {
 	teams []mockTeam
 }
 
-func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
+func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, _ string) (tm *teams.Team, statusCode int, err error) {
 	for _, team := range m.teams {
 		if team.teamID == teamID {
 			return &teams.Team{Members: team.members}, http.StatusOK, nil
@@ -974,7 +974,7 @@ func TestInitSystemUsers(t *testing.T) {
 
 func TestPreparedDatabases(t *testing.T) {
 	cl.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{}
-	cl.initPreparedDatabaseRoles()
+	_ = cl.initPreparedDatabaseRoles()
 
 	for _, role := range []string{"acid_test_owner", "acid_test_reader", "acid_test_writer",
 		"acid_test_data_owner", "acid_test_data_reader", "acid_test_data_writer"} {
@@ -995,7 +995,7 @@ func TestPreparedDatabases(t *testing.T) {
 			},
 		},
 	}
-	cl.initPreparedDatabaseRoles()
+	_ = cl.initPreparedDatabaseRoles()
 
 	for _, role := range []string{
 		"foo_owner", "foo_reader", "foo_writer",

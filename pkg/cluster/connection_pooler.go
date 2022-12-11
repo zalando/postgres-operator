@@ -664,7 +664,7 @@ func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, depl
 		context.TODO(),
 		deployment.Name,
 		types.MergePatchType,
-		[]byte(patchData),
+		patchData,
 		metav1.PatchOptions{},
 		"")
 	if err != nil {

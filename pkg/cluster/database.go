@@ -167,7 +167,7 @@ func (c *Cluster) initDbConnWithName(dbname string) error {
 	if c.pgDb != nil {
 		msg := "closing an existing connection before opening a new one to %s"
 		c.logger.Warningf(msg, dbname)
-		c.closeDbConn()
+		_ = c.closeDbConn()
 	}
 
 	c.pgDb = conn
@@ -243,7 +243,7 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 }
 
 func findUsersFromRotation(rotatedUsers []string, db *sql.DB) (map[string]string, error) {
-	extraUsers := make(map[string]string, 0)
+	extraUsers := make(map[string]string)
 	rows, err := db.Query(getUsersForRetention, pq.Array(rotatedUsers))
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %v", err)
@@ -426,7 +426,7 @@ func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, sc
 
 	// set default privileges for schema
 	// the schemaOwner defines them for global database roles
-	c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, databaseName)
+	_ = c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, databaseName)
 
 	// if schemaOwner and dbOwner differ we know that <databaseName>_<schemaName> default roles were created
 	if schemaOwner != dbOwner {
@@ -434,7 +434,7 @@ func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, sc
 
 		// define schema privileges of <databaseName>_<schemaName>_owner_user for global roles, too
 		if defaultUsers {
-			c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName)
+			_ = c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName)
 		}
 
 		// collect all possible owner roles and define default schema privileges
@@ -442,12 +442,12 @@ func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, sc
 		owners := c.getOwnerRoles(databaseName, c.Spec.PreparedDatabases[databaseName].DefaultUsers)
 		owners = append(owners, c.getOwnerRoles(databaseName+"_"+schemaName, defaultUsers)...)
 		for _, owner := range owners {
-			c.execAlterSchemaDefaultPrivileges(schemaName, owner, databaseName+"_"+schemaName)
+			_ = c.execAlterSchemaDefaultPrivileges(schemaName, owner, databaseName+"_"+schemaName)
 		}
 	} else {
 		// define schema privileges of <databaseName>_owner_user for global roles, too
 		if c.Spec.PreparedDatabases[databaseName].DefaultUsers {
-			c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName)
+			_ = c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName)
 		}
 	}
 
@@ -667,7 +667,7 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 	// List of databases we failed to process. At the moment it function just
 	// like a flag to retry on the next sync, but in the future we may want to
 	// retry only necessary parts, so let's keep the list.
-	failedDatabases := []string{}
+	var failedDatabases []string
 	currentDatabases, err := c.getDatabases()
 	if err != nil {
 		msg := "could not get databases to install pooler lookup function: %v"

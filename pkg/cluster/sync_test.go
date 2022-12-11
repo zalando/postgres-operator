@@ -108,7 +108,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 		context.TODO(),
 		clusterName,
 		types.MergePatchType,
-		[]byte(patchData),
+		patchData,
 		metav1.PatchOptions{},
 		"")
 	assert.NoError(t, err)
@@ -126,7 +126,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 	}
 
 	// now sync statefulset - the diff will trigger a replacement of the statefulset
-	cluster.syncStatefulSet()
+	_ = cluster.syncStatefulSet()
 
 	// compare again after the SYNC - must be identical to the desired state
 	cmp = cluster.compareStatefulSetWith(desiredSts)
@@ -506,7 +506,7 @@ func TestUpdateSecret(t *testing.T) {
 					ApplicationId: appId,
 					Database:      dbname,
 					Tables: map[string]acidv1.StreamTable{
-						"data.foo": acidv1.StreamTable{
+						"data.foo": {
 							EventType: "stream-type-b",
 						},
 					},
@@ -542,11 +542,11 @@ func TestUpdateSecret(t *testing.T) {
 	cluster.pgUsers = map[string]spec.PgUser{}
 
 	// init all users
-	cluster.initUsers()
+	_ = cluster.initUsers()
 	// create secrets
-	cluster.syncSecrets()
+	_ = cluster.syncSecrets()
 	// initialize rotation with current time
-	cluster.syncSecrets()
+	_ = cluster.syncSecrets()
 
 	dayAfterTomorrow := time.Now().AddDate(0, 0, 2)
 
@@ -566,7 +566,7 @@ func TestUpdateSecret(t *testing.T) {
 		secretPassword := string(secret.Data["password"])
 
 		// now update the secret setting a next rotation date (tomorrow + interval)
-		cluster.updateSecret(username, secret, &retentionUsers, dayAfterTomorrow)
+		_ = cluster.updateSecret(username, secret, &retentionUsers, dayAfterTomorrow)
 		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		assert.NoError(t, err)
 

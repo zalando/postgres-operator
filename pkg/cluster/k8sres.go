@@ -323,7 +323,7 @@ func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.
 	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "md5"},
 		map[string]string{"auth-local": "trust"}}
 
-	initdbOptionNames := []string{}
+	var initdbOptionNames []string
 
 	for k := range patroni.InitDB {
 		initdbOptionNames = append(initdbOptionNames, k)
@@ -707,7 +707,7 @@ func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar,
 
 // adds common fields to sidecars
 func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string, logger *logrus.Entry) []v1.Container {
-	result := []v1.Container{}
+	var result []v1.Container
 
 	for _, container := range in {
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
@@ -1358,7 +1358,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate container specs for sidecars specified in the cluster manifest
-	clusterSpecificSidecars := []v1.Container{}
+	var clusterSpecificSidecars []v1.Container
 	if spec.Sidecars != nil && len(spec.Sidecars) > 0 {
 		// warn if sidecars are defined, but globally disabled (does not apply to globally defined sidecars)
 		if c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {

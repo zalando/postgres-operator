@@ -72,7 +72,7 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 				context.TODO(),
 				pod.Name,
 				types.MergePatchType,
-				[]byte(patchData),
+				patchData,
 				metav1.PatchOptions{},
 				"")
 			if err2 != nil {
