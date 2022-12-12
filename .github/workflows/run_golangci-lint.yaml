@@ -22,4 +22,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.46.2
-          args: --timeout=5m --issues-exit-code=0 ./...
+          args: --timeout=10m --issues-exit-code=0 ./...
+          skip-pkg-cache: true
+          skip-build-cache: true
+          skip-go-installation: true
