@@ -17,6 +17,8 @@ jobs:
           go-version: "^1.17.4"
     - name: Make dependencies
       run: make deps mocks
+    - name: Validate code generating
+      run: make verify-codegen
     - name: Compile
       run: make linux
     - name: Run unit tests
