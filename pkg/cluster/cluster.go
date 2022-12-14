@@ -377,10 +377,8 @@ func (c *Cluster) Create() error {
 		}
 	}
 
-	if len(c.Spec.Patroni.Slots) > 0 {
-		for slotName, desiredSlot := range c.Spec.Patroni.Slots {
-			c.replicationSlots[slotName] = desiredSlot
-		}
+	for slotName, desiredSlot := range c.Spec.Patroni.Slots {
+		c.replicationSlots[slotName] = desiredSlot
 	}
 
 	return nil

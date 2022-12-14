@@ -144,6 +144,13 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	client, _ := newFakeK8sSyncClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
+	testSlots := map[string]map[string]string{
+		"slot1": {
+			"type":     "logical",
+			"plugin":   "wal2json",
+			"database": "foo",
+		},
+	}
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -210,6 +217,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	tests := []struct {
 		subtest        string
 		patroni        acidv1.Patroni
+		slots          map[string]map[string]string
 		pgParams       map[string]string
 		restartPrimary bool
 	}{
@@ -251,9 +259,62 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 			},
 			restartPrimary: true,
 		},
+		{
+			subtest: "slot does not exist but is desired",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+			},
+			slots: testSlots,
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			restartPrimary: false,
+		},
+		{
+			subtest: "slot exist, nothing specified in manifest",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+				Slots: map[string]map[string]string{
+					"slot1": {
+						"type":     "logical",
+						"plugin":   "pgoutput",
+						"database": "foo",
+					},
+				},
+			},
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			restartPrimary: false,
+		},
+		{
+			subtest: "slot plugin differs",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+				Slots: map[string]map[string]string{
+					"slot1": {
+						"type":     "logical",
+						"plugin":   "pgoutput",
+						"database": "foo",
+					},
+				},
+			},
+			slots: testSlots,
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			restartPrimary: false,
+		},
 	}
 
 	for _, tt := range tests {
+		if tt.slots != nil {
+			cluster.Spec.Patroni.Slots = tt.slots
+		}
+
 		configPatched, requirePrimaryRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
 		assert.NoError(t, err)
 		if configPatched != true {

@@ -395,13 +395,22 @@ class EndToEndTestCase(unittest.TestCase):
             "spec": {
                 "postgresql": {
                     "parameters": {
-                        "max_connections": new_max_connections_value
+                        "max_connections": new_max_connections_value,
+                        "wal_level": "logical"
                      }
                  },
-                 "patroni": {
+                "users": {
+                    "test_user": []
+                },
+                "databases": {
+                    "foo": "test_user"
+                },
+                "patroni": {
                     "slots": {
                         "test_slot": {
-                            "type": "physical"
+                            "type": "logical",
+                            "database": "foo",
+                            "plugin": "pgoutput"
                         },
                         "test_slot_2": {
                             "type": "physical"
@@ -500,14 +509,22 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
                 "Previous max_connections setting not applied on replica", 10, 5)
 
-            # delete test_slot_2 from config
+            # patch new slot via Patroni REST
+            patroni_slot = "test_patroni_slot"
+            patch_slot_command = """curl -s -XPATCH -d '{"slots": {"test_patroni_slot": {"type": "physical"}}}' http://localhost:8008/config"""
+            k8s.exec_with_kubectl(replica.metadata.name, patch_slot_command)
+
+            # delete test_slot_2 from config and change the plugin type for test_slot
             slot_to_remove = "test_slot_2"
+            slot_to_change = "test_slot"
             pg_patch_slots = {
                 "spec": {
                     "patroni": {
                         "slots": {
                             "test_slot": {
-                                "type": "physical"
+                                "type": "logical",
+                                "database": "foo",
+                                "plugin": "wal2json"
                             }
                         }
                     }
@@ -526,7 +543,26 @@ class EndToEndTestCase(unittest.TestCase):
             """ % (slot_to_remove)
             
             self.eventuallyEqual(lambda: len(self.query_database(replica.metadata.name, "postgres", deleted_slot_query)), 0,
-                "The replication slot cannot be deleted", 10, 5)       
+                "The replication slot cannot be deleted", 10, 5)
+
+            changed_slot_query = """
+                SELECT plugin
+                  FROM pg_replication_slots
+                 WHERE slot_name = '%s';
+            """ % (slot_to_change)
+
+            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", changed_slot_query)[0], "wal2json",
+                "The replication slot cannot be updated", 10, 5)
+            
+            # make sure slot from Patroni didn't get deleted
+            patroni_slot_query = """
+                SELECT slot_name
+                  FROM pg_replication_slots
+                 WHERE slot_name = '%s';
+            """ % (patroni_slot)
+
+            self.eventuallyEqual(lambda: len(self.query_database(replica.metadata.name, "postgres", patroni_slot_query)), 1,
+                "The replication slot from Patroni gets deleted", 10, 5)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
