@@ -32,7 +32,7 @@ clean:
 
 copy: clean
 	mkdir manifests
-	cp ../manifests -r .
+	cp -r ../manifests .
 
 docker: scm-source.json
 	docker build -t "$(IMAGE):$(TAG)" .

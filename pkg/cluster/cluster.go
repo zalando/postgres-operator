@@ -91,7 +91,6 @@ type Cluster struct {
 	currentProcess      Process
 	processMu           sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu              sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-	streamApplications  []string
 	ConnectionPooler    map[PostgresRole]*ConnectionPoolerObjects
 	EBSVolumes          map[string]volumes.VolumeProperties
 	VolumeResizer       volumes.VolumeResizer
