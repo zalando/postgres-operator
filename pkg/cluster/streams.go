@@ -390,12 +390,12 @@ func (c *Cluster) createOrUpdateStreams() error {
 				continue
 			}
 		}
-		c.logger.Infof("event streams do not exist, create it")
+		c.logger.Infof("event streams with applicationId %s do not exist, create it", appId)
 		streamCRD, err := c.createStreams(appId)
 		if err != nil {
-			return fmt.Errorf("failed creating event stream for cluster %s with applicationId %s: %v", c.Name, appId, err)
+			return fmt.Errorf("failed creating event streams with applicationId %s: %v", appId, err)
 		}
-		c.logger.Infof("event stream %q has been successfully created", streamCRD.Name)
+		c.logger.Infof("event streams %q have been successfully created", streamCRD.Name)
 	}
 
 	return nil
