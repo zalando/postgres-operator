@@ -41,7 +41,6 @@ var (
 	appId       string = "test-app"
 	dbName      string = "foo"
 	fesUser     string = fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
-	fesName     string = fmt.Sprintf("%s-%s-12345", clusterName, constants.EventStreamSourceSlotPrefix)
 	slotName    string = fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
 
 	pg = acidv1.Postgresql{
@@ -90,7 +89,7 @@ var (
 			Kind:       constants.EventStreamCRDKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fesName,
+			Name:      fmt.Sprintf("%s-12345", clusterName),
 			Namespace: namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				metav1.OwnerReference{

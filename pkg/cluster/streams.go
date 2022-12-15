@@ -191,8 +191,8 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 			Kind:       constants.EventStreamCRDKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// max length for cluster name is 53 so we can only add 10 more characters / numbers
-			Name:        fmt.Sprintf("%s-%s-%s", c.Name, constants.EventStreamSourceSlotPrefix, util.RandomPassword(5)),
+			// max length for cluster name is 58 so we can only add 5 more characters / numbers
+			Name:        fmt.Sprintf("%s-%s", c.Name, util.RandomPassword(5)),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
 			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
