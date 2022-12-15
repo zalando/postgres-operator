@@ -74,18 +74,18 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 	}{
 		{
 			subtest: "Patroni default configuration",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "9.6"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				Auth: config.Auth{
 					PamRoleName: "zalandos",
 				},
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/9.6/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "11"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
 			patroni: &acidv1.Patroni{
 				InitDB: map[string]string{
 					"encoding":       "UTF8",
@@ -108,11 +108,11 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 					PamRoleName: "zalandos",
 				},
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "14"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				Auth: config.Auth{
@@ -120,11 +120,11 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				},
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "14"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.False(),
 			},
@@ -134,11 +134,11 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				},
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":false}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":false}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "14"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.True(),
 			},
@@ -148,7 +148,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				},
 				EnablePatroniFailsafeMode: util.False(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/14/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -180,15 +180,15 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		},
 		{
 			subTest:  "test current bin path against hard coded template",
-			binPath:  "/usr/lib/postgresql/12/bin",
+			binPath:  "/usr/lib/postgresql/15/bin",
 			template: pgBinariesLocationTemplate,
-			expected: "12",
+			expected: "15",
 		},
 		{
 			subTest:  "test alternative bin path against a matching template",
-			binPath:  "/usr/pgsql-12/bin",
+			binPath:  "/usr/pgsql-15/bin",
 			template: "/usr/pgsql-%v/bin",
-			expected: "12",
+			expected: "15",
 		},
 	}
 

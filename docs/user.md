@@ -517,7 +517,7 @@ Postgres Operator will create the following NOLOGIN roles:
 
 The `<dbname>_owner` role is the database owner and should be used when creating
 new database objects. All members of the `admin` role, e.g. teams API roles, can
-become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/12/sql-alterdefaultprivileges.html)
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/15/sql-alterdefaultprivileges.html)
 are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
@@ -592,7 +592,7 @@ spec:
 
 ### Schema `search_path` for default roles
 
-The schema [`search_path`](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH)
+The schema [`search_path`](https://www.postgresql.org/docs/15/ddl-schemas.html#DDL-SCHEMAS-PATH)
 for each role will include the role name and the schemas, this role should have
 access to. So `foo_bar_writer` does not have to schema-qualify tables from
 schemas `foo_bar_writer, bar`, while `foo_writer` can look up `foo_writer` and
@@ -812,7 +812,7 @@ spec:
 ### Clone directly
 
 Another way to get a fresh copy of your source DB cluster is via
-[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html). To
+[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html). To
 use this feature simply leave out the timestamp field from the clone section.
 The operator will connect to the service of the source cluster by name. If the
 cluster is called test, then the connection string will look like host=test
