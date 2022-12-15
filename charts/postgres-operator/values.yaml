@@ -89,7 +89,7 @@ configMajorVersionUpgrade:
   # - acid
 
   # minimal Postgres major version that will not automatically be upgraded
-  minimal_major_version: "10"
+  minimal_major_version: "11"
   # target Postgres major version when upgrading clusters automatically
   target_major_version: "15"
 

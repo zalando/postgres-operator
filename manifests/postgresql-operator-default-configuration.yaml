@@ -39,7 +39,7 @@ configuration:
     major_version_upgrade_mode: "off"
     # major_version_upgrade_team_allow_list:
     # - acid
-    minimal_major_version: "10"
+    minimal_major_version: "11"
     target_major_version: "15"
   kubernetes:
     # additional_pod_capabilities:
