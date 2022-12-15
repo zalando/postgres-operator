@@ -97,7 +97,7 @@ data:
   # max_memory_request: 4Gi
   # min_cpu_limit: 250m
   # min_memory_limit: 250Mi
-  # minimal_major_version: "9.6"
+  # minimal_major_version: "11"
   # node_readiness_label: "status:ready"
   # node_readiness_label_merge: "OR"
   # oauth_token_secret_name: postgresql-operator
