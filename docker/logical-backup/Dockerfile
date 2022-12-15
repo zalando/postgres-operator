@@ -23,13 +23,12 @@ RUN apt-get update     \
     && curl --silent https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     && apt-get update \
     && apt-get install --no-install-recommends -y  \
+        postgresql-client-15  \
         postgresql-client-14  \
         postgresql-client-13  \
         postgresql-client-12  \
         postgresql-client-11  \
         postgresql-client-10  \
-        postgresql-client-9.6 \
-        postgresql-client-9.5 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

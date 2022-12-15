@@ -11,13 +11,12 @@ import (
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"9.5": 90500,
-	"9.6": 90600,
 	"10":  100000,
 	"11":  110000,
 	"12":  120000,
 	"13":  130000,
 	"14":  140000,
+	"15":  150000,
 }
 
 // IsBiggerPostgresVersion Compare two Postgres version numbers
@@ -36,7 +35,7 @@ func (c *Cluster) GetDesiredMajorVersionAsInt() int {
 func (c *Cluster) GetDesiredMajorVersion() string {
 
 	if c.Config.OpConfig.MajorVersionUpgradeMode == "full" {
-		// e.g. current is 9.6, minimal is 11 allowing 11 to 14 clusters, everything below is upgraded
+		// e.g. current is 10, minimal is 11 allowing 11 to 15 clusters, everything below is upgraded
 		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.MinimalMajorVersion) {
 			c.logger.Infof("overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
 			return c.Config.OpConfig.TargetMajorVersion

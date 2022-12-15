@@ -29,13 +29,13 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 14, starting from 9.6+
+* Supports PostgreSQL 15, starting from 10+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
 [WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
 * Preload libraries: [bg_mon](https://github.com/CyberDem0n/bg_mon),
-[pg_stat_statements](https://www.postgresql.org/docs/14/pgstatstatements.html),
+[pg_stat_statements](https://www.postgresql.org/docs/15/pgstatstatements.html),
 [pgextwlist](https://github.com/dimitri/pgextwlist),
 [pg_auth_mon](https://github.com/RafiaSabih/pg_auth_mon)
 * Incl. popular Postgres extensions such as
