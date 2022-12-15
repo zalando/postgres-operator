@@ -1849,7 +1849,7 @@ func TestSidecars(t *testing.T) {
 
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
-			PgVersion: "12.1",
+			PgVersion: "15",
 			Parameters: map[string]string{
 				"max_connections": "100",
 			},
