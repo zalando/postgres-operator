@@ -511,12 +511,15 @@ class EndToEndTestCase(unittest.TestCase):
 
             # patch new slot via Patroni REST
             patroni_slot = "test_patroni_slot"
-            patch_slot_command = """curl -s -XPATCH -d '{"slots": {"test_patroni_slot": {"type": "physical"}}}' http://localhost:8008/config"""
-            k8s.exec_with_kubectl(replica.metadata.name, patch_slot_command)
+            patch_slot_command = """curl -s -XPATCH -d '{"slots": {"test_patroni_slot": {"type": "physical"}}}' localhost:8008/config"""
+            k8s.exec_with_kubectl(leader.metadata.name, patch_slot_command)
+
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            self.eventuallyTrue(compare_config, "Postgres config not applied")
 
             # delete test_slot_2 from config and change the plugin type for test_slot
-            slot_to_remove = "test_slot_2"
             slot_to_change = "test_slot"
+            slot_to_remove = "test_slot_2"
             pg_patch_slots = {
                 "spec": {
                     "patroni": {
@@ -535,14 +538,15 @@ class EndToEndTestCase(unittest.TestCase):
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_slots)
             
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            self.eventuallyTrue(compare_config, "Postgres config not applied")
 
             deleted_slot_query = """
                 SELECT slot_name
                   FROM pg_replication_slots
                  WHERE slot_name = '%s';
             """ % (slot_to_remove)
-            
-            self.eventuallyEqual(lambda: len(self.query_database(replica.metadata.name, "postgres", deleted_slot_query)), 0,
+
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", deleted_slot_query)), 0,
                 "The replication slot cannot be deleted", 10, 5)
 
             changed_slot_query = """
@@ -551,7 +555,7 @@ class EndToEndTestCase(unittest.TestCase):
                  WHERE slot_name = '%s';
             """ % (slot_to_change)
 
-            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", changed_slot_query)[0], "wal2json",
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", changed_slot_query)[0], "wal2json",
                 "The replication slot cannot be updated", 10, 5)
             
             # make sure slot from Patroni didn't get deleted
@@ -561,7 +565,7 @@ class EndToEndTestCase(unittest.TestCase):
                  WHERE slot_name = '%s';
             """ % (patroni_slot)
 
-            self.eventuallyEqual(lambda: len(self.query_database(replica.metadata.name, "postgres", patroni_slot_query)), 1,
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", patroni_slot_query)), 1,
                 "The replication slot from Patroni gets deleted", 10, 5)
 
         except timeout_decorator.TimeoutError:
