@@ -625,7 +625,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 
 	// check if there exist only config updates that require a restart of the primary
-	if !util.SliceContains(restartPrimary, false) && len(configToSet) == 0 {
+	if len(restartPrimary) > 0 && !util.SliceContains(restartPrimary, false) && len(configToSet) == 0 {
 		requiresMasterRestart = true
 	}
 
