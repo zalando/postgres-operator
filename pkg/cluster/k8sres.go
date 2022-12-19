@@ -1813,7 +1813,7 @@ func addPgbackrestConfigVolume(podSpec *v1.PodSpec, configmapName string, secret
 func addPgbackrestRestoreConfigVolume(podSpec *v1.PodSpec, configmapName string) {
 
 	name := "pgbackrest-restore"
-	path := "/etc/pgbackrest-restore"
+	path := "/opt/pgbackrest/config"
 	defaultMode := int32(0644)
 	initContainerIdx := -1
 
