@@ -223,6 +223,7 @@ type UserFlags []string
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus struct {
 	PostgresClusterStatus string `json:"PostgresClusterStatus"`
+	PgbackrestRestoreID   string `json:"PgbackrestRestoreID"`
 }
 
 // ConnectionPooler Options for connection pooler
@@ -270,6 +271,7 @@ type Pgbackrest struct {
 	Image         string            `json:"image"`
 	Global        map[string]string `json:"global"`
 	Repos         []Repo            `json:"repos"`
+	Restore       Restore           `json:"restore"`
 	Configuration Configuration     `json:"configuration"`
 }
 
@@ -280,6 +282,12 @@ type Repo struct {
 	Endpoint string            `json:"endpoint"`
 	Region   string            `json:"region"`
 	Schedule map[string]string `json:"schedule"`
+}
+
+type Restore struct {
+	ID      string   `json:"id"`
+	Repo    string   `json:"repo"`
+	Options []string `json:"options"`
 }
 
 type Configuration struct {

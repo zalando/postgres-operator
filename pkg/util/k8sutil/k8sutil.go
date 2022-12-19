@@ -189,8 +189,40 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 // SetPostgresCRDStatus of Postgres cluster
 func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string) (*apiacidv1.Postgresql, error) {
 	var pg *apiacidv1.Postgresql
-	var pgStatus apiacidv1.PostgresStatus
+	type PS struct {
+		PostgresClusterStatus string `json:"PostgresClusterStatus"`
+	}
+	var pgStatus PS
 	pgStatus.PostgresClusterStatus = status
+
+	patch, err := json.Marshal(struct {
+		PgStatus interface{} `json:"status"`
+	}{&pgStatus})
+
+	if err != nil {
+		return pg, fmt.Errorf("could not marshal status: %v", err)
+	}
+
+	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
+	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
+	// we should take advantage of it.
+	pg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
+		context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+	if err != nil {
+		return pg, fmt.Errorf("could not update status: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion.
+	return pg, nil
+}
+
+func (client *KubernetesClient) SetPgbackrestRestoreCRDStatus(clusterName spec.NamespacedName, id string) (*apiacidv1.Postgresql, error) {
+	var pg *apiacidv1.Postgresql
+	type PS struct {
+		PgbackrestRestoreID string `json:"PgbackrestRestoreID"`
+	}
+	var pgStatus PS
+	pgStatus.PgbackrestRestoreID = id
 
 	patch, err := json.Marshal(struct {
 		PgStatus interface{} `json:"status"`

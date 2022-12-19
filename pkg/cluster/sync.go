@@ -112,6 +112,13 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 			err = fmt.Errorf("could not sync the pgbackrest jobs: %v", err)
 			return err
 		}
+		if c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+			if err = c.syncPgbackrestRestoreConfig(); err != nil {
+				return err
+			}
+			c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+			c.logger.Info("a pgbackrest restore config has been successfully synced")
+		}
 	}
 
 	// create database objects unless we are running without pods or disabled that feature explicitly
@@ -1326,6 +1333,21 @@ func (c *Cluster) syncPgbackrestConfig() error {
 			return fmt.Errorf("could not create a pgbackrest config: %v", err)
 		}
 		c.logger.Info("a pgbackrest config has been successfully created")
+	}
+	return nil
+}
+
+func (c *Cluster) syncPgbackrestRestoreConfig() error {
+	if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), c.getPgbackrestRestoreConfigmapName(), metav1.GetOptions{}); err == nil {
+		if err := c.updatePgbackrestRestoreConfig(cm); err != nil {
+			return fmt.Errorf("could not update a pgbackrest restore config: %v", err)
+		}
+		c.logger.Info("a pgbackrest restore config has been successfully updated")
+	} else {
+		if err := c.createPgbackrestRestoreConfig(); err != nil {
+			return fmt.Errorf("could not create a pgbackrest restore config: %v", err)
+		}
+		c.logger.Info("a pgbackrest restore config has been successfully created")
 	}
 	return nil
 }

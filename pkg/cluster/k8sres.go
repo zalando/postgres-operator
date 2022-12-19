@@ -831,6 +831,11 @@ func (c *Cluster) generatePodTemplate(
 		addPgbackrestConfigVolume(&podSpec, configmapName, secretName)
 	}
 
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		configmapName := c.getPgbackrestRestoreConfigmapName()
+		addPgbackrestRestoreConfigVolume(&podSpec, configmapName)
+	}
+
 	if podAntiAffinity {
 		podSpec.Affinity = podAffinity(
 			labels,
@@ -1430,6 +1435,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	podAnnotations := c.generatePodAnnotations(spec)
 
 	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+
 		initContainers = append(initContainers, v1.Container{
 			Name:         "pgbackrest-restore",
 			Image:        c.Postgresql.Spec.Backup.Pgbackrest.Image,
@@ -1802,6 +1808,48 @@ func addPgbackrestConfigVolume(podSpec *v1.PodSpec, configmapName string, secret
 	podSpec.InitContainers[postgresInitContainerIdx].VolumeMounts = mounts
 
 	podSpec.Volumes = volumes
+}
+
+func addPgbackrestRestoreConfigVolume(podSpec *v1.PodSpec, configmapName string) {
+
+	name := "pgbackrest-restore"
+	path := "/etc/pgbackrest-restore"
+	defaultMode := int32(0644)
+	initContainerIdx := -1
+
+	for i, container := range podSpec.InitContainers {
+		if container.Name == "pgbackrest-restore" {
+			initContainerIdx = i
+		}
+	}
+
+	if initContainerIdx >= 0 {
+		volumes := append(podSpec.Volumes, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				Projected: &v1.ProjectedVolumeSource{
+					DefaultMode: &defaultMode,
+					Sources: []v1.VolumeProjection{
+						{ConfigMap: &v1.ConfigMapProjection{
+							LocalObjectReference: v1.LocalObjectReference{Name: configmapName},
+							Optional:             util.True(),
+						},
+						},
+					},
+				},
+			},
+		})
+
+		mounts := append(podSpec.InitContainers[initContainerIdx].VolumeMounts,
+			v1.VolumeMount{
+				Name:      name,
+				MountPath: path,
+			})
+
+		podSpec.InitContainers[initContainerIdx].VolumeMounts = mounts
+
+		podSpec.Volumes = volumes
+	}
 }
 
 func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string,
@@ -2429,9 +2477,12 @@ func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return trimCronjobName(fmt.Sprintf("%s%s", c.OpConfig.LogicalBackupJobPrefix, c.clusterName().Name))
 }
 
-// getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getPgbackrestConfigmapName() (jobName string) {
 	return fmt.Sprintf("%s-pgbackrest-config", c.Name)
+}
+
+func (c *Cluster) getPgbackrestRestoreConfigmapName() (jobName string) {
+	return fmt.Sprintf("%s-pgbackrest-restore", c.Name)
 }
 
 // Return an array of ownerReferences to make an arbitraty object dependent on
@@ -2469,7 +2520,7 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 	return file
 }
 
-func (c *Cluster) generatepgbackrestConfigmap() (*v1.ConfigMap, error) {
+func (c *Cluster) generatePgbackrestConfigmap() (*v1.ConfigMap, error) {
 	config := "[db]\npg1-path = /home/postgres/pgdata/pgroot/data\npg1-port = 5432\npg1-socket-path = /var/run/postgresql/\n"
 	config += "\n[global]\nlog-path = /home/postgres/pgdata/pgbackrest/log"
 	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
@@ -2494,6 +2545,24 @@ func (c *Cluster) generatepgbackrestConfigmap() (*v1.ConfigMap, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: c.Namespace,
 			Name:      c.getPgbackrestConfigmapName(),
+		},
+		Data: data,
+	}
+	return configmap, nil
+}
+
+func (c *Cluster) generatePgbackrestRestoreConfigmap() (*v1.ConfigMap, error) {
+	config := "restore_enable = true\n"
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		options := strings.Join(c.Postgresql.Spec.Backup.Pgbackrest.Restore.Options, " ")
+		config += fmt.Sprintf("restore_command= %s;", options)
+	}
+
+	data := map[string]string{"pgbackrest_restore.conf": config}
+	configmap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: c.Namespace,
+			Name:      c.getPgbackrestRestoreConfigmapName(),
 		},
 		Data: data,
 	}

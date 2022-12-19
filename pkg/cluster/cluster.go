@@ -320,6 +320,16 @@ func (c *Cluster) Create() error {
 			return err
 		}
 		c.logger.Info("a pgbackrest config has been successfully synced")
+		if c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+			if err = c.syncPgbackrestRestoreConfig(); err != nil {
+				err = fmt.Errorf("could not sync pgbackrest restore config: %v", err)
+				return err
+			}
+			//TODO write status
+			c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+			c.logger.Info("a pgbackrest restore config has been successfully synced")
+		}
+
 	}
 
 	if c.Statefulset != nil {
@@ -914,6 +924,15 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 				return
 			}
 			c.logger.Info("a k8s cron job for pgbackrest has been successfully created")
+			if c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+				if err := c.syncPgbackrestRestoreConfig(); err != nil {
+					updateFailed = true
+					return
+				}
+				//TODO write status
+				c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+				c.logger.Info("a pgbackrest restore config has been successfully synced")
+			}
 		} else {
 
 			if err := c.deletePgbackrestConfig(); err != nil {
