@@ -403,16 +403,12 @@ class EndToEndTestCase(unittest.TestCase):
                     "test_user": []
                 },
                 "databases": {
-                    "foo": "test_user"
+                    "foo": "test_user",
+                    "bar": "test_user"
                 },
                 "patroni": {
                     "slots": {
-                        "test_slot": {
-                            "type": "logical",
-                            "database": "foo",
-                            "plugin": "pgoutput"
-                        },
-                        "test_slot_2": {
+                        "first_slot": {
                             "type": "physical"
                         }
                     },
@@ -449,6 +445,8 @@ class EndToEndTestCase(unittest.TestCase):
                             "synchronous_mode not updated")
                 self.assertEqual(desired_config["failsafe_mode"], effective_config["failsafe_mode"],
                             "failsafe_mode not updated")
+                self.assertEqual(desired_config["slots"], effective_config["slots"],
+                            "slots not updated")
                 return True
 
             # check if Patroni config has been updated
@@ -512,31 +510,63 @@ class EndToEndTestCase(unittest.TestCase):
             # patch new slot via Patroni REST
             patroni_slot = "test_patroni_slot"
             patch_slot_command = """curl -s -XPATCH -d '{"slots": {"test_patroni_slot": {"type": "physical"}}}' localhost:8008/config"""
-            k8s.exec_with_kubectl(leader.metadata.name, patch_slot_command)
+            pg_patch_config["spec"]["patroni"]["slots"][patroni_slot] = {"type": "physical"}
 
+            k8s.exec_with_kubectl(leader.metadata.name, patch_slot_command)
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
             self.eventuallyTrue(compare_config, "Postgres config not applied")
 
-            # delete test_slot_2 from config and change the plugin type for test_slot
-            slot_to_change = "test_slot"
-            slot_to_remove = "test_slot_2"
-            pg_patch_slots = {
+            # test adding new slots
+            pg_add_new_slots_patch = {
                 "spec": {
                     "patroni": {
-                        "slots": {
+                         "slots": {
                             "test_slot": {
                                 "type": "logical",
                                 "database": "foo",
-                                "plugin": "wal2json"
+                                "plugin": "pgoutput"
+                            },
+                            "test_slot_2": {
+                                "type": "physical"
                             }
                         }
                     }
                 }
             }
 
+            for slot_name, slot_details in pg_add_new_slots_patch["spec"]["patroni"]["slots"].items():
+                pg_patch_config["spec"]["patroni"]["slots"][slot_name] = slot_details
+
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_slots)
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_add_new_slots_patch)
+
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            self.eventuallyTrue(compare_config, "Postgres config not applied")
+
+            # delete test_slot_2 from config and change the database type for test_slot
+            slot_to_change = "test_slot"
+            slot_to_remove = "test_slot_2"
+            pg_delete_slot_patch = {
+                "spec": {
+                    "patroni": {
+                        "slots": {
+                            "test_slot": {
+                                "type": "logical",
+                                "database": "bar",
+                                "plugin": "pgoutput"
+                            },
+                            "test_slot_2": None
+                        }
+                    }
+                }
+            }
+
+            pg_patch_config["spec"]["patroni"]["slots"][slot_to_change]["database"] = "bar"
+            del pg_patch_config["spec"]["patroni"]["slots"][slot_to_remove]
             
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_delete_slot_patch)
+
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
             self.eventuallyTrue(compare_config, "Postgres config not applied")
 
@@ -550,12 +580,12 @@ class EndToEndTestCase(unittest.TestCase):
                 "The replication slot cannot be deleted", 10, 5)
 
             changed_slot_query = """
-                SELECT plugin
+                SELECT database
                   FROM pg_replication_slots
                  WHERE slot_name = '%s';
             """ % (slot_to_change)
 
-            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", changed_slot_query)[0], "wal2json",
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", changed_slot_query)[0], "bar",
                 "The replication slot cannot be updated", 10, 5)
             
             # make sure slot from Patroni didn't get deleted
