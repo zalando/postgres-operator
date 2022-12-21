@@ -1477,6 +1477,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 					},
 				},
 			},
+			v1.EnvVar{
+				Name:  "SELECTOR",
+				Value: fmt.Sprintf("cluster-name=%s,spilo-role=master", c.Name),
+			},
 		)
 		initContainers = append(initContainers, v1.Container{
 			Name:         "pgbackrest-restore",
