@@ -1445,6 +1445,17 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 				},
 			},
 			v1.EnvVar{
+				Name: "RESTORE_BASEBACKUP",
+				ValueFrom: &v1.EnvVarSource{
+					ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: c.getPgbackrestRestoreConfigmapName(),
+						},
+						Key: "restore_basebackup",
+					},
+				},
+			},
+			v1.EnvVar{
 				Name: "RESTORE_METHOD",
 				ValueFrom: &v1.EnvVarSource{
 					ConfigMapKeyRef: &v1.ConfigMapKeySelector{
@@ -2545,6 +2556,7 @@ func (c *Cluster) generatePgbackrestConfigmap() (*v1.ConfigMap, error) {
 func (c *Cluster) generatePgbackrestRestoreConfigmap() (*v1.ConfigMap, error) {
 	data := make(map[string]string)
 	data["restore_enable"] = "true"
+	data["restore_basebackup"] = "false"
 	data["restore_method"] = "pgbackrest"
 	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
 		options := strings.Join(c.Postgresql.Spec.Backup.Pgbackrest.Restore.Options, " ")
