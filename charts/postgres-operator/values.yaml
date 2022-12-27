@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.7.1
+  tag: v1.8.2
   pullPolicy: "IfNotPresent"
 
   # Optionally specify an array of imagePullSecrets.
@@ -33,12 +33,19 @@ configGeneral:
   enable_shm_volume: true
   # enables backwards compatible path between Spilo 12 and Spilo 13+ images
   enable_spilo_wal_path_compat: false
+  # operator will sync only clusters where name starts with teamId prefix
+  enable_team_id_clustername_prefix: false
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
+  # Spilo docker image
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p7
+
+  # key name for annotation to ignore globally configured instance limits
+  # ignore_instance_limits_annotation_key: ""
+
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: false
-  # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p3
+
   # min number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # max number of instances in Postgres cluster. -1 = no limit
@@ -82,7 +89,7 @@ configMajorVersionUpgrade:
   # - acid
 
   # minimal Postgres major version that will not automatically be upgraded
-  minimal_major_version: "9.6"
+  minimal_major_version: "11"
   # target Postgres major version when upgrading clusters automatically
   target_major_version: "14"
 
@@ -122,6 +129,8 @@ configKubernetes:
   enable_pod_antiaffinity: false
   # toggles PDB to set to MinAvailabe 0 or 1
   enable_pod_disruption_budget: true
+  # toogles readiness probe for database pods
+  enable_readiness_probe: false
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
 
@@ -191,7 +200,7 @@ configKubernetes:
   # whether the Spilo container should run with additional permissions other than parent.
   # required by cron which needs setuid
   spilo_allow_privilege_escalation: true
-  # storage resize strategy, available options are: ebs, pvc, off
+  # storage resize strategy, available options are: ebs, pvc, off or mixed
   storage_resize_mode: pvc
   # pod toleration assigned to instances of every Postgres cluster
   # toleration:
@@ -212,6 +221,12 @@ configPostgresPodResources:
   default_memory_limit: 500Mi
   # memory request value for the postgres containers
   default_memory_request: 100Mi
+  # optional upper boundary for CPU request
+  # max_cpu_request: "1"
+
+  # optional upper boundary for memory request
+  # max_memory_request: 4Gi
+
   # hard CPU minimum required to properly run a Postgres cluster
   min_cpu_limit: 250m
   # hard memory minimum required to properly run a Postgres cluster
@@ -256,9 +271,9 @@ configLoadBalancer:
   # define external traffic policy for the load balancer
   external_traffic_policy: "Cluster"
   # defines the DNS name string template for the master load balancer cluster
-  master_dns_name_format: "{cluster}.{team}.{hostedzone}"
+  master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
   # defines the DNS name string template for the replica load balancer cluster
-  replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
+  replica_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
 
 # options to aid debugging of the operator itself
 configDebug:
@@ -284,7 +299,7 @@ configAwsOrGcp:
   # Path to mount the above Secret in the filesystem of the container(s)
   # additional_secret_mount_path: "/some/dir"
 
-  # AWS region used to store ESB volumes
+  # AWS region used to store EBS volumes
   aws_region: eu-central-1
 
   # enable automatic migration on AWS from gp2 to gp3 volumes
@@ -313,7 +328,7 @@ configAwsOrGcp:
 # configure K8s cron job managed by the operator
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.7.1"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.8.0"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -381,7 +396,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-19"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-24"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode
@@ -393,6 +408,10 @@ configConnectionPooler:
   connection_pooler_default_memory_request: 100Mi
   connection_pooler_default_cpu_limit: "1"
   connection_pooler_default_memory_limit: 100Mi
+
+configPatroni:
+  # enable Patroni DCS failsafe_mode feature
+  failsafe_mode: false
 
 # Zalando's internal CDC stream feature
 enableStreams: false

@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sort"
 	"strconv"
 	"time"
@@ -67,7 +66,7 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 		return fmt.Errorf("could not form patch for pod's rolling update flag: %v", err)
 	}
 
-	err = retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
+	err = retryutil.Retry(1*time.Second, 5*time.Second,
 		func() (bool, error) {
 			_, err2 := c.KubeClient.Pods(pod.Namespace).Patch(
 				context.TODO(),
@@ -151,12 +150,13 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
-	if _, ok := c.podSubscribers[podName]; !ok {
+	ch, ok := c.podSubscribers[podName]
+	if !ok {
 		panic("subscriber for pod '" + podName.String() + "' is not found")
 	}
 
-	close(c.podSubscribers[podName])
 	delete(c.podSubscribers, podName)
+	close(ch)
 }
 
 func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan PodEvent {
@@ -211,52 +211,19 @@ func (c *Cluster) movePodFromEndOfLifeNode(pod *v1.Pod) (*v1.Pod, error) {
 	return newPod, nil
 }
 
-func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
-
-	// Wait until at least one replica pod will come up
-	if err := c.waitForAnyReplicaLabelReady(); err != nil {
-		c.logger.Warningf("could not find at least one ready replica: %v", err)
-	}
-
-	replicas, err := c.getRolePods(Replica)
-	if err != nil {
-		return nil, fmt.Errorf("could not get replica pods: %v", err)
-	}
-
-	if len(replicas) == 0 {
-		c.logger.Warningf("no available master candidates, migration will cause longer downtime of Postgres cluster")
-		return nil, nil
-	}
-
-	for i, pod := range replicas {
-		// look for replicas running on live nodes. Ignore errors when querying the nodes.
-		if pod.Spec.NodeName != oldNodeName {
-			eol, err := c.podIsEndOfLife(&pod)
-			if err == nil && !eol {
-				return &replicas[i], nil
-			}
-		}
-	}
-	c.logger.Warningf("no available master candidates on live nodes")
-	return &replicas[rand.Intn(len(replicas))], nil
-}
-
 // MigrateMasterPod migrates master pod via failover to a replica
 func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	var (
-		masterCandidatePod *v1.Pod
-		err                error
-		eol                bool
+		err error
+		eol bool
 	)
 
 	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(context.TODO(), podName.Name, metav1.GetOptions{})
-
 	if err != nil {
-		return fmt.Errorf("could not get pod: %v", err)
+		return fmt.Errorf("could not get master pod: %v", err)
 	}
 
 	c.logger.Infof("starting process to migrate master pod %q", podName)
-
 	if eol, err = c.podIsEndOfLife(oldMaster); err != nil {
 		return fmt.Errorf("could not get node %q: %v", oldMaster.Spec.NodeName, err)
 	}
@@ -280,10 +247,16 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		}
 		c.Statefulset = sset
 	}
-	// We may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case.
+	// we may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case
+	masterCandidateName := podName
+	masterCandidatePod := oldMaster
 	if *c.Statefulset.Spec.Replicas > 1 {
-		if masterCandidatePod, err = c.masterCandidate(oldMaster.Spec.NodeName); err != nil {
+		if masterCandidateName, err = c.getSwitchoverCandidate(oldMaster); err != nil {
 			return fmt.Errorf("could not find suitable replica pod as candidate for failover: %v", err)
+		}
+		masterCandidatePod, err = c.KubeClient.Pods(masterCandidateName.Namespace).Get(context.TODO(), masterCandidateName.Name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("could not get master candidate pod: %v", err)
 		}
 	} else {
 		c.logger.Warningf("migrating single pod cluster %q, this will cause downtime of the Postgres cluster until pod is back", c.clusterName())
@@ -301,11 +274,10 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return nil
 	}
 
-	if masterCandidatePod, err = c.movePodFromEndOfLifeNode(masterCandidatePod); err != nil {
+	if _, err = c.movePodFromEndOfLifeNode(masterCandidatePod); err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
 
-	masterCandidateName := util.NameFromMeta(masterCandidatePod.ObjectMeta)
 	err = retryutil.Retry(1*time.Minute, 5*time.Minute,
 		func() (bool, error) {
 			err := c.Switchover(oldMaster, masterCandidateName)
@@ -399,11 +371,12 @@ func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) 
 }
 
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
+	stopCh := make(chan struct{})
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
-	stopChan := make(chan struct{})
+	defer close(stopCh)
 
-	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval, c.OpConfig.PatroniAPICheckTimeout,
+	err := retryutil.Retry(1*time.Second, 5*time.Second,
 		func() (bool, error) {
 			err2 := c.KubeClient.Pods(podName.Namespace).Delete(
 				context.TODO(),
@@ -421,7 +394,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	if err := c.waitForPodDeletion(ch); err != nil {
 		return nil, err
 	}
-	pod, err := c.waitForPodLabel(ch, stopChan, nil)
+	pod, err := c.waitForPodLabel(ch, stopCh, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +419,7 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 			continue
 		}
 
-		podName := util.NameFromMeta(pod.ObjectMeta)
+		podName := util.NameFromMeta(pods[i].ObjectMeta)
 		newPod, err := c.recreatePod(podName)
 		if err != nil {
 			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
@@ -520,13 +493,13 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 	// if sync_standby replicas were found assume synchronous_mode is enabled and ignore other candidates list
 	if len(syncCandidates) > 0 {
 		sort.Slice(syncCandidates, func(i, j int) bool {
-			return util.IntFromIntStr(syncCandidates[i].Lag) < util.IntFromIntStr(syncCandidates[j].Lag)
+			return syncCandidates[i].Lag < syncCandidates[j].Lag
 		})
 		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
 	}
 	if len(candidates) > 0 {
 		sort.Slice(candidates, func(i, j int) bool {
-			return util.IntFromIntStr(candidates[i].Lag) < util.IntFromIntStr(candidates[j].Lag)
+			return candidates[i].Lag < candidates[j].Lag
 		})
 		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
 	}

@@ -263,6 +263,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 	client := k8sutil.KubernetesClient{
 		StatefulSetsGetter: clientSet.AppsV1(),
 		ServicesGetter:     clientSet.CoreV1(),
+		PodsGetter:         clientSet.CoreV1(),
 		DeploymentsGetter:  clientSet.AppsV1(),
 		PostgresqlsGetter:  acidClientSet.AcidV1(),
 		SecretsGetter:      clientSet.CoreV1(),
@@ -372,6 +373,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 	client := k8sutil.KubernetesClient{
 		StatefulSetsGetter: clientSet.AppsV1(),
 		ServicesGetter:     clientSet.CoreV1(),
+		PodsGetter:         clientSet.CoreV1(),
 		DeploymentsGetter:  clientSet.AppsV1(),
 		PostgresqlsGetter:  acidClientSet.AcidV1(),
 		SecretsGetter:      clientSet.CoreV1(),

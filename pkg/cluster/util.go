@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -13,7 +14,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -158,7 +159,7 @@ func metaAnnotationsPatch(annotations map[string]string) ([]byte, error) {
 	}{&meta})
 }
 
-func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpdate bool, reason string) {
+func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate bool, reason string) {
 	if isUpdate {
 		c.logger.Infof("pod disruption budget %q has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
@@ -243,7 +244,12 @@ func getPostgresContainer(podSpec *v1.PodSpec) (pgContainer v1.Container) {
 func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	if teamID == "" {
-		return nil, fmt.Errorf("no teamId specified")
+		msg := "no teamId specified"
+		if c.OpConfig.EnableTeamIdClusternamePrefix {
+			return nil, fmt.Errorf(msg)
+		}
+		c.logger.Warnf(msg)
+		return nil, nil
 	}
 
 	members := []string{}
@@ -272,17 +278,21 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 		return nil, fmt.Errorf("could not get oauth token to authenticate to team service API: %v", err)
 	}
 
-	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
-	if err != nil {
-		return nil, fmt.Errorf("could not get team info for team %q: %v", teamID, err)
-	}
+	teamInfo, statusCode, err := c.teamsAPIClient.TeamInfo(teamID, token)
 
-	for _, member := range teamInfo.Members {
-		if !(util.SliceContains(members, member)) {
-			members = append(members, member)
+	if err != nil {
+		if statusCode == http.StatusNotFound {
+			c.logger.Warningf("could not get team info for team %q: %v", teamID, err)
+		} else {
+			return nil, fmt.Errorf("could not get team info for team %q: %v", teamID, err)
+		}
+	} else {
+		for _, member := range teamInfo.Members {
+			if !(util.SliceContains(members, member)) {
+				members = append(members, member)
+			}
 		}
 	}
-
 	return members, nil
 }
 
@@ -311,7 +321,7 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 	return nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
+func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
@@ -327,7 +337,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{
 			}
 		case <-timeout:
 			return nil, fmt.Errorf("pod label wait timeout")
-		case <-stopChan:
+		case <-stopCh:
 			return nil, fmt.Errorf("pod label wait cancelled")
 		}
 	}
@@ -495,18 +505,48 @@ func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) la
 	return lbls
 }
 
+func (c *Cluster) dnsName(role PostgresRole) string {
+	var dnsString string
+
+	if role == Master {
+		dnsString = c.masterDNSName()
+	} else {
+		dnsString = c.replicaDNSName()
+	}
+
+	// if cluster name starts with teamID we might need to provide backwards compatibility
+	clusterNameWithoutTeamPrefix, _ := acidv1.ExtractClusterName(c.Name, c.Spec.TeamID)
+	if clusterNameWithoutTeamPrefix != "" {
+		if role == Replica {
+			clusterNameWithoutTeamPrefix = fmt.Sprintf("%s-repl", clusterNameWithoutTeamPrefix)
+		}
+		dnsString = fmt.Sprintf("%s,%s", dnsString, c.oldDNSFormat(clusterNameWithoutTeamPrefix))
+	}
+
+	return dnsString
+}
+
 func (c *Cluster) masterDNSName() string {
 	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
-		"cluster", c.Spec.ClusterName,
+		"cluster", c.Name,
+		"namespace", c.Namespace,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
 func (c *Cluster) replicaDNSName() string {
 	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
-		"cluster", c.Spec.ClusterName,
+		"cluster", c.Name,
+		"namespace", c.Namespace,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
+}
+
+func (c *Cluster) oldDNSFormat(clusterName string) string {
+	return fmt.Sprintf("%s.%s.%s",
+		clusterName,
+		c.teamName(),
+		c.OpConfig.DbHostedZone)
 }
 
 func (c *Cluster) credentialSecretName(username string) string {

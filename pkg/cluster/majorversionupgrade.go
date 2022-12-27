@@ -11,13 +11,12 @@ import (
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"9.5": 90500,
-	"9.6": 90600,
-	"10":  100000,
-	"11":  110000,
-	"12":  120000,
-	"13":  130000,
-	"14":  140000,
+	"10": 100000,
+	"11": 110000,
+	"12": 120000,
+	"13": 130000,
+	"14": 140000,
+	"15": 150000,
 }
 
 // IsBiggerPostgresVersion Compare two Postgres version numbers
@@ -36,7 +35,7 @@ func (c *Cluster) GetDesiredMajorVersionAsInt() int {
 func (c *Cluster) GetDesiredMajorVersion() string {
 
 	if c.Config.OpConfig.MajorVersionUpgradeMode == "full" {
-		// e.g. current is 9.6, minimal is 11 allowing 11 to 14 clusters, everything below is upgraded
+		// e.g. current is 10, minimal is 11 allowing 11 to 14 clusters, everything below is upgraded
 		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.MinimalMajorVersion) {
 			c.logger.Infof("overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
 			return c.Config.OpConfig.TargetMajorVersion
@@ -57,10 +56,10 @@ func (c *Cluster) isUpgradeAllowedForTeam(owningTeam string) bool {
 }
 
 /*
-  Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
+Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
 
-  Manual upgrade means, it is triggered by the user via manifest version change
-  Full upgrade means, operator also determines the minimal version used accross all clusters and upgrades violators.
+Manual upgrade means, it is triggered by the user via manifest version change
+Full upgrade means, operator also determines the minimal version used accross all clusters and upgrades violators.
 */
 func (c *Cluster) majorVersionUpgrade() error {
 
@@ -105,8 +104,8 @@ func (c *Cluster) majorVersionUpgrade() error {
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
-			upgradeCommand := fmt.Sprintf("/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
-			
+			upgradeCommand := fmt.Sprintf("set -o pipefail && /usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
+
 			c.logger.Debugf("checking if the spilo image runs with root or non-root (check for user id=0)")
 			resultIdCheck, errIdCheck := c.ExecCommand(podName, "/bin/bash", "-c", "/usr/bin/id -u")
 			if errIdCheck != nil {

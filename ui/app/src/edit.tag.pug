@@ -139,6 +139,9 @@ edit
         o.spec.enableMasterLoadBalancer = i.spec.enableMasterLoadBalancer || false
         o.spec.enableReplicaLoadBalancer = i.spec.enableReplicaLoadBalancer || false
         o.spec.enableConnectionPooler = i.spec.enableConnectionPooler || false
+        o.spec.enableReplicaConnectionPooler = i.spec.enableReplicaConnectionPooler || false
+        o.spec.enableMasterPoolerLoadBalancer = i.spec.enableMasterPoolerLoadBalancer || false
+        o.spec.enableReplicaPoolerLoadBalancer = i.spec.enableReplicaPoolerLoadBalancer || false
 
         o.spec.volume = {
           size: i.spec.volume.size,

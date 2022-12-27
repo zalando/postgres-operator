@@ -54,13 +54,17 @@ type Resources struct {
 	DefaultMemoryLimit            string              `name:"default_memory_limit" default:"500Mi"`
 	MinCPULimit                   string              `name:"min_cpu_limit" default:"250m"`
 	MinMemoryLimit                string              `name:"min_memory_limit" default:"250Mi"`
+	MaxCPURequest                 string              `name:"max_cpu_request"`
+	MaxMemoryRequest              string              `name:"max_memory_request"`
 	PodEnvironmentConfigMap       spec.NamespacedName `name:"pod_environment_configmap"`
 	PodEnvironmentSecret          string              `name:"pod_environment_secret"`
 	NodeReadinessLabel            map[string]string   `name:"node_readiness_label" default:""`
 	NodeReadinessLabelMerge       string              `name:"node_readiness_label_merge" default:"OR"`
-	MaxInstances                  int32               `name:"max_instances" default:"-1"`
-	MinInstances                  int32               `name:"min_instances" default:"-1"`
 	ShmVolume                     *bool               `name:"enable_shm_volume" default:"true"`
+
+	MaxInstances                      int32  `name:"max_instances" default:"-1"`
+	MinInstances                      int32  `name:"min_instances" default:"-1"`
+	IgnoreInstanceLimitsAnnotationKey string `name:"ignore_instance_limits_annotation_key"`
 }
 
 type InfrastructureRole struct {
@@ -122,7 +126,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.7.1"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.8.2"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
 	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
@@ -161,7 +165,7 @@ type Config struct {
 	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
 	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-14:2.1-p3"`
+	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-14:2.1-p7"`
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
@@ -202,8 +206,8 @@ type Config struct {
 	StorageResizeMode                      string            `name:"storage_resize_mode" default:"pvc"`
 	EnableLoadBalancer                     *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
 	ExternalTrafficPolicy                  string            `name:"external_traffic_policy" default:"Cluster"`
-	MasterDNSNameFormat                    StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
-	ReplicaDNSNameFormat                   StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	MasterDNSNameFormat                    StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{namespace}.{hostedzone}"`
+	ReplicaDNSNameFormat                   StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{namespace}.{hostedzone}"`
 	PDBNameFormat                          StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
 	EnablePodDisruptionBudget              *bool             `name:"enable_pod_disruption_budget" default:"true"`
 	EnableInitContainers                   *bool             `name:"enable_init_containers" default:"true"`
@@ -215,6 +219,7 @@ type Config struct {
 	TeamAPIRoleConfiguration               map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
 	PodTerminateGracePeriod                time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	PodManagementPolicy                    string            `name:"pod_management_policy" default:"ordered_ready"`
+	EnableReadinessProbe                   bool              `name:"enable_readiness_probe" default:"false"`
 	ProtectedRoles                         []string          `name:"protected_role_names" default:"admin,cron_admin"`
 	PostgresSuperuserTeams                 []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
@@ -222,12 +227,14 @@ type Config struct {
 	EnableCrossNamespaceSecret             bool              `name:"enable_cross_namespace_secret" default:"false"`
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
+	EnableTeamIdClusternamePrefix          bool              `name:"enable_team_id_clustername_prefix" default:"false"`
 	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"`
 	MajorVersionUpgradeTeamAllowList       []string          `name:"major_version_upgrade_team_allow_list" default:""`
-	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.6"`
+	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"11"`
 	TargetMajorVersion                     string            `name:"target_major_version" default:"14"`
 	PatroniAPICheckInterval                time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                 time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
+	EnablePatroniFailsafeMode              *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
 }
 
 // MustMarshal marshals the config or panics

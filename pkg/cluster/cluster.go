@@ -29,7 +29,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,7 +61,7 @@ type kubeResources struct {
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
-	PodDisruptionBudget *policybeta1.PodDisruptionBudget
+	PodDisruptionBudget *policyv1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
 }
@@ -133,8 +133,10 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
-			PasswordEncryption: passwordEncryption,
-			RoleDeletionSuffix: cfg.OpConfig.RoleDeletionSuffix},
+			PasswordEncryption:   passwordEncryption,
+			RoleDeletionSuffix:   cfg.OpConfig.RoleDeletionSuffix,
+			AdditionalOwnerRoles: cfg.OpConfig.AdditionalOwnerRoles,
+		},
 		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
@@ -149,7 +151,6 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	cluster.EBSVolumes = make(map[string]volumes.VolumeProperties)
 	if cfg.OpConfig.StorageResizeMode != "pvc" || cfg.OpConfig.EnableEBSGp3Migration {
 		cluster.VolumeResizer = &volumes.EBSVolumeResizer{AWSRegion: cfg.OpConfig.AWSRegion}
-
 	}
 
 	return cluster
@@ -226,6 +227,10 @@ func (c *Cluster) initUsers() error {
 	}
 
 	if err := c.initHumanUsers(); err != nil {
+		// remember all cached users in c.pgUsers
+		for cachedUserName, cachedUser := range c.pgUsersCache {
+			c.pgUsers[cachedUserName] = cachedUser
+		}
 		return fmt.Errorf("could not init human users: %v", err)
 	}
 
@@ -388,6 +393,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's annotations do not match: "+reason)
 	}
+	if c.Statefulset.Spec.PodManagementPolicy != statefulSet.Spec.PodManagementPolicy {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's pod management policy do not match")
+	}
 
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
 	needsRollUpdate, reasons = c.compareContainers("containers", c.Statefulset.Spec.Template.Spec.Containers, statefulSet.Spec.Template.Spec.Containers, needsRollUpdate, reasons)
@@ -527,6 +537,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 	checks := []containerCheck{
 		newCheck("new statefulset %s's %s (index %d) name does not match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
+		newCheck("new statefulset %s's %s (index %d) readiness probe does not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.ReadinessProbe, b.ReadinessProbe) }),
 		newCheck("new statefulset %s's %s (index %d) ports do not match the current one",
 			func(a, b v1.Container) bool { return !comparePorts(a.Ports, b.Ports) }),
 		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
@@ -740,6 +752,7 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 // for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
+	userInitFailed := false
 	syncStatefulSet := false
 
 	c.mu.Lock()
@@ -777,32 +790,39 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// check if users need to be synced
-	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
-		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
-	sameRotatedUsers := reflect.DeepEqual(oldSpec.Spec.UsersWithSecretRotation, newSpec.Spec.UsersWithSecretRotation) &&
-		reflect.DeepEqual(oldSpec.Spec.UsersWithInPlaceSecretRotation, newSpec.Spec.UsersWithInPlaceSecretRotation)
+	// Users
+	func() {
+		// check if users need to be synced during update
+		sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
+			reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
+		sameRotatedUsers := reflect.DeepEqual(oldSpec.Spec.UsersWithSecretRotation, newSpec.Spec.UsersWithSecretRotation) &&
+			reflect.DeepEqual(oldSpec.Spec.UsersWithInPlaceSecretRotation, newSpec.Spec.UsersWithInPlaceSecretRotation)
 
-	// connection pooler needs one system user created, which is done in
-	// initUsers. Check if it needs to be called.
-	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
-		needReplicaConnectionPoolerWorker(&newSpec.Spec)
+		// connection pooler needs one system user created who is initialized in initUsers
+		// only when disabled in oldSpec and enabled in newSpec
+		needPoolerUser := c.needConnectionPoolerUser(&oldSpec.Spec, &newSpec.Spec)
 
-	if !sameUsers || !sameRotatedUsers || needConnectionPooler {
-		c.logger.Debugf("initialize users")
-		if err := c.initUsers(); err != nil {
-			c.logger.Errorf("could not init users: %v", err)
-			updateFailed = true
+		// streams new replication user created who is initialized in initUsers
+		// only when streams were not specified in oldSpec but in newSpec
+		needStreamUser := len(oldSpec.Spec.Streams) == 0 && len(newSpec.Spec.Streams) > 0
+
+		if !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser {
+			c.logger.Debugf("initialize users")
+			if err := c.initUsers(); err != nil {
+				c.logger.Errorf("could not init users - skipping sync of secrets and databases: %v", err)
+				userInitFailed = true
+				updateFailed = true
+				return
+			}
+
+			c.logger.Debugf("syncing secrets")
+			//TODO: mind the secrets of the deleted/new users
+			if err := c.syncSecrets(); err != nil {
+				c.logger.Errorf("could not sync secrets: %v", err)
+				updateFailed = true
+			}
 		}
-
-		c.logger.Debugf("syncing secrets")
-
-		//TODO: mind the secrets of the deleted/new users
-		if err := c.syncSecrets(); err != nil {
-			c.logger.Errorf("could not sync secrets: %v", err)
-			updateFailed = true
-		}
-	}
+	}()
 
 	// Volume
 	if c.OpConfig.StorageResizeMode != "off" {
@@ -884,7 +904,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}()
 
 	// Roles and Databases
-	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
+	if !userInitFailed && !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		c.logger.Debugf("syncing roles")
 		if err := c.syncRoles(); err != nil {
 			c.logger.Errorf("could not sync roles: %v", err)
@@ -912,13 +932,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// need to process. In the future we may want to do this more careful and
 	// check which databases we need to process, but even repeating the whole
 	// installation process should be good enough.
-
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
 		updateFailed = true
 	}
 
-	if len(c.Spec.Streams) > 0 {
+	if len(newSpec.Spec.Streams) > 0 {
 		if err := c.syncStreams(); err != nil {
 			c.logger.Errorf("could not sync streams: %v", err)
 			updateFailed = true
@@ -1031,12 +1050,20 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 		return fmt.Errorf("could not cast to PodEvent")
 	}
 
+	// can only take lock when (un)registerPodSubscriber is finshed
 	c.podSubscribersMu.RLock()
 	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
-	c.podSubscribersMu.RUnlock()
 	if ok {
-		subscriber <- event
+		select {
+		case subscriber <- event:
+		default:
+			// ending up here when there is no receiver on the channel (i.e. waitForPodLabel finished)
+			// avoids blocking channel: https://gobyexample.com/non-blocking-channel-operations
+		}
 	}
+	// hold lock for the time of processing the event to avoid race condition
+	// with unregisterPodSubscriber closing the channel (see #1876)
+	c.podSubscribersMu.RUnlock()
 
 	return nil
 }
@@ -1078,40 +1105,18 @@ func (c *Cluster) initSystemUsers() {
 		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 
-	// Connection pooler user is an exception, if requested it's going to be
-	// created by operator as a normal pgUser
+	// Connection pooler user is an exception
+	// if requested it's going to be created by operator
 	if needConnectionPooler(&c.Spec) {
-		connectionPoolerSpec := c.Spec.ConnectionPooler
-		if connectionPoolerSpec == nil {
-			connectionPoolerSpec = &acidv1.ConnectionPooler{}
-		}
-
-		// Using superuser as pooler user is not a good idea. First of all it's
-		// not going to be synced correctly with the current implementation,
-		// and second it's a bad practice.
-		username := c.OpConfig.ConnectionPooler.User
-
-		isSuperUser := connectionPoolerSpec.User == c.OpConfig.SuperUsername
-		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
-			connectionPoolerSpec.User, "connection pool role")
-
-		if !isSuperUser && !isProtectedUser {
-			username = util.Coalesce(
-				connectionPoolerSpec.User,
-				c.OpConfig.ConnectionPooler.User)
-		}
+		username := c.poolerUser(&c.Spec)
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{
-			Origin:    spec.RoleConnectionPooler,
+			Origin:    spec.RoleOriginConnectionPooler,
 			Name:      username,
 			Namespace: c.Namespace,
 			Flags:     []string{constants.RoleFlagLogin},
 			Password:  util.RandomPassword(constants.PasswordLength),
-		}
-
-		if _, exists := c.pgUsers[username]; !exists {
-			c.pgUsers[username] = connectionPoolerUser
 		}
 
 		if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; !exists {
@@ -1122,17 +1127,17 @@ func (c *Cluster) initSystemUsers() {
 	// replication users for event streams are another exception
 	// the operator will create one replication user for all streams
 	if len(c.Spec.Streams) > 0 {
-		username := constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
+		username := fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
 		streamUser := spec.PgUser{
-			Origin:    spec.RoleConnectionPooler,
+			Origin:    spec.RoleOriginStream,
 			Name:      username,
 			Namespace: c.Namespace,
 			Flags:     []string{constants.RoleFlagLogin, constants.RoleFlagReplication},
 			Password:  util.RandomPassword(constants.PasswordLength),
 		}
 
-		if _, exists := c.pgUsers[username]; !exists {
-			c.pgUsers[username] = streamUser
+		if _, exists := c.systemUsers[constants.EventStreamUserKeyName]; !exists {
+			c.systemUsers[constants.EventStreamUserKeyName] = streamUser
 		}
 	}
 }
@@ -1150,9 +1155,9 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		constants.WriterRoleNameSuffix: constants.ReaderRoleNameSuffix,
 	}
 	defaultUsers := map[string]string{
-		constants.OwnerRoleNameSuffix + constants.UserRoleNameSuffix:  constants.OwnerRoleNameSuffix,
-		constants.ReaderRoleNameSuffix + constants.UserRoleNameSuffix: constants.ReaderRoleNameSuffix,
-		constants.WriterRoleNameSuffix + constants.UserRoleNameSuffix: constants.WriterRoleNameSuffix,
+		fmt.Sprintf("%s%s", constants.OwnerRoleNameSuffix, constants.UserRoleNameSuffix):  constants.OwnerRoleNameSuffix,
+		fmt.Sprintf("%s%s", constants.ReaderRoleNameSuffix, constants.UserRoleNameSuffix): constants.ReaderRoleNameSuffix,
+		fmt.Sprintf("%s%s", constants.WriterRoleNameSuffix, constants.UserRoleNameSuffix): constants.WriterRoleNameSuffix,
 	}
 
 	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
@@ -1213,7 +1218,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 				c.logger.Warn("secretNamespace ignored because enable_cross_namespace_secret set to false. Creating secrets in cluster namespace.")
 			}
 		}
-		roleName := prefix + defaultRole
+		roleName := fmt.Sprintf("%s%s", prefix, defaultRole)
 
 		flags := []string{constants.RoleFlagNoLogin}
 		if defaultRole[len(defaultRole)-5:] == constants.UserRoleNameSuffix {
@@ -1231,7 +1236,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 			adminRole = admin
 			isOwner = true
 		} else {
-			adminRole = prefix + constants.OwnerRoleNameSuffix
+			adminRole = fmt.Sprintf("%s%s", prefix, constants.OwnerRoleNameSuffix)
 		}
 
 		newRole := spec.PgUser{
@@ -1309,28 +1314,15 @@ func (c *Cluster) initRobotUsers() error {
 }
 
 func (c *Cluster) initAdditionalOwnerRoles() {
-	for _, additionalOwner := range c.OpConfig.AdditionalOwnerRoles {
-		// fetch all database owners the additional should become a member of
-		memberOf := make([]string, 0)
-		for username, pgUser := range c.pgUsers {
-			if pgUser.IsDbOwner {
-				memberOf = append(memberOf, username)
-			}
-		}
+	if len(c.OpConfig.AdditionalOwnerRoles) == 0 {
+		return
+	}
 
-		if len(memberOf) > 1 {
-			namespace := c.Namespace
-			additionalOwnerPgUser := spec.PgUser{
-				Origin:    spec.RoleOriginSpilo,
-				MemberOf:  memberOf,
-				Name:      additionalOwner,
-				Namespace: namespace,
-			}
-			if currentRole, present := c.pgUsers[additionalOwner]; present {
-				c.pgUsers[additionalOwner] = c.resolveNameConflict(&currentRole, &additionalOwnerPgUser)
-			} else {
-				c.pgUsers[additionalOwner] = additionalOwnerPgUser
-			}
+	// fetch database owners and assign additional owner roles
+	for username, pgUser := range c.pgUsers {
+		if pgUser.IsDbOwner {
+			pgUser.MemberOf = append(pgUser.MemberOf, c.OpConfig.AdditionalOwnerRoles...)
+			c.pgUsers[username] = pgUser
 		}
 	}
 }
@@ -1486,7 +1478,8 @@ func (c *Cluster) GetCurrentProcess() Process {
 // GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() *ClusterStatus {
 	status := &ClusterStatus{
-		Cluster:             c.Spec.ClusterName,
+		Cluster:             c.Name,
+		Namespace:           c.Namespace,
 		Team:                c.Spec.TeamID,
 		Status:              c.Status,
 		Spec:                c.Spec,
@@ -1513,48 +1506,22 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	var err error
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
 	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
-
-	var wg sync.WaitGroup
-
-	podLabelErr := make(chan error)
 	stopCh := make(chan struct{})
-
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		ch := c.registerPodSubscriber(candidate)
-		defer c.unregisterPodSubscriber(candidate)
-
-		role := Master
-
-		select {
-		case <-stopCh:
-		case podLabelErr <- func() (err2 error) {
-			_, err2 = c.waitForPodLabel(ch, stopCh, &role)
-			return
-		}():
-		}
-	}()
+	ch := c.registerPodSubscriber(candidate)
+	defer c.unregisterPodSubscriber(candidate)
+	defer close(stopCh)
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
-		if err = <-podLabelErr; err != nil {
+		_, err = c.waitForPodLabel(ch, stopCh, nil)
+		if err != nil {
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
 		err = fmt.Errorf("could not switch over from %q to %q: %v", curMaster.Name, candidate, err)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	}
-
-	// signal the role label waiting goroutine to close the shop and go home
-	close(stopCh)
-	// wait until the goroutine terminates, since unregisterPodSubscriber
-	// must be called before the outer return; otherwise we risk subscribing to the same pod twice.
-	wg.Wait()
-	// close the label waiting channel no sooner than the waiting goroutine terminates.
-	close(podLabelErr)
 
 	return err
 }

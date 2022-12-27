@@ -45,11 +45,12 @@ Make sure, the `spec` section of the manifest contains at least a `teamId`, the
 The minimum volume size to run the `postgresql` resource on Elastic Block
 Storage (EBS) is `1Gi`.
 
-Note, that the name of the cluster must start with the `teamId` and `-`. At
-Zalando we use team IDs (nicknames) to lower the chance of duplicate cluster
-names and colliding entities. The team ID would also be used to query an API to
-get all members of a team and create [database roles](#teams-api-roles) for
-them. Besides, the maximum cluster name length is 53 characters.
+Note, that when `enable_team_id_clustername_prefix` is set to `true` the name
+of the cluster must start with the `teamId` and `-`. At Zalando we use team IDs
+(nicknames) to lower chances of duplicate cluster names and colliding entities.
+The team ID would also be used to query an API to get all members of a team
+and create [database roles](#teams-api-roles) for them. Besides, the maximum
+cluster name length is 53 characters.
 
 ## Watch pods being created
 
@@ -83,14 +84,34 @@ kubectl port-forward $PGMASTER 6432:5432 -n default
 ```
 
 Open another CLI and connect to the database using e.g. the psql client.
-When connecting with the `postgres` user read its password from the K8s secret
-which was generated when creating the `acid-minimal-cluster`. As non-encrypted
-connections are rejected by default set the SSL mode to `require`:
+When connecting with a manifest role like `foo_user` user, read its password
+from the K8s secret which was generated when creating `acid-minimal-cluster`.
+As non-encrypted connections are rejected by default set SSL mode to `require`:
 
 ```bash
 export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d)
 export PGSSLMODE=require
 psql -U postgres -h localhost -p 6432
+```
+
+## Password encryption
+
+Passwords are encrypted with `md5` hash generation by default. However, it is
+possible to use the more recent `scram-sha-256` method by changing the
+`password_encryption` parameter in the Postgres config. You can define it
+directly from the cluster manifest:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-minimal-cluster
+spec:
+  [...]
+  postgresql:
+    version: "14"
+    parameters:
+      password_encryption: scram-sha-256
 ```
 
 ## Defining database roles in the operator
@@ -131,7 +152,7 @@ specified explicitly.
 
 The operator automatically generates a password for each manifest role and
 places it in the secret named
-`{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do` in the
+`{username}.{clustername}.credentials.postgresql.acid.zalan.do` in the
 same namespace as the cluster. This way, the application running in the
 K8s cluster and connecting to Postgres can obtain the password right from the
 secret, without ever sharing it outside of the cluster.
@@ -161,7 +182,7 @@ be in the form of `namespace.username`.
 
 For such usernames, the secret is created in the given namespace and its name is
 of the following form,
-`{namespace}.{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do`
+`{namespace}.{username}.{clustername}.credentials.postgresql.acid.zalan.do`
 
 ### Infrastructure roles
 
@@ -202,7 +223,7 @@ the user name, password etc. The secret itself is referenced by the
 above list them separately.
 
 ```yaml
-apiVersion: v1
+apiVersion: "acid.zalan.do/v1"
 kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-configuration
@@ -496,7 +517,7 @@ Postgres Operator will create the following NOLOGIN roles:
 
 The `<dbname>_owner` role is the database owner and should be used when creating
 new database objects. All members of the `admin` role, e.g. teams API roles, can
-become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/12/sql-alterdefaultprivileges.html)
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/15/sql-alterdefaultprivileges.html)
 are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
@@ -571,7 +592,7 @@ spec:
 
 ### Schema `search_path` for default roles
 
-The schema [`search_path`](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH)
+The schema [`search_path`](https://www.postgresql.org/docs/15/ddl-schemas.html#DDL-SCHEMAS-PATH)
 for each role will include the role name and the schemas, this role should have
 access to. So `foo_bar_writer` does not have to schema-qualify tables from
 schemas `foo_bar_writer, bar`, while `foo_writer` can look up `foo_writer` and
@@ -746,15 +767,15 @@ spec:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-minimal-cluster"
     timestamp: "2017-12-19T12:40:33+01:00"
-    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
 cluster will be cloned from S3, using the latest backup before the `timestamp`.
-Note, that a time zone is required for `timestamp` in the format of +00:00 which
-is UTC. You can specify the `s3_wal_path` of the source cluster or let the
-operator try to find it based on the configured `wal_[s3|gs]_bucket` and the
-specified `uid`. You can find the UID of the source cluster in its metadata:
+Note, a time zone is required for `timestamp` in the format of `+00:00` (UTC).
+
+The operator will try to find the WAL location based on the configured
+`wal_[s3|gs]_bucket` or `wal_az_storage_account` and the specified `uid`.
+You can find the UID of the source cluster in its metadata:
 
 ```yaml
 apiVersion: acid.zalan.do/v1
@@ -763,6 +784,14 @@ metadata:
   name: acid-minimal-cluster
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
+
+If your source cluster uses a WAL location different from the global
+configuration you can specify the full path under `s3_wal_path`. For
+[Google Cloud Platform](administrator.md#google-cloud-platform-setup)
+or [Azure](administrator.md#azure-setup)
+it can only be set globally with [custom Pod environment variables](administrator.md#custom-pod-environment-variables)
+or locally in the Postgres manifest's [`env`](administrator.md#via-postgres-cluster-manifest) section.
+
 
 For non AWS S3 following settings can be set to support cloning from other S3
 implementations:
@@ -773,6 +802,7 @@ spec:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-minimal-cluster"
     timestamp: "2017-12-19T12:40:33+01:00"
+    s3_wal_path: "s3://custom/path/to/bucket"
     s3_endpoint: https://s3.acme.org
     s3_access_key_id: 0123456789abcdef0123456789abcdef
     s3_secret_access_key: 0123456789abcdef0123456789abcdef
@@ -782,7 +812,7 @@ spec:
 ### Clone directly
 
 Another way to get a fresh copy of your source DB cluster is via
-[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html). To
+[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html). To
 use this feature simply leave out the timestamp field from the clone section.
 The operator will connect to the service of the source cluster by name. If the
 cluster is called test, then the connection string will look like host=test
@@ -838,15 +868,14 @@ point you should restore.
 ## Setting up a standby cluster
 
 Standby cluster is a [Patroni feature](https://github.com/zalando/patroni/blob/master/docs/replica_bootstrap.rst#standby-cluster)
-that first clones a database, and keeps replicating changes afterwards. As the
-replication is happening by the means of archived WAL files (stored on S3 or
-the equivalent of other cloud providers), the standby cluster can exist in a
-different location than its source database. Unlike cloning, the PostgreSQL
-version between source and target cluster has to be the same.
+that first clones a database, and keeps replicating changes afterwards. It can
+exist in a different location than its source database, but unlike cloning,
+the PostgreSQL version between source and target cluster has to be the same.
 
 To start a cluster as standby, add the following `standby` section in the YAML
-file. Specify the S3/GS bucket path. Omitting both settings will result in an error
-and no statefulset will be created.
+file. You can stream changes from archived WAL files (AWS S3 or Google Cloud
+Storage) or from a remote primary. Only one option can be specfied in the
+manifest:
 
 ```yaml
 spec:
@@ -854,38 +883,55 @@ spec:
     s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
+For GCS, you have to define STANDBY_GOOGLE_APPLICATION_CREDENTIALS as a
+[custom pod environment variable](administrator.md#custom-pod-environment-variables).
+It is not set from the config to allow for overridding.
+
 ```yaml
 spec:
   standby:
     gs_wal_path: "gs://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
-At the moment, the operator only allows to stream from the WAL archive of the
-master. Thus, it is recommended to deploy standby clusters with only [one pod](https://github.com/zalando/postgres-operator/blob/master/manifests/standby-manifest.yaml#L10).
-You can raise the instance count when detaching. Note, that the same pod role
-labels like for normal clusters are used: The standby leader is labeled as
-`master`.
+For a remote primary you specify the host address and optionally the port.
+If you leave out the port Patroni will use `"5432"`.
+
+```yaml
+spec:
+  standby:
+    standby_host: "acid-minimal-cluster.default"
+    standby_port: "5433"
+```
+
+Note, that the pods and services use the same role labels like for normal clusters:
+The standby leader is labeled as `master`. When using the `standby_host` option
+you have to copy the credentials from the source cluster's secrets to successfully
+bootstrap a standby cluster (see next chapter).
 
 ### Providing credentials of source cluster
 
 A standby cluster is replicating the data (including users and passwords) from
 the source database and is read-only. The system and application users (like
 standby, postgres etc.) all have a password that does not match the credentials
-stored in secrets which are created by the operator. One solution is to create
-secrets beforehand and paste in the credentials of the source cluster.
+stored in secrets which are created by the operator. You have two options:
+
+a. Create secrets manually beforehand and paste the credentials of the source
+   cluster
+b. Let the operator create the secrets when it bootstraps the standby cluster.
+   Patch the secrets with the credentials of the source cluster. Replace the
+   spilo pods.
+
 Otherwise, you will see errors in the Postgres logs saying users cannot log in
 and the operator logs will complain about not being able to sync resources.
+If you stream changes from a remote primary you have to align the secrets or
+the standby cluster will not start up.
 
-When you only run a standby leader, you can safely ignore this, as it will be
-sorted out once the cluster is detached from the source. It is also harmless if
-you don’t plan it. But, when you created a standby replica, too, fix the
-credentials right away. WAL files will pile up on the standby leader if no
-connection can be established between standby replica(s). You can also edit the
-secrets after their creation. Find them by:
-
-```bash
-kubectl get secrets --all-namespaces | grep <standby-cluster-name>
-```
+If you stream changes from WAL files and you only run a standby leader, you
+can safely ignore the secret mismatch, as it will be sorted out once the
+cluster is detached from the source. It is also harmless if you do not plan it.
+But, when you create a standby replica, too, fix the credentials right away.
+WAL files will pile up on the standby leader if no connection can be
+established between standby replica(s).
 
 ### Promote the standby
 
@@ -984,9 +1030,9 @@ specified but globally disabled in the configuration. The
 
 ## Increase volume size
 
-Postgres operator supports statefulset volume resize if you're using the
-operator on top of AWS. For that you need to change the size field of the
-volume description in the cluster manifest and apply the change:
+Postgres operator supports statefulset volume resize without doing a rolling
+update. For that you need to change the size field of the volume description
+in the cluster manifest and apply the change:
 
 ```yaml
 spec:
@@ -995,22 +1041,29 @@ spec:
 ```
 
 The operator compares the new value of the size field with the previous one and
-acts on differences.
+acts on differences. The `storage_resize_mode` can be configured. By default,
+the operator will adjust the PVCs and leave it to K8s and the infrastructure to
+apply the change.
 
-You can only enlarge the volume with the process described above, shrinking is
-not supported and will emit a warning. After this update all the new volumes in
-the statefulset are allocated according to the new size. To enlarge persistent
-volumes attached to the running pods, the operator performs the following
-actions:
+When using AWS with gp3 volumes you should set the mode to `mixed` because it
+will also adjust the IOPS and throughput that can be defined in the manifest.
+Check the [AWS docs](https://aws.amazon.com/ebs/general-purpose/) to learn
+about default and maximum values. Keep in mind that AWS rate-limits updating
+volume specs to no more than once every 6 hours. 
 
-* call AWS API to change the volume size
+```yaml
+spec:
+  volume:
+    size: 5Gi # new volume size
+    iops: 4000
+    throughput: 500
+```
 
-* connect to pod using `kubectl exec` and resize filesystem with `resize2fs`.
-
-Fist step has a limitation, AWS rate-limits this operation to no more than once
-every 6 hours. Note, that if the statefulset is scaled down before resizing the
-new size is only applied to the volumes attached to the running pods. The
-size of volumes that correspond to the previously running pods is not changed.
+The operator can only enlarge volumes. Shrinking is not supported and will emit
+a warning. However, it can be done manually after updating the manifest. You
+have to delete the PVC, which will hang until you also delete the corresponding
+pod. Proceed with the next pod when the cluster is healthy again and replicas
+are streaming.
 
 ## Logical backups
 

@@ -311,6 +311,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enableShmVolume": {
 						Type: "boolean",
 					},
+					"env": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
+						},
+					},
 					"init_containers": {
 						Type:        "array",
 						Description: "deprecated",
@@ -493,6 +503,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"patroni": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"failsafe_mode": {
+								Type: "boolean",
+							},
 							"initdb": {
 								Type: "object",
 								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
@@ -568,12 +581,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 								Enum: []apiextv1.JSON{
 									{
-										Raw: []byte(`"9.5"`),
-									},
-									{
-										Raw: []byte(`"9.6"`),
-									},
-									{
 										Raw: []byte(`"10"`),
 									},
 									{
@@ -587,6 +594,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									{
 										Raw: []byte(`"14"`),
+									},
+									{
+										Raw: []byte(`"15"`),
 									},
 								},
 							},
@@ -714,6 +724,17 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"gs_wal_path": {
 								Type: "string",
 							},
+							"standby_host": {
+								Type: "string",
+							},
+							"standby_port": {
+								Type: "string",
+							},
+						},
+						OneOf: []apiextv1.JSONSchemaProps{
+							apiextv1.JSONSchemaProps{Required: []string{"s3_wal_path"}},
+							apiextv1.JSONSchemaProps{Required: []string{"gs_wal_path"}},
+							apiextv1.JSONSchemaProps{Required: []string{"standby_host"}},
 						},
 					},
 					"streams": {
@@ -936,7 +957,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
-					"usersWithSecretRotation": {
+					"usersWithInPlaceSecretRotation": {
 						Type:     "array",
 						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -945,7 +966,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
-					"usersWithInPlaceSecretRotation": {
+					"usersWithSecretRotation": {
 						Type:     "array",
 						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -969,7 +990,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
 												Type:     "object",
-												Required: []string{"key", "operator", "values"},
+												Required: []string{"key", "operator"},
 												Properties: map[string]apiextv1.JSONSchemaProps{
 													"key": {
 														Type: "string",
@@ -978,16 +999,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Type: "string",
 														Enum: []apiextv1.JSON{
 															{
-																Raw: []byte(`"In"`),
-															},
-															{
-																Raw: []byte(`"NotIn"`),
+																Raw: []byte(`"DoesNotExist"`),
 															},
 															{
 																Raw: []byte(`"Exists"`),
 															},
 															{
-																Raw: []byte(`"DoesNotExist"`),
+																Raw: []byte(`"In"`),
+															},
+															{
+																Raw: []byte(`"NotIn"`),
 															},
 														},
 													},
@@ -1091,7 +1112,13 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enable_spilo_wal_path_compat": {
 						Type: "boolean",
 					},
+					"enable_team_id_clustername_prefix": {
+						Type: "boolean",
+					},
 					"etcd_host": {
+						Type: "string",
+					},
+					"ignore_instance_limits_annotation_key": {
 						Type: "string",
 					},
 					"kubernetes_use_configmaps": {
@@ -1246,6 +1273,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "boolean",
 							},
 							"enable_pod_disruption_budget": {
+								Type: "boolean",
+							},
+							"enable_readiness_probe": {
 								Type: "boolean",
 							},
 							"enable_sidecars": {
@@ -1405,6 +1435,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Raw: []byte(`"ebs"`),
 									},
 									{
+										Raw: []byte(`"mixed"`),
+									},
+									{
 										Raw: []byte(`"pvc"`),
 									},
 									{
@@ -1425,6 +1458,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"patroni": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"failsafe_mode": {
+								Type: "boolean",
+							},
+						},
+					},
 					"postgres_pod_resources": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
@@ -1441,6 +1482,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
 							"default_memory_request": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"max_cpu_request": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"max_memory_request": {
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},

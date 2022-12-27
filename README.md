@@ -16,26 +16,26 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Rolling updates on Postgres cluster changes, incl. quick minor version updates
 * Live volume resize without pod restarts (AWS EBS, PVC)
 * Database connection pooling with PGBouncer
-* Support fast in place major version upgrade to PG13. Supports global upgrade of all clusters.
-* Restore and cloning Postgres clusters (incl. major version upgrade)
-* Additionally logical backups to S3 bucket can be configured
-* Standby cluster from S3 WAL archive
+* Support fast in place major version upgrade. Supports global upgrade of all clusters.
+* Restore and cloning Postgres clusters on AWS, GCS and Azure
+* Additionally logical backups to S3 or GCS bucket can be configured
+* Standby cluster from S3 or GCS WAL archive
 * Configurable for non-cloud environments
 * Basic credential and user management on K8s, eases application deployments
 * Support for custom TLS certificates
 * UI to create and edit Postgres cluster manifests
-* Works well on Amazon AWS, Google Cloud, OpenShift and locally on Kind
 * Support for AWS EBS gp2 to gp3 migration, supporting iops and throughput configuration
+* Compatible with OpenShift
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 14, starting from 9.6+
+* Supports PostgreSQL 14, starting from 10+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
 [WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
 * Preload libraries: [bg_mon](https://github.com/CyberDem0n/bg_mon),
-[pg_stat_statements](https://www.postgresql.org/docs/14/pgstatstatements.html),
+[pg_stat_statements](https://www.postgresql.org/docs/15/pgstatstatements.html),
 [pgextwlist](https://github.com/dimitri/pgextwlist),
 [pg_auth_mon](https://github.com/RafiaSabih/pg_auth_mon)
 * Incl. popular Postgres extensions such as
@@ -61,7 +61,7 @@ We introduce the major version into the backup path to smoothen the [major versi
 The new operator configuration can set a compatibility flag *enable_spilo_wal_path_compat* to make Spilo look for wal segments in the current path but also old format paths.
 This comes at potential performance costs and should be disabled after a few days.
 
-The newest Spilo image is: `registry.opensource.zalan.do/acid/spilo-14:2.1-p3`
+The newest Spilo image is: `registry.opensource.zalan.do/acid/spilo-14:2.1-p7`
 
 The last Spilo 12 image is: `registry.opensource.zalan.do/acid/spilo-12:1.6-p5`
 

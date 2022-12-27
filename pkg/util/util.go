@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"math/rand"
 	"reflect"
@@ -324,18 +323,18 @@ func testNil(values ...*int32) bool {
 	return false
 }
 
-// Convert int to IntOrString type
+// ToIntStr converts int to IntOrString type
 func ToIntStr(val int) *intstr.IntOrString {
 	b := intstr.FromInt(val)
 	return &b
 }
 
-// Get int from IntOrString and return max int if string
-func IntFromIntStr(intOrStr intstr.IntOrString) int {
-	if intOrStr.Type == 1 {
-		return math.MaxInt
+// Bool2Int converts bool to int
+func Bool2Int(flag bool) int {
+	if flag {
+		return 1
 	}
-	return intOrStr.IntValue()
+	return 0
 }
 
 // MaxInt32 : Return maximum of two integers provided via pointers. If one value
@@ -367,4 +366,22 @@ func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 	}
 
 	return request.Cmp(limit) == -1, nil
+}
+
+func MinResource(maxRequestStr, requestStr string) (resource.Quantity, error) {
+
+	isSmaller, err := IsSmallerQuantity(maxRequestStr, requestStr)
+	if isSmaller && err == nil {
+		maxRequest, err := resource.ParseQuantity(maxRequestStr)
+		if err != nil {
+			return maxRequest, err
+		}
+		return maxRequest, nil
+	}
+
+	request, err := resource.ParseQuantity(requestStr)
+	if err != nil {
+		return request, err
+	}
+	return request, nil
 }

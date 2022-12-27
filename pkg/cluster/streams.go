@@ -72,7 +72,7 @@ func gatherApplicationIds(streams []acidv1.Stream) []string {
 	return appIds
 }
 
-func (c *Cluster) syncPostgresConfig(requiredPatroniConfig acidv1.Patroni) error {
+func (c *Cluster) syncPostgresConfig(requiredPatroniConfig acidv1.Patroni) (bool, error) {
 	errorMsg := "no pods found to update config"
 
 	// if streams are defined wal_level must be switched to logical
@@ -91,17 +91,17 @@ func (c *Cluster) syncPostgresConfig(requiredPatroniConfig acidv1.Patroni) error
 			continue
 		}
 
-		_, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePatroniConfig, requiredPatroniConfig, effectivePgParameters, requiredPgParameters)
+		configPatched, _, err := c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePatroniConfig, requiredPatroniConfig, effectivePgParameters, requiredPgParameters)
 		if err != nil {
 			errorMsg = fmt.Sprintf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 			continue
 		}
 
 		// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used
-		return nil
+		return configPatched, nil
 	}
 
-	return fmt.Errorf(errorMsg)
+	return false, fmt.Errorf(errorMsg)
 }
 
 func (c *Cluster) syncPublication(publication, dbName string, tables map[string]acidv1.StreamTable) error {
@@ -273,15 +273,26 @@ func (c *Cluster) syncStreams() error {
 		return nil
 	}
 
+	// update config to set wal_level: logical
+	requiredPatroniConfig := c.Spec.Patroni
+	requiresRestart, err := c.syncPostgresConfig(requiredPatroniConfig)
+	if err != nil {
+		return fmt.Errorf("failed to snyc Postgres config for event streaming: %v", err)
+	}
+	if requiresRestart {
+		c.logger.Debugf("updated Postgres config. Server will be restarted and streams will get created during next sync")
+		return nil
+	}
+
 	// fetch different application IDs from streams section
 	// there will be a separate event stream resource for each ID
 	appIds := gatherApplicationIds(c.Spec.Streams)
 	c.streamApplications = appIds
 
 	slots := make(map[string]map[string]string)
+	slotsToSync := make(map[string]map[string]string)
 	publications := make(map[string]map[string]acidv1.StreamTable)
 
-	requiredPatroniConfig := c.Spec.Patroni
 	if len(requiredPatroniConfig.Slots) > 0 {
 		slots = requiredPatroniConfig.Slots
 	}
@@ -308,21 +319,7 @@ func (c *Cluster) syncStreams() error {
 		}
 	}
 
-	// no slots = no streams defined
-	if len(slots) > 0 {
-		requiredPatroniConfig.Slots = slots
-	} else {
-		return nil
-	}
-
-	// add extra logical slots to Patroni config
-	c.logger.Debug("syncing Postgres config for logical decoding")
-	err = c.syncPostgresConfig(requiredPatroniConfig)
-	if err != nil {
-		return fmt.Errorf("failed to snyc Postgres config for event streaming: %v", err)
-	}
-
-	// next, create publications to each created slot
+	// create publications to each created slot
 	c.logger.Debug("syncing database publications")
 	for publication, tables := range publications {
 		// but first check for existing publications
@@ -330,9 +327,25 @@ func (c *Cluster) syncStreams() error {
 		err = c.syncPublication(publication, dbName, tables)
 		if err != nil {
 			c.logger.Warningf("could not sync publication %q in database %q: %v", publication, dbName, err)
+			continue
 		}
+		slotsToSync[publication] = slots[publication]
 	}
 
+	// no slots to sync = no streams defined or publications created
+	if len(slotsToSync) > 0 {
+		requiredPatroniConfig.Slots = slotsToSync
+	} else {
+		return nil
+	}
+
+	// add extra logical slots to Patroni config
+	_, err = c.syncPostgresConfig(requiredPatroniConfig)
+	if err != nil {
+		return fmt.Errorf("failed to snyc Postgres config for event streaming: %v", err)
+	}
+
+	// after Postgres was restarted we can create stream CRDs
 	err = c.createOrUpdateStreams()
 	if err != nil {
 		return err

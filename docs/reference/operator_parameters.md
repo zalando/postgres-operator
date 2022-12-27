@@ -28,6 +28,7 @@ configuration.
   and change it.
 
   To test the CRD-based configuration locally, use the following
+
   ```bash
   kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
   kubectl create -f manifests/postgresql-operator-default-configuration.yaml
@@ -92,6 +93,11 @@ Those are top-level keys, containing both leaf keys and groups.
 * **enable_spilo_wal_path_compat**
   enables backwards compatible path between Spilo 12 and Spilo 13+ images. The default is `false`.
 
+* **enable_team_id_clustername_prefix**
+  To lower the risk of name clashes between clusters of different teams you
+  can turn on this flag and the operator will sync only clusters where the
+  name starts with the `teamId` (from `spec`) plus `-`. Default is `false`.
+
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
   Patroni native Kubernetes support is used. The default is empty (use
@@ -147,6 +153,12 @@ Those are top-level keys, containing both leaf keys and groups.
   When `-1` is specified for `min_instances`, no limits are applied. The default
   is `-1`.
 
+* **ignore_instance_limits_annotation_key**
+  for some clusters it might be required to scale beyond the limits that can be
+  configured with `min_instances` and `max_instances` options. You can define
+  an annotation key that can be used as a toggle in cluster manifests to ignore
+  globally configured instance limits. The default is empty.
+
 * **resync_period**
   period between consecutive sync requests. The default is `30m`.
 
@@ -155,11 +167,12 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **set_memory_request_to_limit**
   Set `memory_request` to `memory_limit` for all Postgres clusters (the default
-  value is also increased). This prevents certain cases of memory overcommitment
-  at the cost of overprovisioning memory and potential scheduling problems for
-  containers with high memory limits due to the lack of memory on Kubernetes
-  cluster nodes. This affects all containers created by the operator (Postgres,
-  connection pooler, logical backup, scalyr sidecar, and other sidecars except 
+  value is also increased but configured `max_memory_request` can not be
+  bypassed). This prevents certain cases of memory overcommitment at the cost
+  of overprovisioning memory and potential scheduling problems for containers
+  with high memory limits due to the lack of memory on Kubernetes cluster
+  nodes. This affects all containers created by the operator (Postgres,
+  connection pooler, logical backup, scalyr sidecar, and other sidecars except
   **sidecars** defined in the operator configuration); to set resources for the
   operator's own container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
   The default is `false`.
@@ -178,13 +191,18 @@ under the `users` key.
   `standby`.
 
 * **additional_owner_roles**
-  Specifies database roles that will become members of all database owners.
-  Then owners can use `SET ROLE` to obtain privileges of these roles to e.g.
-  create/update functionality from extensions as part of a migration script.
-  Note, that roles listed here should be preconfigured in the docker image
-  and already exist in the database cluster on startup. One such role can be
-  `cron_admin` which is provided by the Spilo docker image to set up cron
-  jobs inside the `postgres` database. Default is `empty`.
+  Specifies database roles that will be granted to all database owners. Owners
+  can then use `SET ROLE` to obtain privileges of these roles to e.g. create
+  or update functionality from extensions as part of a migration script. One
+  such role can be `cron_admin` which is provided by the Spilo docker image to
+  set up cron jobs inside the `postgres` database. In general, roles listed
+  here should be preconfigured in the docker image and already exist in the
+  database cluster on startup. Otherwise, syncing roles will return an error
+  on each cluster sync process. Alternatively, you have to create the role and
+  do the GRANT manually. Note, the operator will not allow additional owner
+  roles to be members of database owners because it should be vice versa. If
+  the operator cannot set up the correct membership it tries to revoke all
+  additional owner roles from database owners. Default is `empty`.
 
 * **enable_password_rotation**
   For all `LOGIN` roles that are not database owners the operator can rotate
@@ -228,7 +246,7 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
-  when `major_version_upgrade_mode` is set to `"full"`. The default is `"9.6"`.
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"11"`.
 
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
@@ -263,7 +281,7 @@ configuration they are grouped under the `kubernetes` key.
   will be used. The default is empty.
 
 * **pod_terminate_grace_period**
-  Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
+  Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination)
   after this timeout. The default is `5m`.
 
 * **custom_pod_annotations**
@@ -285,7 +303,7 @@ configuration they are grouped under the `kubernetes` key.
   An array of annotations that should be passed from Postgres CRD on to the
   statefulset and, if exists, to the connection pooler deployment as well.
   Regular expressions like `downscaler/*` etc. are also accepted. Can be used
-  with [kube-downscaler](https://github.com/hjacobs/kube-downscaler).
+  with [kube-downscaler](https://codeberg.org/hjacobs/kube-downscaler).
 
 * **ignored_annotations**
   Some K8s tools inject and update annotations out of the Postgres Operator
@@ -403,10 +421,16 @@ configuration they are grouped under the `kubernetes` key.
 
 * **pod_environment_configmap**
   namespaced name of the ConfigMap with environment variables to populate on
-  every pod. Right now this ConfigMap is searched in the namespace of the
-  Postgres cluster. All variables from that ConfigMap are injected to the pod's
-  environment, on conflicts they are overridden by the environment variables
-  generated by the operator. The default is empty.
+  every pod. All variables from that ConfigMap are injected to the pod's
+  environment if they not if conflict with the environment variables generated
+  by the operator. The WAL location (bucket path) can be overridden, though.
+  The default is empty.
+  
+* **pod_environment_secret**
+  similar to pod_environment_configmap but referencing a secret with custom
+  environment variables. Because the secret is not allowed to exist in a
+  different namespace than a Postgres cluster you can only use it in a single
+  namespace. The default is empty.
 
 * **pod_priority_class_name**
   a name of the [priority class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
@@ -466,13 +490,21 @@ configuration they are grouped under the `kubernetes` key.
   of stateful sets of PG clusters. The default is `ordered_ready`, the second
   possible value is `parallel`.
 
+* **enable_readiness_probe**
+  the operator can set a readiness probe on the statefulset for the database
+  pods with `InitialDelaySeconds: 6`, `PeriodSeconds: 10`, `TimeoutSeconds: 5`,
+  `SuccessThreshold: 1` and `FailureThreshold: 3`. When enabling readiness
+  probes it is recommended to switch the `pod_management_policy` to `parallel`
+  to avoid unneccesary waiting times in case of multiple instances failing.
+  The default is `false`.
+
 * **storage_resize_mode**
   defines how operator handles the difference between the requested volume size and
     the actual size. Available options are:
-    1. `ebs` : operator resizes EBS volumes directly and executes `resizefs` within a pod
-    2. `pvc` : operator only changes PVC definition
-    3. `off` : disables resize of the volumes.
-    4. `mixed` :operator  uses AWS API to adjust size, throughput, and IOPS, and calls pvc change for file system resize
+    1. `ebs`   : operator resizes EBS volumes directly and executes `resizefs` within a pod
+    2. `pvc`   : operator only changes PVC definition
+    3. `off`   : disables resize of the volumes.
+    4. `mixed` : operator uses AWS API to adjust size, throughput, and IOPS, and calls pvc change for file system resize
     Default is "pvc".
 
 ## Kubernetes resource requests
@@ -496,6 +528,12 @@ CRD-based configuration.
 * **default_memory_limit**
   memory limits for the Postgres containers, unless overridden by cluster-specific
   settings. The default is `500Mi`.
+
+* **max_cpu_request**
+  optional upper boundary for CPU request
+
+* **max_memory_request**
+  optional upper boundary for memory request
 
 * **min_cpu_limit**
   hard CPU minimum what we consider to be required to properly run Postgres
@@ -588,15 +626,15 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
 
 * **master_dns_name_format** defines the DNS name string template for the
   master load balancer cluster.  The default is
-  `{cluster}.{team}.{hostedzone}`, where `{cluster}` is replaced by the cluster
-  name, `{team}` is replaced with the team name and `{hostedzone}` is replaced
+  `{cluster}.{namespace}.{hostedzone}`, where `{cluster}` is replaced by the cluster
+  name, `{namespace}` is replaced with the namespace and `{hostedzone}` is replaced
   with the hosted zone (the value of the `db_hosted_zone` parameter). No other
   placeholders are allowed.
 
 * **replica_dns_name_format** defines the DNS name string template for the
   replica load balancer cluster.  The default is
-  `{cluster}-repl.{team}.{hostedzone}`, where `{cluster}` is replaced by the
-  cluster name, `{team}` is replaced with the team name and `{hostedzone}` is
+  `{cluster}-repl.{namespace}.{hostedzone}`, where `{cluster}` is replaced by the
+  cluster name, `{namespace}` is replaced with the namespace and `{hostedzone}` is
   replaced with the hosted zone (the value of the `db_hosted_zone` parameter).
   No other placeholders are allowed.
 
@@ -645,7 +683,10 @@ yet officially supported.
   empty.
 
 * **aws_region**
-  AWS region used to store EBS volumes. The default is `eu-central-1`.
+  AWS region used to store EBS volumes. The default is `eu-central-1`. Note,
+  this option is not meant for specifying the AWS region for backups and
+  restore, since it can be separate from the EBS region. You have to define
+  AWS_REGION as a [custom environment variable](../administrator.md#custom-pod-environment-variables).
 
 * **additional_secret_mount**
   Additional Secret (aws or gcp credentials) to mount in the pod.
@@ -676,7 +717,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.7.1"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.8.2"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.

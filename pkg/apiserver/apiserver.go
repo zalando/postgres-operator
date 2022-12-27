@@ -31,9 +31,9 @@ type controllerInformer interface {
 	GetOperatorConfig() *config.Config
 	GetStatus() *spec.ControllerStatus
 	TeamClusterList() map[string][]spec.NamespacedName
-	ClusterStatus(team, namespace, cluster string) (*cluster.ClusterStatus, error)
-	ClusterLogs(team, namespace, cluster string) ([]*spec.LogEntry, error)
-	ClusterHistory(team, namespace, cluster string) ([]*spec.Diff, error)
+	ClusterStatus(namespace, cluster string) (*cluster.ClusterStatus, error)
+	ClusterLogs(namespace, cluster string) ([]*spec.LogEntry, error)
+	ClusterHistory(namespace, cluster string) ([]*spec.Diff, error)
 	ClusterDatabasesMap() map[string][]string
 	WorkerLogs(workerID uint32) ([]*spec.LogEntry, error)
 	ListQueue(workerID uint32) (*spec.QueueDump, error)
@@ -55,9 +55,9 @@ const (
 )
 
 var (
-	clusterStatusRe  = fmt.Sprintf(`^/clusters/%s/%s/%s/?$`, teamRe, namespaceRe, clusterRe)
-	clusterLogsRe    = fmt.Sprintf(`^/clusters/%s/%s/%s/logs/?$`, teamRe, namespaceRe, clusterRe)
-	clusterHistoryRe = fmt.Sprintf(`^/clusters/%s/%s/%s/history/?$`, teamRe, namespaceRe, clusterRe)
+	clusterStatusRe  = fmt.Sprintf(`^/clusters/%s/%s/?$`, namespaceRe, clusterRe)
+	clusterLogsRe    = fmt.Sprintf(`^/clusters/%s/%s/logs/?$`, namespaceRe, clusterRe)
+	clusterHistoryRe = fmt.Sprintf(`^/clusters/%s/%s/history/?$`, namespaceRe, clusterRe)
 	teamURLRe        = fmt.Sprintf(`^/clusters/%s/?$`, teamRe)
 
 	clusterStatusURL     = regexp.MustCompile(clusterStatusRe)
@@ -170,7 +170,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 
 	if matches := util.FindNamedStringSubmatch(clusterStatusURL, req.URL.Path); matches != nil {
 		namespace := matches["namespace"]
-		resp, err = s.controller.ClusterStatus(matches["team"], namespace, matches["cluster"])
+		resp, err = s.controller.ClusterStatus(namespace, matches["cluster"])
 	} else if matches := util.FindNamedStringSubmatch(teamURL, req.URL.Path); matches != nil {
 		teamClusters := s.controller.TeamClusterList()
 		clusters, found := teamClusters[matches["team"]]
@@ -181,21 +181,21 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 
 		clusterNames := make([]string, 0)
 		for _, cluster := range clusters {
-			clusterNames = append(clusterNames, cluster.Name[len(matches["team"])+1:])
+			clusterNames = append(clusterNames, cluster.Name)
 		}
 
 		resp, err = clusterNames, nil
 	} else if matches := util.FindNamedStringSubmatch(clusterLogsURL, req.URL.Path); matches != nil {
 		namespace := matches["namespace"]
-		resp, err = s.controller.ClusterLogs(matches["team"], namespace, matches["cluster"])
+		resp, err = s.controller.ClusterLogs(namespace, matches["cluster"])
 	} else if matches := util.FindNamedStringSubmatch(clusterHistoryURL, req.URL.Path); matches != nil {
 		namespace := matches["namespace"]
-		resp, err = s.controller.ClusterHistory(matches["team"], namespace, matches["cluster"])
+		resp, err = s.controller.ClusterHistory(namespace, matches["cluster"])
 	} else if req.URL.Path == clustersURL {
 		clusterNamesPerTeam := make(map[string][]string)
 		for team, clusters := range s.controller.TeamClusterList() {
 			for _, cluster := range clusters {
-				clusterNamesPerTeam[team] = append(clusterNamesPerTeam[team], cluster.Name[len(team)+1:])
+				clusterNamesPerTeam[team] = append(clusterNamesPerTeam[team], cluster.Name)
 			}
 		}
 		resp, err = clusterNamesPerTeam, nil

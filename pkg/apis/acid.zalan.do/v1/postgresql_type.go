@@ -36,6 +36,9 @@ type PostgresSpec struct {
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
 
+	// deprecated field storing cluster name without teamId prefix
+	ClusterName string `json:"-"`
+
 	SpiloRunAsUser  *int64 `json:"spiloRunAsUser,omitempty"`
 	SpiloRunAsGroup *int64 `json:"spiloRunAsGroup,omitempty"`
 	SpiloFSGroup    *int64 `json:"spiloFSGroup,omitempty"`
@@ -62,7 +65,6 @@ type PostgresSpec struct {
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
 	Clone                 *CloneDescription           `json:"clone,omitempty"`
-	ClusterName           string                      `json:"-"`
 	Databases             map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
 	SchedulerName         *string                     `json:"schedulerName,omitempty"`
@@ -80,6 +82,7 @@ type PostgresSpec struct {
 	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 	Streams               []Stream                    `json:"streams,omitempty"`
+	Env                   []v1.EnvVar                 `json:"env,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -168,12 +171,15 @@ type Patroni struct {
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
 	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:"1"`
+	FailsafeMode          *bool                        `json:"failsafe_mode,omitempty"`
 }
 
-// StandbyDescription contains s3 wal path
+// StandbyDescription contains remote primary config or s3/gs wal path
 type StandbyDescription struct {
-	S3WalPath string `json:"s3_wal_path,omitempty"`
-	GSWalPath string `json:"gs_wal_path,omitempty"`
+	S3WalPath   string `json:"s3_wal_path,omitempty"`
+	GSWalPath   string `json:"gs_wal_path,omitempty"`
+	StandbyHost string `json:"standby_host,omitempty"`
+	StandbyPort string `json:"standby_port,omitempty"`
 }
 
 // TLSDescription specs TLS properties
@@ -235,6 +241,7 @@ type ConnectionPooler struct {
 	*Resources `json:"resources,omitempty"`
 }
 
+// Stream defines properties for creating FabricEventStream resources
 type Stream struct {
 	ApplicationId string                 `json:"applicationId"`
 	Database      string                 `json:"database"`
@@ -243,6 +250,7 @@ type Stream struct {
 	BatchSize     *uint32                `json:"batchSize,omitempty"`
 }
 
+// StreamTable defines properties of outbox tables for FabricEventStreams
 type StreamTable struct {
 	EventType     string  `json:"eventType"`
 	IdColumn      *string `json:"idColumn,omitempty"`

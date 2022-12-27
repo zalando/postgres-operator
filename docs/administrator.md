@@ -601,15 +601,39 @@ spec:
 
 ## Custom Pod Environment Variables
 
-It is possible to configure a ConfigMap as well as a Secret which are used by
-the Postgres pods as an additional provider for environment variables. One use
-case is a customized Spilo image configured by extra environment variables.
-Another case could be to provide custom cloud provider or backup settings.
+The operator will assign a set of environment variables to the database pods
+that cannot be overridden to guarantee core functionality. Only variables with
+'WAL_' and 'LOG_' prefixes can be customized to allow for backup and log
+shipping to be specified differently. There are three ways to specify extra
+environment variables (or override existing ones) for database pods:
 
-In general the Operator will give preference to the globally configured
-variables, to not have the custom ones interfere with core functionality.
-Variables with the 'WAL_' and 'LOG_' prefix can be overwritten though, to
-allow backup and log shipping to be specified differently.
+* [Via ConfigMap](#via-configmap)
+* [Via Secret](#via-secret)
+* [Via Postgres Cluster Manifest](#via-postgres-cluster-manifest)
+
+The first two options must be referenced from the operator configuration
+making them global settings for all Postgres cluster the operator watches.
+One use case is a customized Spilo image that must be configured by extra
+environment variables. Another case could be to provide custom cloud
+provider or backup settings.
+
+The last options allows for specifying environment variables individual to
+every cluster via the `env` section in the manifest. For example, if you use
+individual backup locations for each of your clusters. Or you want to disable
+WAL archiving for a certain cluster by setting `WAL_S3_BUCKET`, `WAL_GS_BUCKET`
+or `AZURE_STORAGE_ACCOUNT` to an empty string.
+
+The operator will give precedence to environment variables in the following
+order (e.g. a variable defined in 4. overrides a variable with the same name
+in 5.):
+
+1. Assigned by the operator
+2. Clone section (with WAL settings from operator config when `s3_wal_path` is empty)
+3. Standby section
+4. `env` section in cluster manifest
+5. Pod environment secret via operator config
+6. Pod environment config map via operator config
+7. WAL and logical backup settings from operator config
 
 ### Via ConfigMap
 
@@ -705,6 +729,29 @@ data:
 
 The key-value pairs of the Secret are all accessible as environment variables
 to the Postgres StatefulSet/pods.
+
+### Via Postgres Cluster Manifest
+
+It is possible to define environment variables directly in the Postgres cluster
+manifest to configure it individually. The variables must be listed under the
+`env` section in the same way you would do for [containers](https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/).
+Global parameters served from a custom config map or secret will be overridden.
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-test-cluster
+spec:
+  env:
+  - name: wal_s3_bucket
+    value: my-custom-bucket
+  - name: minio_secret_key
+      valueFrom:
+        secretKeyRef:
+          name: my-custom-secret
+          key: minio_secret_key
+```
 
 ## Limiting the number of min and max instances in clusters
 
@@ -928,6 +975,10 @@ When the `AWS_REGION` is set, `AWS_ENDPOINT` and `WALE_S3_ENDPOINT` are
 generated automatically. `WALG_S3_PREFIX` is identical to `WALE_S3_PREFIX`.
 `SCOPE` is the Postgres cluster name.
 
+:warning: If both `AWS_REGION` and `AWS_ENDPOINT` or `WALE_S3_ENDPOINT` are
+defined backups with WAL-E will fail. You can fix it by switching to WAL-G
+with `USE_WALG_BACKUP: "true"`.
+
 ### Google Cloud Platform setup
 
 To configure the operator on GCP these prerequisites that are needed:
@@ -1048,9 +1099,10 @@ and `pod-env-overrides` resources applied to your cluster, ensure that the opera
 is set up like the following:
 ```yml
 ...
-aws_or_gcp:
+kubernetes:
   pod_environment_secret: "psql-backup-creds"
   pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
+aws_or_gcp:
   wal_az_storage_account: "postgresbackupsbucket28302F2"  # name of storage account to save the WAL-G logs
 ...
 ```
@@ -1059,7 +1111,7 @@ aws_or_gcp:
 
 If cluster members have to be (re)initialized restoring physical backups
 happens automatically either from the backup location or by running
-[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html)
+[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html)
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.
@@ -1087,12 +1139,16 @@ data:
 
 ### Standby clusters
 
-The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is very
-similar to cloning. At the moment, the operator only allows for streaming from
-the S3 WAL archive of the master specified in the manifest. Like with cloning,
-if you are using [additional environment variables](#custom-pod-environment-variables)
-to access your backup location you have to copy those variables and prepend the
-`STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
+The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is
+similar to cloning when they stream changes from a WAL archive (S3 or GCS).
+If you are using [additional environment variables](#custom-pod-environment-variables)
+to access your backup location you have to copy those variables and prepend
+the `STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
+
+Alternatively, standby clusters can also stream from a remote primary cluster.
+You have to specify the host address. Port is optional and defaults to 5432.
+Note, that only one of the options (`s3_wal_path`, `gs_wal_path`,
+`standby_host`) can be present under the `standby` top-level key.
 
 ## Logical backups
 
@@ -1231,7 +1287,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.7.1 .
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.8.1 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/
