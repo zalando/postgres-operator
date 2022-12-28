@@ -325,8 +325,8 @@ func (c *Cluster) Create() error {
 				err = fmt.Errorf("could not sync pgbackrest restore config: %v", err)
 				return err
 			}
-			//TODO write status
 			c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+			c.Status.PgbackrestRestoreID = c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID
 			c.logger.Info("a pgbackrest restore config has been successfully synced")
 		}
 
@@ -896,6 +896,31 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 				c.logger.Errorf("could not sync statefulsets: %v", err)
 				updateFailed = true
 			}
+
+			if c.Spec.Backup != nil && c.Spec.Backup.Pgbackrest != nil && c.Spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+				if err := c.syncPgbackrestRestoreConfig(); err != nil {
+					updateFailed = true
+					return
+				}
+
+				if err = c.waitStatefulsetPodsReady(); err != nil {
+					updateFailed = true
+					return
+				}
+
+				c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+				c.Status.PgbackrestRestoreID = c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID
+				c.logger.Info("a pgbackrest restore config has been successfully synced")
+			} else {
+				return
+			}
+			// TODO: avoid generating the StatefulSet object twice by passing it to syncStatefulSet
+			if err := c.syncStatefulSet(); err != nil {
+				c.logger.Errorf("could not sync statefulsets: %v", err)
+				updateFailed = true
+				return
+			}
+
 		}
 	}()
 
@@ -929,8 +954,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 					updateFailed = true
 					return
 				}
-				//TODO write status
 				c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+				c.Status.PgbackrestRestoreID = c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID
 				c.logger.Info("a pgbackrest restore config has been successfully synced")
 			}
 		} else {

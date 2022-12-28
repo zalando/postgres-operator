@@ -1654,6 +1654,9 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	if newcur != cur {
 		c.logger.Infof("adjusted number of instances from %d to %d (min: %d, max: %d)", cur, newcur, min, max)
 	}
+	if spec.Backup != nil && spec.Backup.Pgbackrest != nil && spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+		newcur = 0
+	}
 
 	return newcur
 }
