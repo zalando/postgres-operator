@@ -399,7 +399,7 @@ class EndToEndTestCase(unittest.TestCase):
                         "wal_level": "logical"
                      }
                  },
-                "patroni": {
+                 "patroni": {
                     "slots": {
                         "first_slot": {
                             "type": "physical"
