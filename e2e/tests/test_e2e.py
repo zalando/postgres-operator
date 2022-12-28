@@ -399,13 +399,6 @@ class EndToEndTestCase(unittest.TestCase):
                         "wal_level": "logical"
                      }
                  },
-                "users": {
-                    "test_user": []
-                },
-                "databases": {
-                    "foo": "test_user",
-                    "bar": "test_user"
-                },
                 "patroni": {
                     "slots": {
                         "first_slot": {
