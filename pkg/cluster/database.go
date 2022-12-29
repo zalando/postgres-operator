@@ -98,7 +98,7 @@ func (c *Cluster) pgConnectionString(dbname string) string {
 		dbname = "postgres"
 	}
 
-	return fmt.Sprintf("host='%s' dbname='%s' sslmode=require user='%s' password='%s' connect_timeout='%d'",
+	return fmt.Sprintf("host='%s' dbname='%s' sslmode=require user='%s' password='%s' connect_timeout='%d' options='-c log_statement%30all'",
 		fmt.Sprintf("%s.%s.svc.%s", c.Name, c.Namespace, c.OpConfig.ClusterDomain),
 		dbname,
 		c.systemUsers[constants.SuperuserKeyName].Name,
