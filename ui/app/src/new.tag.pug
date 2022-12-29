@@ -18,7 +18,7 @@ new
         ol.breadcrumb
 
           li.breadcrumb-item
-            a(href='/#/new')
+            a(href='./#/new')
               | New PostgreSQL cluster
 
     .row.text-center(if='{ !creating }')
@@ -64,7 +64,7 @@ new
 
               a.btn.btn-small.btn-warning(
                 if='{ clusterExists }'
-                href='/#/status/{ namespace.state }/{ name }'
+                href='./#/status/{ namespace.state }/{ name }'
               )
                 | Cluster exists (show status)
 
@@ -299,8 +299,21 @@ new
                   )
                   .input-group-addon
                     .input-units Gi
+
             tr
+              td storageClass
               td
+                .input-group
+                  input.form-control(
+                    ref='volumeStorageClass'
+                    type='text'
+                    value='{ volumeStorageClass }'
+                    onchange='{ storageClassChange }'
+                    onkeyup='{ storageClassChange }'
+                  )
+
+            tr
+              td 
               td Specify Iops and Throughput only if you need more than the default 3000 Iops and 125Mb/s EBS provides.
 
             tr
@@ -582,7 +595,8 @@ new
         enableReplicaPoolerLoadBalancer: true
         {{/if}}
         volume:
-          size: "{{ volumeSize }}Gi"{{#if iops}}
+          size: "{{ volumeSize }}Gi"{{#if volumeStorageClass}}
+          storageClass: "{{ volumeStorageClass }}"{{/if}}{{#if iops}}
           iops: {{ iops }}{{/if}}{{#if throughput}}
           throughput: {{ throughput }}{{/if}}
         {{#if users}}
@@ -638,6 +652,7 @@ new
         enableMasterPoolerLoadBalancer: this.enableMasterPoolerLoadBalancer,
         enableReplicaPoolerLoadBalancer: this.enableReplicaPoolerLoadBalancer,
         volumeSize: this.volumeSize,
+        volumeStorageClass: this.volumeStorageClass,
         iops: this.iops,
         throughput: this.throughput,
         users: this.users.valids,
@@ -716,6 +731,10 @@ new
       this.volumeSize = +e.target.value
     }
 
+    this.storageClassChange = e => {
+      this.volumeStorageClass = e.target.value
+    }
+
     this.iopsChange = e => {
       this.iops = +e.target.value
     }
@@ -759,7 +778,7 @@ new
     this.checkClusterExists = () => (
       jQuery
       .get(
-        '/postgresqls/'
+        './postgresqls/'
         + this.namespace.state
         + '/'
         + this.clusterName
@@ -781,7 +800,7 @@ new
 
       jQuery.ajax({
         type: 'POST',
-        url: '/create-cluster',
+        url: './create-cluster',
         contentType:'application/json',
         data: jsonPayload,
         processData: false,
@@ -1013,6 +1032,7 @@ new
 
       this.clusterName = (this.name + '-').toLowerCase()
       this.volumeSize = 10
+      this.volumeStorageClass = ''
       this.instanceCount = 1
       this.ranges = {}
       this.odd = ''
