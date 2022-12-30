@@ -383,7 +383,7 @@ func (c *Cluster) createOrUpdateStreams() error {
 				desiredStreams := c.generateFabricEventStream(appId)
 				if match, reason := sameStreams(stream.Spec.EventStreams, desiredStreams.Spec.EventStreams); !match {
 					c.logger.Debugf("updating event streams: %s", reason)
-					desiredStreams.ObjectMeta.ResourceVersion = stream.ObjectMeta.ResourceVersion
+					desiredStreams.ObjectMeta = stream.ObjectMeta
 					err = c.updateStreams(desiredStreams)
 					if err != nil {
 						return fmt.Errorf("failed updating event stream %s: %v", stream.Name, err)

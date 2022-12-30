@@ -360,19 +360,14 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	// change specs of streams and patch CRD
-	pg.Spec.Streams = []acidv1.Stream{
-		{
-			ApplicationId: appId,
-			Database:      dbName,
-			Tables: map[string]acidv1.StreamTable{
-				"data.bar": acidv1.StreamTable{
-					EventType:     "stream-type-c",
-					IdColumn:      k8sutil.StringToPointer("b_id"),
-					PayloadColumn: k8sutil.StringToPointer("b_payload"),
-				},
-			},
-			BatchSize: k8sutil.UInt32ToPointer(uint32(250)),
-		},
+	for i, stream := range pg.Spec.Streams {
+		if stream.ApplicationId == appId {
+			streamTable := stream.Tables["data.bar"]
+			streamTable.EventType = "stream-type-c"
+			stream.Tables["data.bar"] = streamTable
+			stream.BatchSize = k8sutil.UInt32ToPointer(uint32(250))
+			pg.Spec.Streams[i] = stream
+		}
 	}
 
 	patchData, err := specPatch(pg.Spec)
