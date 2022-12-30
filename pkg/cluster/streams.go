@@ -374,9 +374,12 @@ func (c *Cluster) createOrUpdateStreams() error {
 	}
 
 	for _, appId := range appIds {
+		streamExists := false
+
 		// update stream when it exists and EventStreams array differs
 		for _, stream := range streams.Items {
 			if appId == stream.Spec.ApplicationId {
+				streamExists = true
 				desiredStreams := c.generateFabricEventStream(appId)
 				if match, reason := sameStreams(stream.Spec.EventStreams, desiredStreams.Spec.EventStreams); !match {
 					c.logger.Debugf("updating event streams: %s", reason)
@@ -390,12 +393,15 @@ func (c *Cluster) createOrUpdateStreams() error {
 				continue
 			}
 		}
-		c.logger.Infof("event streams with applicationId %s do not exist, create it", appId)
-		streamCRD, err := c.createStreams(appId)
-		if err != nil {
-			return fmt.Errorf("failed creating event streams with applicationId %s: %v", appId, err)
+
+		if !streamExists {
+			c.logger.Infof("event streams with applicationId %s do not exist, create it", appId)
+			streamCRD, err := c.createStreams(appId)
+			if err != nil {
+				return fmt.Errorf("failed creating event streams with applicationId %s: %v", appId, err)
+			}
+			c.logger.Infof("event streams %q have been successfully created", streamCRD.Name)
 		}
-		c.logger.Infof("event streams %q have been successfully created", streamCRD.Name)
 	}
 
 	return nil
