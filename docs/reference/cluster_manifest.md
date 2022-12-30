@@ -268,7 +268,7 @@ documentation](https://patroni.readthedocs.io/en/latest/SETTINGS.html) for the
 explanation of `ttl` and `loop_wait` parameters.
 
 * **initdb**
-  a map of key-value pairs describing initdb parameters. For `data-checksum`,
+  a map of key-value pairs describing initdb parameters. For `data-checksums`,
   `debug`, `no-locale`, `noclean`, `nosync` and `sync-only` parameters use
   `true` as the value if you want to set them. Changes to this option do not
   affect the already initialized clusters. Optional.
