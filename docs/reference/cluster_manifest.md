@@ -374,6 +374,9 @@ under the `clone` top-level key and do not affect the already running cluster.
   timestamp. When this parameter is set the operator will not consider cloning
   from the live cluster, even if it is running, and instead goes to S3. Optional.
 
+* **wal_timeline_id**
+  the timeline ID from which the recovery should take place. Optional.  
+
 * **s3_wal_path**
   the url to S3 bucket containing the WAL archive of the cluster to be cloned.
   Optional.

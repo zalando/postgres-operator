@@ -131,6 +131,8 @@ spec:
                   uid:
                     format: uuid
                     type: string
+                  wal_timeline_id:
+                    type: integer
               connectionPooler:
                 type: object
                 properties:
