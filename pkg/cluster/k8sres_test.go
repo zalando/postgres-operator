@@ -64,7 +64,6 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
-	testName := "TestGenerateSpiloConfig"
 	tests := []struct {
 		subtest  string
 		pgParam  *acidv1.PostgresqlParam
@@ -159,13 +158,12 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 		}
 		if tt.result != result {
 			t.Errorf("%s %s: Spilo Config is %v, expected %v for role %#v and param %#v",
-				testName, tt.subtest, result, tt.result, tt.opConfig.Auth.PamRoleName, tt.pgParam)
+				t.Name(), tt.subtest, result, tt.result, tt.opConfig.Auth.PamRoleName, tt.pgParam)
 		}
 	}
 }
 
 func TestExtractPgVersionFromBinPath(t *testing.T) {
-	testName := "TestExtractPgVersionFromBinPath"
 	tests := []struct {
 		subTest  string
 		binPath  string
@@ -199,7 +197,7 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		}
 		if pgVersion != tt.expected {
 			t.Errorf("%s %s: Expected version %s, have %s instead",
-				testName, tt.subTest, tt.expected, pgVersion)
+				t.Name(), tt.subTest, tt.expected, pgVersion)
 		}
 	}
 }
@@ -287,7 +285,6 @@ func newMockCluster(opConfig config.Config) *Cluster {
 }
 
 func TestPodEnvironmentConfigMapVariables(t *testing.T) {
-	testName := "TestPodEnvironmentConfigMapVariables"
 	tests := []struct {
 		subTest  string
 		opConfig config.Config
@@ -343,17 +340,17 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 		vars, err := c.getPodEnvironmentConfigMapVariables()
 		if !reflect.DeepEqual(vars, tt.envVars) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
-				testName, tt.subTest, tt.envVars, vars)
+				t.Name(), tt.subTest, tt.envVars, vars)
 		}
 		if tt.err != nil {
 			if err.Error() != tt.err.Error() {
 				t.Errorf("%s %s: expected error `%v` but got `%v`",
-					testName, tt.subTest, tt.err, err)
+					t.Name(), tt.subTest, tt.err, err)
 			}
 		} else {
 			if err != nil {
 				t.Errorf("%s %s: expected no error but got error: `%v`",
-					testName, tt.subTest, err)
+					t.Name(), tt.subTest, err)
 			}
 		}
 	}
@@ -362,7 +359,6 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 // Test if the keys of an existing secret are properly referenced
 func TestPodEnvironmentSecretVariables(t *testing.T) {
 	maxRetries := int(testResourceCheckTimeout / testResourceCheckInterval)
-	testName := "TestPodEnvironmentSecretVariables"
 	tests := []struct {
 		subTest  string
 		opConfig config.Config
@@ -448,17 +444,17 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 		if !reflect.DeepEqual(vars, tt.envVars) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
-				testName, tt.subTest, tt.envVars, vars)
+				t.Name(), tt.subTest, tt.envVars, vars)
 		}
 		if tt.err != nil {
 			if err.Error() != tt.err.Error() {
 				t.Errorf("%s %s: expected error `%v` but got `%v`",
-					testName, tt.subTest, tt.err, err)
+					t.Name(), tt.subTest, tt.err, err)
 			}
 		} else {
 			if err != nil {
 				t.Errorf("%s %s: expected no error but got error: `%v`",
-					testName, tt.subTest, err)
+					t.Name(), tt.subTest, err)
 			}
 		}
 	}
@@ -657,7 +653,6 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		},
 	}
 
-	testName := "TestGenerateSpiloPodEnvVars"
 	tests := []struct {
 		subTest            string
 		opConfig           config.Config
@@ -895,27 +890,26 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 			if env.Name != ev.envVarConstant {
 				t.Errorf("%s %s: expected env name %s, have %s instead",
-					testName, tt.subTest, ev.envVarConstant, env.Name)
+					t.Name(), tt.subTest, ev.envVarConstant, env.Name)
 			}
 
 			if ev.envVarValueRef != nil {
 				if !reflect.DeepEqual(env.ValueFrom, ev.envVarValueRef) {
 					t.Errorf("%s %s: expected env value reference %#v, have %#v instead",
-						testName, tt.subTest, ev.envVarValueRef, env.ValueFrom)
+						t.Name(), tt.subTest, ev.envVarValueRef, env.ValueFrom)
 				}
 				continue
 			}
 
 			if env.Value != ev.envVarValue {
 				t.Errorf("%s %s: expected env value %s, have %s instead",
-					testName, tt.subTest, ev.envVarValue, env.Value)
+					t.Name(), tt.subTest, ev.envVarValue, env.Value)
 			}
 		}
 	}
 }
 
 func TestGetNumberOfInstances(t *testing.T) {
-	testName := "TestGetNumberOfInstances"
 	tests := []struct {
 		subTest         string
 		config          config.Config
@@ -1039,13 +1033,12 @@ func TestGetNumberOfInstances(t *testing.T) {
 
 		if numInstances != tt.provided {
 			t.Errorf("%s %s: Expected to get %d instances, have %d instead",
-				testName, tt.subTest, tt.provided, numInstances)
+				t.Name(), tt.subTest, tt.provided, numInstances)
 		}
 	}
 }
 
 func TestCloneEnv(t *testing.T) {
-	testName := "TestCloneEnv"
 	tests := []struct {
 		subTest   string
 		cloneOpts *acidv1.CloneDescription
@@ -1112,18 +1105,17 @@ func TestCloneEnv(t *testing.T) {
 
 		if env.Name != tt.env.Name {
 			t.Errorf("%s %s: Expected env name %s, have %s instead",
-				testName, tt.subTest, tt.env.Name, env.Name)
+				t.Name(), tt.subTest, tt.env.Name, env.Name)
 		}
 
 		if env.Value != tt.env.Value {
 			t.Errorf("%s %s: Expected env value %s, have %s instead",
-				testName, tt.subTest, tt.env.Value, env.Value)
+				t.Name(), tt.subTest, tt.env.Value, env.Value)
 		}
 	}
 }
 
 func TestAppendEnvVar(t *testing.T) {
-	testName := "TestAppendEnvVar"
 	tests := []struct {
 		subTest      string
 		envs         []v1.EnvVar
@@ -1179,7 +1171,7 @@ func TestAppendEnvVar(t *testing.T) {
 
 		if len(finalEnvs) != tt.expectedSize {
 			t.Errorf("%s %s: expected %d env variables, got %d",
-				testName, tt.subTest, tt.expectedSize, len(finalEnvs))
+				t.Name(), tt.subTest, tt.expectedSize, len(finalEnvs))
 		}
 
 		for _, env := range tt.envs {
@@ -1187,7 +1179,7 @@ func TestAppendEnvVar(t *testing.T) {
 				if env.Name == finalEnv.Name {
 					if env.Value != finalEnv.Value {
 						t.Errorf("%s %s: expected env value %s of variable %s, got %s instead",
-							testName, tt.subTest, env.Value, env.Name, finalEnv.Value)
+							t.Name(), tt.subTest, env.Value, env.Name, finalEnv.Value)
 					}
 				}
 			}
@@ -1196,7 +1188,6 @@ func TestAppendEnvVar(t *testing.T) {
 }
 
 func TestStandbyEnv(t *testing.T) {
-	testName := "TestStandbyEnv"
 	tests := []struct {
 		subTest     string
 		standbyOpts *acidv1.StandbyDescription
@@ -1279,17 +1270,17 @@ func TestStandbyEnv(t *testing.T) {
 
 		if env.Name != tt.env.Name {
 			t.Errorf("%s %s: Expected env name %s, have %s instead",
-				testName, tt.subTest, tt.env.Name, env.Name)
+				t.Name(), tt.subTest, tt.env.Name, env.Name)
 		}
 
 		if env.Value != tt.env.Value {
 			t.Errorf("%s %s: Expected env value %s, have %s instead",
-				testName, tt.subTest, tt.env.Value, env.Value)
+				t.Name(), tt.subTest, tt.env.Value, env.Value)
 		}
 
 		if len(envs) != tt.envLen {
 			t.Errorf("%s %s: Expected number of env variables %d, have %d instead",
-				testName, tt.subTest, tt.envLen, len(envs))
+				t.Name(), tt.subTest, tt.envLen, len(envs))
 		}
 	}
 }
@@ -1471,8 +1462,59 @@ func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role Postg
 	return nil
 }
 
-func TestTLS(t *testing.T) {
+func TestSharePgSocketWithSidecars(t *testing.T) {
+	tests := []struct {
+		subTest   string
+		podSpec   *v1.PodSpec
+		runVolPos int
+	}{
+		{
+			subTest: "empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{},
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{},
+					},
+				},
+			},
+			runVolPos: 0,
+		},
+		{
+			subTest: "non empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{},
+						},
+					},
+				},
+			},
+			runVolPos: 1,
+		},
+	}
+	for _, tt := range tests {
+		addVarRunVolume(tt.podSpec)
+		postgresContainer := getPostgresContainer(tt.podSpec)
 
+		volumeName := tt.podSpec.Volumes[tt.runVolPos].Name
+		volumeMountName := postgresContainer.VolumeMounts[tt.runVolPos].Name
+
+		if volumeName != constants.RunVolumeName {
+			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
+				t.Name(), tt.subTest, constants.RunVolumeName, volumeName)
+		}
+		if volumeMountName != constants.RunVolumeName {
+			t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
+				t.Name(), tt.subTest, constants.RunVolumeName, volumeMountName)
+		}
+	}
+}
+
+func TestTLS(t *testing.T) {
 	client, _ := newFakeK8sTestClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
@@ -1561,7 +1603,6 @@ func TestTLS(t *testing.T) {
 }
 
 func TestShmVolume(t *testing.T) {
-	testName := "TestShmVolume"
 	tests := []struct {
 		subTest string
 		podSpec *v1.PodSpec
@@ -1604,17 +1645,16 @@ func TestShmVolume(t *testing.T) {
 
 		if volumeName != constants.ShmVolumeName {
 			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
-				testName, tt.subTest, constants.ShmVolumeName, volumeName)
+				t.Name(), tt.subTest, constants.ShmVolumeName, volumeName)
 		}
 		if volumeMountName != constants.ShmVolumeName {
 			t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
-				testName, tt.subTest, constants.ShmVolumeName, volumeMountName)
+				t.Name(), tt.subTest, constants.ShmVolumeName, volumeMountName)
 		}
 	}
 }
 
 func TestSecretVolume(t *testing.T) {
-	testName := "TestSecretVolume"
 	tests := []struct {
 		subTest   string
 		podSpec   *v1.PodSpec
@@ -1664,7 +1704,7 @@ func TestSecretVolume(t *testing.T) {
 
 		if volumeName != additionalSecretMount {
 			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
-				testName, tt.subTest, additionalSecretMount, volumeName)
+				t.Name(), tt.subTest, additionalSecretMount, volumeName)
 		}
 
 		for i := range tt.podSpec.Containers {
@@ -1672,7 +1712,7 @@ func TestSecretVolume(t *testing.T) {
 
 			if volumeMountName != additionalSecretMount {
 				t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
-					testName, tt.subTest, additionalSecretMount, volumeMountName)
+					t.Name(), tt.subTest, additionalSecretMount, volumeMountName)
 			}
 		}
 
@@ -1687,8 +1727,6 @@ func TestSecretVolume(t *testing.T) {
 }
 
 func TestAdditionalVolume(t *testing.T) {
-	testName := "TestAdditionalVolume"
-
 	client, _ := newFakeK8sTestClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
@@ -1800,14 +1838,13 @@ func TestAdditionalVolume(t *testing.T) {
 
 			if !util.IsEqualIgnoreOrder(mounts, tt.expectedMounts) {
 				t.Errorf("%s %s: different volume mounts: got %v, epxected %v",
-					testName, tt.subTest, mounts, tt.expectedMounts)
+					t.Name(), tt.subTest, mounts, tt.expectedMounts)
 			}
 		}
 	}
 }
 
 func TestVolumeSelector(t *testing.T) {
-	testName := "TestVolumeSelector"
 	makeSpec := func(volume acidv1.Volume) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
 			TeamID:            "myapp",
@@ -1888,7 +1925,7 @@ func TestVolumeSelector(t *testing.T) {
 		pgSpec := makeSpec(tt.volume)
 		sts, err := cluster.generateStatefulSet(&pgSpec)
 		if err != nil {
-			t.Fatalf("%s %s: no statefulset created %v", testName, tt.subTest, err)
+			t.Fatalf("%s %s: no statefulset created %v", t.Name(), tt.subTest, err)
 		}
 
 		volIdx := len(sts.Spec.VolumeClaimTemplates)
@@ -1899,12 +1936,12 @@ func TestVolumeSelector(t *testing.T) {
 			}
 		}
 		if volIdx == len(sts.Spec.VolumeClaimTemplates) {
-			t.Errorf("%s %s: no datavolume found in sts", testName, tt.subTest)
+			t.Errorf("%s %s: no datavolume found in sts", t.Name(), tt.subTest)
 		}
 
 		selector := sts.Spec.VolumeClaimTemplates[volIdx].Spec.Selector
 		if !reflect.DeepEqual(selector, tt.wantSelector) {
-			t.Errorf("%s %s: expected: %#v but got: %#v", testName, tt.subTest, tt.wantSelector, selector)
+			t.Errorf("%s %s: expected: %#v but got: %#v", t.Name(), tt.subTest, tt.wantSelector, selector)
 		}
 	}
 }
@@ -2320,7 +2357,6 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
-	testName := "TestCreateLoadBalancerLogic"
 	tests := []struct {
 		subtest  string
 		role     PostgresRole
@@ -2362,7 +2398,7 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 		result := cluster.shouldCreateLoadBalancerForService(tt.role, tt.spec)
 		if tt.result != result {
 			t.Errorf("%s %s: Load balancer is %t, expect %t for role %#v and spec %#v",
-				testName, tt.subtest, result, tt.result, tt.role, tt.spec)
+				t.Name(), tt.subtest, result, tt.result, tt.role, tt.spec)
 		}
 	}
 }
@@ -2410,7 +2446,6 @@ func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPo
 }
 
 func TestEnableLoadBalancers(t *testing.T) {
-	testName := "Test enabling LoadBalancers"
 	client, _ := newLBFakeClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
@@ -2545,13 +2580,12 @@ func TestEnableLoadBalancers(t *testing.T) {
 			generatedServices = append(generatedServices, cluster.ConnectionPooler[role].Service.Spec)
 		}
 		if !reflect.DeepEqual(tt.expectedServices, generatedServices) {
-			t.Errorf("%s %s: expected %#v but got %#v", testName, tt.subTest, tt.expectedServices, generatedServices)
+			t.Errorf("%s %s: expected %#v but got %#v", t.Name(), tt.subTest, tt.expectedServices, generatedServices)
 		}
 	}
 }
 
 func TestGenerateResourceRequirements(t *testing.T) {
-	testName := "TestGenerateResourceRequirements"
 	client, _ := newFakeK8sTestClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
@@ -2921,14 +2955,12 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		}
 		assert.NoError(t, err)
 		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
-			t.Errorf("%s - %s: expected %#v but got %#v", testName, tt.subTest, tt.expectedResources, clusterResources)
+			t.Errorf("%s - %s: expected %#v but got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
 		}
 	}
 }
 
 func TestGenerateCapabilities(t *testing.T) {
-
-	testName := "TestGenerateCapabilities"
 	tests := []struct {
 		subTest      string
 		configured   []string
@@ -2968,7 +3000,7 @@ func TestGenerateCapabilities(t *testing.T) {
 		caps := generateCapabilities(tt.configured)
 		if !reflect.DeepEqual(caps, tt.capabilities) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
-				testName, tt.subTest, tt.capabilities, caps)
+				t.Name(), tt.subTest, tt.capabilities, caps)
 		}
 	}
 }

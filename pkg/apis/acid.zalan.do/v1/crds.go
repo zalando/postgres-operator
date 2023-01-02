@@ -1289,9 +1289,6 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
-							"share_pg_socket_with_sidecars": {
-								Type: "boolean",
-							},
 							"infrastructure_roles_secret_name": {
 								Type: "string",
 							},
@@ -1418,6 +1415,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"secret_name_template": {
 								Type: "string",
+							},
+							"share_pgsocket_with_sidecars": {
+								Type: "boolean",
 							},
 							"spilo_runasuser": {
 								Type: "integer",

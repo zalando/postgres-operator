@@ -193,8 +193,8 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(bool)
 		**out = **in
 	}
-	if in.SharePGSocketWithSidecars != nil {
-		in, out := &in.SharePGSocketWithSidecars, &out.SharePGSocketWithSidecars
+	if in.SharePgSocketWithSidecars != nil {
+		in, out := &in.SharePgSocketWithSidecars, &out.SharePgSocketWithSidecars
 		*out = new(bool)
 		**out = **in
 	}

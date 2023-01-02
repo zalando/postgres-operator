@@ -344,7 +344,7 @@ configuration they are grouped under the `kubernetes` key.
   to run alongside Spilo on the same pod. Globally defined sidecars are always
   enabled. Default is true.
 
-* **share_pg_socket_with_sidecars**
+* **share_pgsocket_with_sidecars**
   global option to create an emptyDir volume named `postgresql-run`. This is
   mounted by all containers at `/var/run/postgresql` sharing the unix socket of
   PostgreSQL (`pg_socket`) with the sidecars this way.

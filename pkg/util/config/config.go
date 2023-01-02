@@ -213,7 +213,7 @@ type Config struct {
 	EnablePodDisruptionBudget                *bool             `name:"enable_pod_disruption_budget" default:"true"`
 	EnableInitContainers                     *bool             `name:"enable_init_containers" default:"true"`
 	EnableSidecars                           *bool             `name:"enable_sidecars" default:"true"`
-	SharePGSocketWithSidecars                *bool             `name:"share_pg_socket_with_sidecars" default:"false"`
+	SharePgSocketWithSidecars                *bool             `name:"share_pgsocket_with_sidecars" default:"false"`
 	Workers                                  uint32            `name:"workers" default:"8"`
 	APIPort                                  int               `name:"api_port" default:"8080"`
 	RingLogLines                             int               `name:"ring_log_lines" default:"100"`
@@ -232,11 +232,11 @@ type Config struct {
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`
 	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"off"`
 	MajorVersionUpgradeTeamAllowList         []string          `name:"major_version_upgrade_team_allow_list" default:""`
-	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"9.6"`
+	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"11"`
 	TargetMajorVersion                       string            `name:"target_major_version" default:"14"`
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
-  EnablePatroniFailsafeMode              *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
+	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
 }
 
 // MustMarshal marshals the config or panics
