@@ -222,6 +222,9 @@ spec:
                     type: array
                     items:
                       type: string
+                  share_pg_socket_with_sidecars:
+                    type: boolean
+                    default: false
                   infrastructure_roles_secret_name:
                     type: string
                   infrastructure_roles_secrets:

@@ -713,6 +713,7 @@ func (c *Cluster) generatePodTemplate(
 	spiloContainer *v1.Container,
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
+	sharePGSocketWithSidecars *bool,
 	tolerationsSpec *[]v1.Toleration,
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
@@ -773,6 +774,10 @@ func (c *Cluster) generatePodTemplate(
 
 	if priorityClassName != "" {
 		podSpec.PriorityClassName = priorityClassName
+	}
+
+	if sharePGSocketWithSidecars != nil && *sharePGSocketWithSidecars {
+		addVarRunVolume(&podSpec)
 	}
 
 	if additionalSecretMount != "" {
@@ -1357,6 +1362,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		spiloContainer,
 		initContainers,
 		sidecarContainers,
+		c.OpConfig.SharePGSocketWithSidecars,
 		&tolerationSpec,
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
@@ -1546,6 +1552,28 @@ func addShmVolume(podSpec *v1.PodSpec) {
 		})
 
 	podSpec.Containers[postgresContainerIdx].VolumeMounts = mounts
+
+	podSpec.Volumes = volumes
+}
+
+func addVarRunVolume(podSpec *v1.PodSpec) {
+	volumes := append(podSpec.Volumes, v1.Volume{
+		Name: "postgresql-run",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium: "Memory",
+			},
+		},
+	})
+
+	for i := range podSpec.Containers {
+		mounts := append(podSpec.Containers[i].VolumeMounts,
+			v1.VolumeMount{
+				Name:      "postgresql-run",
+				MountPath: "/var/run/postgresql",
+			})
+		podSpec.Containers[i].VolumeMounts = mounts
+	}
 
 	podSpec.Volumes = volumes
 }
@@ -2080,6 +2108,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},
+		util.False(),
 		&[]v1.Toleration{},
 		nil,
 		nil,

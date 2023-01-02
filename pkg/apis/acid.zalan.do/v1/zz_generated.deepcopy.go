@@ -193,6 +193,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(bool)
 		**out = **in
 	}
+	if in.SharePGSocketWithSidecars != nil {
+		in, out := &in.SharePGSocketWithSidecars, &out.SharePGSocketWithSidecars
+		*out = new(bool)
+		**out = **in
+	}
 	out.OAuthTokenSecretName = in.OAuthTokenSecretName
 	out.InfrastructureRolesSecretName = in.InfrastructureRolesSecretName
 	if in.InfrastructureRolesDefs != nil {
