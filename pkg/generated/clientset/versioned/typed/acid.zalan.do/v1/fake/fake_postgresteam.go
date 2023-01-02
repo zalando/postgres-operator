@@ -111,7 +111,7 @@ func (c *FakePostgresTeams) Update(ctx context.Context, postgresTeam *acidzaland
 // Delete takes name of the postgresTeam and deletes it. Returns an error if one occurs.
 func (c *FakePostgresTeams) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(postgresteamsResource, c.ns, name), &acidzalandov1.PostgresTeam{})
+		Invokes(testing.NewDeleteActionWithOptions(postgresteamsResource, c.ns, name, opts), &acidzalandov1.PostgresTeam{})
 
 	return err
 }
