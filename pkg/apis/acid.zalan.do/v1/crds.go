@@ -1375,6 +1375,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pod_antiaffinity_topology_key": {
 								Type: "string",
 							},
+							"pod_antiaffinity_preferred_during_scheduling": {
+								Type: "boolean",
+							},
 							"pod_environment_configmap": {
 								Type: "string",
 							},

@@ -167,6 +167,8 @@ configKubernetes:
   pdb_name_format: "postgres-{cluster}-pdb"
   # override topology key for pod anti affinity
   pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  # switches pod anti affinity type to `preferredDuringSchedulingIgnoredDuringExecution`
+  # pod_antiaffinity_preferred_during_scheduling: true
   # namespaced name of the ConfigMap with environment variables to populate on every pod
   # pod_environment_configmap: "default/my-custom-config"
   # name of the Secret (in cluster namespace) with environment variables to populate on every pod

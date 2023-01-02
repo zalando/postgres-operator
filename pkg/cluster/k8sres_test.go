@@ -1351,6 +1351,95 @@ func TestNodeAffinity(t *testing.T) {
 	assert.Equal(t, s.Spec.Template.Spec.Affinity.NodeAffinity, nodeAff, "cluster template has correct node affinity")
 }
 
+func TestPodAntiAffinityrRequiredDuringScheduling(t *testing.T) {
+	var err error
+	var spiloRunAsUser = int64(101)
+	var spiloRunAsGroup = int64(103)
+	var spiloFSGroup = int64(103)
+
+	spec := acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: &acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+	}
+
+	cluster := New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					SpiloRunAsUser:  &spiloRunAsUser,
+					SpiloRunAsGroup: &spiloRunAsGroup,
+					SpiloFSGroup:    &spiloFSGroup,
+				},
+				EnablePodAntiAffinity: true,
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	s, err := cluster.generateStatefulSet(&spec)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	assert.Nil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should not use preferredDuringScheduling")
+	assert.NotNil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should use requiredDuringScheduling")
+}
+
+func TestPodAntiAffinityPreferredDuringScheduling(t *testing.T) {
+	var err error
+	var spiloRunAsUser = int64(101)
+	var spiloRunAsGroup = int64(103)
+	var spiloFSGroup = int64(103)
+
+	spec := acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: &acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+	}
+
+	cluster := New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					SpiloRunAsUser:  &spiloRunAsUser,
+					SpiloRunAsGroup: &spiloRunAsGroup,
+					SpiloFSGroup:    &spiloFSGroup,
+				},
+				EnablePodAntiAffinity:                    true,
+				PodAntiAffinityPreferredDuringScheduling: true,
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	s, err := cluster.generateStatefulSet(&spec)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	assert.NotNil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should use preferredDuringScheduling")
+	assert.Nil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should not use requiredDuringScheduling")
+}
+
 func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
