@@ -34,7 +34,7 @@ data:
   # default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p7
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_registration: "true"
@@ -47,11 +47,13 @@ data:
   enable_master_load_balancer: "false"
   enable_master_pooler_load_balancer: "false"
   enable_password_rotation: "false"
+  # enable_patroni_failsafe_mode: "false"
   enable_pgversion_env_var: "true"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
   # enable_postgres_team_crd: "false"
   # enable_postgres_team_crd_superusers: "false"
+  enable_readiness_probe: "false"
   enable_replica_load_balancer: "false"
   enable_replica_pooler_load_balancer: "false"
   # enable_shm_volume: "true"
@@ -95,7 +97,7 @@ data:
   # max_memory_request: 4Gi
   # min_cpu_limit: 250m
   # min_memory_limit: 250Mi
-  # minimal_major_version: "9.6"
+  # minimal_major_version: "11"
   # node_readiness_label: "status:ready"
   # node_readiness_label_merge: "OR"
   # oauth_token_secret_name: postgresql-operator

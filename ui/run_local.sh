@@ -25,6 +25,7 @@ default_operator_ui_config='{
   "cost_core": 0.0575,
   "cost_memory": 0.014375,
   "postgresql_versions": [
+    "15",
     "14",
     "13",
     "12",

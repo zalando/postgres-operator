@@ -49,7 +49,7 @@ type PostgresUsersConfiguration struct {
 type MajorVersionUpgradeConfiguration struct {
 	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
 	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
-	MinimalMajorVersion              string   `json:"minimal_major_version" default:"9.6"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"11"`
 	TargetMajorVersion               string   `json:"target_major_version" default:"14"`
 }
 
@@ -72,6 +72,7 @@ type KubernetesMetaConfiguration struct {
 	StorageResizeMode                      string                       `json:"storage_resize_mode,omitempty"`
 	EnableInitContainers                   *bool                        `json:"enable_init_containers,omitempty"`
 	EnableSidecars                         *bool                        `json:"enable_sidecars,omitempty"`
+	SharePGSocketWithSidecars              *bool                        `json:"share_pgsocket_with_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate        `json:"secret_name_template,omitempty"`
 	ClusterDomain                          string                       `json:"cluster_domain,omitempty"`
 	OAuthTokenSecretName                   spec.NamespacedName          `json:"oauth_token_secret_name,omitempty"`
@@ -99,6 +100,7 @@ type KubernetesMetaConfiguration struct {
 	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodAntiAffinityPreferredDuringScheduling bool                `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
+  EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
 }
 
@@ -227,6 +229,11 @@ type OperatorLogicalBackupConfiguration struct {
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
 }
 
+// PatroniConfiguration defines configuration for Patroni
+type PatroniConfiguration struct {
+	FailsafeMode *bool `json:"failsafe_mode,omitempty"`
+}
+
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
 	EnableCRDRegistration         *bool                              `json:"enable_crd_registration,omitempty"`
@@ -259,11 +266,12 @@ type OperatorConfigurationData struct {
 	Scalyr                        ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup                 OperatorLogicalBackupConfiguration `json:"logical_backup"`
 	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	Patroni                       PatroniConfiguration               `json:"patroni"`
 
 	MinInstances                      int32  `json:"min_instances,omitempty"`
 	MaxInstances                      int32  `json:"max_instances,omitempty"`
 	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
 }
 
-//Duration shortens this frequently used name
+// Duration shortens this frequently used name
 type Duration time.Duration

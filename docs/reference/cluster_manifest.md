@@ -268,7 +268,7 @@ documentation](https://patroni.readthedocs.io/en/latest/SETTINGS.html) for the
 explanation of `ttl` and `loop_wait` parameters.
 
 * **initdb**
-  a map of key-value pairs describing initdb parameters. For `data-checksum`,
+  a map of key-value pairs describing initdb parameters. For `data-checksums`,
   `debug`, `no-locale`, `noclean`, `nosync` and `sync-only` parameters use
   `true` as the value if you want to set them. Changes to this option do not
   affect the already initialized clusters. Optional.
@@ -316,6 +316,9 @@ explanation of `ttl` and `loop_wait` parameters.
 
 * **synchronous_node_count**
   Patroni `synchronous_node_count` parameter value. Note, this option is only available for Spilo images with Patroni 2.0+. The default is set to `1`. Optional.
+
+* **failsafe_mode**
+  Patroni `failsafe_mode` parameter value. If enabled, allows Patroni to cope with DCS outages and avoid leader demotion. Note, this option is currently not included in any Patroni release. The default is set to `false`. Optional.
   
 ## Postgres container resources
 
@@ -555,7 +558,7 @@ Those parameters are grouped under the `tls` top-level key.
 ## Change data capture streams
 
 This sections enables change data capture (CDC) streams via Postgres' 
-[logical decoding](https://www.postgresql.org/docs/14/logicaldecoding.html)
+[logical decoding](https://www.postgresql.org/docs/15/logicaldecoding.html)
 feature and `pgoutput` plugin. While the Postgres operator takes responsibility
 for providing the setup to publish change events, it relies on external tools
 to consume them. At Zalando, we are using a workflow based on
@@ -587,7 +590,7 @@ can have the following properties:
   and `payloadColumn`). The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
   The application is responsible for putting events into a (JSON/B or VARCHAR)
   payload column of the outbox table in the structure of the specified target
-  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/14/logical-replication-publication.html)
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/15/logical-replication-publication.html)
   in Postgres for all tables specified for one `database` and `applicationId`.
   The CDC operator will consume from it shortly after transactions are
   committed to the outbox table. The `idColumn` will be used in telemetry for

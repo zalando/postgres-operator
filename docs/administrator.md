@@ -1102,9 +1102,10 @@ and `pod-env-overrides` resources applied to your cluster, ensure that the opera
 is set up like the following:
 ```yml
 ...
-aws_or_gcp:
+kubernetes:
   pod_environment_secret: "psql-backup-creds"
   pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
+aws_or_gcp:
   wal_az_storage_account: "postgresbackupsbucket28302F2"  # name of storage account to save the WAL-G logs
 ...
 ```
@@ -1113,7 +1114,7 @@ aws_or_gcp:
 
 If cluster members have to be (re)initialized restoring physical backups
 happens automatically either from the backup location or by running
-[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html)
+[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html)
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.

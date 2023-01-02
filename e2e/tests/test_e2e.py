@@ -250,6 +250,8 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(enable_postgres_team_crd)
 
+        # add team and member to custom-team-membership
+        # contains already elephant user
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresteams', 'custom-team-membership',
@@ -300,6 +302,13 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
             "Database role of replaced member in PostgresTeam not renamed", 10, 5)
 
+        # create fake deletion user so operator fails renaming
+        # but altering role to NOLOGIN will succeed
+        create_fake_deletion_user = """
+            CREATE USER tester_delete_me NOLOGIN;
+        """
+        self.query_database(leader.metadata.name, "postgres", create_fake_deletion_user)
+
         # re-add additional member and check if the role is renamed back
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
@@ -317,11 +326,44 @@ class EndToEndTestCase(unittest.TestCase):
         user_query = """
             SELECT rolname
               FROM pg_catalog.pg_roles
-             WHERE (rolname = 'kind' AND rolcanlogin)
-                OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
+             WHERE rolname = 'kind' AND rolcanlogin;
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 1,
+            "Database role of recreated member in PostgresTeam not renamed back to original name", 10, 5)
+
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname IN ('tester','tester_delete_me') AND NOT rolcanlogin;
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
-            "Database role of recreated member in PostgresTeam not renamed back to original name", 10, 5)
+            "Database role of replaced member in PostgresTeam not denied from login", 10, 5)
+
+        # re-add other additional member, operator should grant LOGIN back to tester
+        # but nothing happens to deleted role
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresteams', 'custom-team-membership',
+        {
+            'spec': {
+                'additionalMembers': {
+                    'e2e': [
+                        'kind',
+                        'tester'
+                    ]
+                },
+            }
+        })
+
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE (rolname IN ('tester', 'kind')
+               AND rolcanlogin)
+                OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 3,
+            "Database role of deleted member in PostgresTeam not removed when recreated manually", 10, 5)
 
         # revert config change
         revert_resync = {
@@ -365,7 +407,8 @@ class EndToEndTestCase(unittest.TestCase):
                     "ttl": 29,
                     "loop_wait": 9,
                     "retry_timeout": 9,
-                    "synchronous_mode": True
+                    "synchronous_mode": True,
+                    "failsafe_mode": True,
                  }
             }
         }
@@ -392,6 +435,8 @@ class EndToEndTestCase(unittest.TestCase):
                             "retry_timeout not updated")
                 self.assertEqual(desired_config["synchronous_mode"], effective_config["synchronous_mode"],
                             "synchronous_mode not updated")
+                self.assertEqual(desired_config["failsafe_mode"], effective_config["failsafe_mode"],
+                            "failsafe_mode not updated")
                 return True
 
             # check if Patroni config has been updated
@@ -1204,8 +1249,9 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # node affinity change should cause another rolling update and relocation of replica
-            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -1398,6 +1444,10 @@ class EndToEndTestCase(unittest.TestCase):
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 3,
             "Found incorrect number of rotation users", 10, 5)
+
+        # test that rotation_user can connect to the database
+        self.eventuallyEqual(lambda: len(self.query_database_with_user(leader.metadata.name, "postgres", "SELECT 1", "foo_user")), 1,
+            "Could not connect to the database with rotation user {}".format(rotation_user), 10, 5)
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped 
@@ -1945,6 +1995,29 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             q = exec_query.format(query, db_name)
+            q = "su postgres -c \"{}\"".format(q)
+            result = k8s.exec_with_kubectl(pod_name, q)
+            result_set = clean_list(result.stdout.split(b'\n'))
+        except Exception as ex:
+            print('Error on query execution: {}'.format(ex))
+            print('Stdout: {}'.format(result.stdout))
+            print('Stderr: {}'.format(result.stderr))
+
+        return result_set
+
+    def query_database_with_user(self, pod_name, db_name, query, user_name):
+        '''
+           Query database and return result as a list
+        '''
+        k8s = self.k8s
+        result_set = []
+        exec_query = r"PGPASSWORD={} psql -h localhost -U {} -tAq -c \"{}\" -d {}"
+
+        try:
+            user_secret = k8s.get_secret(user_name)
+            secret_user = str(base64.b64decode(user_secret.data["username"]), 'utf-8')
+            secret_pw = str(base64.b64decode(user_secret.data["password"]), 'utf-8')
+            q = exec_query.format(secret_pw, secret_user, query, db_name)
             q = "su postgres -c \"{}\"".format(q)
             result = k8s.exec_with_kubectl(pod_name, q)
             result_set = clean_list(result.stdout.split(b'\n'))

@@ -29,7 +29,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,7 +61,7 @@ type kubeResources struct {
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
-	PodDisruptionBudget *policybeta1.PodDisruptionBudget
+	PodDisruptionBudget *policyv1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
 }
@@ -91,7 +91,6 @@ type Cluster struct {
 	currentProcess      Process
 	processMu           sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu              sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-	streamApplications  []string
 	ConnectionPooler    map[PostgresRole]*ConnectionPoolerObjects
 	EBSVolumes          map[string]volumes.VolumeProperties
 	VolumeResizer       volumes.VolumeResizer
@@ -227,6 +226,10 @@ func (c *Cluster) initUsers() error {
 	}
 
 	if err := c.initHumanUsers(); err != nil {
+		// remember all cached users in c.pgUsers
+		for cachedUserName, cachedUser := range c.pgUsersCache {
+			c.pgUsers[cachedUserName] = cachedUser
+		}
 		return fmt.Errorf("could not init human users: %v", err)
 	}
 
@@ -389,6 +392,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's annotations do not match: "+reason)
 	}
+	if c.Statefulset.Spec.PodManagementPolicy != statefulSet.Spec.PodManagementPolicy {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's pod management policy do not match")
+	}
 
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
 	needsRollUpdate, reasons = c.compareContainers("containers", c.Statefulset.Spec.Template.Spec.Containers, statefulSet.Spec.Template.Spec.Containers, needsRollUpdate, reasons)
@@ -528,6 +536,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 	checks := []containerCheck{
 		newCheck("new statefulset %s's %s (index %d) name does not match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
+		newCheck("new statefulset %s's %s (index %d) readiness probe does not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.ReadinessProbe, b.ReadinessProbe) }),
 		newCheck("new statefulset %s's %s (index %d) ports do not match the current one",
 			func(a, b v1.Container) bool { return !comparePorts(a.Ports, b.Ports) }),
 		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
@@ -741,6 +751,7 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 // for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
+	userInitFailed := false
 	syncStatefulSet := false
 
 	c.mu.Lock()
@@ -778,32 +789,39 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// check if users need to be synced
-	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
-		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
-	sameRotatedUsers := reflect.DeepEqual(oldSpec.Spec.UsersWithSecretRotation, newSpec.Spec.UsersWithSecretRotation) &&
-		reflect.DeepEqual(oldSpec.Spec.UsersWithInPlaceSecretRotation, newSpec.Spec.UsersWithInPlaceSecretRotation)
+	// Users
+	func() {
+		// check if users need to be synced during update
+		sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
+			reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
+		sameRotatedUsers := reflect.DeepEqual(oldSpec.Spec.UsersWithSecretRotation, newSpec.Spec.UsersWithSecretRotation) &&
+			reflect.DeepEqual(oldSpec.Spec.UsersWithInPlaceSecretRotation, newSpec.Spec.UsersWithInPlaceSecretRotation)
 
-	// connection pooler needs one system user created, which is done in
-	// initUsers. Check if it needs to be called.
-	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
-		needReplicaConnectionPoolerWorker(&newSpec.Spec)
+		// connection pooler needs one system user created who is initialized in initUsers
+		// only when disabled in oldSpec and enabled in newSpec
+		needPoolerUser := c.needConnectionPoolerUser(&oldSpec.Spec, &newSpec.Spec)
 
-	if !sameUsers || !sameRotatedUsers || needConnectionPooler {
-		c.logger.Debugf("initialize users")
-		if err := c.initUsers(); err != nil {
-			c.logger.Errorf("could not init users: %v", err)
-			updateFailed = true
+		// streams new replication user created who is initialized in initUsers
+		// only when streams were not specified in oldSpec but in newSpec
+		needStreamUser := len(oldSpec.Spec.Streams) == 0 && len(newSpec.Spec.Streams) > 0
+
+		if !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser {
+			c.logger.Debugf("initialize users")
+			if err := c.initUsers(); err != nil {
+				c.logger.Errorf("could not init users - skipping sync of secrets and databases: %v", err)
+				userInitFailed = true
+				updateFailed = true
+				return
+			}
+
+			c.logger.Debugf("syncing secrets")
+			//TODO: mind the secrets of the deleted/new users
+			if err := c.syncSecrets(); err != nil {
+				c.logger.Errorf("could not sync secrets: %v", err)
+				updateFailed = true
+			}
 		}
-
-		c.logger.Debugf("syncing secrets")
-
-		//TODO: mind the secrets of the deleted/new users
-		if err := c.syncSecrets(); err != nil {
-			c.logger.Errorf("could not sync secrets: %v", err)
-			updateFailed = true
-		}
-	}
+	}()
 
 	// Volume
 	if c.OpConfig.StorageResizeMode != "off" {
@@ -885,7 +903,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}()
 
 	// Roles and Databases
-	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
+	if !userInitFailed && !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		c.logger.Debugf("syncing roles")
 		if err := c.syncRoles(); err != nil {
 			c.logger.Errorf("could not sync roles: %v", err)
@@ -913,13 +931,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// need to process. In the future we may want to do this more careful and
 	// check which databases we need to process, but even repeating the whole
 	// installation process should be good enough.
-
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
 		updateFailed = true
 	}
 
-	if len(c.Spec.Streams) > 0 {
+	if len(newSpec.Spec.Streams) > 0 {
 		if err := c.syncStreams(); err != nil {
 			c.logger.Errorf("could not sync streams: %v", err)
 			updateFailed = true
@@ -1087,28 +1104,10 @@ func (c *Cluster) initSystemUsers() {
 		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 
-	// Connection pooler user is an exception, if requested it's going to be
-	// created by operator as a normal pgUser
+	// Connection pooler user is an exception
+	// if requested it's going to be created by operator
 	if needConnectionPooler(&c.Spec) {
-		connectionPoolerSpec := c.Spec.ConnectionPooler
-		if connectionPoolerSpec == nil {
-			connectionPoolerSpec = &acidv1.ConnectionPooler{}
-		}
-
-		// Using superuser as pooler user is not a good idea. First of all it's
-		// not going to be synced correctly with the current implementation,
-		// and second it's a bad practice.
-		username := c.OpConfig.ConnectionPooler.User
-
-		isSuperUser := connectionPoolerSpec.User == c.OpConfig.SuperUsername
-		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
-			connectionPoolerSpec.User, "connection pool role")
-
-		if !isSuperUser && !isProtectedUser {
-			username = util.Coalesce(
-				connectionPoolerSpec.User,
-				c.OpConfig.ConnectionPooler.User)
-		}
+		username := c.poolerUser(&c.Spec)
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{

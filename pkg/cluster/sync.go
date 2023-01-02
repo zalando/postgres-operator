@@ -15,13 +15,13 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var requireMasterRestartWhenDecreased = []string{
+var requirePrimaryRestartWhenDecreased = []string{
 	"max_connections",
 	"max_prepared_transactions",
 	"max_locks_per_transaction",
@@ -104,18 +104,15 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		c.logger.Debug("syncing roles")
 		if err = c.syncRoles(); err != nil {
-			err = fmt.Errorf("could not sync roles: %v", err)
-			return err
+			c.logger.Errorf("could not sync roles: %v", err)
 		}
 		c.logger.Debug("syncing databases")
 		if err = c.syncDatabases(); err != nil {
-			err = fmt.Errorf("could not sync databases: %v", err)
-			return err
+			c.logger.Errorf("could not sync databases: %v", err)
 		}
 		c.logger.Debug("syncing prepared databases with schemas")
 		if err = c.syncPreparedDatabases(); err != nil {
-			err = fmt.Errorf("could not sync prepared database: %v", err)
-			return err
+			c.logger.Errorf("could not sync prepared database: %v", err)
 		}
 	}
 
@@ -236,7 +233,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 
 func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	var (
-		pdb *policybeta1.PodDisruptionBudget
+		pdb *policyv1.PodDisruptionBudget
 		err error
 	)
 	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
@@ -278,8 +275,9 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 
 func (c *Cluster) syncStatefulSet() error {
 	var (
-		restartWait        uint32
-		restartMasterFirst bool
+		restartWait         uint32
+		configPatched       bool
+		restartPrimaryFirst bool
 	)
 	podsToRecreate := make([]v1.Pod, 0)
 	isSafeToRecreatePods := true
@@ -420,22 +418,24 @@ func (c *Cluster) syncStatefulSet() error {
 		// do not attempt a restart
 		if !reflect.DeepEqual(patroniConfig, acidv1.Patroni{}) || len(pgParameters) > 0 {
 			// compare config returned from Patroni with what is specified in the manifest
-			restartMasterFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, c.Spec.Patroni, pgParameters, c.Spec.Parameters)
+			configPatched, restartPrimaryFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, c.Spec.Patroni, pgParameters, c.Spec.Parameters)
 			if err != nil {
 				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", pods[i].Name, err)
 				continue
 			}
 
 			// it could take up to LoopWait to apply the config
-			time.Sleep(time.Duration(restartWait)*time.Second + time.Second*2)
-			break
+			if configPatched {
+				time.Sleep(time.Duration(restartWait)*time.Second + time.Second*2)
+				break
+			}
 		}
 	}
 
-	// restart instances if required
+	// restart instances if it is still pending
 	remainingPods := make([]*v1.Pod, 0)
 	skipRole := Master
-	if restartMasterFirst {
+	if restartPrimaryFirst {
 		skipRole = Replica
 	}
 	for i, pod := range pods {
@@ -474,6 +474,7 @@ func (c *Cluster) syncStatefulSet() error {
 			c.logger.Warningf("postpone pod recreation until next sync")
 		}
 	}
+
 	return nil
 }
 
@@ -533,10 +534,11 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) have changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectivePatroniConfig, desiredPatroniConfig acidv1.Patroni, effectivePgParameters, desiredPgParameters map[string]string) (bool, error) {
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectivePatroniConfig, desiredPatroniConfig acidv1.Patroni, effectivePgParameters, desiredPgParameters map[string]string) (bool, bool, error) {
 	configToSet := make(map[string]interface{})
 	parametersToSet := make(map[string]string)
-	restartMaster := make([]bool, 0)
+	restartPrimary := make([]bool, 0)
+	configPatched := false
 	requiresMasterRestart := false
 
 	// compare effective and desired Patroni config options
@@ -562,6 +564,21 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 		configToSet["ttl"] = desiredPatroniConfig.TTL
 	}
 
+	var desiredFailsafe *bool
+	if desiredPatroniConfig.FailsafeMode != nil {
+		desiredFailsafe = desiredPatroniConfig.FailsafeMode
+	} else if c.OpConfig.EnablePatroniFailsafeMode != nil {
+		desiredFailsafe = c.OpConfig.EnablePatroniFailsafeMode
+	}
+
+	effectiveFailsafe := effectivePatroniConfig.FailsafeMode
+
+	if desiredFailsafe != nil {
+		if effectiveFailsafe == nil || *desiredFailsafe != *effectiveFailsafe {
+			configToSet["failsafe_mode"] = *desiredFailsafe
+		}
+	}
+
 	// check if specified slots exist in config and if they differ
 	slotsToSet := make(map[string]map[string]string)
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
@@ -581,22 +598,23 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 		effectiveValue := effectivePgParameters[desiredOption]
 		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
 			parametersToSet[desiredOption] = desiredValue
-			if util.SliceContains(requireMasterRestartWhenDecreased, desiredOption) {
+			if util.SliceContains(requirePrimaryRestartWhenDecreased, desiredOption) {
 				effectiveValueNum, errConv := strconv.Atoi(effectiveValue)
 				desiredValueNum, errConv2 := strconv.Atoi(desiredValue)
 				if errConv != nil || errConv2 != nil {
 					continue
 				}
 				if effectiveValueNum > desiredValueNum {
-					restartMaster = append(restartMaster, true)
+					restartPrimary = append(restartPrimary, true)
 					continue
 				}
 			}
-			restartMaster = append(restartMaster, false)
+			restartPrimary = append(restartPrimary, false)
 		}
 	}
 
-	if !util.SliceContains(restartMaster, false) && len(configToSet) == 0 {
+	// check if there exist only config updates that require a restart of the primary
+	if !util.SliceContains(restartPrimary, false) && len(configToSet) == 0 {
 		requiresMasterRestart = true
 	}
 
@@ -605,7 +623,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 
 	if len(configToSet) == 0 {
-		return false, nil
+		return configPatched, requiresMasterRestart, nil
 	}
 
 	configToSetJson, err := json.Marshal(configToSet)
@@ -619,10 +637,11 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
 		podName, configToSetJson)
 	if err = c.patroni.SetConfig(pod, configToSet); err != nil {
-		return requiresMasterRestart, fmt.Errorf("could not patch postgres parameters within pod %s: %v", podName, err)
+		return configPatched, requiresMasterRestart, fmt.Errorf("could not patch postgres parameters within pod %s: %v", podName, err)
 	}
+	configPatched = true
 
-	return requiresMasterRestart, nil
+	return configPatched, requiresMasterRestart, nil
 }
 
 func (c *Cluster) syncSecrets() error {
@@ -630,7 +649,6 @@ func (c *Cluster) syncSecrets() error {
 	c.logger.Info("syncing secrets")
 	c.setProcessName("syncing secrets")
 	generatedSecrets := c.generateUserSecrets()
-	rotationUsers := make(spec.PgUserMap)
 	retentionUsers := make([]string, 0)
 	currentTime := time.Now()
 
@@ -642,26 +660,11 @@ func (c *Cluster) syncSecrets() error {
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
-			if err = c.updateSecret(secretUsername, generatedSecret, &rotationUsers, &retentionUsers, currentTime); err != nil {
+			if err = c.updateSecret(secretUsername, generatedSecret, &retentionUsers, currentTime); err != nil {
 				c.logger.Warningf("syncing secret %s failed: %v", util.NameFromMeta(secret.ObjectMeta), err)
 			}
 		} else {
 			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err)
-		}
-	}
-
-	// add new user with date suffix and use it in the secret of the original user
-	if len(rotationUsers) > 0 {
-		err := c.initDbConn()
-		if err != nil {
-			return fmt.Errorf("could not init db connection: %v", err)
-		}
-		pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(spec.PgUserMap{}, rotationUsers)
-		if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
-			return fmt.Errorf("error creating database roles for password rotation: %v", err)
-		}
-		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection after creating users for password rotation: %v", err)
 		}
 	}
 
@@ -690,7 +693,6 @@ func (c *Cluster) getNextRotationDate(currentDate time.Time) (time.Time, string)
 func (c *Cluster) updateSecret(
 	secretUsername string,
 	generatedSecret *v1.Secret,
-	rotationUsers *spec.PgUserMap,
 	retentionUsers *[]string,
 	currentTime time.Time) error {
 	var (
@@ -749,7 +751,7 @@ func (c *Cluster) updateSecret(
 	rotationAllowed := !pwdUser.IsDbOwner && util.SliceContains(allowedRoleTypes, pwdUser.Origin)
 
 	if (c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest {
-		updateSecretMsg, err = c.rotatePasswordInSecret(secret, pwdUser, secretUsername, currentTime, rotationUsers, retentionUsers)
+		updateSecretMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
 		if err != nil {
 			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
 		}
@@ -774,8 +776,13 @@ func (c *Cluster) updateSecret(
 		updateSecret = true
 		updateSecretMsg = fmt.Sprintf("updating the secret %s from the infrastructure roles", secretName)
 	} else {
-		// for non-infrastructure role - update the role with the password from the secret
+		// for non-infrastructure role - update the role with username and password from secret
+		pwdUser.Name = string(secret.Data["username"])
 		pwdUser.Password = string(secret.Data["password"])
+		// update membership if we deal with a rotation user
+		if secretUsername != pwdUser.Name {
+			pwdUser.MemberOf = []string{secretUsername}
+		}
 		userMap[userKey] = pwdUser
 	}
 
@@ -792,10 +799,9 @@ func (c *Cluster) updateSecret(
 
 func (c *Cluster) rotatePasswordInSecret(
 	secret *v1.Secret,
-	secretPgUser spec.PgUser,
 	secretUsername string,
+	roleOrigin spec.RoleOrigin,
 	currentTime time.Time,
-	rotationUsers *spec.PgUserMap,
 	retentionUsers *[]string) (string, error) {
 	var (
 		err                 error
@@ -825,18 +831,14 @@ func (c *Cluster) rotatePasswordInSecret(
 	if currentTime.After(nextRotationDate) {
 		// create rotation user if role is not listed for in-place password update
 		if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
-			rotationUser := secretPgUser
-			newRotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format("060102"))
-			rotationUser.Name = newRotationUsername
-			rotationUser.MemberOf = []string{secretUsername}
-			(*rotationUsers)[newRotationUsername] = rotationUser
-			secret.Data["username"] = []byte(newRotationUsername)
-
+			rotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format("060102"))
+			secret.Data["username"] = []byte(rotationUsername)
+			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, rotationUsername)
 			// whenever there is a rotation, check if old rotation users can be deleted
 			*retentionUsers = append(*retentionUsers, secretUsername)
 		} else {
 			// when passwords of system users are rotated in place, pods have to be replaced
-			if secretPgUser.Origin == spec.RoleOriginSystem {
+			if roleOrigin == spec.RoleOriginSystem {
 				pods, err := c.listPods()
 				if err != nil {
 					return "", fmt.Errorf("could not list pods of the statefulset: %v", err)
@@ -850,7 +852,7 @@ func (c *Cluster) rotatePasswordInSecret(
 			}
 
 			// when password of connection pooler is rotated in place, pooler pods have to be replaced
-			if secretPgUser.Origin == spec.RoleOriginConnectionPooler {
+			if roleOrigin == spec.RoleOriginConnectionPooler {
 				listOptions := metav1.ListOptions{
 					LabelSelector: c.poolerLabelsSet(true).String(),
 				}
@@ -867,8 +869,8 @@ func (c *Cluster) rotatePasswordInSecret(
 			}
 
 			// when password of stream user is rotated in place, it should trigger rolling update in FES deployment
-			if secretPgUser.Origin == spec.RoleOriginStream {
-				c.logger.Warnf("secret of stream user %s changed", constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix)
+			if roleOrigin == spec.RoleOriginStream {
+				c.logger.Warnf("password in secret of stream user %s changed", constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix)
 			}
 		}
 		secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
@@ -926,10 +928,7 @@ func (c *Cluster) syncRoles() (err error) {
 		}
 	}
 
-	// copy map for ProduceSyncRequests to include also system users
-	for userName, pgUser := range c.pgUsers {
-		newUsers[userName] = pgUser
-	}
+	// search also for system users
 	for _, systemUser := range c.systemUsers {
 		userNames = append(userNames, systemUser.Name)
 		newUsers[systemUser.Name] = systemUser
@@ -943,11 +942,19 @@ func (c *Cluster) syncRoles() (err error) {
 	// update pgUsers where a deleted role was found
 	// so that they are skipped in ProduceSyncRequests
 	for _, dbUser := range dbUsers {
-		if originalUser, exists := deletedUsers[dbUser.Name]; exists {
-			recreatedUser := c.pgUsers[originalUser]
+		originalUsername, foundDeletedUser := deletedUsers[dbUser.Name]
+		// check if original user does not exist in dbUsers
+		_, originalUserAlreadyExists := dbUsers[originalUsername]
+		if foundDeletedUser && !originalUserAlreadyExists {
+			recreatedUser := c.pgUsers[originalUsername]
 			recreatedUser.Deleted = true
-			c.pgUsers[originalUser] = recreatedUser
+			c.pgUsers[originalUsername] = recreatedUser
 		}
+	}
+
+	// last but not least copy pgUsers to newUsers to send to ProduceSyncRequests
+	for _, pgUser := range c.pgUsers {
+		newUsers[pgUser.Name] = pgUser
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, newUsers)
@@ -1138,8 +1145,8 @@ func (c *Cluster) syncExtensions(extensions map[string]string) error {
 
 func (c *Cluster) syncLogicalBackupJob() error {
 	var (
-		job        *batchv1beta1.CronJob
-		desiredJob *batchv1beta1.CronJob
+		job        *batchv1.CronJob
+		desiredJob *batchv1.CronJob
 		err        error
 	)
 	c.setProcessName("syncing the logical backup job")

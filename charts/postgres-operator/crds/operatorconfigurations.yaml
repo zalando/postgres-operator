@@ -68,7 +68,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "registry.opensource.zalan.do/acid/spilo-14:2.1-p6"
+                default: "registry.opensource.zalan.do/acid/spilo-14:2.1-p7"
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -167,7 +167,7 @@ spec:
                       type: string
                   minimal_major_version:
                     type: string
-                    default: "9.6"
+                    default: "11"
                   target_major_version:
                     type: string
                     default: "14"
@@ -214,6 +214,9 @@ spec:
                   enable_pod_disruption_budget:
                     type: boolean
                     default: true
+                  enable_readiness_probe:
+                    type: boolean
+                    default: false
                   enable_sidecars:
                     type: boolean
                     default: true
@@ -633,6 +636,12 @@ spec:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                     default: "100Mi"
+              patroni:
+                type: object
+                properties:
+                  failsafe_mode:
+                    type: boolean
+                    default: false
           status:
             type: object
             additionalProperties:

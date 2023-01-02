@@ -503,6 +503,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"patroni": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"failsafe_mode": {
+								Type: "boolean",
+							},
 							"initdb": {
 								Type: "object",
 								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
@@ -578,12 +581,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 								Enum: []apiextv1.JSON{
 									{
-										Raw: []byte(`"9.5"`),
-									},
-									{
-										Raw: []byte(`"9.6"`),
-									},
-									{
 										Raw: []byte(`"10"`),
 									},
 									{
@@ -597,6 +594,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									{
 										Raw: []byte(`"14"`),
+									},
+									{
+										Raw: []byte(`"15"`),
 									},
 								},
 							},
@@ -1275,6 +1275,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_pod_disruption_budget": {
 								Type: "boolean",
 							},
+							"enable_readiness_probe": {
+								Type: "boolean",
+							},
 							"enable_sidecars": {
 								Type: "boolean",
 							},
@@ -1285,6 +1288,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "string",
 									},
 								},
+							},
+							"share_pg_socket_with_sidecars": {
+								Type: "boolean",
 							},
 							"infrastructure_roles_secret_name": {
 								Type: "string",
@@ -1455,6 +1461,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"watched_namespace": {
 								Type: "string",
+							},
+						},
+					},
+					"patroni": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"failsafe_mode": {
+								Type: "boolean",
 							},
 						},
 					},

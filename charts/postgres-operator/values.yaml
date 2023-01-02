@@ -38,7 +38,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p7
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
@@ -89,7 +89,7 @@ configMajorVersionUpgrade:
   # - acid
 
   # minimal Postgres major version that will not automatically be upgraded
-  minimal_major_version: "9.6"
+  minimal_major_version: "11"
   # target Postgres major version when upgrading clusters automatically
   target_major_version: "14"
 
@@ -129,6 +129,8 @@ configKubernetes:
   enable_pod_antiaffinity: false
   # toggles PDB to set to MinAvailabe 0 or 1
   enable_pod_disruption_budget: true
+  # toogles readiness probe for database pods
+  enable_readiness_probe: false
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
 
@@ -299,7 +301,7 @@ configAwsOrGcp:
   # Path to mount the above Secret in the filesystem of the container(s)
   # additional_secret_mount_path: "/some/dir"
 
-  # AWS region used to store ESB volumes
+  # AWS region used to store EBS volumes
   aws_region: eu-central-1
 
   # enable automatic migration on AWS from gp2 to gp3 volumes
@@ -408,6 +410,10 @@ configConnectionPooler:
   connection_pooler_default_memory_request: 100Mi
   connection_pooler_default_cpu_limit: "1"
   connection_pooler_default_memory_limit: 100Mi
+
+configPatroni:
+  # enable Patroni DCS failsafe_mode feature
+  failsafe_mode: false
 
 # Zalando's internal CDC stream feature
 enableStreams: false

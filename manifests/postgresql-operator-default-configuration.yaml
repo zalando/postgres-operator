@@ -3,7 +3,7 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p7
   # enable_crd_registration: true
   # crd_categories:
   # - all
@@ -39,7 +39,7 @@ configuration:
     major_version_upgrade_mode: "off"
     # major_version_upgrade_team_allow_list:
     # - acid
-    minimal_major_version: "9.6"
+    minimal_major_version: "11"
     target_major_version: "14"
   kubernetes:
     # additional_pod_capabilities:
@@ -60,6 +60,7 @@ configuration:
     enable_init_containers: true
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
+    enable_readiness_probe: false
     enable_sidecars: true
     # ignored_annotations:
     # - k8s.v1.cni.cncf.io/network-status
@@ -197,3 +198,5 @@ configuration:
     connection_pooler_number_of_instances: 2
     # connection_pooler_schema: "pooler"
     # connection_pooler_user: "pooler"
+  # patroni:
+    # failsafe_mode: "false"

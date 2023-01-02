@@ -21,7 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,21 +69,23 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 		subtest  string
 		pgParam  *acidv1.PostgresqlParam
 		patroni  *acidv1.Patroni
-		role     string
-		opConfig config.Config
+		opConfig *config.Config
 		result   string
 	}{
 		{
-			subtest:  "Patroni default configuration",
-			pgParam:  &acidv1.PostgresqlParam{PgVersion: "9.6"},
-			patroni:  &acidv1.Patroni{},
-			role:     "zalandos",
-			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/9.6/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+			subtest: "Patroni default configuration",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			patroni: &acidv1.Patroni{},
+			opConfig: &config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "11"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
 			patroni: &acidv1.Patroni{
 				InitDB: map[string]string{
 					"encoding":       "UTF8",
@@ -99,21 +101,65 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				SynchronousModeStrict: true,
 				SynchronousNodeCount:  1,
 				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
+				FailsafeMode:          util.True(),
 			},
-			role:     "zalandos",
-			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
+			opConfig: &config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
+		},
+		{
+			subtest: "Patroni failsafe_mode configured globally",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			patroni: &acidv1.Patroni{},
+			opConfig: &config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+				EnablePatroniFailsafeMode: util.True(),
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
+		},
+		{
+			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			patroni: &acidv1.Patroni{
+				FailsafeMode: util.False(),
+			},
+			opConfig: &config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+				EnablePatroniFailsafeMode: util.True(),
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":false}}}`,
+		},
+		{
+			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			patroni: &acidv1.Patroni{
+				FailsafeMode: util.True(),
+			},
+			opConfig: &config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+				EnablePatroniFailsafeMode: util.False(),
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
 		},
 	}
 	for _, tt := range tests {
-		cluster.OpConfig = tt.opConfig
-		result, err := generateSpiloJSONConfiguration(tt.pgParam, tt.patroni, tt.role, false, logger)
+		cluster.OpConfig = *tt.opConfig
+		result, err := generateSpiloJSONConfiguration(tt.pgParam, tt.patroni, tt.opConfig, logger)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if tt.result != result {
 			t.Errorf("%s %s: Spilo Config is %v, expected %v for role %#v and param %#v",
-				testName, tt.subtest, result, tt.result, tt.role, tt.pgParam)
+				testName, tt.subtest, result, tt.result, tt.opConfig.Auth.PamRoleName, tt.pgParam)
 		}
 	}
 }
@@ -134,15 +180,15 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		},
 		{
 			subTest:  "test current bin path against hard coded template",
-			binPath:  "/usr/lib/postgresql/12/bin",
+			binPath:  "/usr/lib/postgresql/15/bin",
 			template: pgBinariesLocationTemplate,
-			expected: "12",
+			expected: "15",
 		},
 		{
 			subTest:  "test alternative bin path against a matching template",
-			binPath:  "/usr/pgsql-12/bin",
+			binPath:  "/usr/pgsql-15/bin",
 			template: "/usr/pgsql-%v/bin",
-			expected: "12",
+			expected: "15",
 		},
 	}
 
@@ -836,9 +882,13 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 	for _, tt := range tests {
 		c := newMockCluster(tt.opConfig)
-		c.Postgresql = tt.pgsql
-		actualEnvs := c.generateSpiloPodEnvVars(
-			types.UID(dummyUUID), exampleSpiloConfig, tt.cloneDescription, tt.standbyDescription)
+		pgsql := tt.pgsql
+		pgsql.Spec.Clone = tt.cloneDescription
+		pgsql.Spec.StandbyCluster = tt.standbyDescription
+		c.Postgresql = pgsql
+
+		actualEnvs, err := c.generateSpiloPodEnvVars(&pgsql.Spec, types.UID(dummyUUID), exampleSpiloConfig)
+		assert.NoError(t, err)
 
 		for _, ev := range tt.expectedValues {
 			env := actualEnvs[ev.envIndex]
@@ -1888,7 +1938,7 @@ func TestSidecars(t *testing.T) {
 
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
-			PgVersion: "12.1",
+			PgVersion: "15",
 			Parameters: map[string]string{
 				"max_connections": "100",
 			},
@@ -2068,7 +2118,7 @@ func TestSidecars(t *testing.T) {
 func TestGeneratePodDisruptionBudget(t *testing.T) {
 	tests := []struct {
 		c   *Cluster
-		out policyv1beta1.PodDisruptionBudget
+		out policyv1.PodDisruptionBudget
 	}{
 		// With multiple instances.
 		{
@@ -2080,13 +2130,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
@@ -2104,13 +2154,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
@@ -2128,13 +2178,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
@@ -2152,13 +2202,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-databass-budget",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},

@@ -6,18 +6,18 @@ edit
         ol.breadcrumb
 
           li.breadcrumb-item
-            a(href='/#/list')
+            a(href='./#/list')
               | PostgreSQL clusters
 
           li.breadcrumb-item(if='{ cluster_path }')
-            a(href='/#/status/{ cluster_path }')
+            a(href='./#/status/{ cluster_path }')
               | { qname }
 
           li.breadcrumb-item.active(
             aria-current='page'
             if='{ cluster_path }'
           )
-            a(href='/#/edit/{ cluster_path }')
+            a(href='./#/edit/{ cluster_path }')
               | Edit
 
     .row(if='{ cluster_path }')
@@ -92,7 +92,7 @@ edit
 
       jQuery.ajax({
         type: 'POST',
-        url: '/postgresqls/' + this.cluster_path,
+        url: './postgresqls/' + this.cluster_path,
         contentType:"application/json",
         data: jsonPayload,
         processData: false,
@@ -113,7 +113,7 @@ edit
 
     this.pollProgress = () => {
       jQuery.get(
-        '/postgresqls/' + this.cluster_path,
+        './postgresqls/' + this.cluster_path,
       ).then(data => {
 
         // Input data:
@@ -139,11 +139,17 @@ edit
         o.spec.enableMasterLoadBalancer = i.spec.enableMasterLoadBalancer || false
         o.spec.enableReplicaLoadBalancer = i.spec.enableReplicaLoadBalancer || false
         o.spec.enableConnectionPooler = i.spec.enableConnectionPooler || false
+        o.spec.enableReplicaConnectionPooler = i.spec.enableReplicaConnectionPooler || false
+        o.spec.enableMasterPoolerLoadBalancer = i.spec.enableMasterPoolerLoadBalancer || false
+        o.spec.enableReplicaPoolerLoadBalancer = i.spec.enableReplicaPoolerLoadBalancer || false
 
         o.spec.volume = {
           size: i.spec.volume.size,
           throughput: i.spec.volume.throughput || 125,
           iops: i.spec.volume.iops || 3000
+        }
+        if ('storageClass' in i.spec.volume) {
+            o.spec.volume.storageClass=i.spec.volume.storageClass
         }
 
         o.spec.postgresql = {}
