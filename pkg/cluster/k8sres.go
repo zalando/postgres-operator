@@ -713,7 +713,7 @@ func (c *Cluster) generatePodTemplate(
 	spiloContainer *v1.Container,
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
-	sharePGSocketWithSidecars *bool,
+	sharePgSocketWithSidecars *bool,
 	tolerationsSpec *[]v1.Toleration,
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
@@ -776,7 +776,7 @@ func (c *Cluster) generatePodTemplate(
 		podSpec.PriorityClassName = priorityClassName
 	}
 
-	if sharePGSocketWithSidecars != nil && *sharePGSocketWithSidecars {
+	if sharePgSocketWithSidecars != nil && *sharePgSocketWithSidecars {
 		addVarRunVolume(&podSpec)
 	}
 
@@ -1362,7 +1362,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		spiloContainer,
 		initContainers,
 		sidecarContainers,
-		c.OpConfig.SharePGSocketWithSidecars,
+		c.OpConfig.SharePgSocketWithSidecars,
 		&tolerationSpec,
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
@@ -1569,8 +1569,8 @@ func addVarRunVolume(podSpec *v1.PodSpec) {
 	for i := range podSpec.Containers {
 		mounts := append(podSpec.Containers[i].VolumeMounts,
 			v1.VolumeMount{
-				Name:      "postgresql-run",
-				MountPath: "/var/run/postgresql",
+				Name:      constants.RunVolumeName,
+				MountPath: constants.RunVolumePath,
 			})
 		podSpec.Containers[i].VolumeMounts = mounts
 	}

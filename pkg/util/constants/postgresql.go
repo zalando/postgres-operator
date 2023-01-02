@@ -15,4 +15,7 @@ const (
 
 	ShmVolumeName = "dshm"
 	ShmVolumePath = "/dev/shm"
+
+	RunVolumeName = "postgresql-run"
+	RunVolumePath = "/var/run/postgresql"
 )

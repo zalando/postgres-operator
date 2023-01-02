@@ -1008,11 +1008,39 @@ If you want to add a sidecar to every cluster managed by the operator, you can s
 
 ### Accessing the PostgreSQL socket from sidecars
 
-If enabled by the `share_pg_socket_with_sidecars` option in the operator
-configuration the PostgreSQL socket is placed in a volume of type
-`emptyDir` named `postgresql-run`.
-To allow access to the socket from any sidecar container simply add a
-VolumeMount to this volume to your sidecar spec.
+If enabled by the `share_pgsocket_with_sidecars` option in the operator
+configuration the PostgreSQL socket is placed in a volume of type `emptyDir`
+named `postgresql-run`. To allow access to the socket from any sidecar
+container simply add a VolumeMount to this volume to your sidecar spec.
+
+```yaml
+  - name: "container-name"
+    image: "company/image:tag"
+    volumeMounts:
+    - mountPath: /var/run
+      name: postgresql-run
+```
+
+If you do not want to globally enable this feature and only use it for single
+Postgres clusters, specify an `EmptyDir` volume under `additionalVolumes` in
+the manifest:
+
+```yaml
+spec:
+  additionalVolumes:
+  - name: postgresql-run
+    mountPath: /var/run/postgresql
+    targetContainers:
+    - all
+    volumeSource:
+      emptyDir: {}
+  sidecars: 
+  - name: "container-name"
+    image: "company/image:tag"
+    volumeMounts:
+    - mountPath: /var/run
+      name: postgresql-run
+```
 
 ## InitContainers Support
 
