@@ -563,32 +563,19 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
             self.eventuallyTrue(compare_config, "Postgres config not applied")
 
-            deleted_slot_query = """
-                SELECT slot_name
+            get_slot_query = """
+                SELECT %s
                   FROM pg_replication_slots
                  WHERE slot_name = '%s';
-            """ % (slot_to_remove)
-
-            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", deleted_slot_query)), 0,
+                """
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_slot_query%("slot_name", slot_to_remove))), 0,
                 "The replication slot cannot be deleted", 10, 5)
 
-            changed_slot_query = """
-                SELECT database
-                  FROM pg_replication_slots
-                 WHERE slot_name = '%s';
-            """ % (slot_to_change)
-
-            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", changed_slot_query)[0], "bar",
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", get_slot_query%("database", slot_to_change))[0], "bar",
                 "The replication slot cannot be updated", 10, 5)
             
             # make sure slot from Patroni didn't get deleted
-            patroni_slot_query = """
-                SELECT slot_name
-                  FROM pg_replication_slots
-                 WHERE slot_name = '%s';
-            """ % (patroni_slot)
-
-            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", patroni_slot_query)), 1,
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_slot_query%("slot_name", patroni_slot))), 1,
                 "The replication slot from Patroni gets deleted", 10, 5)
 
         except timeout_decorator.TimeoutError:
