@@ -202,8 +202,8 @@ type Config struct {
 	CustomServiceAnnotations                 map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                     map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                    bool              `name:"enable_pod_antiaffinity" default:"false"`
-	PodAntiAffinityTopologyKey               string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	PodAntiAffinityPreferredDuringScheduling bool              `name:"pod_antiaffinity_preferred_during_scheduling" default:"false"`
+	PodAntiAffinityTopologyKey               string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	StorageResizeMode                        string            `name:"storage_resize_mode" default:"pvc"`
 	EnableLoadBalancer                       *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
 	ExternalTrafficPolicy                    string            `name:"external_traffic_policy" default:"Cluster"`
