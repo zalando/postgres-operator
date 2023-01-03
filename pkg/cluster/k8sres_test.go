@@ -1351,93 +1351,94 @@ func TestNodeAffinity(t *testing.T) {
 	assert.Equal(t, s.Spec.Template.Spec.Affinity.NodeAffinity, nodeAff, "cluster template has correct node affinity")
 }
 
-func TestPodAntiAffinityrRequiredDuringScheduling(t *testing.T) {
-	var err error
-	var spiloRunAsUser = int64(101)
-	var spiloRunAsGroup = int64(103)
-	var spiloFSGroup = int64(103)
+func TestPodAffinity(t *testing.T) {
+	clusterName := "acid-test-cluster"
+	namespace := "default"
 
-	spec := acidv1.PostgresSpec{
-		TeamID: "myapp", NumberOfInstances: 1,
-		Resources: &acidv1.Resources{
-			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+	tests := []struct {
+		subTest   string
+		preferred bool
+		anti      bool
+	}{
+		{
+			subTest:   "generate affinity RequiredDuringSchedulingIgnoredDuringExecution",
+			preferred: false,
+			anti:      false,
 		},
-		Volume: acidv1.Volume{
-			Size: "1G",
+		{
+			subTest:   "generate affinity PreferredDuringSchedulingIgnoredDuringExecution",
+			preferred: true,
+			anti:      false,
+		},
+		{
+			subTest:   "generate anitAffinity RequiredDuringSchedulingIgnoredDuringExecution",
+			preferred: false,
+			anti:      true,
+		},
+		{
+			subTest:   "generate anitAffinity PreferredDuringSchedulingIgnoredDuringExecution",
+			preferred: true,
+			anti:      true,
 		},
 	}
 
-	cluster := New(
-		Config{
-			OpConfig: config.Config{
-				PodManagementPolicy: "ordered_ready",
-				ProtectedRoles:      []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
-				},
-				Resources: config.Resources{
-					SpiloRunAsUser:  &spiloRunAsUser,
-					SpiloRunAsGroup: &spiloRunAsGroup,
-					SpiloFSGroup:    &spiloFSGroup,
-				},
-				EnablePodAntiAffinity: true,
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			NumberOfInstances: 1,
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-
-	s, err := cluster.generateStatefulSet(&spec)
-	if err != nil {
-		assert.NoError(t, err)
-	}
-
-	assert.Nil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should not use preferredDuringScheduling")
-	assert.NotNil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should use requiredDuringScheduling")
-}
-
-func TestPodAntiAffinityPreferredDuringScheduling(t *testing.T) {
-	var err error
-	var spiloRunAsUser = int64(101)
-	var spiloRunAsGroup = int64(103)
-	var spiloFSGroup = int64(103)
-
-	spec := acidv1.PostgresSpec{
-		TeamID: "myapp", NumberOfInstances: 1,
-		Resources: &acidv1.Resources{
-			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-		},
-		Volume: acidv1.Volume{
-			Size: "1G",
-		},
-	}
-
-	cluster := New(
-		Config{
-			OpConfig: config.Config{
-				PodManagementPolicy: "ordered_ready",
-				ProtectedRoles:      []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
-				},
-				Resources: config.Resources{
-					SpiloRunAsUser:  &spiloRunAsUser,
-					SpiloRunAsGroup: &spiloRunAsGroup,
-					SpiloFSGroup:    &spiloFSGroup,
-				},
-				EnablePodAntiAffinity:                    true,
-				PodAntiAffinityPreferredDuringScheduling: true,
+			Volume: acidv1.Volume{
+				Size: "1G",
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-
-	s, err := cluster.generateStatefulSet(&spec)
-	if err != nil {
-		assert.NoError(t, err)
+		},
 	}
 
-	assert.NotNil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should use preferredDuringScheduling")
-	assert.Nil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should not use requiredDuringScheduling")
+	for _, tt := range tests {
+		cluster := New(
+			Config{
+				OpConfig: config.Config{
+					EnablePodAntiAffinity:                    tt.anti,
+					PodManagementPolicy:                      "ordered_ready",
+					ProtectedRoles:                           []string{"admin"},
+					PodAntiAffinityPreferredDuringScheduling: tt.preferred,
+					Resources: config.Resources{
+						ClusterLabels:        map[string]string{"application": "spilo"},
+						ClusterNameLabel:     "cluster-name",
+						DefaultCPURequest:    "300m",
+						DefaultCPULimit:      "300m",
+						DefaultMemoryRequest: "300Mi",
+						DefaultMemoryLimit:   "300Mi",
+						PodRoleLabel:         "spilo-role",
+					},
+				},
+			}, k8sutil.KubernetesClient{}, pg, logger, eventRecorder)
+
+		cluster.Name = clusterName
+		cluster.Namespace = namespace
+
+		s, err := cluster.generateStatefulSet(&pg.Spec)
+		if err != nil {
+			assert.NoError(t, err)
+		}
+
+		if !tt.anti {
+			assert.Nil(t, s.Spec.Template.Spec.Affinity, "pod affinity should not be set")
+		} else {
+			if tt.preferred {
+				assert.NotNil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should use preferredDuringScheduling")
+				assert.Nil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should not use requiredDuringScheduling")
+			} else {
+				assert.Nil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should not use preferredDuringScheduling")
+				assert.NotNil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should use requiredDuringScheduling")
+			}
+		}
+	}
 }
 
 func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {

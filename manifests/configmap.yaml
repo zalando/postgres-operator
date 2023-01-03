@@ -109,6 +109,7 @@ data:
   # password_rotation_interval: "90"
   # password_rotation_user_retention: "180"
   pdb_name_format: "postgres-{cluster}-pdb"
+  # pod_antiaffinity_preferred_during_scheduling: "false"
   # pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   pod_deletion_wait_timeout: 10m
   # pod_environment_configmap: "default/my-custom-config"

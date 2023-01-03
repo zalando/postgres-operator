@@ -97,10 +97,10 @@ type KubernetesMetaConfiguration struct {
 	PodPriorityClassName                     string              `json:"pod_priority_class_name,omitempty"`
 	MasterPodMoveTimeout                     Duration            `json:"master_pod_move_timeout,omitempty"`
 	EnablePodAntiAffinity                    bool                `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodAntiAffinityPreferredDuringScheduling bool                `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
+	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
-  EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
+	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
 }
 

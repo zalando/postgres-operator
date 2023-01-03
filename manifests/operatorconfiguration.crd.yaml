@@ -276,6 +276,9 @@ spec:
                   pdb_name_format:
                     type: string
                     default: "postgres-{cluster}-pdb"
+                  pod_antiaffinity_preferred_during_scheduling:
+                    type: boolean
+                    default: false
                   pod_antiaffinity_topology_key:
                     type: string
                     default: "kubernetes.io/hostname"

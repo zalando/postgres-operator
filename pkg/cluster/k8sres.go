@@ -495,8 +495,14 @@ func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinit
 	}
 }
 
-func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1.Affinity, preferredDuringScheduling bool) *v1.Affinity {
-	// generate pod anti-affinity to avoid multiple pods of the same Postgres cluster in the same topology , e.g. node
+func podAffinity(
+	labels labels.Set,
+	topologyKey string,
+	nodeAffinity *v1.Affinity,
+	preferredDuringScheduling bool,
+	anti bool) *v1.Affinity {
+
+	var podAffinity v1.Affinity
 
 	podAffinityTerm := v1.PodAffinityTerm{
 		LabelSelector: &metav1.LabelSelector{
@@ -505,17 +511,10 @@ func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1
 		TopologyKey: topologyKey,
 	}
 
-	podAffinity := v1.Affinity{
-		PodAntiAffinity: &v1.PodAntiAffinity{},
-	}
-
-	if preferredDuringScheduling {
-		podAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []v1.WeightedPodAffinityTerm{{
-			Weight:          1,
-			PodAffinityTerm: podAffinityTerm,
-		}}
+	if anti {
+		podAffinity.PodAntiAffinity = generatePodAntiAffinity(podAffinityTerm, preferredDuringScheduling)
 	} else {
-		podAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []v1.PodAffinityTerm{podAffinityTerm}
+		podAffinity.PodAffinity = generatePodAffinity(podAffinityTerm, preferredDuringScheduling)
 	}
 
 	if nodeAffinity != nil && nodeAffinity.NodeAffinity != nil {
@@ -523,6 +522,36 @@ func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1
 	}
 
 	return &podAffinity
+}
+
+func generatePodAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuringScheduling bool) *v1.PodAffinity {
+	podAffinity := &v1.PodAffinity{}
+
+	if preferredDuringScheduling {
+		podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []v1.WeightedPodAffinityTerm{{
+			Weight:          1,
+			PodAffinityTerm: podAffinityTerm,
+		}}
+	} else {
+		podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []v1.PodAffinityTerm{podAffinityTerm}
+	}
+
+	return podAffinity
+}
+
+func generatePodAntiAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuringScheduling bool) *v1.PodAntiAffinity {
+	podAntiAffinity := &v1.PodAntiAffinity{}
+
+	if preferredDuringScheduling {
+		podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []v1.WeightedPodAffinityTerm{{
+			Weight:          1,
+			PodAffinityTerm: podAffinityTerm,
+		}}
+	} else {
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []v1.PodAffinityTerm{podAffinityTerm}
+	}
+
+	return podAntiAffinity
 }
 
 func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
@@ -778,11 +807,12 @@ func (c *Cluster) generatePodTemplate(
 	}
 
 	if podAntiAffinity {
-		podSpec.Affinity = generatePodAffinity(
+		podSpec.Affinity = podAffinity(
 			labels,
 			podAntiAffinityTopologyKey,
 			nodeAffinity,
 			podAntiAffinityPreferredDuringScheduling,
+			true,
 		)
 	} else if nodeAffinity != nil {
 		podSpec.Affinity = nodeAffinity
@@ -2100,20 +2130,15 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		c.OpConfig.ClusterNameLabel: c.Name,
 		"application":               "spilo-logical-backup",
 	}
-	podAffinityTerm := v1.PodAffinityTerm{
-		LabelSelector: &metav1.LabelSelector{
-			MatchLabels: labels,
-		},
-		TopologyKey: "kubernetes.io/hostname",
-	}
-	podAffinity := v1.Affinity{
-		PodAffinity: &v1.PodAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
-				Weight:          1,
-				PodAffinityTerm: podAffinityTerm,
-			},
-			},
-		}}
+
+	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil)
+	podAffinity := podAffinity(
+		labels,
+		"kubernetes.io/hostname",
+		nodeAffinity,
+		true,
+		false,
+	)
 
 	annotations := c.generatePodAnnotations(&c.Spec)
 
@@ -2147,7 +2172,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 	}
 
 	// overwrite specific params of logical backups pods
-	podTemplate.Spec.Affinity = &podAffinity
+	podTemplate.Spec.Affinity = podAffinity
 	podTemplate.Spec.RestartPolicy = "Never" // affects containers within a pod
 
 	// configure a batch job
