@@ -1635,11 +1635,11 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"logical_backup_job_prefix": {
 								Type: "string",
 							},
-							"logical_backup_memory_request": {
+							"logical_backup_memory_limit": {
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
-							"logical_backup_memory_limit": {
+							"logical_backup_memory_request": {
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},

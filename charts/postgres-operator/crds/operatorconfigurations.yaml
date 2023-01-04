@@ -483,10 +483,10 @@ spec:
                   logical_backup_job_prefix:
                     type: string
                     default: "logical-backup-"
-                  logical_backup_memory_request:
+                  logical_backup_memory_limit:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                  logical_backup_memory_limit:
+                  logical_backup_memory_request:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                   logical_backup_provider:

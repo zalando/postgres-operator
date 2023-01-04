@@ -720,8 +720,8 @@ grouped under the `logical_backup` key.
 
 * **logical_backup_cpu_limit**
   **logical_backup_cpu_request**
-  **logical_backup_memory_request**
   **logical_backup_memory_limit**
+  **logical_backup_memory_request**
   Resource configuration for pod template in logical backup cron job. If empty
   default values from `postgres_pod_resources` will be used.
 

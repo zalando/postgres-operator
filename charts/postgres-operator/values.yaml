@@ -335,8 +335,8 @@ configLogicalBackup:
   # resources for logical backup pod, if empty configPostgresPodResources will be used
   # logical_backup_cpu_limit: ""
   # logical_backup_cpu_request: ""
-  # logical_backup_memory_request: ""
   # logical_backup_memory_limit: ""
+  # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.8.0"
