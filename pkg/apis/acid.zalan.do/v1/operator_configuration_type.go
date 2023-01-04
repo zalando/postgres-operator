@@ -227,10 +227,10 @@ type OperatorLogicalBackupConfiguration struct {
 	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
-	CPURequest                   string `name:"logical_backup_cpu_request"`
-	MemoryRequest                string `name:"logical_backup_memory_request"`
-	CPULimit                     string `name:"logical_backup_cpu_limit"`
-	MemoryLimit                  string `name:"logical_backup_memory_limit"`
+	CPURequest                   string `json:"logical_backup_cpu_request"`
+	MemoryRequest                string `json:"logical_backup_memory_request"`
+	CPULimit                     string `json:"logical_backup_cpu_limit"`
+	MemoryLimit                  string `json:"logical_backup_memory_limit"`
 }
 
 // PatroniConfiguration defines configuration for Patroni
