@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -13,10 +13,9 @@ const (
 	readyValue = "ready"
 )
 
-func initializeController() *Controller {
-	var c = NewController(&spec.ControllerConfig{})
-	c.opConfig.NodeReadinessLabel = map[string]string{readyLabel: readyValue}
-	return c
+func newNodeTestController() *Controller {
+	var controller = NewController(&spec.ControllerConfig{}, "node-test")
+	return controller
 }
 
 func makeNode(labels map[string]string, isSchedulable bool) *v1.Node {
@@ -31,34 +30,65 @@ func makeNode(labels map[string]string, isSchedulable bool) *v1.Node {
 	}
 }
 
-var c = initializeController()
+var nodeTestController = newNodeTestController()
 
 func TestNodeIsReady(t *testing.T) {
 	testName := "TestNodeIsReady"
 	var testTable = []struct {
-		in  *v1.Node
-		out bool
+		in             *v1.Node
+		out            bool
+		readinessLabel map[string]string
 	}{
 		{
-			in:  makeNode(map[string]string{"foo": "bar"}, true),
-			out: true,
+			in:             makeNode(map[string]string{"foo": "bar"}, true),
+			out:            true,
+			readinessLabel: map[string]string{readyLabel: readyValue},
 		},
 		{
-			in:  makeNode(map[string]string{"foo": "bar"}, false),
-			out: false,
+			in:             makeNode(map[string]string{"foo": "bar"}, false),
+			out:            false,
+			readinessLabel: map[string]string{readyLabel: readyValue},
 		},
 		{
-			in:  makeNode(map[string]string{readyLabel: readyValue}, false),
-			out: true,
+			in:             makeNode(map[string]string{readyLabel: readyValue}, false),
+			out:            true,
+			readinessLabel: map[string]string{readyLabel: readyValue},
 		},
 		{
-			in:  makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
-			out: true,
+			in:             makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
+			out:            true,
+			readinessLabel: map[string]string{readyLabel: readyValue},
+		},
+		{
+			in:             makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
+			out:            true,
+			readinessLabel: map[string]string{readyLabel: readyValue},
+		},
+		{
+			in:             makeNode(map[string]string{"foo": "bar"}, true),
+			out:            true,
+			readinessLabel: map[string]string{},
+		},
+		{
+			in:             makeNode(map[string]string{"foo": "bar"}, false),
+			out:            false,
+			readinessLabel: map[string]string{},
+		},
+		{
+			in:             makeNode(map[string]string{readyLabel: readyValue}, false),
+			out:            false,
+			readinessLabel: map[string]string{},
+		},
+		{
+			in:             makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
+			out:            true,
+			readinessLabel: map[string]string{},
 		},
 	}
 	for _, tt := range testTable {
-		if isReady := c.nodeIsReady(tt.in); isReady != tt.out {
-			t.Errorf("%s: expected response %t doesn't match the actual %t for the node %#v",
+		nodeTestController.opConfig.NodeReadinessLabel = tt.readinessLabel
+		if isReady := nodeTestController.nodeIsReady(tt.in); isReady != tt.out {
+			t.Errorf("%s: expected response %t does not match the actual %t for the node %#v",
 				testName, tt.out, isReady, tt.in)
 		}
 	}

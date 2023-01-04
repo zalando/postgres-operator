@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Compose, Zalando SE
+Copyright 2023 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,5 +25,7 @@ SOFTWARE.
 package v1
 
 type OperatorConfigurationExpansion interface{}
+
+type PostgresTeamExpansion interface{}
 
 type PostgresqlExpansion interface{}

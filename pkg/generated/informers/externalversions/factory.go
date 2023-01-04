@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Compose, Zalando SE
+Copyright 2023 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,7 @@ import (
 	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	acidzalando "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do"
 	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	zalandoorg "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/zalando.org"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -179,8 +180,13 @@ type SharedInformerFactory interface {
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	Acid() acidzalando.Interface
+	Zalando() zalandoorg.Interface
 }
 
 func (f *sharedInformerFactory) Acid() acidzalando.Interface {
 	return acidzalando.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Zalando() zalandoorg.Interface {
+	return zalandoorg.New(f, f.namespace, f.tweakListOptions)
 }

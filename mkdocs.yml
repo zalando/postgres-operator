@@ -13,4 +13,3 @@ nav:
     - Config parameters: 'reference/operator_parameters.md'
     - Manifest parameters: 'reference/cluster_manifest.md'
     - CLI options and environment: 'reference/command_line_and_environment.md'
-  - Google Summer of Code 2019: 'gsoc-2019/ideas.md'

@@ -1,9 +1,9 @@
 from boto3 import client
 from datetime import datetime, timezone
 from furl import furl
-from json import dumps
+from json import dumps, loads
 from logging import getLogger
-from os import environ
+from os import environ, getenv
 from requests import Session
 from urllib.parse import urljoin
 from uuid import UUID
@@ -15,6 +15,19 @@ from .utils import Attrs, defaulting, these
 logger = getLogger(__name__)
 
 session = Session()
+
+AWS_ENDPOINT = getenv('AWS_ENDPOINT')
+
+OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-name')
+
+COMMON_CLUSTER_LABEL = getenv('COMMON_CLUSTER_LABEL', '{"application":"spilo"}')
+COMMON_POOLER_LABEL = getenv('COMMON_POOLER_LABEL', '{"application":"db-connection-pooler"}')
+
+logger.info("Common Cluster Label: {}".format(COMMON_CLUSTER_LABEL))
+logger.info("Common Pooler Label: {}".format(COMMON_POOLER_LABEL))
+
+COMMON_CLUSTER_LABEL = loads(COMMON_CLUSTER_LABEL)
+COMMON_POOLER_LABEL = loads(COMMON_POOLER_LABEL)
 
 
 def request(cluster, path, **kwargs):
@@ -83,6 +96,7 @@ def resource_api_version(resource_type):
     return {
         'postgresqls': 'apis/acid.zalan.do/v1',
         'statefulsets': 'apis/apps/v1',
+        'deployments': 'apis/apps/v1',
     }.get(resource_type, 'api/v1')
 
 
@@ -91,6 +105,12 @@ def encode_labels(label_selector):
         f'{label}={value}'
         for label, value in label_selector.items()
     ])
+
+
+def cluster_labels(spilo_cluster):
+    labels = COMMON_CLUSTER_LABEL
+    labels[OPERATOR_CLUSTER_NAME_LABEL] = spilo_cluster
+    return labels
 
 
 def kubernetes_url(
@@ -137,7 +157,7 @@ def read_pods(cluster, namespace, spilo_cluster):
         cluster=cluster,
         resource_type='pods',
         namespace=namespace,
-        label_selector={'version': spilo_cluster},
+        label_selector=cluster_labels(spilo_cluster),
     )
 
 
@@ -147,7 +167,7 @@ def read_pod(cluster, namespace, resource_name):
         resource_type='pods',
         namespace=namespace,
         resource_name=resource_name,
-        label_selector={'application': 'spilo'},
+        label_selector=COMMON_CLUSTER_LABEL,
     )
 
 
@@ -157,7 +177,17 @@ def read_service(cluster, namespace, resource_name):
         resource_type='services',
         namespace=namespace,
         resource_name=resource_name,
-        label_selector={'application': 'spilo'},
+        label_selector=COMMON_CLUSTER_LABEL,
+    )
+
+
+def read_pooler(cluster, namespace, resource_name):
+    return kubernetes_get(
+        cluster=cluster,
+        resource_type='deployments',
+        namespace=namespace,
+        resource_name=resource_name,
+        label_selector=COMMON_POOLER_LABEL,
     )
 
 
@@ -167,7 +197,7 @@ def read_statefulset(cluster, namespace, resource_name):
         resource_type='statefulsets',
         namespace=namespace,
         resource_name=resource_name,
-        label_selector={'application': 'spilo'},
+        label_selector=COMMON_CLUSTER_LABEL,
     )
 
 
@@ -244,7 +274,7 @@ def read_stored_clusters(bucket, prefix, delimiter='/'):
     return [
         prefix['Prefix'].split('/')[-2]
         for prefix in these(
-            client('s3').list_objects(
+            client('s3', endpoint_url=AWS_ENDPOINT).list_objects(
                 Bucket=bucket,
                 Delimiter=delimiter,
                 Prefix=prefix,
@@ -265,7 +295,7 @@ def read_versions(
     return [
         'base' if uid == 'wal' else uid
         for prefix in these(
-            client('s3').list_objects(
+            client('s3', endpoint_url=AWS_ENDPOINT).list_objects(
                 Bucket=bucket,
                 Delimiter=delimiter,
                 Prefix=prefix + pg_cluster + delimiter,
@@ -278,6 +308,7 @@ def read_versions(
         if uid == 'wal' or defaulting(lambda: UUID(uid))
     ]
 
+BACKUP_VERSION_PREFIXES = ['', '9.6/', '10/', '11/', '12/', '13/', '14/', '15/']
 
 def read_basebackups(
     pg_cluster,
@@ -290,18 +321,24 @@ def read_basebackups(
 ):
     environ['WALE_S3_ENDPOINT'] = s3_endpoint
     suffix = '' if uid == 'base' else '/' + uid
-    return [
-        {
-            key: value
-            for key, value in basebackup.__dict__.items()
-            if isinstance(value, str) or isinstance(value, int)
-        }
-        for basebackup in Attrs.call(
-            f=configure_backup_cxt,
-            aws_instance_profile=use_aws_instance_profile,
-            s3_prefix=f's3://{bucket}/{prefix}{pg_cluster}{suffix}/wal/',
-        )._backup_list(detail=True)
-    ]
+    backups = []
+
+    for vp in BACKUP_VERSION_PREFIXES:
+
+        backups = backups + [
+            {
+                key: value
+                for key, value in basebackup.__dict__.items()
+                if isinstance(value, str) or isinstance(value, int)
+            }
+            for basebackup in Attrs.call(
+                f=configure_backup_cxt,
+                aws_instance_profile=use_aws_instance_profile,
+                s3_prefix=f's3://{bucket}/{prefix}{pg_cluster}{suffix}/wal/{vp}',
+            )._backup_list(detail=True)
+        ]
+
+    return backups
 
 
 def parse_time(s: str):

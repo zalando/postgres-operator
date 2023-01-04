@@ -7,4 +7,5 @@ const (
 	ElbTimeoutAnnotationValue          = "3600"
 	KubeIAmAnnotation                  = "iam.amazonaws.com/role"
 	VolumeStorateProvisionerAnnotation = "pv.kubernetes.io/provisioned-by"
+	PostgresqlControllerAnnotationKey  = "acid.zalan.do/controller"
 )

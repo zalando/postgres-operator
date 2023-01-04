@@ -6,7 +6,7 @@ postgresqls
         ol.breadcrumb
 
           li.breadcrumb-item
-            a(href='/#/list')
+            a(href='./#/list')
               | PostgreSQL clusters
 
     .sk-spinner-pulse(
@@ -20,7 +20,7 @@ postgresqls
       |
       | or
       |
-      a(href='/') start over
+      a(href='./') start over
       | .
 
     div(
@@ -45,12 +45,32 @@ postgresqls
         thead
           tr
             th(style='width: 120px') Team
+            th(style='width: 130px') Namespace
+            th Name
             th(style='width: 50px') Pods
             th(style='width: 140px') CPU
             th(style='width: 130px') Memory
             th(style='width: 100px') Size
-            th(style='width: 130px') Namespace
-            th Name
+            th(style='width: 100px') IOPS
+            th(style='width: 100px') Throughput
+            th(style='width: 120px')
+              .tooltip(style='width: 120px')
+                | Cost/Month
+                .tooltiptext
+                  strong Cost = MAX(CPU, Memory) + rest
+                  br
+                  | 1 CPU core : 42.09$
+                  br
+                  | 1GB memory: 10.5225$
+                  br
+                  | 1GB volume:  0.0952$
+                  br
+                  | IOPS (-3000 baseline): 0.006$
+                  br
+                  | Throughput (-125 baseline): 0.0476$
+                  br
+                  | 1 ELB: 21.96$
+            th(stlye='width: 120px')
 
         tbody
           tr(
@@ -58,19 +78,21 @@ postgresqls
             hidden='{ !namespaced_name.toLowerCase().includes(filter.state.toLowerCase()) }'
           )
             td { team }
+            td(style='white-space: pre')
+              | { namespace }
+            td
+              a(href='./#/status/{ cluster_path(this) }') { name }
+              btn.btn-danger(if='{status.PostgresClusterStatus == "CreateFailed"}') Create Failed
             td { nodes }
             td { cpu } / { cpu_limit }
             td { memory } / { memory_limit }
             td { volume_size }
-
-            td(style='white-space: pre')
-              | { namespace }
+            td { iops }
+            td { throughput }
+            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput, num_elb) }$
 
             td
-              a(
-                href='/#/status/{ cluster_path(this) }'
-              )
-                | { name }
+
 
               .btn-group.pull-right(
                 aria-label='Cluster { qname } actions'
@@ -79,7 +101,7 @@ postgresqls
               )
 
                 a.btn.btn-info(
-                  href='/#/status/{ cluster_path(this) }'
+                  href='./#/status/{ cluster_path(this) }'
                 )
                   i.fa.fa-check-circle.regular
                   | Status
@@ -92,21 +114,21 @@ postgresqls
                   | Pgview
 
                 a.btn.btn-info(
-                  href='/#/logs/{ cluster_path(this) }'
+                  href='./#/logs/{ cluster_path(this) }'
                 )
                   i.fa.fa-align-justify
                   | Logs
 
                 a.btn(
                   class='btn-{ opts.read_write ? "primary" : "info" }'
-                  href='/#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
+                  href='./#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
                 )
                   i.fa.fa-clone.regular
                   | Clone
 
                 a.btn(
                   class='btn-{ opts.read_write ? "warning" : "info" }'
-                  href='/#/edit/{ cluster_path(this) }'
+                  href='./#/edit/{ cluster_path(this) }'
                 )
                   | Edit
 
@@ -124,12 +146,32 @@ postgresqls
         thead
           tr
             th(style='width: 120px') Team
+            th(style='width: 130px') Namespace
+            th Name
             th(style='width: 50px') Pods
             th(style='width: 140px') CPU
             th(style='width: 130px') Memory
             th(style='width: 100px') Size
-            th(style='width: 130px') Namespace
-            th Name
+            th(style='width: 100px') IOPS
+            th(style='width: 100px') Throughput
+            th(style='width: 120px')
+              .tooltip(style='width: 120px')
+                | Cost/Month
+                .tooltiptext
+                  strong Cost = MAX(CPU, Memory) + rest
+                  br
+                  | 1 CPU core : 42.09$
+                  br
+                  | 1GB memory: 10.5225$
+                  br
+                  | 1GB volume:  0.0952$
+                  br
+                  | IOPS (-3000 baseline): 0.006$
+                  br
+                  | Throughput (-125 baseline): 0.0476$
+                  br
+                  | 1 ELB: 21.96$
+            th(style='width: 120px')
 
         tbody
           tr(
@@ -137,20 +179,22 @@ postgresqls
             hidden='{ !namespaced_name.toLowerCase().includes(filter.state.toLowerCase()) }'
           )
             td { team }
+            td(style='white-space: pre')
+              | { namespace }
+            td
+              a(
+                href='./#/status/{ cluster_path(this) }'
+              )
+                | { name }
             td { nodes }
             td { cpu } / { cpu_limit }
             td { memory } / { memory_limit }
             td { volume_size }
-
-            td(style='white-space: pre')
-              | { namespace }
+            td { iops }
+            td { throughput }
+            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput, num_elb) }$
 
             td
-
-              a(
-                href='/#/status/{ cluster_path(this) }'
-              )
-                | { name }
 
               .btn-group.pull-right(
                 aria-label='Cluster { qname } actions'
@@ -159,7 +203,7 @@ postgresqls
               )
 
                 a.btn.btn-info(
-                  href='/#/status/{ cluster_path(this) }'
+                  href='./#/status/{ cluster_path(this) }'
                 )
                   i.fa.fa-check-circle.regular
                   | Status
@@ -173,21 +217,21 @@ postgresqls
                   | Pgview
 
                 a.btn.btn-info(
-                  href='/#/logs/{ cluster_path(this) }'
+                  href='./#/logs/{ cluster_path(this) }'
                 )
                   i.fa.fa-align-justify
                   | Logs
 
                 a.btn(
                   class='btn-{ opts.read_write ? "primary" : "info" }'
-                  href='/#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
+                  href='./#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
                 )
                   i.fa.fa-clone.regular
                   | Clone
 
                 a.btn(
                   class='btn-{ opts.read_write ? "warning" : "info" }'
-                  href='/#/edit/{ cluster_path(this) }'
+                  href='./#/edit/{ cluster_path(this) }'
                 )
                   | Edit
 
@@ -223,9 +267,83 @@ postgresqls
       + '/' + encodeURI(cluster.name)
     )
 
+    const calcCosts = this.calcCosts = (nodes, cpu, memory, disk, iops, throughput, num_elb) => {
+      podcount = Math.max(nodes, opts.config.min_pods)
+      corecost = toCores(cpu) * opts.config.cost_core * 30.5 * 24
+      memorycost = toMemory(memory) * opts.config.cost_memory * 30.5 * 24
+      elbcost = num_elb * opts.config.cost_elb * 30.5 * 24
+      diskcost = toDisk(disk) * opts.config.cost_ebs
+      iopscost = 0
+      if (iops !== undefined && iops > opts.config.free_iops) {
+        if (iops > opts.config.limit_iops) {
+          iops = opts.config.limit_iops
+        }
+        iopscost = (iops - opts.config.free_iops) * opts.config.cost_iops
+      }
+      throughputcost = 0
+      if (throughput !== undefined && throughput > opts.config.free_throughput) {
+        if (throughput > opts.config.limit_throughput) {
+          throughput = opts.config.limit_throughput
+        }
+        throughputcost = (throughput - opts.config.free_throughput) * opts.config.cost_throughput
+      }
+
+      costs = podcount * (Math.max(corecost, memorycost) + diskcost + iopscost + throughputcost) + elbcost
+       return costs.toFixed(2)
+    }
+
+    const toDisk = this.toDisk = value => {
+      if(value.endsWith("Mi")) {
+        value = value.substring(0, value.length-2)
+        value = Number(value) / 1000.
+        return value
+      }
+      else if(value.endsWith("Gi")) {
+        value = value.substring(0, value.length-2)
+        value = Number(value)
+        return value
+      }
+      else if(value.endsWith("Ti")) {
+        value = value.substring(0, value.length-2)
+        value = Number(value) * 1000
+        return value
+      }
+      
+      return value
+    }    
+
+    const toMemory = this.toMemory = value => {
+      if (value.endsWith("Mi")) {
+        value = value.substring(0, value.length-2)
+        value = Number(value) / 1000.
+        return value
+      }
+      else if(value.endsWith("Gi")) {
+        value = value.substring(0, value.length-2)
+        value = Number(value)
+        return value
+      }
+      else if(value.endsWith("Ti")) {
+        value = value.substring(0, value.length-2)
+        value = Number(value) * 1000
+        return value
+      }
+
+      return value
+    }
+
+    const toCores = this.toCores = value => {
+      if (value.endsWith("m")) {
+        value = value.substring(0, value.length-1)
+        value = Number(value) / 1000.
+        return value
+      }
+      return value
+    }
+
     this.on('mount', () =>
       jQuery
-      .get('/postgresqls')
+      .get('./postgresqls')
       .done(clusters => {
         this.my_clusters = []
         this.other_clusters = []

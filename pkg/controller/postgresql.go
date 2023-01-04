@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
@@ -40,12 +43,23 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 // clusterListFunc obtains a list of all PostgreSQL clusters
 func (c *Controller) listClusters(options metav1.ListOptions) (*acidv1.PostgresqlList, error) {
+	var pgList acidv1.PostgresqlList
+
 	// TODO: use the SharedInformer cache instead of quering Kubernetes API directly.
-	list, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.opConfig.WatchedNamespace).List(options)
+	list, err := c.KubeClient.PostgresqlsGetter.Postgresqls(c.opConfig.WatchedNamespace).List(context.TODO(), options)
 	if err != nil {
 		c.logger.Errorf("could not list postgresql objects: %v", err)
 	}
-	return list, err
+	if c.controllerID != "" {
+		c.logger.Debugf("watch only clusters with controllerID %q", c.controllerID)
+	}
+	for _, pg := range list.Items {
+		if pg.Error == "" && c.hasOwnership(&pg) {
+			pgList.Items = append(pgList.Items, pg)
+		}
+	}
+
+	return &pgList, err
 }
 
 // clusterListAndSync lists all manifests and decides whether to run the sync or repair.
@@ -144,8 +158,15 @@ func (c *Controller) acquireInitialListOfClusters() error {
 	return nil
 }
 
-func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) *cluster.Cluster {
-	cl := cluster.New(c.makeClusterConfig(), c.KubeClient, *pgSpec, lg)
+func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) (*cluster.Cluster, error) {
+	if c.opConfig.EnableTeamIdClusternamePrefix {
+		if _, err := acidv1.ExtractClusterName(clusterName.Name, pgSpec.Spec.TeamID); err != nil {
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusInvalid)
+			return nil, err
+		}
+	}
+
+	cl := cluster.New(c.makeClusterConfig(), c.KubeClient, *pgSpec, lg, c.eventRecorder)
 	cl.Run(c.stopCh)
 	teamName := strings.ToLower(cl.Spec.TeamID)
 
@@ -157,12 +178,13 @@ func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedNam
 	c.clusterLogs[clusterName] = ringlog.New(c.opConfig.RingLogLines)
 	c.clusterHistory[clusterName] = ringlog.New(c.opConfig.ClusterHistoryEntries)
 
-	return cl
+	return cl, nil
 }
 
 func (c *Controller) processEvent(event ClusterEvent) {
 	var clusterName spec.NamespacedName
 	var clHistory ringlog.RingLogger
+	var err error
 
 	lg := c.logger.WithField("worker", event.WorkerID)
 
@@ -185,10 +207,10 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	if event.EventType == EventRepair {
 		runRepair, lastOperationStatus := cl.NeedsRepair()
 		if !runRepair {
-			lg.Debugf("Observed cluster status %s, repair is not required", lastOperationStatus)
+			lg.Debugf("observed cluster status %s, repair is not required", lastOperationStatus)
 			return
 		}
-		lg.Debugf("Observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
+		lg.Debugf("observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
 		event.EventType = EventSync
 	}
 
@@ -202,8 +224,8 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			c.mergeDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 		}
 
-		if err := c.submitRBACCredentials(event); err != nil {
-			c.logger.Warnf("Pods and/or Patroni may misfunction due to the lack of permissions: %v", err)
+		if err = c.submitRBACCredentials(event); err != nil {
+			c.logger.Warnf("pods and/or Patroni may misfunction due to the lack of permissions: %v", err)
 		}
 
 	}
@@ -211,20 +233,26 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	switch event.EventType {
 	case EventAdd:
 		if clusterFound {
-			lg.Debugf("cluster already exists")
+			lg.Infof("received add event for already existing Postgres cluster")
 			return
 		}
 
-		lg.Infof("creation of the cluster started")
+		lg.Infof("creating a new Postgres cluster")
 
-		cl = c.addCluster(lg, clusterName, event.NewSpec)
+		cl, err = c.addCluster(lg, clusterName, event.NewSpec)
+		if err != nil {
+			lg.Errorf("creation of cluster is blocked: %v", err)
+			return
+		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
-		if err := cl.Create(); err != nil {
+		err = cl.Create()
+		if err != nil {
+			cl.Status = acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusInvalid}
 			cl.Error = fmt.Sprintf("could not create cluster: %v", err)
 			lg.Error(cl.Error)
-
+			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Create", "%v", cl.Error)
 			return
 		}
 
@@ -237,7 +265,8 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			return
 		}
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Update(event.OldSpec, event.NewSpec); err != nil {
+		err = cl.Update(event.OldSpec, event.NewSpec)
+		if err != nil {
 			cl.Error = fmt.Sprintf("could not update cluster: %v", err)
 			lg.Error(cl.Error)
 
@@ -262,6 +291,8 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 		cl.Delete()
+		// Fixme - no error handling for delete ?
+		// c.eventRecorder.Eventf(cl.GetReference, v1.EventTypeWarning, "Delete", "%v", cl.Error)
 
 		func() {
 			defer c.clustersMu.Unlock()
@@ -286,12 +317,18 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
-			cl = c.addCluster(lg, clusterName, event.NewSpec)
+			cl, err = c.addCluster(lg, clusterName, event.NewSpec)
+			if err != nil {
+				lg.Errorf("syncing of cluster is blocked: %v", err)
+				return
+			}
 		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Sync(event.NewSpec); err != nil {
+		err = cl.Sync(event.NewSpec)
+		if err != nil {
 			cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
+			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Sync", "%v", cl.Error)
 			lg.Error(cl.Error)
 			return
 		}
@@ -330,11 +367,11 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.PostgresSpec) {
 
 	deprecate := func(deprecated, replacement string) {
-		c.logger.Warningf("Parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
+		c.logger.Warningf("parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
 	}
 
 	noeffect := func(param string, explanation string) {
-		c.logger.Warningf("Parameter %q takes no effect. %s", param, explanation)
+		c.logger.Warningf("parameter %q takes no effect. %s", param, explanation)
 	}
 
 	if spec.UseLoadBalancer != nil {
@@ -350,7 +387,7 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.Postg
 
 	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
 		(spec.EnableReplicaLoadBalancer != nil || spec.EnableMasterLoadBalancer != nil) {
-		c.logger.Warnf("Both old and new load balancer parameters are present in the manifest, ignoring old ones")
+		c.logger.Warnf("both old and new load balancer parameters are present in the manifest, ignoring old ones")
 	}
 }
 
@@ -403,15 +440,42 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		clusterError = informerNewSpec.Error
 	}
 
+	// only allow deletion if delete annotations are set and conditions are met
+	if eventType == EventDelete {
+		if err := c.meetsClusterDeleteAnnotations(informerOldSpec); err != nil {
+			c.logger.WithField("cluster-name", clusterName).Warnf(
+				"ignoring %q event for cluster %q - manifest does not fulfill delete requirements: %s", eventType, clusterName, err)
+			c.logger.WithField("cluster-name", clusterName).Warnf(
+				"please, recreate Postgresql resource %q and set annotations to delete properly", clusterName)
+			if currentManifest, marshalErr := json.Marshal(informerOldSpec); marshalErr != nil {
+				c.logger.WithField("cluster-name", clusterName).Warnf("could not marshal current manifest:\n%+v", informerOldSpec)
+			} else {
+				c.logger.WithField("cluster-name", clusterName).Warnf("%s\n", string(currentManifest))
+			}
+			return
+		}
+	}
+
 	if clusterError != "" && eventType != EventDelete {
-		c.logger.
-			WithField("cluster-name", clusterName).
-			Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
+		c.logger.WithField("cluster-name", clusterName).Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
+
+		switch eventType {
+		case EventAdd:
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusAddFailed)
+			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Create", "%v", clusterError)
+		case EventUpdate:
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusUpdateFailed)
+			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Update", "%v", clusterError)
+		default:
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusSyncFailed)
+			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Sync", "%v", clusterError)
+		}
+
 		return
 	}
 
 	// Don't pass the spec directly from the informer, since subsequent modifications of it would be reflected
-	// in the informer internal state, making it incohherent with the actual Kubernetes object (and, as a side
+	// in the informer internal state, making it incoherent with the actual Kubernetes object (and, as a side
 	// effect, the modified state will be returned together with subsequent events).
 
 	workerID := c.clusterWorkerID(clusterName)
@@ -428,7 +492,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
 		lg.Errorf("error while queueing cluster event: %v", clusterEvent)
 	}
-	lg.Infof("%q event has been queued", eventType)
+	lg.Infof("%s event has been queued", eventType)
 
 	if eventType != EventDelete {
 		return
@@ -449,54 +513,58 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		if err != nil {
 			lg.Warningf("could not delete event from the queue: %v", err)
 		} else {
-			lg.Debugf("event %q has been discarded for the cluster", evType)
+			lg.Debugf("event %s has been discarded for the cluster", evType)
 		}
 	}
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {
-	pg, ok := obj.(*acidv1.Postgresql)
-	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
-		return
+	pg := c.postgresqlCheck(obj)
+	if pg != nil {
+		// We will not get multiple Add events for the same cluster
+		c.queueClusterEvent(nil, pg, EventAdd)
 	}
-
-	// We will not get multiple Add events for the same cluster
-	c.queueClusterEvent(nil, pg, EventAdd)
 }
 
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
-	pgOld, ok := prev.(*acidv1.Postgresql)
-	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
+	pgOld := c.postgresqlCheck(prev)
+	pgNew := c.postgresqlCheck(cur)
+	if pgOld != nil && pgNew != nil {
+		// Avoid the inifinite recursion for status updates
+		if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
+			if reflect.DeepEqual(pgNew.Annotations, pgOld.Annotations) {
+				return
+			}
+		}
+		c.queueClusterEvent(pgOld, pgNew, EventUpdate)
 	}
-	pgNew, ok := cur.(*acidv1.Postgresql)
-	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
-	}
-	// Avoid the inifinite recursion for status updates
-	if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
-		return
-	}
-
-	c.queueClusterEvent(pgOld, pgNew, EventUpdate)
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {
+	pg := c.postgresqlCheck(obj)
+	if pg != nil {
+		c.queueClusterEvent(pg, nil, EventDelete)
+	}
+}
+
+func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
 	pg, ok := obj.(*acidv1.Postgresql)
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
-		return
+		return nil
 	}
-
-	c.queueClusterEvent(pg, nil, EventDelete)
+	if !c.hasOwnership(pg) {
+		return nil
+	}
+	return pg
 }
 
 /*
   Ensures the pod service account and role bindings exists in a namespace
   before a PG cluster is created there so that a user does not have to deploy
   these credentials manually.  StatefulSets require the service account to
-  create pods; Patroni requires relevant RBAC bindings to access endpoints.
+  create pods; Patroni requires relevant RBAC bindings to access endpoints
+  or config maps.
 
   The operator does not sync accounts/role bindings after creation.
 */
@@ -505,11 +573,11 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 	namespace := event.NewSpec.GetNamespace()
 
 	if err := c.createPodServiceAccount(namespace); err != nil {
-		return fmt.Errorf("could not create pod service account %v : %v", c.opConfig.PodServiceAccountName, err)
+		return fmt.Errorf("could not create pod service account %q : %v", c.opConfig.PodServiceAccountName, err)
 	}
 
 	if err := c.createRoleBindings(namespace); err != nil {
-		return fmt.Errorf("could not create role binding %v : %v", c.PodServiceAccountRoleBinding.Name, err)
+		return fmt.Errorf("could not create role binding %q : %v", c.PodServiceAccountRoleBinding.Name, err)
 	}
 	return nil
 }
@@ -517,19 +585,19 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 func (c *Controller) createPodServiceAccount(namespace string) error {
 
 	podServiceAccountName := c.opConfig.PodServiceAccountName
-	_, err := c.KubeClient.ServiceAccounts(namespace).Get(podServiceAccountName, metav1.GetOptions{})
+	_, err := c.KubeClient.ServiceAccounts(namespace).Get(context.TODO(), podServiceAccountName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 
-		c.logger.Infof(fmt.Sprintf("creating pod service account in the namespace %v", namespace))
+		c.logger.Infof(fmt.Sprintf("creating pod service account %q in the %q namespace", podServiceAccountName, namespace))
 
 		// get a separate copy of service account
 		// to prevent a race condition when setting a namespace for many clusters
 		sa := *c.PodServiceAccount
-		if _, err = c.KubeClient.ServiceAccounts(namespace).Create(&sa); err != nil {
-			return fmt.Errorf("cannot deploy the pod service account %v defined in the config map to the %v namespace: %v", podServiceAccountName, namespace, err)
+		if _, err = c.KubeClient.ServiceAccounts(namespace).Create(context.TODO(), &sa, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("cannot deploy the pod service account %q defined in the configuration to the %q namespace: %v", podServiceAccountName, namespace, err)
 		}
 
-		c.logger.Infof("successfully deployed the pod service account %v to the %v namespace", podServiceAccountName, namespace)
+		c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, namespace)
 	} else if k8sutil.ResourceAlreadyExists(err) {
 		return nil
 	}
@@ -542,17 +610,17 @@ func (c *Controller) createRoleBindings(namespace string) error {
 	podServiceAccountName := c.opConfig.PodServiceAccountName
 	podServiceAccountRoleBindingName := c.PodServiceAccountRoleBinding.Name
 
-	_, err := c.KubeClient.RoleBindings(namespace).Get(podServiceAccountRoleBindingName, metav1.GetOptions{})
+	_, err := c.KubeClient.RoleBindings(namespace).Get(context.TODO(), podServiceAccountRoleBindingName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 
-		c.logger.Infof("Creating the role binding %v in the namespace %v", podServiceAccountRoleBindingName, namespace)
+		c.logger.Infof("Creating the role binding %q in the %q namespace", podServiceAccountRoleBindingName, namespace)
 
 		// get a separate copy of role binding
 		// to prevent a race condition when setting a namespace for many clusters
 		rb := *c.PodServiceAccountRoleBinding
-		_, err = c.KubeClient.RoleBindings(namespace).Create(&rb)
+		_, err = c.KubeClient.RoleBindings(namespace).Create(context.TODO(), &rb, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("cannot bind the pod service account %q defined in the config map to the cluster role in the %q namespace: %v", podServiceAccountName, namespace, err)
+			return fmt.Errorf("cannot bind the pod service account %q defined in the configuration to the cluster role in the %q namespace: %v", podServiceAccountName, namespace, err)
 		}
 
 		c.logger.Infof("successfully deployed the role binding for the pod service account %q to the %q namespace", podServiceAccountName, namespace)

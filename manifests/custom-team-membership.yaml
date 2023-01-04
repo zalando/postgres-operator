@@ -1,0 +1,13 @@
+apiVersion: "acid.zalan.do/v1"
+kind: PostgresTeam
+metadata:
+  name: custom-team-membership
+spec:
+  additionalSuperuserTeams:
+    acid:
+    - "postgres_superusers"
+  additionalTeams:
+    acid: []
+  additionalMembers:
+    acid:
+    - "elephant"

@@ -2,6 +2,10 @@ version: "2017-09-20"
 pipeline:
     - id: build-postgres-operator
       type: script
+      vm: large
+      cache:
+        paths:
+          - /go/pkg/mod
       commands:
         - desc: 'Update'
           cmd: |
@@ -12,7 +16,7 @@ pipeline:
         - desc: 'Install go'
           cmd: |
             cd /tmp
-            wget -q https://storage.googleapis.com/golang/go1.12.linux-amd64.tar.gz -O go.tar.gz
+            wget -q https://storage.googleapis.com/golang/go1.17.4.linux-amd64.tar.gz -O go.tar.gz
             tar -xf go.tar.gz
             mv go /usr/local
             ln -s /usr/local/go/bin/go /usr/bin/go
@@ -28,7 +32,7 @@ pipeline:
               IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
             fi
             export IMAGE
-            make deps docker
+            make deps mocks docker
         - desc: 'Run unit tests'
           cmd: |
             export PATH=$PATH:$HOME/go/bin
@@ -66,20 +70,25 @@ pipeline:
         - desc: 'Build and push Docker image'
           cmd: |
             cd ui
-            image_base='registry-write.opensource.zalan.do/acid/postgres-operator-ui'
-            if [[ "${CDP_TARGET_BRANCH}" == 'master' && -z "${CDP_PULL_REQUEST_NUMBER}" ]]
+            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
+            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
             then
-              image="${image_base}"
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui
             else
-              image="${image_base}-test"
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui-test
             fi
-            image_with_tag="${image}:c${CDP_BUILD_VERSION}"
+            export IMAGE
+            make docker
+            make push
 
-            if docker pull "${image}"
-            then
-              docker build --cache-from="${image}" -t "${image_with_tag}" .
-            else
-              docker build -t "${image_with_tag}" .
-            fi
+    - id: build-logical-backup
+      type: script
 
-            docker push "${image_with_tag}"
+      commands:
+        - desc: Build image
+          cmd: |
+            cd docker/logical-backup
+            export TAG=$(git describe --tags --always --dirty)
+            IMAGE="registry-write.opensource.zalan.do/acid/logical-backup"
+            docker build --rm -t "$IMAGE:$TAG$CDP_TAG" .
+            docker push "$IMAGE:$TAG$CDP_TAG"

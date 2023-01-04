@@ -27,7 +27,7 @@ func (t *Ticker) Tick() { <-t.ticker.C }
 func Retry(interval time.Duration, timeout time.Duration, f func() (bool, error)) error {
 	//TODO: make the retry exponential
 	if timeout < interval {
-		return fmt.Errorf("timout(%s) should be greater than interval(%v)", timeout, interval)
+		return fmt.Errorf("timeout(%s) should be greater than interval(%v)", timeout, interval)
 	}
 	tick := &Ticker{time.NewTicker(interval)}
 	return RetryWorker(interval, timeout, tick, f)

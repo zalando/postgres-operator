@@ -2,8 +2,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres-operator
+  labels:
+    application: postgres-operator
 spec:
   replicas: 1
+  strategy:
+    type: "Recreate"
   selector:
     matchLabels:
       name: postgres-operator
@@ -12,22 +16,23 @@ spec:
       labels:
         name: postgres-operator
     spec:
-      serviceAccountName: zalando-postgres-operator
+      serviceAccountName: postgres-operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/postgres-operator:v1.2.0
+        image: registry.opensource.zalan.do/acid/postgres-operator:v1.8.2
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            cpu: 500m
+            cpu: 100m
             memory: 250Mi
           limits:
-            cpu: 2000m
+            cpu: 500m
             memory: 500Mi
         securityContext:
           runAsUser: 1000
           runAsNonRoot: true
           readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
         env:
         # provided additional ENV vars can overwrite individual config map entries
         - name: CONFIG_MAP_NAME
@@ -35,3 +40,6 @@ spec:
         # In order to use the CRD OperatorConfiguration instead, uncomment these lines and comment out the two lines above
         # - name: POSTGRES_OPERATOR_CONFIGURATION_OBJECT
         #  value: postgresql-operator-default-configuration
+        # Define an ID to isolate controllers from each other
+        # - name: CONTROLLER_ID
+        #   value: "second-operator"

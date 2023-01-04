@@ -1,0 +1,27 @@
+name: operator-e2e-tests
+
+on: 
+  pull_request:
+  push:
+    branches:
+    - master
+
+jobs:
+  tests:
+    name: End-2-End tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-go@v2
+      with:
+          go-version: "^1.17.4"
+    - name: Make dependencies
+      run: make deps mocks
+    - name: Code generation
+      run: make codegen
+    - name: Compile
+      run: make linux
+    - name: Run unit tests
+      run: make test
+    - name: Run end-2-end tests
+      run: make e2e

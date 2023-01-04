@@ -23,13 +23,16 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
+	"log"
+
 	"github.com/spf13/cobra"
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
-	"log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // createCmd kubectl pg create.
@@ -50,6 +53,9 @@ kubectl pg create -f cluster-manifest.yaml
 func create(fileName string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ymlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatal(err)
@@ -62,7 +68,7 @@ func create(fileName string) {
 	}
 
 	postgresSql := obj.(*v1.Postgresql)
-	_, err = postgresConfig.Postgresqls(postgresSql.Namespace).Create(postgresSql)
+	_, err = postgresConfig.Postgresqls(postgresSql.Namespace).Create(context.TODO(), postgresSql, metav1.CreateOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}

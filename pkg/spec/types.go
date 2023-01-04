@@ -23,13 +23,17 @@ const fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespa
 // RoleOrigin contains the code of the origin of a role
 type RoleOrigin int
 
-// The rolesOrigin constant values must be sorted by the role priority for resolveNameConflict(...) to work.
+// The rolesOrigin constant values must be sorted by the role priority for
+// resolveNameConflict(...) to work.
 const (
 	RoleOriginUnknown RoleOrigin = iota
 	RoleOriginManifest
 	RoleOriginInfrastructure
 	RoleOriginTeamsAPI
 	RoleOriginSystem
+	RoleOriginBootstrap
+	RoleOriginConnectionPooler
+	RoleOriginStream
 )
 
 type syncUserOperation int
@@ -39,17 +43,25 @@ const (
 	PGSyncUserAdd = iota
 	PGsyncUserAlter
 	PGSyncAlterSet // handle ALTER ROLE SET parameter = value
+	PGSyncUserRename
 )
 
 // PgUser contains information about a single user.
 type PgUser struct {
 	Origin     RoleOrigin        `yaml:"-"`
 	Name       string            `yaml:"-"`
+	Namespace  string            `yaml:"-"`
 	Password   string            `yaml:"-"`
 	Flags      []string          `yaml:"user_flags"`
 	MemberOf   []string          `yaml:"inrole"`
 	Parameters map[string]string `yaml:"db_parameters"`
 	AdminRole  string            `yaml:"admin_role"`
+	IsDbOwner  bool              `yaml:"is_db_owner"`
+	Deleted    bool              `yaml:"deleted"`
+}
+
+func (user *PgUser) Valid() bool {
+	return user.Name != "" && user.Password != ""
 }
 
 // PgUserMap maps user names to the definitions.
@@ -107,6 +119,9 @@ type ControllerConfig struct {
 	CRDReadyWaitTimeout  time.Duration
 	ConfigMapName        NamespacedName
 	Namespace            string
+	IgnoredAnnotations   []string
+
+	EnableJsonLogging bool
 }
 
 // cached value for the GetOperatorNamespace
@@ -178,6 +193,10 @@ func (r RoleOrigin) String() string {
 		return "teams API role"
 	case RoleOriginSystem:
 		return "system role"
+	case RoleOriginBootstrap:
+		return "bootstrapped role"
+	case RoleOriginConnectionPooler:
+		return "connection pooler role"
 	default:
 		panic(fmt.Sprintf("bogus role origin value %d", r))
 	}

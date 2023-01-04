@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Compose, Zalando SE
+Copyright 2023 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,8 +32,10 @@ import (
 )
 
 // PostgresqlLister helps list Postgresqls.
+// All objects returned here must be treated as read-only.
 type PostgresqlLister interface {
 	// List lists all Postgresqls in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Postgresql, err error)
 	// Postgresqls returns an object that can list and get Postgresqls.
 	Postgresqls(namespace string) PostgresqlNamespaceLister
@@ -64,10 +66,13 @@ func (s *postgresqlLister) Postgresqls(namespace string) PostgresqlNamespaceList
 }
 
 // PostgresqlNamespaceLister helps list and get Postgresqls.
+// All objects returned here must be treated as read-only.
 type PostgresqlNamespaceLister interface {
 	// List lists all Postgresqls in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Postgresql, err error)
 	// Get retrieves the Postgresql from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.Postgresql, error)
 	PostgresqlNamespaceListerExpansion
 }

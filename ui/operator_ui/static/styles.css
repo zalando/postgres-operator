@@ -64,3 +64,56 @@ label {
 td {
   vertical-align: middle !important;
 }
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  opacity: 1;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 0;
+}
+.tooltip:after {
+  content: '?';
+  display: inline-block;
+  font-family: sans-serif;
+  font-weight: bold;
+  text-align: center;
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+  line-height: 16px;
+  border-radius: 12px;
+  padding: 0px;
+  color: white;
+  background: black;
+  border: 1px solid black;
+}
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 250px;
+  background-color: white;
+  color: #000;
+  text-align: justify;
+  border-radius: 6px;
+  padding: 10px 10px;
+  position: absolute;
+  bottom: 150%;
+  left: 50%;
+  margin-left: -120px;
+  border: 1px solid black;
+  font-weight: normal;
+}
+.tooltip .tooltiptext::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: black transparent transparent transparent;
+}
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+}

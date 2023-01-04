@@ -46,7 +46,7 @@ func parseWeekday(s string) (time.Weekday, error) {
 	return time.Weekday(weekday), nil
 }
 
-func extractClusterName(clusterName string, teamName string) (string, error) {
+func ExtractClusterName(clusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)
 	if len(clusterName) < teamNameLen+2 {
 		return "", fmt.Errorf("cluster name must match {TEAM}-{NAME} format. Got cluster name '%v', team name '%v'", clusterName, teamName)
@@ -72,7 +72,7 @@ func extractClusterName(clusterName string, teamName string) (string, error) {
 
 func validateCloneClusterDescription(clone *CloneDescription) error {
 	// when cloning from the basebackup (no end timestamp) check that the cluster name is a valid service name
-	if clone.ClusterName != "" && clone.EndTimestamp == "" {
+	if clone != nil && clone.ClusterName != "" && clone.EndTimestamp == "" {
 		if !serviceNameRegex.MatchString(clone.ClusterName) {
 			return fmt.Errorf("clone cluster name must confirm to DNS-1035, regex used for validation is %q",
 				serviceNameRegexString)

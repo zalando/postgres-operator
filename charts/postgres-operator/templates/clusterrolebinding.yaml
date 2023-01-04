@@ -14,8 +14,6 @@ roleRef:
   name: {{ include "postgres-operator.serviceAccountName" . }}
 subjects:
 - kind: ServiceAccount
-# note: the cluster role binding needs to be defined
-# for every namespace the operator service account lives in.
   name: {{ include "postgres-operator.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
 {{ end }}

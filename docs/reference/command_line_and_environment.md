@@ -45,7 +45,7 @@ The following environment variables are accepted by the operator:
   all namespaces. Empty value defaults to the operator namespace. Overrides the
   `watched_namespace` operator parameter.
 
-* **SCALYR_API_KEY**
+* **SCALYR_API_KEY** (*deprecated*)
   the value of the Scalyr API key to supply to the pods. Overrides the
   `scalyr_api_key` operator parameter.
 
@@ -56,3 +56,7 @@ The following environment variables are accepted by the operator:
 * **CRD_READY_WAIT_INTERVAL**
   defines the  interval between consecutive attempts waiting for the
   `postgresql` CRD to be created. The default is 5s.
+  
+* **ENABLE_JSON_LOGGING**
+  Set to `true` for JSON formatted logging output.
+  The default is false.

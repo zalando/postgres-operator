@@ -14,15 +14,22 @@ export TARGET_NAMESPACE="${TARGET_NAMESPACE-*}"
 
 default_operator_ui_config='{
   "docs_link":"https://postgres-operator.readthedocs.io/en/latest/",
-  "dns_format_string": "{1}-{0}.{2}",
+  "dns_format_string": "{0}.{1}",
   "databases_visible": true,
   "nat_gateways_visible": false,
   "resources_visible": true,
   "users_visible": true,
+  "cost_ebs": 0.0952,
+  "cost_iops": 0.006,
+  "cost_throughput": 0.0476,
+  "cost_core": 0.0575,
+  "cost_memory": 0.014375,
   "postgresql_versions": [
-    "11",
-    "10",
-    "9.6"
+    "15",
+    "14",
+    "13",
+    "12",
+    "11"
   ],
   "static_network_whitelist": {
     "localhost": ["172.0.0.1/32"]

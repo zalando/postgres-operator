@@ -1,37 +1,41 @@
 # Postgres Operator
 
-[![Build Status](https://travis-ci.org/zalando/postgres-operator.svg?branch=master)](https://travis-ci.org/zalando/postgres-operator)
-[![Coverage Status](https://coveralls.io/repos/github/zalando/postgres-operator/badge.svg)](https://coveralls.io/github/zalando/postgres-operator)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zalando/postgres-operator)](https://goreportcard.com/report/github.com/zalando/postgres-operator)
-[![GoDoc](https://godoc.org/github.com/zalando/postgres-operator?status.svg)](https://godoc.org/github.com/zalando/postgres-operator)
-[![golangci](https://golangci.com/badges/github.com/zalando/postgres-operator.svg)](https://golangci.com/r/github.com/zalando/postgres-operator)
+![Tests](https://github.com/zalando/postgres-operator/workflows/operator-tests/badge.svg)
+![E2E Tests](https://github.com/zalando/postgres-operator/workflows/operator-e2e-tests/badge.svg)
+[![Coverage Status](https://coveralls.io/repos/github/zalando/postgres-operator/badge.svg?branch=master)](https://coveralls.io/github/zalando/postgres-operator?branch=master)
 
 <img src="docs/diagrams/logo.png" width="200">
 
-The Postgres Operator enables highly-available [PostgreSQL](https://www.postgresql.org/)
-clusters on Kubernetes (K8s) powered by [Patroni](https://github.com/zalando/spilo).
-It is configured only through manifests to ease integration into automated CI/CD
-pipelines with no access to Kubernetes directly.
+The Postgres Operator delivers an easy to run highly-available [PostgreSQL](https://www.postgresql.org/)
+clusters on Kubernetes (K8s) powered by [Patroni](https://github.com/zalando/patroni).
+It is configured only through Postgres manifests (CRDs) to ease integration into automated CI/CD
+pipelines with no access to Kubernetes API directly, promoting infrastructure as code vs manual operations.
 
 ### Operator features
 
-* Rolling updates on Postgres cluster changes
-* Volume resize without Pod restarts
-* Cloning Postgres clusters
-* Logical Backups to S3 Bucket
-* Standby cluster from S3 WAL archive
+* Rolling updates on Postgres cluster changes, incl. quick minor version updates
+* Live volume resize without pod restarts (AWS EBS, PVC)
+* Database connection pooling with PGBouncer
+* Support fast in place major version upgrade. Supports global upgrade of all clusters.
+* Restore and cloning Postgres clusters on AWS, GCS and Azure
+* Additionally logical backups to S3 or GCS bucket can be configured
+* Standby cluster from S3 or GCS WAL archive
 * Configurable for non-cloud environments
+* Basic credential and user management on K8s, eases application deployments
+* Support for custom TLS certificates
 * UI to create and edit Postgres cluster manifests
+* Support for AWS EBS gp2 to gp3 migration, supporting iops and throughput configuration
+* Compatible with OpenShift
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 9.6+
+* Supports PostgreSQL 15, starting from 10+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
 [WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
 * Preload libraries: [bg_mon](https://github.com/CyberDem0n/bg_mon),
-[pg_stat_statements](https://www.postgresql.org/docs/9.4/pgstatstatements.html),
+[pg_stat_statements](https://www.postgresql.org/docs/15/pgstatstatements.html),
 [pgextwlist](https://github.com/dimitri/pgextwlist),
 [pg_auth_mon](https://github.com/RafiaSabih/pg_auth_mon)
 * Incl. popular Postgres extensions such as
@@ -47,12 +51,29 @@ pipelines with no access to Kubernetes directly.
 [timescaledb](https://github.com/timescale/timescaledb)
 
 The Postgres Operator has been developed at Zalando and is being used in
-production for over two years.
+production for over three years.
+
+## Using Spilo 12 images or lower
+
+If you are already using the Postgres operator in older version with a Spilo 12 Docker image you need to be aware of the changes for the backup path.
+We introduce the major version into the backup path to smoothen the [major version upgrade](docs/administrator.md#minor-and-major-version-upgrade) that is now supported.
+
+The new operator configuration can set a compatibility flag *enable_spilo_wal_path_compat* to make Spilo look for wal segments in the current path but also old format paths.
+This comes at potential performance costs and should be disabled after a few days.
+
+The newest Spilo image is: `ghcr.io/zalando/spilo-15:2.1-p9`
+
+The last Spilo 12 image is: `registry.opensource.zalan.do/acid/spilo-12:1.6-p5`
+
 
 ## Getting started
 
 For a quick first impression follow the instructions of this
 [tutorial](docs/quickstart.md).
+
+## Supported setups of Postgres and Applications
+
+![Features](docs/diagrams/neutral_operator.png)
 
 ## Documentation
 
@@ -68,12 +89,6 @@ There is a browser-friendly version of this documentation at
 * [Configuration options](docs/reference/operator_parameters.md)
 * [Postgres manifest reference](docs/reference/cluster_manifest.md)
 * [Command-line options and environment variables](docs/reference/command_line_and_environment.md)
-
-## Google Summer of Code
-
-The Postgres Operator made it to the [Google Summer of Code 2019](https://summerofcode.withgoogle.com/organizations/5429926902104064/)!
-Check [our ideas](docs/gsoc-2019/ideas.md#google-summer-of-code-2019)
-and start discussions in [the issue tracker](https://github.com/zalando/postgres-operator/issues).
 
 ## Community
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Compose, Zalando SE
+Copyright 2023 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,10 @@ type FakeAcidV1 struct {
 
 func (c *FakeAcidV1) OperatorConfigurations(namespace string) v1.OperatorConfigurationInterface {
 	return &FakeOperatorConfigurations{c, namespace}
+}
+
+func (c *FakeAcidV1) PostgresTeams(namespace string) v1.PostgresTeamInterface {
+	return &FakePostgresTeams{c, namespace}
 }
 
 func (c *FakeAcidV1) Postgresqls(namespace string) v1.PostgresqlInterface {

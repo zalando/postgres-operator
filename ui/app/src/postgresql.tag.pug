@@ -6,11 +6,11 @@ postgresql
         ol.breadcrumb
 
           li.breadcrumb-item
-            a(href='/#/list')
+            a(href='./#/list')
               | PostgreSQL clusters
 
           li.breadcrumb-item(if='{ cluster_path }')
-            a(href='/#/status/{ cluster_path }')
+            a(href='./#/status/{ cluster_path }')
               | { qname }
 
     .row(if='{ cluster_path }')
@@ -39,20 +39,20 @@ postgresql
             )
 
               a.btn.btn-info(
-                href='/#/logs/{ cluster_path }'
+                href='./#/logs/{ cluster_path }'
               )
                 | Logs
 
               a.btn(
                 class='btn-{ opts.read_write ? "primary" : "info" }'
                 if='{ progress.postgresql }'
-                href='/#/clone/{ clustername }/{ uid }/{ encodeURI(new Date().toISOString()) }'
+                href='./#/clone/{ clustername }/{ uid }/{ encodeURI(new Date().toISOString()) }'
               )
                 | Clone
 
               a.btn(
                 class='btn-{ opts.read_write ? "warning" : "info" }'
-                href='/#/edit/{ cluster_path }'
+                href='./#/edit/{ cluster_path }'
               )
                 | Edit
 
@@ -74,7 +74,12 @@ postgresql
 
         .alert.alert-info(if='{ !progress.requestStatus }') PostgreSQL cluster requested
         .alert.alert-danger(if='{ progress.requestStatus !== "OK" }') Create request failed
-        .alert.alert-success(if='{ progress.requestStatus === "OK" }') Create request successful ({ new Date(progress.createdTimestamp).toLocaleString() })
+        .alert.alert-success(if='{ progress.requestStatus === "OK" }') Manifest creation successful ({ new Date(progress.createdTimestamp).toLocaleString() })
+
+        .alert.alert-info(if='{ !progress.postgresql }') PostgreSQL cluster manifest pending
+        .alert.alert-success(if='{ progress.postgresql }') PostgreSQL cluster manifest created
+
+        .alert.alert-danger(if='{progress.status && progress.status.PostgresClusterStatus == "CreateFailed"}') Cluster creation failed: Check events and cluster name!
 
         .alert.alert-info(if='{ !progress.statefulSet }') StatefulSet pending
         .alert.alert-success(if='{ progress.statefulSet }') StatefulSet created
@@ -88,6 +93,8 @@ postgresql
         .alert.alert-info(if='{ progress.containerFirst && !progress.masterLabel }') Waiting for master to become available
         .alert.alert-success(if='{ progress.masterLabel }') PostgreSQL master available, label is attached
         .alert.alert-success(if='{ progress.masterLabel && progress.dnsName }') PostgreSQL ready: <strong>{ progress.dnsName }</strong>
+
+        .alert.alert-success(if='{ progress.pooler }') Connection pooler deployment created
 
       .col-lg-3
         help-general(config='{ opts.config }')
@@ -117,22 +124,26 @@ postgresql
 
     this.pollProgress = () => {
       jQuery.get(
-        '/postgresqls/' + this.cluster_path,
+        './postgresqls/' + this.cluster_path,
       ).done(data => {
+        this.progress.pooler = false
         this.progress.postgresql = true
         this.progress.postgresqlManifest = data
+        // copy status as we delete later for edit
+        this.progress.status = data.status
         this.progress.createdTimestamp = data.metadata.creationTimestamp
+        this.progress.poolerEnabled = data.spec.enableConnectionPooler
         this.uid = this.progress.postgresqlManifest.metadata.uid
         this.update()
 
         jQuery.get(
-          '/statefulsets/' + this.cluster_path,
+          './statefulsets/' + this.cluster_path,
         ).done(data => {
           this.progress.statefulSet = true
           this.update()
 
           jQuery.get(
-            '/statefulsets/' + this.cluster_path + '/pods',
+            './statefulsets/' + this.cluster_path + '/pods',
           ).done(data => {
             if (data.length > 0) {
                 this.progress.containerFirst = true
@@ -146,7 +157,7 @@ postgresql
             this.update()
 
             jQuery.get(
-              '/services/' + this.cluster_path,
+              './services/' + this.cluster_path,
             ).done(data => {
               if (data.metadata && data.metadata.annotations && 'zalando.org/dnsname' in data.metadata.annotations) {
                 this.progress.dnsName = data.metadata.annotations['zalando.org/dnsname']
@@ -155,6 +166,13 @@ postgresql
               } else {
                 // Kubernetes Service name should resolve
                 this.progress.dnsName = data.metadata.name + '.' + data.metadata.namespace
+              }
+
+              if (this.progress.poolerEnabled == true) {
+                jQuery.get('./pooler/' + this.cluster_path).done(data => {
+                  this.progress.pooler = {"url": ""}
+                  this.update()
+                })
               }
 
               this.update()
@@ -191,6 +209,7 @@ postgresql
           delete manifest.metadata.annotations[last_applied]
         }
 
+        delete manifest.metadata.managedFields
         delete manifest.metadata.creationTimestamp
         delete manifest.metadata.deletionGracePeriodSeconds
         delete manifest.metadata.deletionTimestamp

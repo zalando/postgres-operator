@@ -1,41 +1,54 @@
 package controller
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/cache"
-
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/apiserver"
 	"github.com/zalando/postgres-operator/pkg/cluster"
+	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/ringlog"
-
-	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
+	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/reference"
 )
 
 // Controller represents operator controller
 type Controller struct {
-	config   spec.ControllerConfig
-	opConfig *config.Config
+	config    spec.ControllerConfig
+	opConfig  *config.Config
+	pgTeamMap teams.PostgresTeamMap
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
 	apiserver  *apiserver.Server
 
+	eventRecorder    record.EventRecorder
+	eventBroadcaster record.EventBroadcaster
+
 	stopCh chan struct{}
 
+	controllerID     string
 	curWorkerID      uint32 //initialized with 0
 	curWorkerCluster sync.Map
 	clusterWorkers   map[spec.NamespacedName]uint32
@@ -45,10 +58,11 @@ type Controller struct {
 	clusterHistory   map[spec.NamespacedName]ringlog.RingLogger // history of the cluster changes
 	teamClusters     map[string][]spec.NamespacedName
 
-	postgresqlInformer cache.SharedIndexInformer
-	podInformer        cache.SharedIndexInformer
-	nodesInformer      cache.SharedIndexInformer
-	podCh              chan cluster.PodEvent
+	postgresqlInformer   cache.SharedIndexInformer
+	postgresTeamInformer cache.SharedIndexInformer
+	podInformer          cache.SharedIndexInformer
+	nodesInformer        cache.SharedIndexInformer
+	podCh                chan cluster.PodEvent
 
 	clusterEventQueues    []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime   int64
@@ -57,17 +71,41 @@ type Controller struct {
 	workerLogs map[uint32]ringlog.RingLogger
 
 	PodServiceAccount            *v1.ServiceAccount
-	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
+	PodServiceAccountRoleBinding *rbacv1.RoleBinding
 }
 
 // NewController creates a new controller
-func NewController(controllerConfig *spec.ControllerConfig) *Controller {
+func NewController(controllerConfig *spec.ControllerConfig, controllerId string) *Controller {
 	logger := logrus.New()
+	if controllerConfig.EnableJsonLogging {
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	} else {
+		if os.Getenv("LOG_NOQUOTE") != "" {
+			logger.SetFormatter(&logrus.TextFormatter{PadLevelText: true, DisableQuote: true})
+		}
+	}
+
+	var myComponentName = "postgres-operator"
+	if controllerId != "" {
+		myComponentName += "/" + controllerId
+	}
+
+	eventBroadcaster := record.NewBroadcaster()
+
+	// disabling the sending of events also to the logoutput
+	// the operator currently duplicates a lot of log entries with this setup
+	// eventBroadcaster.StartLogging(logger.Infof)
+	scheme := scheme.Scheme
+	acidv1.AddToScheme(scheme)
+	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: myComponentName})
 
 	c := &Controller{
 		config:           *controllerConfig,
 		opConfig:         &config.Config{},
 		logger:           logger.WithField("pkg", "controller"),
+		eventRecorder:    recorder,
+		eventBroadcaster: eventBroadcaster,
+		controllerID:     controllerId,
 		curWorkerCluster: sync.Map{},
 		clusterWorkers:   make(map[spec.NamespacedName]uint32),
 		clusters:         make(map[spec.NamespacedName]*cluster.Cluster),
@@ -89,6 +127,11 @@ func (c *Controller) initClients() {
 	if err != nil {
 		c.logger.Fatalf("could not create kubernetes clients: %v", err)
 	}
+	c.eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: c.KubeClient.EventsGetter.Events("")})
+	if err != nil {
+		c.logger.Fatalf("could not setup kubernetes event sink: %v", err)
+	}
+
 }
 
 func (c *Controller) initOperatorConfig() {
@@ -96,7 +139,7 @@ func (c *Controller) initOperatorConfig() {
 
 	if c.config.ConfigMapName != (spec.NamespacedName{}) {
 		configMap, err := c.KubeClient.ConfigMaps(c.config.ConfigMapName.Namespace).
-			Get(c.config.ConfigMapName.Name, metav1.GetOptions{})
+			Get(context.TODO(), c.config.ConfigMapName.Name, metav1.GetOptions{})
 		if err != nil {
 			panic(err)
 		}
@@ -111,7 +154,7 @@ func (c *Controller) initOperatorConfig() {
 
 	if c.opConfig.SetMemoryRequestToLimit {
 
-		isSmaller, err := util.RequestIsSmallerThanLimit(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
+		isSmaller, err := util.IsSmallerQuantity(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
 		if err != nil {
 			panic(err)
 		}
@@ -120,7 +163,7 @@ func (c *Controller) initOperatorConfig() {
 			c.opConfig.DefaultMemoryRequest = c.opConfig.DefaultMemoryLimit
 		}
 
-		isSmaller, err = util.RequestIsSmallerThanLimit(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
+		isSmaller, err = util.IsSmallerQuantity(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
 		if err != nil {
 			panic(err)
 		}
@@ -155,18 +198,35 @@ func (c *Controller) warnOnDeprecatedOperatorParameters() {
 		c.logger.Warningf("Operator configuration parameter 'enable_load_balancer' is deprecated and takes no effect. " +
 			"Consider using the 'enable_master_load_balancer' or 'enable_replica_load_balancer' instead.")
 	}
+
+	if len(c.opConfig.SidecarImages) > 0 {
+		c.logger.Warningf("Operator configuration parameter 'sidecar_docker_images' is deprecated. " +
+			"Consider using 'sidecars' instead.")
+	}
+}
+
+func compactValue(v string) string {
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, []byte(v)); err != nil {
+		panic("Hard coded json strings broken!")
+	}
+	return compact.String()
 }
 
 func (c *Controller) initPodServiceAccount() {
 
 	if c.opConfig.PodServiceAccountDefinition == "" {
-		c.opConfig.PodServiceAccountDefinition = `
-		{ "apiVersion": "v1",
-		  "kind": "ServiceAccount",
-		  "metadata": {
-				 "name": "operator"
-		   }
+		stringValue := `
+		{
+			"apiVersion": "v1",
+			"kind": "ServiceAccount",
+			"metadata": {
+				"name": "postgres-pod"
+			}
 		}`
+
+		c.opConfig.PodServiceAccountDefinition = compactValue(stringValue)
+
 	}
 
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
@@ -175,13 +235,13 @@ func (c *Controller) initPodServiceAccount() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse pod service account definition from the operator config map: %v", err))
+		panic(fmt.Errorf("Unable to parse pod service account definition from the operator configuration: %v", err))
 	case groupVersionKind.Kind != "ServiceAccount":
-		panic(fmt.Errorf("pod service account definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+		panic(fmt.Errorf("pod service account definition in the operator configuration defines another type of resource: %v", groupVersionKind.Kind))
 	default:
 		c.PodServiceAccount = obj.(*v1.ServiceAccount)
 		if c.PodServiceAccount.Name != c.opConfig.PodServiceAccountName {
-			c.logger.Warnf("in the operator config map, the pod service account name %v does not match the name %v given in the account definition; using the former for consistency", c.opConfig.PodServiceAccountName, c.PodServiceAccount.Name)
+			c.logger.Warnf("in the operator configuration, the pod service account name %v does not match the name %v given in the account definition; using the former for consistency", c.opConfig.PodServiceAccountName, c.PodServiceAccount.Name)
 			c.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
 		}
 		c.PodServiceAccount.Namespace = ""
@@ -196,9 +256,9 @@ func (c *Controller) initRoleBinding() {
 	// operator binds it to the cluster role with sufficient privileges
 	// we assume the role is created by the k8s administrator
 	if c.opConfig.PodServiceAccountRoleBindingDefinition == "" {
-		c.opConfig.PodServiceAccountRoleBindingDefinition = fmt.Sprintf(`
+		stringValue := fmt.Sprintf(`
 		{
-			"apiVersion": "rbac.authorization.k8s.io/v1beta1",
+			"apiVersion": "rbac.authorization.k8s.io/v1",
 			"kind": "RoleBinding",
 			"metadata": {
 				   "name": "%s"
@@ -215,6 +275,7 @@ func (c *Controller) initRoleBinding() {
 				}
 			]
 		}`, c.PodServiceAccount.Name, c.PodServiceAccount.Name, c.PodServiceAccount.Name)
+		c.opConfig.PodServiceAccountRoleBindingDefinition = compactValue(stringValue)
 	}
 	c.logger.Info("Parse role bindings")
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
@@ -223,25 +284,35 @@ func (c *Controller) initRoleBinding() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse the definition of the role binding for the pod service account definition from the operator config map: %v", err))
+		panic(fmt.Errorf("unable to parse the role binding definition from the operator configuration: %v", err))
 	case groupVersionKind.Kind != "RoleBinding":
-		panic(fmt.Errorf("role binding definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+		panic(fmt.Errorf("role binding definition in the operator configuration defines another type of resource: %v", groupVersionKind.Kind))
 	default:
-		c.PodServiceAccountRoleBinding = obj.(*rbacv1beta1.RoleBinding)
+		c.PodServiceAccountRoleBinding = obj.(*rbacv1.RoleBinding)
 		c.PodServiceAccountRoleBinding.Namespace = ""
 		c.logger.Info("successfully parsed")
 
 	}
 
-	// actual roles bindings are deployed at the time of Postgres/Spilo cluster creation
+	// actual roles bindings ar*logrus.Entrye deployed at the time of Postgres/Spilo cluster creation
+}
+
+func logMultiLineConfig(log *logrus.Entry, config string) {
+	lines := strings.Split(config, "\n")
+	for _, l := range lines {
+		log.Infof("%s", l)
+	}
 }
 
 func (c *Controller) initController() {
 	c.initClients()
+	c.controllerID = os.Getenv("CONTROLLER_ID")
 
 	if configObjectName := os.Getenv("POSTGRES_OPERATOR_CONFIGURATION_OBJECT"); configObjectName != "" {
-		if err := c.createConfigurationCRD(c.opConfig.EnableCRDValidation); err != nil {
-			c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
+		if c.opConfig.EnableCRDRegistration != nil && *c.opConfig.EnableCRDRegistration {
+			if err := c.createConfigurationCRD(); err != nil {
+				c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
+			}
 		}
 		if cfg, err := c.readOperatorConfigurationFromCRD(spec.GetOperatorNamespace(), configObjectName); err != nil {
 			c.logger.Fatalf("unable to read operator configuration: %v", err)
@@ -256,20 +327,27 @@ func (c *Controller) initController() {
 
 	c.modifyConfigFromEnvironment()
 
-	if err := c.createPostgresCRD(c.opConfig.EnableCRDValidation); err != nil {
-		c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
+	if c.opConfig.EnableCRDRegistration != nil && *c.opConfig.EnableCRDRegistration {
+		if err := c.createPostgresCRD(); err != nil {
+			c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
+		}
 	}
 
-	c.initPodServiceAccount()
 	c.initSharedInformers()
+
+	c.pgTeamMap = teams.PostgresTeamMap{}
+	if c.opConfig.EnablePostgresTeamCRD {
+		c.loadPostgresTeams()
+	}
 
 	if c.opConfig.DebugLogging {
 		c.logger.Logger.Level = logrus.DebugLevel
 	}
 
-	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
+	logMultiLineConfig(c.logger, c.opConfig.MustMarshal())
 
-	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
+	roleDefs := c.getInfrastructureRoleDefinitions()
+	if infraRoles, err := c.getInfrastructureRoles(roleDefs); err != nil {
 		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.config.InfrastructureRoles = infraRoles
@@ -293,6 +371,7 @@ func (c *Controller) initController() {
 
 func (c *Controller) initSharedInformers() {
 
+	// Postgresqls
 	c.postgresqlInformer = acidv1informer.NewPostgresqlInformer(
 		c.KubeClient.AcidV1ClientSet,
 		c.opConfig.WatchedNamespace,
@@ -304,6 +383,20 @@ func (c *Controller) initSharedInformers() {
 		UpdateFunc: c.postgresqlUpdate,
 		DeleteFunc: c.postgresqlDelete,
 	})
+
+	// PostgresTeams
+	if c.opConfig.EnablePostgresTeamCRD {
+		c.postgresTeamInformer = acidv1informer.NewPostgresTeamInformer(
+			c.KubeClient.AcidV1ClientSet,
+			c.opConfig.WatchedNamespace,
+			constants.QueueResyncPeriodTPR*6, // 30 min
+			cache.Indexers{})
+
+		c.postgresTeamInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    c.postgresTeamAdd,
+			UpdateFunc: c.postgresTeamUpdate,
+		})
+	}
 
 	// Pods
 	podLw := &cache.ListWatch{
@@ -358,12 +451,16 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 		panic("could not acquire initial list of clusters")
 	}
 
-	wg.Add(5)
+	wg.Add(5 + util.Bool2Int(c.opConfig.EnablePostgresTeamCRD))
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
 	go c.apiserver.Run(stopCh, wg)
 	go c.kubeNodesInformer(stopCh, wg)
+
+	if c.opConfig.EnablePostgresTeamCRD {
+		go c.runPostgresTeamInformer(stopCh, wg)
+	}
 
 	c.logger.Info("started working in background")
 }
@@ -378,6 +475,12 @@ func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.Wait
 	defer wg.Done()
 
 	c.postgresqlInformer.Run(stopCh)
+}
+
+func (c *Controller) runPostgresTeamInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	c.postgresTeamInformer.Run(stopCh)
 }
 
 func queueClusterKey(eventType EventType, uid types.UID) string {
@@ -401,7 +504,7 @@ func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFr
 
 	} else {
 
-		if _, err := c.KubeClient.Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+		if _, err := c.KubeClient.Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
 			c.logger.Fatalf("Could not find the watched namespace %q", namespace)
 		} else {
 			c.logger.Infof("Listenting to the specific namespace %q", namespace)
@@ -410,4 +513,58 @@ func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFr
 	}
 
 	return namespace
+}
+
+// GetReference of Postgres CR object
+// i.e. required to emit events to this resource
+func (c *Controller) GetReference(postgresql *acidv1.Postgresql) *v1.ObjectReference {
+	ref, err := reference.GetReference(scheme.Scheme, postgresql)
+	if err != nil {
+		c.logger.Errorf("could not get reference for Postgresql CR %v/%v: %v", postgresql.Namespace, postgresql.Name, err)
+	}
+	return ref
+}
+
+func (c *Controller) meetsClusterDeleteAnnotations(postgresql *acidv1.Postgresql) error {
+
+	deleteAnnotationDateKey := c.opConfig.DeleteAnnotationDateKey
+	currentTime := time.Now()
+	currentDate := currentTime.Format("2006-01-02") // go's reference date
+
+	if deleteAnnotationDateKey != "" {
+		if deleteDate, ok := postgresql.Annotations[deleteAnnotationDateKey]; ok {
+			if deleteDate != currentDate {
+				return fmt.Errorf("annotation %s not matching the current date: got %s, expected %s", deleteAnnotationDateKey, deleteDate, currentDate)
+			}
+		} else {
+			return fmt.Errorf("annotation %s not set in manifest to allow cluster deletion", deleteAnnotationDateKey)
+		}
+	}
+
+	deleteAnnotationNameKey := c.opConfig.DeleteAnnotationNameKey
+
+	if deleteAnnotationNameKey != "" {
+		if clusterName, ok := postgresql.Annotations[deleteAnnotationNameKey]; ok {
+			if clusterName != postgresql.Name {
+				return fmt.Errorf("annotation %s not matching the cluster name: got %s, expected %s", deleteAnnotationNameKey, clusterName, postgresql.Name)
+			}
+		} else {
+			return fmt.Errorf("annotation %s not set in manifest to allow cluster deletion", deleteAnnotationNameKey)
+		}
+	}
+
+	return nil
+}
+
+// hasOwnership returns true if the controller is the "owner" of the postgresql.
+// Whether it's owner is determined by the value of 'acid.zalan.do/controller'
+// annotation. If the value matches the controllerID then it owns it, or if the
+// controllerID is "" and there's no annotation set.
+func (c *Controller) hasOwnership(postgresql *acidv1.Postgresql) bool {
+	if postgresql.Annotations != nil {
+		if owner, ok := postgresql.Annotations[constants.PostgresqlControllerAnnotationKey]; ok {
+			return owner == c.controllerID
+		}
+	}
+	return c.controllerID == ""
 }

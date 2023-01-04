@@ -1,5 +1,5 @@
 {{ if .Values.rbac.create }}
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ include "postgres-operator.serviceAccountName" . }}
@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 rules:
+# all verbs allowed for custom operator resources
 - apiGroups:
   - acid.zalan.do
   resources:
@@ -16,16 +17,80 @@ rules:
   - postgresqls/status
   - operatorconfigurations
   verbs:
-  - "*"
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+# operator only reads PostgresTeams
+- apiGroups:
+  - acid.zalan.do
+  resources:
+  - postgresteams
+  verbs:
+  - get
+  - list
+  - watch
+# all verbs allowed for event streams
+{{- if .Values.enableStreams }}
+- apiGroups:
+  - zalando.org
+  resources:
+  - fabriceventstreams
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+{{- end }}
+# to create or get/update CRDs when starting up
 - apiGroups:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
   verbs:
-  - create
   - get
+{{- if toString .Values.configGeneral.enable_crd_registration | eq "true" }}
+  - create
   - patch
   - update
+{{- end }}
+# to send events to the CRs
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+# to manage endpoints/configmaps which are also used by Patroni
+{{- if toString .Values.configGeneral.kubernetes_use_configmaps | eq "true" }}
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+{{- else }}
+# to read configuration from ConfigMaps
 - apiGroups:
   - ""
   resources:
@@ -43,16 +108,20 @@ rules:
   - get
   - list
   - patch
-  - watch  # needed if zalando-postgres-operator account is used for pods as well
+  - update
+  - watch
+{{- end }}
+# to CRUD secrets for database access
 - apiGroups:
   - ""
   resources:
   - secrets
   verbs:
   - create
-  - update
   - delete
   - get
+  - update
+# to check nodes for node readiness label
 - apiGroups:
   - ""
   resources:
@@ -61,6 +130,7 @@ rules:
   - get
   - list
   - watch
+# to read or delete existing PVCs. Creation via StatefulSet
 - apiGroups:
   - ""
   resources:
@@ -69,6 +139,11 @@ rules:
   - delete
   - get
   - list
+{{- if toString .Values.configKubernetes.storage_resize_mode | eq "pvc" }}
+  - patch
+  - update
+{{- end }}
+ # to read existing PVs. Creation should be done via dynamic provisioning
 - apiGroups:
   - ""
   resources:
@@ -76,7 +151,10 @@ rules:
   verbs:
   - get
   - list
+{{- if toString .Values.configKubernetes.storage_resize_mode | eq "ebs" }}
   - update  # only for resizing AWS volumes
+{{- end }}
+# to watch Spilo pods and do rolling updates. Creation via StatefulSet
 - apiGroups:
   - ""
   resources:
@@ -85,14 +163,17 @@ rules:
   - delete
   - get
   - list
-  - watch
   - patch
+  - update
+  - watch
+# to resize the filesystem in Spilo pods when increasing volume size
 - apiGroups:
   - ""
   resources:
   - pods/exec
   verbs:
   - create
+# to CRUD services to point to Postgres cluster instances
 - apiGroups:
   - ""
   resources:
@@ -102,22 +183,39 @@ rules:
   - delete
   - get
   - patch
+  - update
+# to CRUD the StatefulSet which controls the Postgres cluster instances
 - apiGroups:
   - apps
   resources:
   - statefulsets
+  - deployments
   verbs:
   - create
   - delete
   - get
   - list
   - patch
+# to CRUD cron jobs for logical backups
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+# to get namespaces operator resources can run in
 - apiGroups:
   - ""
   resources:
   - namespaces
   verbs:
   - get
+# to define PDBs. Update happens via delete/create
 - apiGroups:
   - policy
   resources:
@@ -126,6 +224,7 @@ rules:
   - create
   - delete
   - get
+# to create ServiceAccounts in each namespace the operator watches
 - apiGroups:
   - ""
   resources:
@@ -133,30 +232,23 @@ rules:
   verbs:
   - get
   - create
+# to create role bindings to the postgres-pod service account
 - apiGroups:
-  - "rbac.authorization.k8s.io"
+  - rbac.authorization.k8s.io
   resources:
   - rolebindings
   verbs:
   - get
   - create
+{{- if toString .Values.configKubernetes.spilo_privileged | eq "true" }}
+# to run privileged pods
 - apiGroups:
-  - "rbac.authorization.k8s.io"
+  - extensions
   resources:
-  - clusterroles
-  verbs:
-  - bind
+  - podsecuritypolicies
   resourceNames:
-  - {{ include "postgres-operator.serviceAccountName" . }}
-- apiGroups:
-  - batch
-  resources:
-  - cronjobs  # enables logical backups
+  - privileged
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
+  - use
+{{- end }}
 {{ end }}

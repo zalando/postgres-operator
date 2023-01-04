@@ -1,7 +1,9 @@
 package controller
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -19,7 +21,7 @@ func (c *Controller) podListFunc(options metav1.ListOptions) (runtime.Object, er
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.Pods(c.opConfig.WatchedNamespace).List(opts)
+	return c.KubeClient.Pods(c.opConfig.WatchedNamespace).List(context.TODO(), opts)
 }
 
 func (c *Controller) podWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
@@ -29,7 +31,7 @@ func (c *Controller) podWatchFunc(options metav1.ListOptions) (watch.Interface, 
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.Pods(c.opConfig.WatchedNamespace).Watch(opts)
+	return c.KubeClient.Pods(c.opConfig.WatchedNamespace).Watch(context.TODO(), opts)
 }
 
 func (c *Controller) dispatchPodEvent(clusterName spec.NamespacedName, event cluster.PodEvent) {
