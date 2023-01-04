@@ -962,17 +962,17 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_USE_CONFIGMAPS", Value: "true"})
 	}
 
+	// fetch cluster-specific variables that will override all subsequent global variables
+	if len(spec.Env) > 0 {
+		envVars = appendEnvVars(envVars, spec.Env...)
+	}
+
 	if spec.Clone != nil && spec.Clone.ClusterName != "" {
 		envVars = append(envVars, c.generateCloneEnvironment(spec.Clone)...)
 	}
 
 	if spec.StandbyCluster != nil {
 		envVars = append(envVars, c.generateStandbyEnvironment(spec.StandbyCluster)...)
-	}
-
-	// fetch cluster-specific variables that will override all subsequent global variables
-	if len(spec.Env) > 0 {
-		envVars = appendEnvVars(envVars, spec.Env...)
 	}
 
 	// fetch variables from custom environment Secret
