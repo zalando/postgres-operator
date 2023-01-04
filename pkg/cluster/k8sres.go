@@ -495,17 +495,26 @@ func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinit
 	}
 }
 
-func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1.Affinity) *v1.Affinity {
-	// generate pod anti-affinity to avoid multiple pods of the same Postgres cluster in the same topology , e.g. node
-	podAffinity := v1.Affinity{
-		PodAntiAffinity: &v1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
-				LabelSelector: &metav1.LabelSelector{
-					MatchLabels: labels,
-				},
-				TopologyKey: topologyKey,
-			}},
+func podAffinity(
+	labels labels.Set,
+	topologyKey string,
+	nodeAffinity *v1.Affinity,
+	preferredDuringScheduling bool,
+	anti bool) *v1.Affinity {
+
+	var podAffinity v1.Affinity
+
+	podAffinityTerm := v1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
 		},
+		TopologyKey: topologyKey,
+	}
+
+	if anti {
+		podAffinity.PodAntiAffinity = generatePodAntiAffinity(podAffinityTerm, preferredDuringScheduling)
+	} else {
+		podAffinity.PodAffinity = generatePodAffinity(podAffinityTerm, preferredDuringScheduling)
 	}
 
 	if nodeAffinity != nil && nodeAffinity.NodeAffinity != nil {
@@ -513,6 +522,36 @@ func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1
 	}
 
 	return &podAffinity
+}
+
+func generatePodAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuringScheduling bool) *v1.PodAffinity {
+	podAffinity := &v1.PodAffinity{}
+
+	if preferredDuringScheduling {
+		podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []v1.WeightedPodAffinityTerm{{
+			Weight:          1,
+			PodAffinityTerm: podAffinityTerm,
+		}}
+	} else {
+		podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []v1.PodAffinityTerm{podAffinityTerm}
+	}
+
+	return podAffinity
+}
+
+func generatePodAntiAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuringScheduling bool) *v1.PodAntiAffinity {
+	podAntiAffinity := &v1.PodAntiAffinity{}
+
+	if preferredDuringScheduling {
+		podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []v1.WeightedPodAffinityTerm{{
+			Weight:          1,
+			PodAffinityTerm: podAffinityTerm,
+		}}
+	} else {
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []v1.PodAffinityTerm{podAffinityTerm}
+	}
+
+	return podAntiAffinity
 }
 
 func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
@@ -713,6 +752,7 @@ func (c *Cluster) generatePodTemplate(
 	spiloContainer *v1.Container,
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
+	sharePgSocketWithSidecars *bool,
 	tolerationsSpec *[]v1.Toleration,
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
@@ -726,6 +766,7 @@ func (c *Cluster) generatePodTemplate(
 	shmVolume *bool,
 	podAntiAffinity bool,
 	podAntiAffinityTopologyKey string,
+	podAntiAffinityPreferredDuringScheduling bool,
 	additionalSecretMount string,
 	additionalSecretMountPath string,
 	additionalVolumes []acidv1.AdditionalVolume,
@@ -766,13 +807,23 @@ func (c *Cluster) generatePodTemplate(
 	}
 
 	if podAntiAffinity {
-		podSpec.Affinity = generatePodAffinity(labels, podAntiAffinityTopologyKey, nodeAffinity)
+		podSpec.Affinity = podAffinity(
+			labels,
+			podAntiAffinityTopologyKey,
+			nodeAffinity,
+			podAntiAffinityPreferredDuringScheduling,
+			true,
+		)
 	} else if nodeAffinity != nil {
 		podSpec.Affinity = nodeAffinity
 	}
 
 	if priorityClassName != "" {
 		podSpec.PriorityClassName = priorityClassName
+	}
+
+	if sharePgSocketWithSidecars != nil && *sharePgSocketWithSidecars {
+		addVarRunVolume(&podSpec)
 	}
 
 	if additionalSecretMount != "" {
@@ -1124,7 +1175,7 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 func generateSpiloReadinessProbe() *v1.Probe {
 	return &v1.Probe{
 		FailureThreshold: 3,
-		Handler: v1.Handler{
+		ProbeHandler: v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path:   "/readiness",
 				Port:   intstr.IntOrString{IntVal: patroni.ApiPort},
@@ -1357,6 +1408,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		spiloContainer,
 		initContainers,
 		sidecarContainers,
+		c.OpConfig.SharePgSocketWithSidecars,
 		&tolerationSpec,
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
@@ -1370,6 +1422,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		mountShmVolumeNeeded(c.OpConfig, spec),
 		c.OpConfig.EnablePodAntiAffinity,
 		c.OpConfig.PodAntiAffinityTopologyKey,
+		c.OpConfig.PodAntiAffinityPreferredDuringScheduling,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		additionalVolumes)
@@ -1546,6 +1599,28 @@ func addShmVolume(podSpec *v1.PodSpec) {
 		})
 
 	podSpec.Containers[postgresContainerIdx].VolumeMounts = mounts
+
+	podSpec.Volumes = volumes
+}
+
+func addVarRunVolume(podSpec *v1.PodSpec) {
+	volumes := append(podSpec.Volumes, v1.Volume{
+		Name: "postgresql-run",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium: "Memory",
+			},
+		},
+	})
+
+	for i := range podSpec.Containers {
+		mounts := append(podSpec.Containers[i].VolumeMounts,
+			v1.VolumeMount{
+				Name:      constants.RunVolumeName,
+				MountPath: constants.RunVolumePath,
+			})
+		podSpec.Containers[i].VolumeMounts = mounts
+	}
 
 	podSpec.Volumes = volumes
 }
@@ -2055,20 +2130,15 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		c.OpConfig.ClusterNameLabel: c.Name,
 		"application":               "spilo-logical-backup",
 	}
-	podAffinityTerm := v1.PodAffinityTerm{
-		LabelSelector: &metav1.LabelSelector{
-			MatchLabels: labels,
-		},
-		TopologyKey: "kubernetes.io/hostname",
-	}
-	podAffinity := v1.Affinity{
-		PodAffinity: &v1.PodAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
-				Weight:          1,
-				PodAffinityTerm: podAffinityTerm,
-			},
-			},
-		}}
+
+	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil)
+	podAffinity := podAffinity(
+		labels,
+		"kubernetes.io/hostname",
+		nodeAffinity,
+		true,
+		false,
+	)
 
 	annotations := c.generatePodAnnotations(&c.Spec)
 
@@ -2080,6 +2150,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},
+		util.False(),
 		&[]v1.Toleration{},
 		nil,
 		nil,
@@ -2093,6 +2164,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		util.False(),
 		false,
 		"",
+		false,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		[]acidv1.AdditionalVolume{}); err != nil {
@@ -2100,7 +2172,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 	}
 
 	// overwrite specific params of logical backups pods
-	podTemplate.Spec.Affinity = &podAffinity
+	podTemplate.Spec.Affinity = podAffinity
 	podTemplate.Spec.RestartPolicy = "Never" // affects containers within a pod
 
 	// configure a batch job

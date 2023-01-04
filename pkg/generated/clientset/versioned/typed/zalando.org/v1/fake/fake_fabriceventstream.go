@@ -111,7 +111,7 @@ func (c *FakeFabricEventStreams) Update(ctx context.Context, fabricEventStream *
 // Delete takes name of the fabricEventStream and deletes it. Returns an error if one occurs.
 func (c *FakeFabricEventStreams) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(fabriceventstreamsResource, c.ns, name), &zalandoorgv1.FabricEventStream{})
+		Invokes(testing.NewDeleteActionWithOptions(fabriceventstreamsResource, c.ns, name, opts), &zalandoorgv1.FabricEventStream{})
 
 	return err
 }

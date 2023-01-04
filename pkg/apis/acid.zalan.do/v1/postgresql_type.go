@@ -115,10 +115,10 @@ type PreparedSchema struct {
 
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.
 type MaintenanceWindow struct {
-	Everyday  bool
-	Weekday   time.Weekday
-	StartTime metav1.Time // Start time
-	EndTime   metav1.Time // End time
+	Everyday  bool         `json:"everyday,omitempty"`
+	Weekday   time.Weekday `json:"weekday,omitempty"`
+	StartTime metav1.Time  `json:"startTime,omitempty"`
+	EndTime   metav1.Time  `json:"endTime,omitempty"`
 }
 
 // Volume describes a single volume in the manifest.

@@ -84,6 +84,7 @@ type Cluster struct {
 	userSyncStrategy spec.UserSyncer
 	deleteOptions    metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
+	replicationSlots map[string]interface{}
 
 	teamsAPIClient      teams.Interface
 	oauthTokenGetter    OAuthTokenGetter
@@ -91,7 +92,6 @@ type Cluster struct {
 	currentProcess      Process
 	processMu           sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu              sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-	streamApplications  []string
 	ConnectionPooler    map[PostgresRole]*ConnectionPoolerObjects
 	EBSVolumes          map[string]volumes.VolumeProperties
 	VolumeResizer       volumes.VolumeResizer
@@ -141,6 +141,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
 		currentMajorVersion: 0,
+		replicationSlots:    make(map[string]interface{}),
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
@@ -373,6 +374,10 @@ func (c *Cluster) Create() error {
 		if err = c.syncStreams(); err != nil {
 			c.logger.Errorf("could not create streams: %v", err)
 		}
+	}
+
+	for slotName, desiredSlot := range c.Spec.Patroni.Slots {
+		c.replicationSlots[slotName] = desiredSlot
 	}
 
 	return nil

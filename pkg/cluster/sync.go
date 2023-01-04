@@ -579,8 +579,18 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 		}
 	}
 
+	slotsToSet := make(map[string]interface{})
+	// check if there is any slot deletion
+	for slotName, effectiveSlot := range c.replicationSlots {
+		if desiredSlot, exists := desiredPatroniConfig.Slots[slotName]; exists {
+			if reflect.DeepEqual(effectiveSlot, desiredSlot) {
+				continue
+			}
+		}
+		slotsToSet[slotName] = nil
+		delete(c.replicationSlots, slotName)
+	}
 	// check if specified slots exist in config and if they differ
-	slotsToSet := make(map[string]map[string]string)
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
 		if effectiveSlot, exists := effectivePatroniConfig.Slots[slotName]; exists {
 			if reflect.DeepEqual(desiredSlot, effectiveSlot) {
@@ -588,6 +598,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 			}
 		}
 		slotsToSet[slotName] = desiredSlot
+		c.replicationSlots[slotName] = desiredSlot
 	}
 	if len(slotsToSet) > 0 {
 		configToSet["slots"] = slotsToSet
@@ -614,7 +625,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 
 	// check if there exist only config updates that require a restart of the primary
-	if !util.SliceContains(restartPrimary, false) && len(configToSet) == 0 {
+	if len(restartPrimary) > 0 && !util.SliceContains(restartPrimary, false) && len(configToSet) == 0 {
 		requiresMasterRestart = true
 	}
 

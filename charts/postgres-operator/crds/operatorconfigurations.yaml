@@ -278,6 +278,9 @@ spec:
                   pdb_name_format:
                     type: string
                     default: "postgres-{cluster}-pdb"
+                  pod_antiaffinity_preferred_during_scheduling:
+                    type: boolean
+                    default: false
                   pod_antiaffinity_topology_key:
                     type: string
                     default: "kubernetes.io/hostname"
@@ -311,6 +314,9 @@ spec:
                   secret_name_template:
                     type: string
                     default: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+                  share_pgsocket_with_sidecars:
+                    type: boolean
+                    default: false
                   spilo_allow_privilege_escalation:
                     type: boolean
                     default: true

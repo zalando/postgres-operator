@@ -1372,6 +1372,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pdb_name_format": {
 								Type: "string",
 							},
+							"pod_antiaffinity_preferred_during_scheduling": {
+								Type: "boolean",
+							},
 							"pod_antiaffinity_topology_key": {
 								Type: "string",
 							},
@@ -1412,6 +1415,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"secret_name_template": {
 								Type: "string",
+							},
+							"share_pgsocket_with_sidecars": {
+								Type: "boolean",
 							},
 							"spilo_runasuser": {
 								Type: "integer",

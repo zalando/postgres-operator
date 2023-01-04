@@ -84,6 +84,7 @@ configuration:
     # node_readiness_label_merge: "OR"
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
+    pod_antiaffinity_preferred_during_scheduling: false
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
     # pod_environment_configmap: "default/my-custom-config"
     # pod_environment_secret: "my-custom-secret"
@@ -95,6 +96,7 @@ configuration:
     # pod_service_account_role_binding_definition: ""
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+    share_pgsocket_with_sidecars: false
     spilo_allow_privilege_escalation: true
     # spilo_runasuser: 101
     # spilo_runasgroup: 103

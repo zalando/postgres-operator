@@ -144,6 +144,13 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	client, _ := newFakeK8sSyncClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
+	testSlots := map[string]map[string]string{
+		"slot1": {
+			"type":     "logical",
+			"plugin":   "wal2json",
+			"database": "foo",
+		},
+	}
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -208,11 +215,26 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 
 	// simulate existing config that differs from cluster.Spec
 	tests := []struct {
-		subtest        string
-		patroni        acidv1.Patroni
-		pgParams       map[string]string
-		restartPrimary bool
+		subtest         string
+		patroni         acidv1.Patroni
+		desiredSlots    map[string]map[string]string
+		removedSlots    map[string]map[string]string
+		pgParams        map[string]string
+		shouldBePatched bool
+		restartPrimary  bool
 	}{
+		{
+			subtest: "Patroni and Postgresql.Parameters do not differ",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+			},
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: false,
+			restartPrimary:  false,
+		},
 		{
 			subtest: "Patroni and Postgresql.Parameters differ - restart replica first",
 			patroni: acidv1.Patroni{
@@ -222,7 +244,8 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 				"log_min_duration_statement": "500", // desired 200
 				"max_connections":            "100", // desired 50
 			},
-			restartPrimary: false,
+			shouldBePatched: true,
+			restartPrimary:  false,
 		},
 		{
 			subtest: "multiple Postgresql.Parameters differ - restart replica first",
@@ -231,7 +254,8 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 				"log_min_duration_statement": "500", // desired 200
 				"max_connections":            "100", // desired 50
 			},
-			restartPrimary: false,
+			shouldBePatched: true,
+			restartPrimary:  false,
 		},
 		{
 			subtest: "desired max_connections bigger - restart replica first",
@@ -240,7 +264,8 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 				"log_min_duration_statement": "200",
 				"max_connections":            "30", // desired 50
 			},
-			restartPrimary: false,
+			shouldBePatched: true,
+			restartPrimary:  false,
 		},
 		{
 			subtest: "desired max_connections smaller - restart master first",
@@ -249,19 +274,105 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 				"log_min_duration_statement": "200",
 				"max_connections":            "100", // desired 50
 			},
-			restartPrimary: true,
+			shouldBePatched: true,
+			restartPrimary:  true,
+		},
+		{
+			subtest: "slot does not exist but is desired",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+			},
+			desiredSlots: testSlots,
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest: "slot exist, nothing specified in manifest",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+				Slots: map[string]map[string]string{
+					"slot1": {
+						"type":     "logical",
+						"plugin":   "pgoutput",
+						"database": "foo",
+					},
+				},
+			},
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: false,
+			restartPrimary:  false,
+		},
+		{
+			subtest: "slot is removed from manifest",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+				Slots: map[string]map[string]string{
+					"slot1": {
+						"type":     "logical",
+						"plugin":   "pgoutput",
+						"database": "foo",
+					},
+				},
+			},
+			removedSlots: testSlots,
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest: "slot plugin differs",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+				Slots: map[string]map[string]string{
+					"slot1": {
+						"type":     "logical",
+						"plugin":   "pgoutput",
+						"database": "foo",
+					},
+				},
+			},
+			desiredSlots: testSlots,
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: true,
+			restartPrimary:  false,
 		},
 	}
 
 	for _, tt := range tests {
+		if len(tt.desiredSlots) > 0 {
+			cluster.Spec.Patroni.Slots = tt.desiredSlots
+		}
+		if len(tt.removedSlots) > 0 {
+			for slotName, removedSlot := range tt.removedSlots {
+				cluster.replicationSlots[slotName] = removedSlot
+			}
+		}
+
 		configPatched, requirePrimaryRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
 		assert.NoError(t, err)
-		if configPatched != true {
+		if configPatched != tt.shouldBePatched {
 			t.Errorf("%s - %s: expected config update did not happen", testName, tt.subtest)
 		}
 		if requirePrimaryRestart != tt.restartPrimary {
 			t.Errorf("%s - %s: wrong master restart strategy, got restart %v, expected restart %v", testName, tt.subtest, requirePrimaryRestart, tt.restartPrimary)
 		}
+
+		// reset slots for next tests
+		cluster.Spec.Patroni.Slots = nil
+		cluster.replicationSlots = make(map[string]interface{})
 	}
 
 	testsFailsafe := []struct {
@@ -342,7 +453,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 			effectiveVal:    util.True(),
 			desiredVal:      true,
 			shouldBePatched: false, // should not require patching
-			restartPrimary:  true,
+			restartPrimary:  false,
 		},
 	}
 

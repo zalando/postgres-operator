@@ -165,6 +165,8 @@ configKubernetes:
 
   # defines the template for PDB (Pod Disruption Budget) names
   pdb_name_format: "postgres-{cluster}-pdb"
+  # switches pod anti affinity type to `preferredDuringSchedulingIgnoredDuringExecution`
+  pod_antiaffinity_preferred_during_scheduling: false
   # override topology key for pod anti affinity
   pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   # namespaced name of the ConfigMap with environment variables to populate on every pod
@@ -189,9 +191,12 @@ configKubernetes:
   # if the user is in different namespace than cluster and cross namespace secrets
   # are enabled via `enable_cross_namespace_secret` flag in the configuration.
   secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+  # sharing unix socket of PostgreSQL (`pg_socket`) with the sidecars
+  share_pgsocket_with_sidecars: false
   # set user and group for the spilo container (required to run Spilo as non-root process)
   # spilo_runasuser: 101
   # spilo_runasgroup: 103
+
   # group ID with write-access to volumes (required to run Spilo as non-root process)
   # spilo_fsgroup: 103
 

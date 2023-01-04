@@ -72,6 +72,7 @@ type KubernetesMetaConfiguration struct {
 	StorageResizeMode                      string                       `json:"storage_resize_mode,omitempty"`
 	EnableInitContainers                   *bool                        `json:"enable_init_containers,omitempty"`
 	EnableSidecars                         *bool                        `json:"enable_sidecars,omitempty"`
+	SharePgSocketWithSidecars              *bool                        `json:"share_pgsocket_with_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate        `json:"secret_name_template,omitempty"`
 	ClusterDomain                          string                       `json:"cluster_domain,omitempty"`
 	OAuthTokenSecretName                   spec.NamespacedName          `json:"oauth_token_secret_name,omitempty"`
@@ -90,16 +91,17 @@ type KubernetesMetaConfiguration struct {
 	NodeReadinessLabelMerge                string                       `json:"node_readiness_label_merge,omitempty"`
 	CustomPodAnnotations                   map[string]string            `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
-	PodToleration              map[string]string   `json:"toleration,omitempty"`
-	PodEnvironmentConfigMap    spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
-	PodEnvironmentSecret       string              `json:"pod_environment_secret,omitempty"`
-	PodPriorityClassName       string              `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout       Duration            `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey string              `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy        string              `json:"pod_management_policy,omitempty"`
-	EnableReadinessProbe       bool                `json:"enable_readiness_probe,omitempty"`
-	EnableCrossNamespaceSecret bool                `json:"enable_cross_namespace_secret,omitempty"`
+	PodToleration                            map[string]string   `json:"toleration,omitempty"`
+	PodEnvironmentConfigMap                  spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
+	PodEnvironmentSecret                     string              `json:"pod_environment_secret,omitempty"`
+	PodPriorityClassName                     string              `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout                     Duration            `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity                    bool                `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityPreferredDuringScheduling bool                `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
+	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
+	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
+	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources

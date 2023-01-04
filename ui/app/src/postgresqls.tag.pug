@@ -6,7 +6,7 @@ postgresqls
         ol.breadcrumb
 
           li.breadcrumb-item
-            a(href='/#/list')
+            a(href='./#/list')
               | PostgreSQL clusters
 
     .sk-spinner-pulse(
@@ -20,7 +20,7 @@ postgresqls
       |
       | or
       |
-      a(href='/') start over
+      a(href='./') start over
       | .
 
     div(
@@ -81,7 +81,7 @@ postgresqls
             td(style='white-space: pre')
               | { namespace }
             td
-              a(href='/#/status/{ cluster_path(this) }') { name }
+              a(href='./#/status/{ cluster_path(this) }') { name }
               btn.btn-danger(if='{status.PostgresClusterStatus == "CreateFailed"}') Create Failed
             td { nodes }
             td { cpu } / { cpu_limit }
@@ -101,7 +101,7 @@ postgresqls
               )
 
                 a.btn.btn-info(
-                  href='/#/status/{ cluster_path(this) }'
+                  href='./#/status/{ cluster_path(this) }'
                 )
                   i.fa.fa-check-circle.regular
                   | Status
@@ -114,21 +114,21 @@ postgresqls
                   | Pgview
 
                 a.btn.btn-info(
-                  href='/#/logs/{ cluster_path(this) }'
+                  href='./#/logs/{ cluster_path(this) }'
                 )
                   i.fa.fa-align-justify
                   | Logs
 
                 a.btn(
                   class='btn-{ opts.read_write ? "primary" : "info" }'
-                  href='/#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
+                  href='./#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
                 )
                   i.fa.fa-clone.regular
                   | Clone
 
                 a.btn(
                   class='btn-{ opts.read_write ? "warning" : "info" }'
-                  href='/#/edit/{ cluster_path(this) }'
+                  href='./#/edit/{ cluster_path(this) }'
                 )
                   | Edit
 
@@ -183,7 +183,7 @@ postgresqls
               | { namespace }
             td
               a(
-                href='/#/status/{ cluster_path(this) }'
+                href='./#/status/{ cluster_path(this) }'
               )
                 | { name }
             td { nodes }
@@ -203,7 +203,7 @@ postgresqls
               )
 
                 a.btn.btn-info(
-                  href='/#/status/{ cluster_path(this) }'
+                  href='./#/status/{ cluster_path(this) }'
                 )
                   i.fa.fa-check-circle.regular
                   | Status
@@ -217,21 +217,21 @@ postgresqls
                   | Pgview
 
                 a.btn.btn-info(
-                  href='/#/logs/{ cluster_path(this) }'
+                  href='./#/logs/{ cluster_path(this) }'
                 )
                   i.fa.fa-align-justify
                   | Logs
 
                 a.btn(
                   class='btn-{ opts.read_write ? "primary" : "info" }'
-                  href='/#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
+                  href='./#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
                 )
                   i.fa.fa-clone.regular
                   | Clone
 
                 a.btn(
                   class='btn-{ opts.read_write ? "warning" : "info" }'
-                  href='/#/edit/{ cluster_path(this) }'
+                  href='./#/edit/{ cluster_path(this) }'
                 )
                   | Edit
 
@@ -343,7 +343,7 @@ postgresqls
 
     this.on('mount', () =>
       jQuery
-      .get('/postgresqls')
+      .get('./postgresqls')
       .done(clusters => {
         this.my_clusters = []
         this.other_clusters = []
