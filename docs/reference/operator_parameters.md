@@ -251,7 +251,7 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
   which violate the configured allowed `minimal_major_version` when
-  `major_version_upgrade_mode` is set to `"full"`. The default is `"14"`.
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"15"`.
 
 ## Kubernetes resources
 

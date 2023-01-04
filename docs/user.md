@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "14"
+    version: "15"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -109,7 +109,7 @@ metadata:
 spec:
   [...]
   postgresql:
-    version: "14"
+    version: "15"
     parameters:
       password_encryption: scram-sha-256
 ```

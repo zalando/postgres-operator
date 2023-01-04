@@ -68,7 +68,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "registry.opensource.zalan.do/acid/spilo-14:2.1-p7"
+                default: "ghcr.io/zalando/spilo-15:2.1-p9"
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -170,7 +170,7 @@ spec:
                     default: "11"
                   target_major_version:
                     type: string
-                    default: "14"
+                    default: "15"
               kubernetes:
                 type: object
                 properties:
