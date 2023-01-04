@@ -34,7 +34,7 @@ data:
   # default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-15:2.1-p253
+  docker_image: ghcr.io/zalando/spilo-15:2.1-p9
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_registration: "true"
