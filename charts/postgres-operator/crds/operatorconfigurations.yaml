@@ -498,6 +498,12 @@ spec:
                     type: string
                     pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
                     default: "30 00 * * *"
+                  logical_backup_azure_storage_account_name:
+                    type: string
+                  logical_backup_azure_storage_container:
+                    type: string
+                  logical_backup_azure_storage_account_key:
+                    type: string
               debug:
                 type: object
                 properties:

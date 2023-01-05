@@ -227,6 +227,9 @@ type OperatorLogicalBackupConfiguration struct {
 	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
+	AzureStorageAccountName      string `json:"logical_backup_azure_storage_account_name,omitempty"`
+	AzureStorageContainer        string `json:"logical_backup_azure_storage_container,omitempty"`
+	AzureStorageAccountKey       string `json:"logical_backup_azure_storage_account_key,omitempty"`
 }
 
 // PatroniConfiguration defines configuration for Patroni
