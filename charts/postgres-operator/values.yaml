@@ -350,7 +350,7 @@ configLogicalBackup:
 
   # prefix for the backup job name
   logical_backup_job_prefix: "logical-backup-"
-  # storage provider - either "s3" or "gcs"
+  # storage provider - either "s3", "gcs" or "az"
   logical_backup_provider: "s3"
   # S3 Access Key ID
   logical_backup_s3_access_key_id: ""

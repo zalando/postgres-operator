@@ -495,6 +495,10 @@ spec:
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                   logical_backup_provider:
                     type: string
+                    enum:
+                      - "az"
+                      - "gcs"
+                      - "s3"
                     default: "s3"
                   logical_backup_s3_access_key_id:
                     type: string

@@ -1654,6 +1654,17 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"logical_backup_provider": {
 								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(`"az"`),
+									},
+									{
+										Raw: []byte(`"gcs"`),
+									},
+									{
+										Raw: []byte(`"s3"`),
+									},
+								},
 							},
 							"logical_backup_s3_access_key_id": {
 								Type: "string",

@@ -739,8 +739,17 @@ grouped under the `logical_backup` key.
   The prefix to be prepended to the name of a k8s CronJob running the backups. Beware the prefix counts towards the name length restrictions imposed by k8s. Empty string is a legitimate value. Operator does not do the actual renaming: It simply creates the job with the new prefix. You will have to delete the old cron job manually. Default: "logical-backup-".
 
 * **logical_backup_provider**
-  Specifies the storage provider to which the backup should be uploaded (`s3` or `gcs`).
-  Default: "s3"
+  Specifies the storage provider to which the backup should be uploaded
+  (`s3`, `gcs` or `az`). Default: "s3"
+
+* **logical_backup_azure_storage_account_name**
+  Storage account name used to upload logical backups to when using Azure. Default: ""
+
+* **logical_backup_azure_storage_container**
+  Storage container used to upload logical backups to when using Azure. Default: ""
+
+* **logical_backup_azure_storage_account_key**
+  Storage account key used to authenticate with Azure when uploading logical backups. Default: ""
 
 * **logical_backup_s3_access_key_id**
   When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
@@ -771,15 +780,6 @@ grouped under the `logical_backup` key.
   Backup schedule in the cron format. Please take the
   [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Default: "30 00 \* \* \*"
-
-* **logical_backup_azure_storage_account_name**
-  Storage account name used to upload logical backups to when using Azure. Default: ""
-
-* **logical_backup_azure_storage_container**
-  Storage container used to upload logical backups to when using Azure. Default: ""
-
-* **logical_backup_azure_storage_account_key**
-  Storage account key used to authenticate with Azure when uploading logical backups. Default: ""
 
 ## Debugging the operator
 
