@@ -48,6 +48,10 @@ envs:
   teams:
     - "acid"
 
+# Extra pod annotations
+podAnnotations:
+  {}
+
 # configure extra UI ENVs
 # Extra ENVs are writen in kubenertes format and added "as is" to the pod's env variables
 # https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
@@ -85,6 +89,8 @@ service:
   # If the type of the service is NodePort a port can be specified using the nodePort field
   # If the nodePort field is not specified, or if it has no value, then a random port is used
   # nodePort: 32521
+  annotations:
+    {}
 
 # configure UI ingress. If needed: "enabled: true"
 ingress:
