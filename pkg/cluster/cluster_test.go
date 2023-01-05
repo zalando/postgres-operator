@@ -524,7 +524,9 @@ func TestServiceAnnotations(t *testing.T) {
 		enableReplicaLoadBalancerOC   bool
 		enableTeamIdClusterPrefix     bool
 		operatorAnnotations           map[string]string
-		clusterAnnotations            map[string]string
+		serviceAnnotations            map[string]string
+		masterServiceAnnotations      map[string]string
+		replicaServiceAnnotations     map[string]string
 		expect                        map[string]string
 	}{
 		//MASTER
@@ -535,7 +537,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableMasterLoadBalancerOC:   false,
 			enableTeamIdClusterPrefix:    false,
 			operatorAnnotations:          make(map[string]string),
-			clusterAnnotations:           make(map[string]string),
+			serviceAnnotations:           make(map[string]string),
 			expect:                       make(map[string]string),
 		},
 		{
@@ -545,7 +547,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableMasterLoadBalancerOC:   false,
 			enableTeamIdClusterPrefix:    false,
 			operatorAnnotations:          make(map[string]string),
-			clusterAnnotations:           make(map[string]string),
+			serviceAnnotations:           make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test.test.db.example.com,test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
@@ -558,7 +560,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableMasterLoadBalancerOC:   true,
 			enableTeamIdClusterPrefix:    false,
 			operatorAnnotations:          make(map[string]string),
-			clusterAnnotations:           make(map[string]string),
+			serviceAnnotations:           make(map[string]string),
 			expect:                       make(map[string]string),
 		},
 		{
@@ -567,7 +569,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
-			clusterAnnotations:         make(map[string]string),
+			serviceAnnotations:         make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test.test.db.example.com,test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
@@ -579,7 +581,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
-			clusterAnnotations:         map[string]string{"foo": "bar"},
+			serviceAnnotations:         map[string]string{"foo": "bar"},
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test.test.db.example.com,test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
@@ -593,7 +595,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableMasterLoadBalancerOC:   true,
 			enableTeamIdClusterPrefix:    false,
 			operatorAnnotations:          make(map[string]string),
-			clusterAnnotations:           map[string]string{"foo": "bar"},
+			serviceAnnotations:           map[string]string{"foo": "bar"},
 			expect:                       map[string]string{"foo": "bar"},
 		},
 		{
@@ -602,7 +604,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        map[string]string{"foo": "bar"},
-			clusterAnnotations:         make(map[string]string),
+			serviceAnnotations:         make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test.test.db.example.com,test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
@@ -617,7 +619,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
-			clusterAnnotations: make(map[string]string),
+			serviceAnnotations: make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test.test.db.example.com,test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
@@ -629,7 +631,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
-			clusterAnnotations: map[string]string{
+			serviceAnnotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 			expect: map[string]string{
@@ -643,7 +645,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
-			clusterAnnotations: map[string]string{
+			serviceAnnotations: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
 			},
 			expect: map[string]string{
@@ -656,11 +658,28 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                       "master",
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  true,
-			clusterAnnotations:         make(map[string]string),
+			serviceAnnotations:         make(map[string]string),
 			operatorAnnotations:        make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test.test.db.example.com,test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+			},
+		},
+		{
+			about:                      "Master with master service annotations override service annotations",
+			role:                       "master",
+			enableMasterLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:  false,
+			operatorAnnotations:        make(map[string]string),
+			serviceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
+			},
+			masterServiceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
+			},
+			expect: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test.test.db.example.com,test.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
 			},
 		},
 		// REPLICA
@@ -671,7 +690,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC:   false,
 			enableTeamIdClusterPrefix:     false,
 			operatorAnnotations:           make(map[string]string),
-			clusterAnnotations:            make(map[string]string),
+			serviceAnnotations:            make(map[string]string),
 			expect:                        make(map[string]string),
 		},
 		{
@@ -681,7 +700,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC:   false,
 			enableTeamIdClusterPrefix:     false,
 			operatorAnnotations:           make(map[string]string),
-			clusterAnnotations:            make(map[string]string),
+			serviceAnnotations:            make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-repl.test.db.example.com,test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
@@ -694,7 +713,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC:   true,
 			enableTeamIdClusterPrefix:     false,
 			operatorAnnotations:           make(map[string]string),
-			clusterAnnotations:            make(map[string]string),
+			serviceAnnotations:            make(map[string]string),
 			expect:                        make(map[string]string),
 		},
 		{
@@ -703,7 +722,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
-			clusterAnnotations:          make(map[string]string),
+			serviceAnnotations:          make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-repl.test.db.example.com,test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
@@ -715,7 +734,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
-			clusterAnnotations:          map[string]string{"foo": "bar"},
+			serviceAnnotations:          map[string]string{"foo": "bar"},
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-repl.test.db.example.com,test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
@@ -729,7 +748,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC:   true,
 			enableTeamIdClusterPrefix:     false,
 			operatorAnnotations:           make(map[string]string),
-			clusterAnnotations:            map[string]string{"foo": "bar"},
+			serviceAnnotations:            map[string]string{"foo": "bar"},
 			expect:                        map[string]string{"foo": "bar"},
 		},
 		{
@@ -738,7 +757,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         map[string]string{"foo": "bar"},
-			clusterAnnotations:          make(map[string]string),
+			serviceAnnotations:          make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-repl.test.db.example.com,test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
@@ -753,7 +772,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
-			clusterAnnotations: make(map[string]string),
+			serviceAnnotations: make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-repl.test.db.example.com,test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
@@ -765,7 +784,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
-			clusterAnnotations: map[string]string{
+			serviceAnnotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 			expect: map[string]string{
@@ -779,7 +798,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
-			clusterAnnotations: map[string]string{
+			serviceAnnotations: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
 			},
 			expect: map[string]string{
@@ -792,11 +811,28 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:   true,
-			clusterAnnotations:          make(map[string]string),
+			serviceAnnotations:          make(map[string]string),
 			operatorAnnotations:         make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-repl.test.db.example.com,test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+			},
+		},
+		{
+			about:                       "Replica with replica service annotations override service annotations",
+			role:                        "replica",
+			enableReplicaLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:   false,
+			operatorAnnotations:         make(map[string]string),
+			serviceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
+			},
+			replicaServiceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
+			},
+			expect: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-repl.test.db.example.com,test-repl.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
 			},
 		},
 		// COMMON
@@ -806,7 +842,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC: false,
 			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         map[string]string{"foo": "bar"},
-			clusterAnnotations:          map[string]string{"post": "gres"},
+			serviceAnnotations:          map[string]string{"post": "gres"},
 			expect:                      map[string]string{"foo": "bar", "post": "gres"},
 		},
 		{
@@ -815,7 +851,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableReplicaLoadBalancerOC: false,
 			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         map[string]string{"foo": "bar", "post": "gres"},
-			clusterAnnotations:          map[string]string{"post": "greSQL"},
+			serviceAnnotations:          map[string]string{"post": "greSQL"},
 			expect:                      map[string]string{"foo": "bar", "post": "greSQL"},
 		},
 	}
@@ -833,7 +869,9 @@ func TestServiceAnnotations(t *testing.T) {
 
 			cl.Postgresql.Spec.ClusterName = ""
 			cl.Postgresql.Spec.TeamID = "acid"
-			cl.Postgresql.Spec.ServiceAnnotations = tt.clusterAnnotations
+			cl.Postgresql.Spec.ServiceAnnotations = tt.serviceAnnotations
+			cl.Postgresql.Spec.MasterServiceAnnotations = tt.masterServiceAnnotations
+			cl.Postgresql.Spec.ReplicaServiceAnnotations = tt.replicaServiceAnnotations
 			cl.Postgresql.Spec.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerSpec
 			cl.Postgresql.Spec.EnableReplicaLoadBalancer = tt.enableReplicaLoadBalancerSpec
 

@@ -79,10 +79,14 @@ type PostgresSpec struct {
 	StandbyCluster        *StandbyDescription         `json:"standby,omitempty"`
 	PodAnnotations        map[string]string           `json:"podAnnotations,omitempty"`
 	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
-	TLS                   *TLSDescription             `json:"tls,omitempty"`
-	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
-	Streams               []Stream                    `json:"streams,omitempty"`
-	Env                   []v1.EnvVar                 `json:"env,omitempty"`
+	// MasterServiceAnnotations takes precedence over ServiceAnnotations for master role if not empty
+	MasterServiceAnnotations map[string]string `json:"masterServiceAnnotations,omitempty"`
+	// ReplicaServiceAnnotations takes precedence over ServiceAnnotations for replica role if not empty
+	ReplicaServiceAnnotations map[string]string  `json:"replicaServiceAnnotations,omitempty"`
+	TLS                       *TLSDescription    `json:"tls,omitempty"`
+	AdditionalVolumes         []AdditionalVolume `json:"additionalVolumes,omitempty"`
+	Streams                   []Stream           `json:"streams,omitempty"`
+	Env                       []v1.EnvVar        `json:"env,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`

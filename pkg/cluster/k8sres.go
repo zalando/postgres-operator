@@ -1905,10 +1905,31 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 	for k, v := range c.OpConfig.CustomServiceAnnotations {
 		annotations[k] = v
 	}
-	if spec != nil || spec.ServiceAnnotations != nil {
-		for k, v := range spec.ServiceAnnotations {
-			annotations[k] = v
+
+	var specServiceAnnotations map[string]string
+	if spec != nil {
+		switch role {
+		case Master:
+			// MasterServiceAnnotations take precedence over ServiceAnnotations if they are not empty
+			if len(spec.MasterServiceAnnotations) > 0 {
+				specServiceAnnotations = spec.MasterServiceAnnotations
+			} else {
+				specServiceAnnotations = spec.ServiceAnnotations
+			}
+		case Replica:
+			// ReplicaServiceAnnotations take precedence over ServiceAnnotations if they are not empty
+			if len(spec.ReplicaServiceAnnotations) > 0 {
+				specServiceAnnotations = spec.ReplicaServiceAnnotations
+			} else {
+				specServiceAnnotations = spec.ServiceAnnotations
+			}
+		default:
+			specServiceAnnotations = spec.ServiceAnnotations
 		}
+	}
+
+	for k, v := range specServiceAnnotations {
+		annotations[k] = v
 	}
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
