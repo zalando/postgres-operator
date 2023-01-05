@@ -128,6 +128,9 @@ type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
 	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.8.2"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
+	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
+	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
+	LogicalBackupAzureStorageAccountKey       string `name:"logical_backup_azure_storage_account_key" default:""`
 	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
 	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
 	LogicalBackupS3Endpoint                   string `name:"logical_backup_s3_endpoint" default:""`
@@ -137,9 +140,10 @@ type LogicalBackup struct {
 	LogicalBackupS3RetentionTime              string `name:"logical_backup_s3_retention_time" default:""`
 	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
-	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
-	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
-	LogicalBackupAzureStorageAccountKey       string `name:"logical_backup_azure_storage_account_key" default:""`
+	LogicalBackupCPURequest                   string `name:"logical_backup_cpu_request"`
+	LogicalBackupMemoryRequest                string `name:"logical_backup_memory_request"`
+	LogicalBackupCPULimit                     string `name:"logical_backup_cpu_limit"`
+	LogicalBackupMemoryLimit                  string `name:"logical_backup_memory_limit"`
 }
 
 // Operator options for connection pooler

@@ -1201,6 +1201,10 @@ of the backup cron job.
 `cronjobs` resource from the `batch` API group for the operator service account.
 See [example RBAC](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml)
 
+7. Resources of the pod template in the cron job can be configured. When left
+empty [default values of spilo pods](reference/operator_parameters.md#kubernetes-resource-requests)
+will be used.
+
 ## Sidecars for Postgres clusters
 
 A list of sidecars is added to each cluster created by the operator. The default

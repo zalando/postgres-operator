@@ -332,6 +332,17 @@ configAwsOrGcp:
 
 # configure K8s cron job managed by the operator
 configLogicalBackup:
+  # Azure Storage Account specs to store backup results
+  # logical_backup_azure_storage_account_name: ""
+  # logical_backup_azure_storage_container: ""
+  # logical_backup_azure_storage_account_key: ""
+
+  # resources for logical backup pod, if empty configPostgresPodResources will be used
+  # logical_backup_cpu_limit: ""
+  # logical_backup_cpu_request: ""
+  # logical_backup_memory_limit: ""
+  # logical_backup_memory_request: ""
+
   # image for pods of the logical backup job (example runs pg_dumpall)
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.8.0"
   # path of google cloud service account json file
@@ -339,7 +350,7 @@ configLogicalBackup:
 
   # prefix for the backup job name
   logical_backup_job_prefix: "logical-backup-"
-  # storage provider - either "s3" or "gcs"
+  # storage provider - either "s3", "gcs" or "az"
   logical_backup_provider: "s3"
   # S3 Access Key ID
   logical_backup_s3_access_key_id: ""

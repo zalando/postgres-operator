@@ -174,6 +174,9 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
 	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.8.2")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
+	result.LogicalBackupAzureStorageAccountName = fromCRD.LogicalBackup.AzureStorageAccountName
+	result.LogicalBackupAzureStorageAccountKey = fromCRD.LogicalBackup.AzureStorageAccountKey
+	result.LogicalBackupAzureStorageContainer = fromCRD.LogicalBackup.AzureStorageContainer
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
 	result.LogicalBackupS3Region = fromCRD.LogicalBackup.S3Region
 	result.LogicalBackupS3Endpoint = fromCRD.LogicalBackup.S3Endpoint
@@ -183,9 +186,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupS3RetentionTime = fromCRD.LogicalBackup.RetentionTime
 	result.LogicalBackupGoogleApplicationCredentials = fromCRD.LogicalBackup.GoogleApplicationCredentials
 	result.LogicalBackupJobPrefix = util.Coalesce(fromCRD.LogicalBackup.JobPrefix, "logical-backup-")
-	result.LogicalBackupAzureStorageAccountName = fromCRD.LogicalBackup.AzureStorageAccountName
-	result.LogicalBackupAzureStorageAccountKey = fromCRD.LogicalBackup.AzureStorageAccountKey
-	result.LogicalBackupAzureStorageContainer = fromCRD.LogicalBackup.AzureStorageContainer
+	result.LogicalBackupCPURequest = fromCRD.LogicalBackup.CPURequest
+	result.LogicalBackupMemoryRequest = fromCRD.LogicalBackup.MemoryRequest
+	result.LogicalBackupCPULimit = fromCRD.LogicalBackup.CPULimit
+	result.LogicalBackupMemoryLimit = fromCRD.LogicalBackup.MemoryLimit
 
 	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging

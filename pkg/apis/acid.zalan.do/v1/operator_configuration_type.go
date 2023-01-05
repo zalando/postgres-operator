@@ -218,6 +218,9 @@ type OperatorLogicalBackupConfiguration struct {
 	Schedule                     string `json:"logical_backup_schedule,omitempty"`
 	DockerImage                  string `json:"logical_backup_docker_image,omitempty"`
 	BackupProvider               string `json:"logical_backup_provider,omitempty"`
+	AzureStorageAccountName      string `json:"logical_backup_azure_storage_account_name,omitempty"`
+	AzureStorageContainer        string `json:"logical_backup_azure_storage_container,omitempty"`
+	AzureStorageAccountKey       string `json:"logical_backup_azure_storage_account_key,omitempty"`
 	S3Bucket                     string `json:"logical_backup_s3_bucket,omitempty"`
 	S3Region                     string `json:"logical_backup_s3_region,omitempty"`
 	S3Endpoint                   string `json:"logical_backup_s3_endpoint,omitempty"`
@@ -227,9 +230,10 @@ type OperatorLogicalBackupConfiguration struct {
 	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
-	AzureStorageAccountName      string `json:"logical_backup_azure_storage_account_name,omitempty"`
-	AzureStorageContainer        string `json:"logical_backup_azure_storage_container,omitempty"`
-	AzureStorageAccountKey       string `json:"logical_backup_azure_storage_account_key,omitempty"`
+	CPURequest                   string `json:"logical_backup_cpu_request,omitempty"`
+	MemoryRequest                string `json:"logical_backup_memory_request,omitempty"`
+	CPULimit                     string `json:"logical_backup_cpu_limit,omitempty"`
+	MemoryLimit                  string `json:"logical_backup_memory_limit,omitempty"`
 }
 
 // PatroniConfiguration defines configuration for Patroni

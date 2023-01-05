@@ -1618,6 +1618,23 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"logical_backup": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"logical_backup_azure_storage_account_name": {
+								Type: "string",
+							},
+							"logical_backup_azure_storage_container": {
+								Type: "string",
+							},
+							"logical_backup_azure_storage_account_key": {
+								Type: "string",
+							},
+							"logical_backup_cpu_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"logical_backup_cpu_request": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
 							"logical_backup_docker_image": {
 								Type: "string",
 							},
@@ -1627,8 +1644,27 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"logical_backup_job_prefix": {
 								Type: "string",
 							},
+							"logical_backup_memory_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"logical_backup_memory_request": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
 							"logical_backup_provider": {
 								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(`"az"`),
+									},
+									{
+										Raw: []byte(`"gcs"`),
+									},
+									{
+										Raw: []byte(`"s3"`),
+									},
+								},
 							},
 							"logical_backup_s3_access_key_id": {
 								Type: "string",
@@ -1654,15 +1690,6 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"logical_backup_schedule": {
 								Type:    "string",
 								Pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$",
-							},
-							"logical_backup_azure_storage_account_name": {
-								Type: "string",
-							},
-							"logical_backup_azure_storage_container": {
-								Type: "string",
-							},
-							"logical_backup_azure_storage_account_key": {
-								Type: "string",
 							},
 						},
 					},

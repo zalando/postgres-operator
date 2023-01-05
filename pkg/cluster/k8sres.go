@@ -139,6 +139,23 @@ func makeDefaultResources(config *config.Config) acidv1.Resources {
 	}
 }
 
+func makeLogicalBackupResources(config *config.Config) acidv1.Resources {
+
+	logicalBackupResourceRequests := acidv1.ResourceDescription{
+		CPU:    config.LogicalBackup.LogicalBackupCPURequest,
+		Memory: config.LogicalBackup.LogicalBackupMemoryRequest,
+	}
+	logicalBackupResourceLimits := acidv1.ResourceDescription{
+		CPU:    config.LogicalBackup.LogicalBackupCPULimit,
+		Memory: config.LogicalBackup.LogicalBackupMemoryLimit,
+	}
+
+	return acidv1.Resources{
+		ResourceRequests: logicalBackupResourceRequests,
+		ResourceLimits:   logicalBackupResourceLimits,
+	}
+}
+
 func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) error {
 	var (
 		isSmaller bool
@@ -2107,9 +2124,12 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	c.logger.Debug("Generating logical backup pod template")
 
-	// allocate for the backup pod the same amount of resources as for normal DB pods
+	// allocate configured resources for logical backup pod
+	logicalBackupResources := makeLogicalBackupResources(&c.OpConfig)
+	// if not defined only default resources from spilo pods are used
 	resourceRequirements, err = c.generateResourceRequirements(
-		c.Spec.Resources, makeDefaultResources(&c.OpConfig), logicalBackupContainerName)
+		&logicalBackupResources, makeDefaultResources(&c.OpConfig), logicalBackupContainerName)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
 	}

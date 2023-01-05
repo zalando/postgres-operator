@@ -2638,7 +2638,6 @@ func TestGenerateResourceRequirements(t *testing.T) {
 	clusterName := "acid-test-cluster"
 	namespace := "default"
 	clusterNameLabel := "cluster-name"
-	roleLabel := "spilo-role"
 	sidecarName := "postgres-exporter"
 
 	// enforceMinResourceLimits will be called 2 twice emitting 4 events (2x cpu, 2x memory raise)
@@ -2657,7 +2656,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		DefaultMemoryLimit:   "500Mi",
 		MaxMemoryRequest:     "1Gi",
 		MinMemoryLimit:       "250Mi",
-		PodRoleLabel:         roleLabel,
+		PodRoleLabel:         "spilo-role",
 	}
 
 	tests := []struct {
@@ -3004,6 +3003,137 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		assert.NoError(t, err)
 		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
 			t.Errorf("%s - %s: expected %#v but got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
+		}
+	}
+}
+
+func TestGenerateLogicalBackupJob(t *testing.T) {
+	clusterName := "acid-test-cluster"
+	configResources := config.Resources{
+		DefaultCPURequest:    "100m",
+		DefaultCPULimit:      "1",
+		DefaultMemoryRequest: "100Mi",
+		DefaultMemoryLimit:   "500Mi",
+	}
+
+	tests := []struct {
+		subTest           string
+		config            config.Config
+		specSchedule      string
+		expectedSchedule  string
+		expectedJobName   string
+		expectedResources acidv1.Resources
+	}{
+		{
+			subTest: "test generation of logical backup pod resources when not configured",
+			config: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupJobPrefix: "logical-backup-",
+					LogicalBackupSchedule:  "30 00 * * *",
+				},
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			specSchedule:     "",
+			expectedSchedule: "30 00 * * *",
+			expectedJobName:  "logical-backup-acid-test-cluster",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+		},
+		{
+			subTest: "test generation of logical backup pod resources when configured",
+			config: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCPURequest:    "10m",
+					LogicalBackupCPULimit:      "300m",
+					LogicalBackupMemoryRequest: "50Mi",
+					LogicalBackupMemoryLimit:   "300Mi",
+					LogicalBackupJobPrefix:     "lb-",
+					LogicalBackupSchedule:      "30 00 * * *",
+				},
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			specSchedule:     "30 00 * * 7",
+			expectedSchedule: "30 00 * * 7",
+			expectedJobName:  "lb-acid-test-cluster",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "50Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "300m", Memory: "300Mi"},
+			},
+		},
+		{
+			subTest: "test generation of logical backup pod resources when partly configured",
+			config: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCPURequest: "50m",
+					LogicalBackupCPULimit:   "250m",
+					LogicalBackupJobPrefix:  "",
+					LogicalBackupSchedule:   "30 00 * * *",
+				},
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			specSchedule:     "",
+			expectedSchedule: "30 00 * * *",
+			expectedJobName:  "acid-test-cluster",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "50m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "250m", Memory: "500Mi"},
+			},
+		},
+		{
+			subTest: "test generation of logical backup pod resources with SetMemoryRequestToLimit enabled",
+			config: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupMemoryRequest: "80Mi",
+					LogicalBackupMemoryLimit:   "200Mi",
+					LogicalBackupJobPrefix:     "test-long-prefix-so-name-must-be-trimmed-",
+					LogicalBackupSchedule:      "30 00 * * *",
+				},
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: true,
+			},
+			specSchedule:     "",
+			expectedSchedule: "30 00 * * *",
+			expectedJobName:  "test-long-prefix-so-name-must-be-trimmed-acid-test-c",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "200Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "200Mi"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		var cluster = New(
+			Config{
+				OpConfig: tt.config,
+			}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
+
+		cluster.ObjectMeta.Name = clusterName
+		cluster.Spec.LogicalBackupSchedule = tt.specSchedule
+		cronJob, err := cluster.generateLogicalBackupJob()
+		assert.NoError(t, err)
+
+		if cronJob.Spec.Schedule != tt.expectedSchedule {
+			t.Errorf("%s - %s: expected schedule %s, got %s", t.Name(), tt.subTest, tt.expectedSchedule, cronJob.Spec.Schedule)
+		}
+
+		if cronJob.Name != tt.expectedJobName {
+			t.Errorf("%s - %s: expected job name %s, got %s", t.Name(), tt.subTest, tt.expectedJobName, cronJob.Name)
+		}
+
+		containers := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers
+		clusterResources, err := parseResourceRequirements(containers[0].Resources)
+		assert.NoError(t, err)
+		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
+			t.Errorf("%s - %s: expected resources %#v, got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
 		}
 	}
 }

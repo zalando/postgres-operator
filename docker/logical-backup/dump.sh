@@ -126,7 +126,7 @@ function upload {
         "gcs")
             gcs_upload
             ;;
-        "aws")
+        "s3")
             aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
             aws_delete_outdated
             ;;

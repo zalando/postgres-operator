@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"context"
@@ -389,7 +388,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	result := cluster.generateFabricEventStream(appId)
-	if !reflect.DeepEqual(result.Spec.EventStreams, streams.Items[0].Spec.EventStreams) {
+	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
 		t.Errorf("Malformed FabricEventStream, expected %#v, got %#v", streams.Items[0], result)
 	}
 }
