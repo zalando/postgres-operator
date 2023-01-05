@@ -1618,6 +1618,15 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"logical_backup": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"logical_backup_azure_storage_account_name": {
+								Type: "string",
+							},
+							"logical_backup_azure_storage_container": {
+								Type: "string",
+							},
+							"logical_backup_azure_storage_account_key": {
+								Type: "string",
+							},
 							"logical_backup_cpu_limit": {
 								Type:    "string",
 								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",

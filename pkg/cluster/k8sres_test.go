@@ -602,6 +602,23 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			envVarValue:    "s3.eu-central-1.amazonaws.com",
 		},
 	}
+	expectedCloneEnvSpecEnv := []ExpectedValue{
+		{
+			envIndex:       15,
+			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "test-cluster",
+		},
+		{
+			envIndex:       17,
+			envVarConstant: "CLONE_WALE_S3_PREFIX",
+			envVarValue:    "s3://another-bucket",
+		},
+		{
+			envIndex:       21,
+			envVarConstant: "CLONE_AWS_ENDPOINT",
+			envVarValue:    "s3.eu-central-1.amazonaws.com",
+		},
+	}
 	expectedCloneEnvConfigMap := []ExpectedValue{
 		{
 			envIndex:       16,
@@ -820,6 +837,36 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			},
 			standbyDescription: &acidv1.StandbyDescription{},
 			expectedValues:     expectedCloneEnvSpec,
+		},
+		{
+			subTest: "will set CLONE_ parameters from manifest `env` section, followed by other options",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentConfigMap: spec.NamespacedName{
+						Name: testPodEnvironmentConfigMapName,
+					},
+				},
+				WALES3Bucket: "global-s3-bucket",
+			},
+			cloneDescription: &acidv1.CloneDescription{
+				ClusterName:  "test-cluster",
+				EndTimestamp: "somewhen",
+				UID:          dummyUUID,
+				S3WalPath:    "s3://another-bucket",
+				S3Endpoint:   "s3.eu-central-1.amazonaws.com",
+			},
+			standbyDescription: &acidv1.StandbyDescription{},
+			expectedValues:     expectedCloneEnvSpecEnv,
+			pgsql: acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					Env: []v1.EnvVar{
+						{
+							Name:  "CLONE_WAL_BUCKET_SCOPE_PREFIX",
+							Value: "test-cluster",
+						},
+					},
+				},
+			},
 		},
 		{
 			subTest: "will set CLONE_AWS_ENDPOINT parameter from pod environment config map",

@@ -151,6 +151,9 @@ configuration:
     # wal_gs_bucket: ""
     # wal_s3_bucket: ""
   logical_backup:
+    # logical_backup_azure_storage_account_name: ""
+    # logical_backup_azure_storage_container: ""
+    # logical_backup_azure_storage_account_key: ""
     # logical_backup_cpu_limit: ""
     # logical_backup_cpu_request: ""
     # logical_backup_memory_limit: ""

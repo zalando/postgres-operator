@@ -332,6 +332,11 @@ configAwsOrGcp:
 
 # configure K8s cron job managed by the operator
 configLogicalBackup:
+  # Azure Storage Account specs to store backup results
+  # logical_backup_azure_storage_account_name: ""
+  # logical_backup_azure_storage_container: ""
+  # logical_backup_azure_storage_account_key: ""
+
   # resources for logical backup pod, if empty configPostgresPodResources will be used
   # logical_backup_cpu_limit: ""
   # logical_backup_cpu_request: ""

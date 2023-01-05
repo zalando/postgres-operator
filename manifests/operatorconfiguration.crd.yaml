@@ -467,6 +467,12 @@ spec:
               logical_backup:
                 type: object
                 properties:
+                  logical_backup_azure_storage_account_name:
+                    type: string
+                  logical_backup_azure_storage_container:
+                    type: string
+                  logical_backup_azure_storage_account_key:
+                    type: string
                   logical_backup_cpu_limit:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
