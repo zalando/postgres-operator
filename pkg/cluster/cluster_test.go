@@ -672,6 +672,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
 			serviceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-nlb-target-type":         "ip",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 			masterServiceAnnotations: map[string]string{
@@ -679,6 +680,7 @@ func TestServiceAnnotations(t *testing.T) {
 			},
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test.test.db.example.com,test.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-nlb-target-type":         "ip",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
 			},
 		},
@@ -825,6 +827,7 @@ func TestServiceAnnotations(t *testing.T) {
 			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
 			serviceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-nlb-target-type":         "ip",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 			replicaServiceAnnotations: map[string]string{
@@ -832,6 +835,7 @@ func TestServiceAnnotations(t *testing.T) {
 			},
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-repl.test.db.example.com,test-repl.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-nlb-target-type":         "ip",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
 			},
 		},

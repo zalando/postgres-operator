@@ -1906,30 +1906,15 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 		annotations[k] = v
 	}
 
-	var specServiceAnnotations map[string]string
 	if spec != nil {
+		annotations = mergeAnnotations(annotations, spec.ServiceAnnotations)
+
 		switch role {
 		case Master:
-			// MasterServiceAnnotations take precedence over ServiceAnnotations if they are not empty
-			if len(spec.MasterServiceAnnotations) > 0 {
-				specServiceAnnotations = spec.MasterServiceAnnotations
-			} else {
-				specServiceAnnotations = spec.ServiceAnnotations
-			}
+			annotations = mergeAnnotations(annotations, spec.MasterServiceAnnotations)
 		case Replica:
-			// ReplicaServiceAnnotations take precedence over ServiceAnnotations if they are not empty
-			if len(spec.ReplicaServiceAnnotations) > 0 {
-				specServiceAnnotations = spec.ReplicaServiceAnnotations
-			} else {
-				specServiceAnnotations = spec.ServiceAnnotations
-			}
-		default:
-			specServiceAnnotations = spec.ServiceAnnotations
+			annotations = mergeAnnotations(annotations, spec.ReplicaServiceAnnotations)
 		}
-	}
-
-	for k, v := range specServiceAnnotations {
-		annotations[k] = v
 	}
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
@@ -2400,4 +2385,19 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 		return path.Join(defaultDir, file)
 	}
 	return file
+}
+
+// mergeAnnotations merged annotations that entries in b override the ones in a.
+func mergeAnnotations(a, b map[string]string) map[string]string {
+	result := make(map[string]string)
+
+	for k, v := range a {
+		result[k] = v
+	}
+
+	for k, v := range b {
+		result[k] = v
+	}
+
+	return result
 }
