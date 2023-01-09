@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -336,6 +337,52 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 	}
 
+	// If the cluster has custom TLS certificates configured, we do the following:
+	//  1. Add environment variables to tell pgBouncer where to find the TLS certificates
+	//  2. Reference the secret in a volume
+	//  3. Mount the volume to the container at /tls
+	poolerVolumes := []v1.Volume{}
+	if spec.TLS != nil && spec.TLS.SecretName != "" {
+		// Env vars
+		crtFile := spec.TLS.CertificateFile
+		keyFile := spec.TLS.PrivateKeyFile
+		if crtFile == "" {
+			crtFile = "tls.crt"
+		}
+		if keyFile == "" {
+			crtFile = "tls.key"
+		}
+
+		envVars = append(
+			envVars,
+			v1.EnvVar{
+				Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: filepath.Join("/tls", crtFile),
+			},
+			v1.EnvVar{
+				Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: filepath.Join("/tls", keyFile),
+			},
+		)
+
+		// Volume
+		mode := int32(0640)
+		volume := v1.Volume{
+			Name: "tls",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName:  spec.TLS.SecretName,
+					DefaultMode: &mode,
+				},
+			},
+		}
+		poolerVolumes = append(poolerVolumes, volume)
+
+		// Mount
+		poolerContainer.VolumeMounts = []v1.VolumeMount{{
+			Name:      "tls",
+			MountPath: "/tls",
+		}}
+	}
+
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 
 	podTemplate := &v1.PodTemplateSpec{
@@ -348,6 +395,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers:                    []v1.Container{poolerContainer},
 			Tolerations:                   tolerationsSpec,
+			Volumes:                       poolerVolumes,
 		},
 	}
 
