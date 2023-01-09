@@ -560,13 +560,13 @@ func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
 }
 
 /*
-  Ensures the pod service account and role bindings exists in a namespace
-  before a PG cluster is created there so that a user does not have to deploy
-  these credentials manually.  StatefulSets require the service account to
-  create pods; Patroni requires relevant RBAC bindings to access endpoints
-  or config maps.
+Ensures the pod service account and role bindings exists in a namespace
+before a PG cluster is created there so that a user does not have to deploy
+these credentials manually.  StatefulSets require the service account to
+create pods; Patroni requires relevant RBAC bindings to access endpoints
+or config maps.
 
-  The operator does not sync accounts/role bindings after creation.
+The operator does not sync accounts/role bindings after creation.
 */
 func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 

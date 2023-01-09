@@ -15,7 +15,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 )
 
-//ExecCommand executes arbitrary command inside the pod
+// ExecCommand executes arbitrary command inside the pod
 func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (string, error) {
 	c.setProcessName("executing command %q", strings.Join(command, " "))
 

@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"testing"
 	"time"
 
-	"testing"
-
 	"github.com/stretchr/testify/assert"
-
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -18,7 +16,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -937,7 +934,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 			if env.Name != ev.envVarConstant {
 				t.Errorf("%s %s: expected env name %s, have %s instead",
-					testName, tt.subTest, ev.envVarConstant, env.Name)
+					t.Name(), tt.subTest, ev.envVarConstant, env.Name)
 			}
 
 			if ev.envVarValueRef != nil {

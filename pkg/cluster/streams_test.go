@@ -1,9 +1,9 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"strings"
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

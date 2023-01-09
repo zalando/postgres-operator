@@ -196,7 +196,7 @@ func (c *Controller) GetWorkersCnt() uint32 {
 	return c.opConfig.Workers
 }
 
-//WorkerStatus provides status of the worker
+// WorkerStatus provides status of the worker
 func (c *Controller) WorkerStatus(workerID uint32) (*cluster.WorkerStatus, error) {
 	obj, ok := c.curWorkerCluster.Load(workerID)
 	if !ok || obj == nil {

@@ -2,16 +2,11 @@ package cluster
 
 import (
 	"bytes"
-	"io/ioutil"
+	"context"
+	"io"
 	"net/http"
 	"testing"
 	"time"
-
-	"context"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/sirupsen/logrus"
@@ -25,6 +20,9 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -200,7 +198,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 
 	// mocking a config after setConfig is called
 	configJson := `{"postgresql": {"parameters": {"log_min_duration_statement": 200, "max_connections": 50}}}, "ttl": 20}`
-	r := ioutil.NopCloser(bytes.NewReader([]byte(configJson)))
+	r := io.NopCloser(bytes.NewReader([]byte(configJson)))
 
 	response := http.Response{
 		StatusCode: 200,
