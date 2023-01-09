@@ -1902,9 +1902,7 @@ func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourc
 func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
 	annotations := make(map[string]string)
 
-	for k, v := range c.OpConfig.CustomServiceAnnotations {
-		annotations[k] = v
-	}
+	annotations = mergeAnnotations(annotations, c.OpConfig.CustomServiceAnnotations)
 
 	if spec != nil {
 		annotations = mergeAnnotations(annotations, spec.ServiceAnnotations)
