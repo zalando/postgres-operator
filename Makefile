@@ -73,7 +73,7 @@ docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
 	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
 
 indocker-race:
-	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.17.3 bash -c "make linux"
+	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.18.9 bash -c "make linux"
 
 push:
 	docker push "$(IMAGE):$(TAG)$(CDP_TAG)"
