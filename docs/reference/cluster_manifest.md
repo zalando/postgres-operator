@@ -178,14 +178,16 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   to the master service created for the database cluster. Check the
   [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#load-balancers-and-allowed-ip-ranges)
   for more information regarding default values and overwrite rules.
-  This field overrides `serviceAnnotations` for the master service if not empty.
+  This field overrides `serviceAnnotations` with the same key for the master
+  service if not empty.
 
 * **replicaServiceAnnotations**
   A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
-  to the replica services created for the database cluster. Check the
+  to the replica service created for the database cluster. Check the
   [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#load-balancers-and-allowed-ip-ranges)
   for more information regarding default values and overwrite rules.
-  This field overrides `serviceAnnotations` for the replica service if not empty.
+  This field overrides `serviceAnnotations` with the same key for the replica
+  service if not empty.
 
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default Docker
