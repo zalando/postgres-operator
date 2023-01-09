@@ -324,7 +324,6 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
-		Env: envVars,
 		ReadinessProbe: &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				TCPSocket: &v1.TCPSocketAction{
@@ -341,7 +340,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	//  1. Add environment variables to tell pgBouncer where to find the TLS certificates
 	//  2. Reference the secret in a volume
 	//  3. Mount the volume to the container at /tls
-	poolerVolumes := []v1.Volume{}
+	var poolerVolumes []v1.Volume
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
 		// Env vars
 		crtFile := spec.TLS.CertificateFile
@@ -383,6 +382,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		}}
 	}
 
+	poolerContainer.Env = envVars
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 
 	podTemplate := &v1.PodTemplateSpec{
