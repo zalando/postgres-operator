@@ -784,9 +784,15 @@ services:
   This value can't be overwritten. If any changing in its value is needed, it
   MUST be done changing the DNS format operator config parameters; and
 - `service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout` with
-  a default value of "3600". This value can be overwritten with the operator
-  config parameter `custom_service_annotations` or the  cluster parameter
-  `serviceAnnotations`.
+  a default value of "3600".
+
+There are multiple options to specify service annotations that will be merged
+with each other and override in the following order (where latter take
+precedence):
+1. Default annotations if LoadBalancer is enabled
+2. Globally configured `custom_service_annotations`
+3. `serviceAnnotations` specified in the cluster manifest
+4. `masterServiceAnnotations` and `replicaServiceAnnotations` specified in the cluster manifest
 
 To limit the range of IP addresses that can reach a load balancer, specify the
 desired ranges in the `allowedSourceRanges` field (applies to both master and
