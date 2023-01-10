@@ -1,11 +1,11 @@
 module github.com/zalando/postgres-operator/kubectl-pg
 
-go 1.17
+go 1.18
 
 require (
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
-	github.com/zalando/postgres-operator v1.8.1
+	github.com/zalando/postgres-operator v1.8.2
 	k8s.io/api v0.23.5
 	k8s.io/apiextensions-apiserver v0.23.5
 	k8s.io/apimachinery v0.23.5
