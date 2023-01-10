@@ -492,7 +492,7 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 	}
 
 	if c.shouldCreateLoadBalancerForPoolerService(connectionPooler.Role, spec) {
-		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
+		c.configureLoadBalanceService(&serviceSpec, connectionPooler.Role, spec)
 	}
 
 	service := &v1.Service{
