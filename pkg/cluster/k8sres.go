@@ -28,6 +28,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	"golang.org/x/exp/maps"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -1901,17 +1902,16 @@ func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourc
 
 func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
 	annotations := make(map[string]string)
-
-	annotations = mergeAnnotations(annotations, c.OpConfig.CustomServiceAnnotations)
+	maps.Copy(annotations, c.OpConfig.CustomServiceAnnotations)
 
 	if spec != nil {
-		annotations = mergeAnnotations(annotations, spec.ServiceAnnotations)
+		maps.Copy(annotations, spec.ServiceAnnotations)
 
 		switch role {
 		case Master:
-			annotations = mergeAnnotations(annotations, spec.MasterServiceAnnotations)
+			maps.Copy(annotations, spec.MasterServiceAnnotations)
 		case Replica:
-			annotations = mergeAnnotations(annotations, spec.ReplicaServiceAnnotations)
+			maps.Copy(annotations, spec.ReplicaServiceAnnotations)
 		}
 	}
 
@@ -2383,19 +2383,4 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 		return path.Join(defaultDir, file)
 	}
 	return file
-}
-
-// mergeAnnotations merged annotations that entries in b override the ones in a.
-func mergeAnnotations(a, b map[string]string) map[string]string {
-	result := make(map[string]string)
-
-	for k, v := range a {
-		result[k] = v
-	}
-
-	for k, v := range b {
-		result[k] = v
-	}
-
-	return result
 }
