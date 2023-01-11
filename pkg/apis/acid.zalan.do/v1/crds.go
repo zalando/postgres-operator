@@ -355,6 +355,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"masterServiceAnnotations": {
+						Type: "object",
+						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type: "string",
+							},
+						},
+					},
 					"nodeAffinity": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
@@ -653,6 +661,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"replicaLoadBalancer": {
 						Type:        "boolean",
 						Description: "deprecated",
+					},
+					"replicaServiceAnnotations": {
+						Type: "object",
+						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type: "string",
+							},
+						},
 					},
 					"resources": {
 						Type: "object",

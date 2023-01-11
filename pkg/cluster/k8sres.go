@@ -28,6 +28,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	"golang.org/x/exp/maps"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -1901,13 +1902,16 @@ func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourc
 
 func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
 	annotations := make(map[string]string)
+	maps.Copy(annotations, c.OpConfig.CustomServiceAnnotations)
 
-	for k, v := range c.OpConfig.CustomServiceAnnotations {
-		annotations[k] = v
-	}
-	if spec != nil || spec.ServiceAnnotations != nil {
-		for k, v := range spec.ServiceAnnotations {
-			annotations[k] = v
+	if spec != nil {
+		maps.Copy(annotations, spec.ServiceAnnotations)
+
+		switch role {
+		case Master:
+			maps.Copy(annotations, spec.MasterServiceAnnotations)
+		case Replica:
+			maps.Copy(annotations, spec.ReplicaServiceAnnotations)
 		}
 	}
 
