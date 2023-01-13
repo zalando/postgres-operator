@@ -1592,9 +1592,17 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								},
 							},
 							"master_dns_name_format": {
+								Type:        "string",
+								Description: "deprecated",
+							},
+							"master_lb_dns_name_format": {
 								Type: "string",
 							},
 							"replica_dns_name_format": {
+								Type:        "string",
+								Description: "deprecated",
+							},
+							"replica_lb_dns_name_format": {
 								Type: "string",
 							},
 						},

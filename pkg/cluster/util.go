@@ -506,7 +506,7 @@ func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) la
 }
 
 func (c *Cluster) dnsName(role PostgresRole) string {
-	var dnsString string
+	var dnsString, oldDnsString string
 
 	if role == Master {
 		dnsString = c.masterDNSName()
@@ -517,36 +517,43 @@ func (c *Cluster) dnsName(role PostgresRole) string {
 	// if cluster name starts with teamID we might need to provide backwards compatibility
 	clusterNameWithoutTeamPrefix, _ := acidv1.ExtractClusterName(c.Name, c.Spec.TeamID)
 	if clusterNameWithoutTeamPrefix != "" {
-		if role == Replica {
-			clusterNameWithoutTeamPrefix = fmt.Sprintf("%s-repl", clusterNameWithoutTeamPrefix)
+		if role == Master {
+			oldDnsString = c.oldMasterDNSName(clusterNameWithoutTeamPrefix)
+		} else {
+			oldDnsString = c.oldReplicaDNSName(clusterNameWithoutTeamPrefix)
 		}
-		dnsString = fmt.Sprintf("%s,%s", dnsString, c.oldDNSFormat(clusterNameWithoutTeamPrefix))
+		dnsString = fmt.Sprintf("%s,%s", dnsString, oldDnsString)
 	}
 
 	return dnsString
 }
 
 func (c *Cluster) masterDNSName() string {
-	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
+	return strings.ToLower(c.OpConfig.MasterLBDNSNameFormat.Format(
 		"cluster", c.Name,
 		"namespace", c.Namespace,
-		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
 func (c *Cluster) replicaDNSName() string {
-	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
+	return strings.ToLower(c.OpConfig.ReplicaLBDNSNameFormat.Format(
 		"cluster", c.Name,
 		"namespace", c.Namespace,
+		"hostedzone", c.OpConfig.DbHostedZone))
+}
+
+func (c *Cluster) oldMasterDNSName(clusterName string) string {
+	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
+		"cluster", clusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
-func (c *Cluster) oldDNSFormat(clusterName string) string {
-	return fmt.Sprintf("%s.%s.%s",
-		clusterName,
-		c.teamName(),
-		c.OpConfig.DbHostedZone)
+func (c *Cluster) oldReplicaDNSName(clusterName string) string {
+	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
+		"cluster", clusterName,
+		"team", c.teamName(),
+		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
 func (c *Cluster) credentialSecretName(username string) string {

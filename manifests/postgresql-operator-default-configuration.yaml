@@ -136,8 +136,10 @@ configuration:
     enable_replica_load_balancer: false
     enable_replica_pooler_load_balancer: false
     external_traffic_policy: "Cluster"
-    master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
-    replica_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
+    # master_dns_name_format: "{cluster}.{team}.{hostedzone}"
+    master_lb_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
+    # replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
+    replica_lb_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
   aws_or_gcp:
     # additional_secret_mount: "some-secret-name"
     # additional_secret_mount_path: "/some/dir"

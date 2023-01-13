@@ -154,7 +154,9 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableReplicaPoolerLoadBalancer = fromCRD.LoadBalancer.EnableReplicaPoolerLoadBalancer
 	result.CustomServiceAnnotations = fromCRD.LoadBalancer.CustomServiceAnnotations
 	result.MasterDNSNameFormat = fromCRD.LoadBalancer.MasterDNSNameFormat
+	result.MasterLBDNSNameFormat = fromCRD.LoadBalancer.MasterLBDNSNameFormat
 	result.ReplicaDNSNameFormat = fromCRD.LoadBalancer.ReplicaDNSNameFormat
+	result.ReplicaLBDNSNameFormat = fromCRD.LoadBalancer.ReplicaLBDNSNameFormat
 	result.ExternalTrafficPolicy = util.Coalesce(fromCRD.LoadBalancer.ExternalTrafficPolicy, "Cluster")
 
 	// AWS or GCP config

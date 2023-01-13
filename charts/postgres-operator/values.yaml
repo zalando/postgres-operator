@@ -275,10 +275,14 @@ configLoadBalancer:
   enable_replica_pooler_load_balancer: false
   # define external traffic policy for the load balancer
   external_traffic_policy: "Cluster"
+  # deprecated DNS template for master load balancer using team name
+  master_dns_name_format: "{cluster}.{team}.{hostedzone}"
   # defines the DNS name string template for the master load balancer cluster
-  master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
+  master_lb_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
+  # deprecated DNS template for master load balancer using team name
+  replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
   # defines the DNS name string template for the replica load balancer cluster
-  replica_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
+  replica_lb_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
 
 # options to aid debugging of the operator itself
 configDebug:

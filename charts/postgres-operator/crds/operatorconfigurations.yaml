@@ -433,8 +433,16 @@ spec:
                     default: "Cluster"
                   master_dns_name_format:
                     type: string
+                    description: deprecated
+                    default: "{cluster}.{team}.{hostedzone}"
+                  master_lb_dns_name_format:
+                    type: string
                     default: "{cluster}.{namespace}.{hostedzone}"
                   replica_dns_name_format:
+                    type: string
+                    description: deprecated
+                    default: "{cluster}-repl.{team}.{hostedzone}"
+                  replica_lb_dns_name_format:
                     type: string
                     default: "{cluster}-repl.{namespace}.{hostedzone}"
               aws_or_gcp:
