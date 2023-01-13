@@ -867,10 +867,10 @@ func TestServiceAnnotations(t *testing.T) {
 			cl.OpConfig.CustomServiceAnnotations = tt.operatorAnnotations
 			cl.OpConfig.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerOC
 			cl.OpConfig.EnableReplicaLoadBalancer = tt.enableReplicaLoadBalancerOC
-			cl.OpConfig.MasterDNSNameFormat = "{cluster}-stg.{team}.{hostedzone}"
-			cl.OpConfig.MasterLBDNSNameFormat = "{cluster}-stg.{namespace}.{hostedzone}"
-			cl.OpConfig.ReplicaDNSNameFormat = "{cluster}-stg-repl.{team}.{hostedzone}"
-			cl.OpConfig.ReplicaLBDNSNameFormat = "{cluster}-stg-repl.{namespace}.{hostedzone}"
+			cl.OpConfig.MasterDNSNameFormat = "{cluster}-stg.{namespace}.{hostedzone}"
+			cl.OpConfig.MasterOldDNSNameFormat = "{cluster}-stg.{team}.{hostedzone}"
+			cl.OpConfig.ReplicaDNSNameFormat = "{cluster}-stg-repl.{namespace}.{hostedzone}"
+			cl.OpConfig.ReplicaOldDNSNameFormat = "{cluster}-stg-repl.{team}.{hostedzone}"
 			cl.OpConfig.DbHostedZone = "db.example.com"
 
 			cl.Postgresql.Spec.ClusterName = ""

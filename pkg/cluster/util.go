@@ -529,28 +529,30 @@ func (c *Cluster) dnsName(role PostgresRole) string {
 }
 
 func (c *Cluster) masterDNSName() string {
-	return strings.ToLower(c.OpConfig.MasterLBDNSNameFormat.Format(
+	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
 		"cluster", c.Name,
 		"namespace", c.Namespace,
+		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
 func (c *Cluster) replicaDNSName() string {
-	return strings.ToLower(c.OpConfig.ReplicaLBDNSNameFormat.Format(
+	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
 		"cluster", c.Name,
 		"namespace", c.Namespace,
+		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
 func (c *Cluster) oldMasterDNSName(clusterName string) string {
-	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
+	return strings.ToLower(c.OpConfig.MasterOldDNSNameFormat.Format(
 		"cluster", clusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
 func (c *Cluster) oldReplicaDNSName(clusterName string) string {
-	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
+	return strings.ToLower(c.OpConfig.ReplicaOldDNSNameFormat.Format(
 		"cluster", clusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))

@@ -780,7 +780,7 @@ If load balancing is enabled two default annotations will be applied to its
 services:
 
 - `external-dns.alpha.kubernetes.io/hostname` with the value defined by the
-  operator configs `master_lb_dns_name_format` and `replica_lb_dns_name_format`.
+  operator configs `master_dns_name_format` and `replica_dns_name_format`.
   This value can't be overwritten. If any changing in its value is needed, it
   MUST be done changing the DNS format operator config parameters; and
 - `service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout` with

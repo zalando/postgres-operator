@@ -631,27 +631,27 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   defines external traffic policy for load
   balancers. Allowed values are `Cluster` (default) and `Local`.
 
-* **master_lb_dns_name_format**
+* **master_dns_name_format**
   defines the DNS name string template for the master load balancer cluster. 
   The default is `{cluster}.{namespace}.{hostedzone}`, where `{cluster}` is
   replaced by the cluster name, `{namespace}` is replaced with the namespace
   and `{hostedzone}` is replaced with the hosted zone (the value of the
   `db_hosted_zone` parameter). No other placeholders are allowed!
 
-* **master_dns_name_format**
-  *deprecated* option that uses the old default `{cluster}.{team}.{hostedzone}`.
+* **master_old_dns_name_format**
+  option that uses the old *deprecated* default `{cluster}.{team}.{hostedzone}`.
   If cluster name starts with `teamId` then a second DNS entry will be created
   using the template defined here to provide backwards compatibility.
 
-* **replica_lb_dns_name_format**
+* **replica_dns_name_format**
   defines the DNS name string template for the replica load balancer cluster.
   The default is `{cluster}-repl.{namespace}.{hostedzone}`, where `{cluster}`
   is replaced by the cluster name, `{namespace}` is replaced with the
   namespace and `{hostedzone}` is replaced with the hosted zone (the value of
   the `db_hosted_zone` parameter). No other placeholders are allowed!
 
-* **replica_dns_name_format**
-  *deprecated* option that uses the old default `{cluster}-repl.{team}.{hostedzone}`.
+* **replica_old_dns_name_format**
+  option that uses the old *deprecated* default `{cluster}-repl.{team}.{hostedzone}`.
   If cluster name starts with `teamId` then a second DNS entry will be created
   using the template defined here to provide backwards compatibility.
 
