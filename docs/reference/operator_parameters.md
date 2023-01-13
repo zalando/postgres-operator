@@ -636,24 +636,34 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   The default is `{cluster}.{namespace}.{hostedzone}`, where `{cluster}` is
   replaced by the cluster name, `{namespace}` is replaced with the namespace
   and `{hostedzone}` is replaced with the hosted zone (the value of the
-  `db_hosted_zone` parameter). No other placeholders are allowed!
+  `db_hosted_zone` parameter). The `{team}` placeholder can still be used,
+  although it is not recommened because the team of a cluster can change.
+  If the cluster name starts with the `teamId` it will also be part of the
+  DNS, aynway. No other placeholders are allowed!
 
 * **master_old_dns_name_format**
   option that uses the old *deprecated* default `{cluster}.{team}.{hostedzone}`.
   If cluster name starts with `teamId` then a second DNS entry will be created
-  using the template defined here to provide backwards compatibility.
+  using the template defined here to provide backwards compatibility. The
+  `teamId` prefix will be extracted from the clustername, because it follows
+  later in the DNS string.
 
 * **replica_dns_name_format**
   defines the DNS name string template for the replica load balancer cluster.
   The default is `{cluster}-repl.{namespace}.{hostedzone}`, where `{cluster}`
   is replaced by the cluster name, `{namespace}` is replaced with the
   namespace and `{hostedzone}` is replaced with the hosted zone (the value of
-  the `db_hosted_zone` parameter). No other placeholders are allowed!
+  the `db_hosted_zone` parameter). The `{team}` placeholder can still be used,
+  although it is not recommened because the team of a cluster can change.
+  If the cluster name starts with the `teamId` it will also be part of the
+  DNS, aynway. No other placeholders are allowed!
 
 * **replica_old_dns_name_format**
   option that uses the old *deprecated* default `{cluster}-repl.{team}.{hostedzone}`.
   If cluster name starts with `teamId` then a second DNS entry will be created
-  using the template defined here to provide backwards compatibility.
+  using the template defined here to provide backwards compatibility. The
+  `teamId` prefix will be extracted from the clustername, because it follows
+  later in the DNS string.
 
 ## AWS or GCP interaction
 
