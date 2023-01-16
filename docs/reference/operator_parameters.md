@@ -641,12 +641,14 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   If the cluster name starts with the `teamId` it will also be part of the
   DNS, aynway. No other placeholders are allowed!
 
-* **master_old_dns_name_format**
-  option that uses the old *deprecated* default `{cluster}.{team}.{hostedzone}`.
-  If cluster name starts with `teamId` then a second DNS entry will be created
-  using the template defined here to provide backwards compatibility. The
-  `teamId` prefix will be extracted from the clustername, because it follows
-  later in the DNS string.
+* **master_legacy_dns_name_format**
+  *deprecated* default master DNS template `{cluster}.{team}.{hostedzone}` as
+  of pre `v1.9.0`. If cluster name starts with `teamId` then a second DNS
+  entry will be created using the template defined here to provide backwards
+  compatibility. The `teamId` prefix will be extracted from the clustername
+  because it follows later in the DNS string. When using a customized
+  `master_dns_name_format` make sure to define the legacy DNS format when
+  switching to v1.9.0.
 
 * **replica_dns_name_format**
   defines the DNS name string template for the replica load balancer cluster.
@@ -658,12 +660,14 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   If the cluster name starts with the `teamId` it will also be part of the
   DNS, aynway. No other placeholders are allowed!
 
-* **replica_old_dns_name_format**
-  option that uses the old *deprecated* default `{cluster}-repl.{team}.{hostedzone}`.
-  If cluster name starts with `teamId` then a second DNS entry will be created
-  using the template defined here to provide backwards compatibility. The
-  `teamId` prefix will be extracted from the clustername, because it follows
-  later in the DNS string.
+* **replica_legacy_dns_name_format**
+  *deprecated* default master DNS template `{cluster}-repl.{team}.{hostedzone}`
+  as of pre `v1.9.0`. If cluster name starts with `teamId` then a second DNS
+  entry will be created using the template defined here to provide backwards
+  compatibility. The `teamId` prefix will be extracted from the clustername
+  because it follows later in the DNS string. When using a customized
+  `master_dns_name_format` make sure to define the legacy DNS format when
+  switching to v1.9.0.
 
 ## AWS or GCP interaction
 

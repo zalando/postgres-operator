@@ -137,9 +137,9 @@ type LoadBalancerConfiguration struct {
 	EnableReplicaPoolerLoadBalancer bool                  `json:"enable_replica_pooler_load_balancer,omitempty"`
 	CustomServiceAnnotations        map[string]string     `json:"custom_service_annotations,omitempty"`
 	MasterDNSNameFormat             config.StringTemplate `json:"master_dns_name_format,omitempty"`
-	MasterOldDNSNameFormat          config.StringTemplate `json:"master_old_dns_name_format,omitempty"`
+	MasterLegacyDNSNameFormat       config.StringTemplate `json:"master_legacy_dns_name_format,omitempty"`
 	ReplicaDNSNameFormat            config.StringTemplate `json:"replica_dns_name_format,omitempty"`
-	ReplicaOldDNSNameFormat         config.StringTemplate `json:"replica_old_dns_name_format,omitempty"`
+	ReplicaLegacyDNSNameFormat      config.StringTemplate `json:"replica_legacy_dns_name_format,omitempty"`
 	ExternalTrafficPolicy           string                `json:"external_traffic_policy" default:"Cluster"`
 }
 

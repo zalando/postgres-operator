@@ -278,11 +278,11 @@ configLoadBalancer:
   # defines the DNS name string template for the master load balancer cluster
   master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
   # deprecated DNS template for master load balancer using team name
-  master_old_dns_name_format: "{cluster}.{team}.{hostedzone}"
+  master_legacy_dns_name_format: "{cluster}.{team}.{hostedzone}"
   # defines the DNS name string template for the replica load balancer cluster
   replica_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
-    # deprecated DNS template for replica load balancer using team name
-  replica_old_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
+  # deprecated DNS template for replica load balancer using team name
+  replica_legacy_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
 
 # options to aid debugging of the operator itself
 configDebug:

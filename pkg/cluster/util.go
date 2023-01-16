@@ -545,14 +545,14 @@ func (c *Cluster) replicaDNSName() string {
 }
 
 func (c *Cluster) oldMasterDNSName(clusterName string) string {
-	return strings.ToLower(c.OpConfig.MasterOldDNSNameFormat.Format(
+	return strings.ToLower(c.OpConfig.MasterLegacyDNSNameFormat.Format(
 		"cluster", clusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
 func (c *Cluster) oldReplicaDNSName(clusterName string) string {
-	return strings.ToLower(c.OpConfig.ReplicaOldDNSNameFormat.Format(
+	return strings.ToLower(c.OpConfig.ReplicaLegacyDNSNameFormat.Format(
 		"cluster", clusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
