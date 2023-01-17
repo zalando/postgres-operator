@@ -759,7 +759,7 @@ func (c *Cluster) updateSecret(
 
 	// globally enabled rotation is only allowed for manifest and bootstrapped roles
 	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
-	rotationAllowed := !pwdUser.IsDbOwner && util.SliceContains(allowedRoleTypes, pwdUser.Origin)
+	rotationAllowed := !pwdUser.IsDbOwner && util.SliceContains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
 
 	if (c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest {
 		updateSecretMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
