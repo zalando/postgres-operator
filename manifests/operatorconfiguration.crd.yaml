@@ -432,9 +432,15 @@ spec:
                   master_dns_name_format:
                     type: string
                     default: "{cluster}.{namespace}.{hostedzone}"
+                  master_legacy_dns_name_format:
+                    type: string
+                    default: "{cluster}.{team}.{hostedzone}"
                   replica_dns_name_format:
                     type: string
                     default: "{cluster}-repl.{namespace}.{hostedzone}"
+                  replica_legacy_dns_name_format:
+                    type: string
+                    default: "{cluster}-repl.{team}.{hostedzone}"
               aws_or_gcp:
                 type: object
                 properties:

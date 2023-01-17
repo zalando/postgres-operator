@@ -1594,7 +1594,13 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"master_dns_name_format": {
 								Type: "string",
 							},
+							"master_legacy_dns_name_format": {
+								Type: "string",
+							},
 							"replica_dns_name_format": {
+								Type: "string",
+							},
+							"replica_legacy_dns_name_format": {
 								Type: "string",
 							},
 						},
