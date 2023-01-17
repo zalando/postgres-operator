@@ -79,7 +79,7 @@ TOKENINFO_URL = getenv('OAUTH2_TOKEN_INFO_URL')
 
 OPERATOR_API_URL = getenv('OPERATOR_API_URL', 'http://postgres-operator')
 OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-name')
-OPERATOR_UI_CONFIG = getenv('OPERATOR_UI_CONFIG', '{}')
+OPERATOR_UI_CONFIG = loads(getenv('OPERATOR_UI_CONFIG', '{}'))
 OPERATOR_UI_MAINTENANCE_CHECK = getenv('OPERATOR_UI_MAINTENANCE_CHECK', '{}')
 READ_ONLY_MODE = getenv('READ_ONLY_MODE', False) in [True, 'true']
 SPILO_S3_BACKUP_PREFIX = getenv('SPILO_S3_BACKUP_PREFIX', 'spilo/')
@@ -348,7 +348,7 @@ DEFAULT_UI_CONFIG = {
 @authorize
 def get_config():
     config = DEFAULT_UI_CONFIG.copy() 
-    config.update(loads(OPERATOR_UI_CONFIG))
+    config.update(OPERATOR_UI_CONFIG)
 
     config['namespaces'] = (
         [TARGET_NAMESPACE]
@@ -508,10 +508,10 @@ def get_postgresqls():
     postgresqls = [
         {
             'nodes': spec.get('numberOfInstances', ''),
-            'memory': spec.get('resources', {}).get('requests', {}).get('memory', 0),
-            'memory_limit': spec.get('resources', {}).get('limits', {}).get('memory', 0),
-            'cpu': spec.get('resources', {}).get('requests', {}).get('cpu', 0),
-            'cpu_limit': spec.get('resources', {}).get('limits', {}).get('cpu', 0),
+            'memory': spec.get('resources', {}).get('requests', {}).get('memory', OPERATOR_UI_CONFIG.get("default_memory", DEFAULT_MEMORY)),
+            'memory_limit': spec.get('resources', {}).get('limits', {}).get('memory', OPERATOR_UI_CONFIG.get("default_memory_limit", DEFAULT_MEMORY_LIMIT)),
+            'cpu': spec.get('resources', {}).get('requests', {}).get('cpu', OPERATOR_UI_CONFIG.get("default_cpu", DEFAULT_CPU)),
+            'cpu_limit': spec.get('resources', {}).get('limits', {}).get('cpu', OPERATOR_UI_CONFIG.get("default_cpu_limit", DEFAULT_CPU_LIMIT)),
             'volume_size': spec.get('volume', {}).get('size', 0),
             'iops': spec.get('volume', {}).get('iops', 3000),
             'throughput': spec.get('volume', {}).get('throughput', 125),
