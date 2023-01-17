@@ -1919,7 +1919,7 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 		dnsName := c.dnsName(role)
 
 		// Just set ELB Timeout annotation with default value, if it does not
-		// have a cutom value
+		// have a custom value
 		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
 			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
 		}
