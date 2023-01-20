@@ -58,6 +58,7 @@ type PgUser struct {
 	AdminRole  string            `yaml:"admin_role"`
 	IsDbOwner  bool              `yaml:"is_db_owner"`
 	Deleted    bool              `yaml:"deleted"`
+	Rotated    bool              `yaml:"rotated"`
 }
 
 func (user *PgUser) Valid() bool {
