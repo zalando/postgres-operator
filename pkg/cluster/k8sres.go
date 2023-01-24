@@ -2705,7 +2705,7 @@ func (c *Cluster) generatePgbbackrestPodEnvVars(name string) []v1.EnvVar {
 		},
 		{
 			Name:  "COMMAND_OPTS",
-			Value: fmt.Sprintf("--log-path=/tmp --pg1-user=postgres --stanza=db --repo=1 --type=%s", name),
+			Value: fmt.Sprintf("--stanza=db --repo=1 --type=%s", name),
 		},
 		{
 			Name:  "COMPARE_HASH",
