@@ -403,7 +403,10 @@ func (c *Cluster) syncStatefulSet() error {
 		c.logger.Warnf("could not get list of pods to apply PostgreSQL parameters only to be set via Patroni API: %v", err)
 	}
 
-	requiredPgParameters := c.Spec.Parameters
+	requiredPgParameters := make(map[string]string)
+	for k, v := range c.Spec.Parameters {
+		requiredPgParameters[k] = v
+	}
 	// if streams are defined wal_level must be switched to logical
 	if len(c.Spec.Streams) > 0 {
 		requiredPgParameters["wal_level"] = "logical"
