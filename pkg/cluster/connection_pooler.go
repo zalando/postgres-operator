@@ -478,7 +478,6 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 }
 
 func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPoolerObjects) *v1.Service {
-	var dnsString string
 	spec := &c.Spec
 	poolerRole := connectionPooler.Role
 	serviceSpec := v1.ServiceSpec{
@@ -499,22 +498,12 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
-	serviceAnnotations := c.generateServiceAnnotations(poolerRole, spec)
-	// -repl suffix will be added by replicaDNSName
-	clusterNameWithPoolerSuffix := c.connectionPoolerName(Master)
-	if poolerRole == Master {
-		dnsString = c.masterDNSName(clusterNameWithPoolerSuffix)
-	} else {
-		dnsString = c.replicaDNSName(clusterNameWithPoolerSuffix)
-	}
-	serviceAnnotations[constants.ZalandoDNSNameAnnotation] = dnsString
-
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        connectionPooler.Name,
 			Namespace:   connectionPooler.Namespace,
 			Labels:      c.connectionPoolerLabels(connectionPooler.Role, false).MatchLabels,
-			Annotations: c.annotationsSet(serviceAnnotations),
+			Annotations: c.annotationsSet(c.generatePoolerServiceAnnotations(poolerRole, spec)),
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
 			// propagation policy, which means that it's deletion will not
@@ -527,6 +516,32 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 	}
 
 	return service
+}
+
+func (c *Cluster) generatePoolerServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
+	var dnsString string
+	annotations := c.getCustomServiceAnnotations(role, spec)
+
+	if c.shouldCreateLoadBalancerForPoolerService(role, spec) {
+		// set ELB Timeout annotation with default value
+		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
+			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
+		}
+		// -repl suffix will be added by replicaDNSName
+		clusterNameWithPoolerSuffix := c.connectionPoolerName(Master)
+		if role == Master {
+			dnsString = c.masterDNSName(clusterNameWithPoolerSuffix)
+		} else {
+			dnsString = c.replicaDNSName(clusterNameWithPoolerSuffix)
+		}
+		annotations[constants.ZalandoDNSNameAnnotation] = dnsString
+	}
+
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	return annotations
 }
 
 func (c *Cluster) shouldCreateLoadBalancerForPoolerService(role PostgresRole, spec *acidv1.PostgresSpec) bool {

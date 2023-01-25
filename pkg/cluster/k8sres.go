@@ -1901,6 +1901,28 @@ func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourc
 }
 
 func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
+	annotations := c.getCustomServiceAnnotations(role, spec)
+
+	if c.shouldCreateLoadBalancerForService(role, spec) {
+		dnsName := c.dnsName(role)
+
+		// Just set ELB Timeout annotation with default value, if it does not
+		// have a custom value
+		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
+			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
+		}
+		// External DNS name annotation is not customizable
+		annotations[constants.ZalandoDNSNameAnnotation] = dnsName
+	}
+
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	return annotations
+}
+
+func (c *Cluster) getCustomServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
 	annotations := make(map[string]string)
 	maps.Copy(annotations, c.OpConfig.CustomServiceAnnotations)
 
@@ -1913,22 +1935,6 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 		case Replica:
 			maps.Copy(annotations, spec.ReplicaServiceAnnotations)
 		}
-	}
-
-	if c.shouldCreateLoadBalancerForService(role, spec) {
-		dnsName := c.dnsName(role)
-
-		// Just set ELB Timeout annotation with default value, if it does not
-		// have a cutom value
-		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
-			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
-		}
-		// External DNS name annotation is not customizable
-		annotations[constants.ZalandoDNSNameAnnotation] = dnsName
-	}
-
-	if len(annotations) == 0 {
-		return nil
 	}
 
 	return annotations
