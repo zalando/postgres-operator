@@ -395,12 +395,12 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 	}
 
-	// Apply special PostgreSQL parameters that can only be set via the Patroni API.
+	// apply PostgreSQL parameters that can only be set via the Patroni API.
 	// it is important to do it after the statefulset pods are there, but before the rolling update
 	// since those parameters require PostgreSQL restart.
 	pods, err = c.listPods()
 	if err != nil {
-		c.logger.Warnf("could not get list of pods to apply special PostgreSQL parameters only to be set via Patroni API: %v", err)
+		c.logger.Warnf("could not get list of pods to apply PostgreSQL parameters only to be set via Patroni API: %v", err)
 	}
 
 	requiredPgParameters := c.Spec.Parameters
@@ -415,12 +415,10 @@ func (c *Cluster) syncStatefulSet() error {
 		isSafeToRecreatePods = false
 	}
 
-	// restart instances if it is still pending
-	if configPatched {
-		if err = c.restartInstances(pods, restartWait, restartPrimaryFirst); err != nil {
-			c.logger.Errorf("%v", err)
-			isSafeToRecreatePods = false
-		}
+	// restart Postgres where it is still pending
+	if err = c.restartInstances(pods, restartWait, restartPrimaryFirst); err != nil {
+		c.logger.Errorf("errors while restarting Postgres in pods via Patroni API: %v", err)
+		isSafeToRecreatePods = false
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
@@ -434,7 +432,7 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 		} else {
-			c.logger.Warningf("postpone pod recreation until next sync")
+			c.logger.Warningf("postpone pod recreation until next sync because of errors during config sync")
 		}
 	}
 
@@ -464,8 +462,9 @@ func (c *Cluster) syncPatroniConfig(pods []v1.Pod, requiredPatroniConfig acidv1.
 		loopWait = effectivePatroniConfig.LoopWait
 
 		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
-		// do not attempt a restart
-		if !reflect.DeepEqual(effectivePatroniConfig, acidv1.Patroni{}) || len(effectivePgParameters) > 0 {
+		if reflect.DeepEqual(effectivePatroniConfig, acidv1.Patroni{}) || len(effectivePgParameters) == 0 {
+			errors = append(errors, fmt.Sprintf("empty Patroni config on pod %s - skipping config patch", podName))
+		} else {
 			configPatched, restartPrimaryFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePatroniConfig, requiredPatroniConfig, effectivePgParameters, requiredPgParameters)
 			if err != nil {
 				errors = append(errors, fmt.Sprintf("could not set PostgreSQL configuration options for pod %s: %v", podName, err))
@@ -483,18 +482,21 @@ func (c *Cluster) syncPatroniConfig(pods []v1.Pod, requiredPatroniConfig acidv1.
 	}
 
 	if len(errors) > 0 {
-		err = fmt.Errorf("errors occurred while patching Patroni config: %v", strings.Join(errors, `', '`))
+		err = fmt.Errorf("%v", strings.Join(errors, `', '`))
 	}
 
 	return configPatched, restartPrimaryFirst, loopWait, err
 }
 
 func (c *Cluster) restartInstances(pods []v1.Pod, restartWait uint32, restartPrimaryFirst bool) (err error) {
+	errors := make([]string, 0)
 	remainingPods := make([]*v1.Pod, 0)
+
 	skipRole := Master
 	if restartPrimaryFirst {
 		skipRole = Replica
 	}
+
 	for i, pod := range pods {
 		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 		if role == skipRole {
@@ -502,7 +504,7 @@ func (c *Cluster) restartInstances(pods []v1.Pod, restartWait uint32, restartPri
 			continue
 		}
 		if err = c.restartInstance(&pod, restartWait); err != nil {
-			return err
+			errors = append(errors, fmt.Sprintf("%v", err))
 		}
 	}
 
@@ -510,9 +512,13 @@ func (c *Cluster) restartInstances(pods []v1.Pod, restartWait uint32, restartPri
 	if len(remainingPods) > 0 {
 		for _, remainingPod := range remainingPods {
 			if err = c.restartInstance(remainingPod, restartWait); err != nil {
-				return err
+				errors = append(errors, fmt.Sprintf("%v", err))
 			}
 		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
 	}
 
 	return nil
