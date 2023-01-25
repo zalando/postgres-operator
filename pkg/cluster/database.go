@@ -284,7 +284,7 @@ func (c *Cluster) cleanupRotatedUsers(rotatedUsers []string, db *sql.DB) error {
 	retentionDate := time.Now().AddDate(0, 0, int(retenionDays)*-1)
 
 	for rotatedUser, dateSuffix := range extraUsers {
-		userCreationDate, err := time.Parse("060102", dateSuffix)
+		userCreationDate, err := time.Parse(constants.RotationUserDateFormat, dateSuffix)
 		if err != nil {
 			c.logger.Errorf("could not parse creation date suffix of user %q: %v", rotatedUser, err)
 			continue

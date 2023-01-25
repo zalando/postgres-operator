@@ -932,7 +932,8 @@ class EndToEndTestCase(unittest.TestCase):
                             "AdminRole": "",
                             "Origin": 2,
                             "IsDbOwner": False,
-                            "Deleted": False
+                            "Deleted": False,
+                            "Rotated": False
                         })
                         return True
                 except:
@@ -1472,9 +1473,9 @@ class EndToEndTestCase(unittest.TestCase):
         # create fake rotation users that should be removed by operator
         # but have one that would still fit into the retention period
         create_fake_rotation_user = """
-            CREATE ROLE foo_user201031 IN ROLE foo_user;
-            CREATE ROLE foo_user211031 IN ROLE foo_user;
-            CREATE ROLE foo_user"""+(today-timedelta(days=40)).strftime("%y%m%d")+""" IN ROLE foo_user;
+            CREATE USER foo_user201031 IN ROLE foo_user;
+            CREATE USER foo_user211031 IN ROLE foo_user;
+            CREATE USER foo_user"""+(today-timedelta(days=40)).strftime("%y%m%d")+""" IN ROLE foo_user;
         """
         self.query_database(leader.metadata.name, "postgres", create_fake_rotation_user)
 
@@ -1490,6 +1491,12 @@ class EndToEndTestCase(unittest.TestCase):
             name="foo-user.acid-minimal-cluster.credentials.postgresql.acid.zalan.do", 
             namespace="default",
             body=secret_fake_rotation)
+
+        # update rolconfig for foo_user that will be copied for new rotation user
+        alter_foo_user_search_path = """
+            ALTER ROLE foo_user SET search_path TO data;
+        """
+        self.query_database(leader.metadata.name, "postgres", alter_foo_user_search_path)
 
         # enable password rotation for all other users (foo_user)
         # this will force a sync of secrets for further assertions
@@ -1526,6 +1533,18 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 3,
             "Found incorrect number of rotation users", 10, 5)
 
+        # check if rolconfig was passed from foo_user to foo_user+today
+        # and that no foo_user has been deprecated (can still login)
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname LIKE 'foo_user%'
+               AND rolconfig = ARRAY['search_path=data']::text[]
+               AND rolcanlogin;
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
+            "Rolconfig not applied to new rotation user", 10, 5)
+
         # test that rotation_user can connect to the database
         self.eventuallyEqual(lambda: len(self.query_database_with_user(leader.metadata.name, "postgres", "SELECT 1", "foo_user")), 1,
             "Could not connect to the database with rotation user {}".format(rotation_user), 10, 5)
@@ -1559,7 +1578,7 @@ class EndToEndTestCase(unittest.TestCase):
              WHERE rolname LIKE 'foo_user%';
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
-            "Found incorrect number of rotation users", 10, 5)
+            "Found incorrect number of rotation users after disabling password rotation", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_rolling_update_flag(self):

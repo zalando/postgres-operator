@@ -656,7 +656,6 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 }
 
 func (c *Cluster) syncSecrets() error {
-
 	c.logger.Info("syncing secrets")
 	c.setProcessName("syncing secrets")
 	generatedSecrets := c.generateUserSecrets()
@@ -792,6 +791,7 @@ func (c *Cluster) updateSecret(
 		pwdUser.Password = string(secret.Data["password"])
 		// update membership if we deal with a rotation user
 		if secretUsername != pwdUser.Name {
+			pwdUser.Rotated = true
 			pwdUser.MemberOf = []string{secretUsername}
 		}
 		userMap[userKey] = pwdUser
@@ -842,7 +842,7 @@ func (c *Cluster) rotatePasswordInSecret(
 	if currentTime.After(nextRotationDate) {
 		// create rotation user if role is not listed for in-place password update
 		if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
-			rotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format("060102"))
+			rotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format(constants.RotationUserDateFormat))
 			secret.Data["username"] = []byte(rotationUsername)
 			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, rotationUsername)
 			// whenever there is a rotation, check if old rotation users can be deleted
@@ -924,6 +924,12 @@ func (c *Cluster) syncRoles() (err error) {
 	for _, u := range c.pgUsers {
 		pgRole := u.Name
 		userNames = append(userNames, pgRole)
+
+		// when a rotation happened add group role to query its rolconfig
+		if u.Rotated {
+			userNames = append(userNames, u.MemberOf[0])
+		}
+
 		// add team member role name with rename suffix in case we need to rename it back
 		if u.Origin == spec.RoleOriginTeamsAPI && c.OpConfig.EnableTeamMemberDeprecation {
 			deletedUsers[pgRole+c.OpConfig.RoleDeletionSuffix] = pgRole
@@ -950,9 +956,21 @@ func (c *Cluster) syncRoles() (err error) {
 		return fmt.Errorf("error getting users from the database: %v", err)
 	}
 
-	// update pgUsers where a deleted role was found
-	// so that they are skipped in ProduceSyncRequests
+DBUSERS:
 	for _, dbUser := range dbUsers {
+		// copy rolconfig to rotation users
+		for pgUserName, pgUser := range c.pgUsers {
+			if pgUser.Rotated && pgUser.MemberOf[0] == dbUser.Name {
+				pgUser.Parameters = dbUser.Parameters
+				c.pgUsers[pgUserName] = pgUser
+				// remove group role from dbUsers to not count as deleted role
+				delete(dbUsers, dbUser.Name)
+				continue DBUSERS
+			}
+		}
+
+		// update pgUsers where a deleted role was found
+		// so that they are skipped in ProduceSyncRequests
 		originalUsername, foundDeletedUser := deletedUsers[dbUser.Name]
 		// check if original user does not exist in dbUsers
 		_, originalUserAlreadyExists := dbUsers[originalUsername]
