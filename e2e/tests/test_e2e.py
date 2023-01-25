@@ -1578,7 +1578,7 @@ class EndToEndTestCase(unittest.TestCase):
              WHERE rolname LIKE 'foo_user%';
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
-            "Found incorrect number of rotation users after disbaling password rotation", 10, 5)
+            "Found incorrect number of rotation users after disabling password rotation", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_rolling_update_flag(self):
