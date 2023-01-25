@@ -463,18 +463,22 @@ func (c *Cluster) syncPatroniConfig(pods []v1.Pod, requiredPatroniConfig acidv1.
 		}
 		loopWait = effectivePatroniConfig.LoopWait
 
-		configPatched, restartPrimaryFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePatroniConfig, requiredPatroniConfig, effectivePgParameters, requiredPgParameters)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("could not set PostgreSQL configuration options for pod %s: %v", podName, err))
-			continue
-		}
+		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
+		// do not attempt a restart
+		if !reflect.DeepEqual(effectivePatroniConfig, acidv1.Patroni{}) || len(effectivePgParameters) > 0 {
+			configPatched, restartPrimaryFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePatroniConfig, requiredPatroniConfig, effectivePgParameters, requiredPgParameters)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("could not set PostgreSQL configuration options for pod %s: %v", podName, err))
+				continue
+			}
 
-		// it could take up to LoopWait to apply the config
-		if configPatched {
-			time.Sleep(time.Duration(loopWait)*time.Second + time.Second*2)
-			// Patroni's config endpoint is just a "proxy" to DCS.
-			// It is enough to patch it only once and it doesn't matter which pod is used
-			break
+			// it could take up to LoopWait to apply the config
+			if configPatched {
+				time.Sleep(time.Duration(loopWait)*time.Second + time.Second*2)
+				// Patroni's config endpoint is just a "proxy" to DCS.
+				// It is enough to patch it only once and it doesn't matter which pod is used
+				break
+			}
 		}
 	}
 
