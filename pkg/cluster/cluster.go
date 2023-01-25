@@ -836,6 +836,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume sync.")
 	}
 
+	// streams configuration
+	if len(oldSpec.Spec.Streams) == 0 && len(newSpec.Spec.Streams) > 0 {
+		syncStatefulSet = true
+	}
+
 	// Statefulset
 	func() {
 		oldSs, err := c.generateStatefulSet(&oldSpec.Spec)
@@ -851,6 +856,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			updateFailed = true
 			return
 		}
+
 		if syncStatefulSet || !reflect.DeepEqual(oldSs, newSs) {
 			c.logger.Debugf("syncing statefulsets")
 			syncStatefulSet = false
@@ -942,6 +948,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		updateFailed = true
 	}
 
+	// streams
 	if len(newSpec.Spec.Streams) > 0 {
 		if err := c.syncStreams(); err != nil {
 			c.logger.Errorf("could not sync streams: %v", err)
@@ -1034,7 +1041,7 @@ func (c *Cluster) Delete() {
 
 }
 
-//NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
+// NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
 func (c *Cluster) NeedsRepair() (bool, acidv1.PostgresStatus) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
