@@ -810,6 +810,9 @@ Load balancer services can also be enabled for the [connection pooler](user.md#c
 pods with manifest flags `enableMasterPoolerLoadBalancer` and/or
 `enableReplicaPoolerLoadBalancer` or in the operator configuration with
 `enable_master_pooler_load_balancer` and/or `enable_replica_pooler_load_balancer`.
+For the `external-dns.alpha.kubernetes.io/hostname` annotation the `-pooler`
+suffix will be appended to the cluster name used in the template which is
+defined in `master|replica_dns_name_format`.
 
 ## Running periodic 'autorepair' scans of K8s objects
 

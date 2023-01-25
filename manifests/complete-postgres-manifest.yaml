@@ -28,6 +28,8 @@ spec:
   enableReplicaLoadBalancer: false
   enableConnectionPooler: false # enable/disable connection pooler deployment
   enableReplicaConnectionPooler: false # set to enable connectionPooler for replica service
+  enableMasterPoolerLoadBalancer: false
+  enableReplicaPoolerLoadBalancer: false
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:

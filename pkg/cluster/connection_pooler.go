@@ -45,7 +45,7 @@ type ConnectionPoolerObjects struct {
 }
 
 func (c *Cluster) connectionPoolerName(role PostgresRole) string {
-	name := c.Name + "-pooler"
+	name := fmt.Sprintf("%s-%s", c.Name, constants.ConnectionPoolerResourceSuffix)
 	if role == Replica {
 		name = fmt.Sprintf("%s-%s", name, "repl")
 	}
@@ -163,24 +163,27 @@ func (c *Cluster) createConnectionPooler(LookupFunction InstallFunction) (SyncRe
 	return reason, nil
 }
 
-//
 // Generate pool size related environment variables.
 //
 // MAX_DB_CONN would specify the global maximum for connections to a target
-// 	database.
+//
+//	database.
 //
 // MAX_CLIENT_CONN is not configurable at the moment, just set it high enough.
 //
 // DEFAULT_SIZE is a pool size per db/user (having in mind the use case when
-// 	most of the queries coming through a connection pooler are from the same
-// 	user to the same db). In case if we want to spin up more connection pooler
-// 	instances, take this into account and maintain the same number of
-// 	connections.
+//
+//	most of the queries coming through a connection pooler are from the same
+//	user to the same db). In case if we want to spin up more connection pooler
+//	instances, take this into account and maintain the same number of
+//	connections.
 //
 // MIN_SIZE is a pool's minimal size, to prevent situation when sudden workload
-// 	have to wait for spinning up a new connections.
+//
+//	have to wait for spinning up a new connections.
 //
 // RESERVE_SIZE is how many additional connections to allow for a pooler.
+
 func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	spec := &c.Spec
 	connectionPoolerSpec := spec.ConnectionPooler
@@ -475,32 +478,43 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 }
 
 func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPoolerObjects) *v1.Service {
-
+	var dnsString string
 	spec := &c.Spec
+	poolerRole := connectionPooler.Role
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{
 				Name:       connectionPooler.Name,
 				Port:       pgPort,
-				TargetPort: intstr.IntOrString{IntVal: c.servicePort(connectionPooler.Role)},
+				TargetPort: intstr.IntOrString{IntVal: c.servicePort(poolerRole)},
 			},
 		},
 		Type: v1.ServiceTypeClusterIP,
 		Selector: map[string]string{
-			"connection-pooler": c.connectionPoolerName(connectionPooler.Role),
+			"connection-pooler": c.connectionPoolerName(poolerRole),
 		},
 	}
 
-	if c.shouldCreateLoadBalancerForPoolerService(connectionPooler.Role, spec) {
+	if c.shouldCreateLoadBalancerForPoolerService(poolerRole, spec) {
 		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
+
+	serviceAnnotations := c.generateServiceAnnotations(poolerRole, spec)
+	// -repl suffix will be added by replicaDNSName
+	clusterNameWithPoolerSuffix := c.connectionPoolerName(Master)
+	if poolerRole == Master {
+		dnsString = c.masterDNSName(clusterNameWithPoolerSuffix)
+	} else {
+		dnsString = c.replicaDNSName(clusterNameWithPoolerSuffix)
+	}
+	serviceAnnotations[constants.ZalandoDNSNameAnnotation] = dnsString
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        connectionPooler.Name,
 			Namespace:   connectionPooler.Namespace,
 			Labels:      c.connectionPoolerLabels(connectionPooler.Role, false).MatchLabels,
-			Annotations: c.annotationsSet(c.generateServiceAnnotations(connectionPooler.Role, spec)),
+			Annotations: c.annotationsSet(serviceAnnotations),
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
 			// propagation policy, which means that it's deletion will not
@@ -546,7 +560,7 @@ func (c *Cluster) listPoolerPods(listOptions metav1.ListOptions) ([]v1.Pod, erro
 	return pods.Items, nil
 }
 
-//delete connection pooler
+// delete connection pooler
 func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	c.logger.Infof("deleting connection pooler spilo-role=%s", role)
 
@@ -605,7 +619,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	return nil
 }
 
-//delete connection pooler
+// delete connection pooler
 func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 	// Repeat the same for the secret object
 	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
@@ -654,7 +668,7 @@ func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDe
 	return deployment, nil
 }
 
-//updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
+// updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
 func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, deployment *appsv1.Deployment, annotations map[string]string) (*appsv1.Deployment, error) {
 	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
