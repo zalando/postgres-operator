@@ -220,7 +220,7 @@ postgresql
         delete manifest.status
 
         if (this.refs.yamlNice) {
-          this.refs.yamlNice.innerHTML = yamlParser.safeDump(
+          this.refs.yamlNice.innerHTML = yamlParser.dump(
             this.progress.postgresqlManifest,
             {
               sortKeys: true,
