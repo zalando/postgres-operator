@@ -104,7 +104,7 @@ func TestInheritedAnnotations(t *testing.T) {
 	}
 
 	// check service annotations
-	cluster.createService(Master)
+	_, _ = cluster.createService(Master)
 	svcList, err := client.Services(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
 	for _, svc := range svcList.Items {
@@ -114,7 +114,7 @@ func TestInheritedAnnotations(t *testing.T) {
 	}
 
 	// check pod disruption budget annotations
-	cluster.createPodDisruptionBudget()
+	_, _ = cluster.createPodDisruptionBudget()
 	pdbList, err := client.PodDisruptionBudgets(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
 	for _, pdb := range pdbList.Items {

@@ -150,7 +150,7 @@ func (c *Controller) acquireInitialListOfClusters() error {
 			continue
 		}
 		clusterName = util.NameFromMeta(pg.ObjectMeta)
-		c.addCluster(c.logger, clusterName, &pg)
+		_, _ = c.addCluster(c.logger, clusterName, &pg)
 		c.logger.Debugf("added new cluster: %q", clusterName)
 	}
 	// initiate initial sync of all clusters.
@@ -161,7 +161,7 @@ func (c *Controller) acquireInitialListOfClusters() error {
 func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) (*cluster.Cluster, error) {
 	if c.opConfig.EnableTeamIdClusternamePrefix {
 		if _, err := acidv1.ExtractClusterName(clusterName.Name, pgSpec.Spec.TeamID); err != nil {
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusInvalid)
+			_, _ = c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusInvalid)
 			return nil, err
 		}
 	}
@@ -347,7 +347,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	for {
-		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}) error { return nil }))
+		obj, err := c.clusterEventQueues[idx].Pop(func(interface{}) error { return nil })
 		if err != nil {
 			if err == cache.ErrFIFOClosed {
 				return
@@ -461,13 +461,13 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 
 		switch eventType {
 		case EventAdd:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusAddFailed)
+			_, _ = c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusAddFailed)
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Create", "%v", clusterError)
 		case EventUpdate:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusUpdateFailed)
+			_, _ = c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusUpdateFailed)
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Update", "%v", clusterError)
 		default:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusSyncFailed)
+			_, _ = c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusSyncFailed)
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Sync", "%v", clusterError)
 		}
 
@@ -560,13 +560,13 @@ func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
 }
 
 /*
-  Ensures the pod service account and role bindings exists in a namespace
-  before a PG cluster is created there so that a user does not have to deploy
-  these credentials manually.  StatefulSets require the service account to
-  create pods; Patroni requires relevant RBAC bindings to access endpoints
-  or config maps.
+Ensures the pod service account and role bindings exists in a namespace
+before a PG cluster is created there so that a user does not have to deploy
+these credentials manually.  StatefulSets require the service account to
+create pods; Patroni requires relevant RBAC bindings to access endpoints
+or config maps.
 
-  The operator does not sync accounts/role bindings after creation.
+The operator does not sync accounts/role bindings after creation.
 */
 func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 

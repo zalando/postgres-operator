@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/motomux/pretty"
-	resource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -55,7 +55,7 @@ func RandomPassword(n int) string {
 	for i := range b {
 		maxN := big.NewInt(int64(len(passwordChars)))
 		if n, err := cryptoRand.Int(cryptoRand.Reader, maxN); err != nil {
-			panic(fmt.Errorf("Unable to generate secure, random password: %v", err))
+			panic(fmt.Errorf("unable to generate secure, random password: %v", err))
 		} else {
 			b[i] = passwordChars[n.Int64()]
 		}
@@ -142,17 +142,17 @@ func IsEqualIgnoreOrder(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	a_copy := make([]string, len(a))
-	b_copy := make([]string, len(b))
-	copy(a_copy, a)
-	copy(b_copy, b)
-	sort.Strings(a_copy)
-	sort.Strings(b_copy)
+	aCopy := make([]string, len(a))
+	bCopy := make([]string, len(b))
+	copy(aCopy, a)
+	copy(bCopy, b)
+	sort.Strings(aCopy)
+	sort.Strings(bCopy)
 
-	return reflect.DeepEqual(a_copy, b_copy)
+	return reflect.DeepEqual(aCopy, bCopy)
 }
 
-// SliceReplaceElement
+// StringSliceReplaceElement
 func StringSliceReplaceElement(s []string, a, b string) (result []string) {
 	tmp := make([]string, 0, len(s))
 	for _, str := range s {

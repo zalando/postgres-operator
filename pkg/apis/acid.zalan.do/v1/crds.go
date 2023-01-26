@@ -748,9 +748,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 						OneOf: []apiextv1.JSONSchemaProps{
-							apiextv1.JSONSchemaProps{Required: []string{"s3_wal_path"}},
-							apiextv1.JSONSchemaProps{Required: []string{"gs_wal_path"}},
-							apiextv1.JSONSchemaProps{Required: []string{"standby_host"}},
+							{Required: []string{"s3_wal_path"}},
+							{Required: []string{"gs_wal_path"}},
+							{Required: []string{"standby_host"}},
 						},
 					},
 					"streams": {

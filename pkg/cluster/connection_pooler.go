@@ -163,22 +163,24 @@ func (c *Cluster) createConnectionPooler(LookupFunction InstallFunction) (SyncRe
 	return reason, nil
 }
 
-//
 // Generate pool size related environment variables.
 //
 // MAX_DB_CONN would specify the global maximum for connections to a target
-// 	database.
+//
+//	database.
 //
 // MAX_CLIENT_CONN is not configurable at the moment, just set it high enough.
 //
 // DEFAULT_SIZE is a pool size per db/user (having in mind the use case when
-// 	most of the queries coming through a connection pooler are from the same
-// 	user to the same db). In case if we want to spin up more connection pooler
-// 	instances, take this into account and maintain the same number of
-// 	connections.
+//
+//	most of the queries coming through a connection pooler are from the same
+//	user to the same db). In case if we want to spin up more connection pooler
+//	instances, take this into account and maintain the same number of
+//	connections.
 //
 // MIN_SIZE is a pool's minimal size, to prevent situation when sudden workload
-// 	have to wait for spinning up a new connections.
+//
+//	have to wait for spinning up a new connections.
 //
 // RESERVE_SIZE is how many additional connections to allow for a pooler.
 func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
@@ -546,7 +548,7 @@ func (c *Cluster) listPoolerPods(listOptions metav1.ListOptions) ([]v1.Pod, erro
 	return pods.Items, nil
 }
 
-//delete connection pooler
+// delete connection pooler
 func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	c.logger.Infof("deleting connection pooler spilo-role=%s", role)
 
@@ -605,7 +607,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	return nil
 }
 
-//delete connection pooler
+// delete connection pooler
 func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 	// Repeat the same for the secret object
 	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
@@ -654,7 +656,7 @@ func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDe
 	return deployment, nil
 }
 
-//updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
+// updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
 func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, deployment *appsv1.Deployment, annotations map[string]string) (*appsv1.Deployment, error) {
 	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
@@ -664,7 +666,7 @@ func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, depl
 		context.TODO(),
 		deployment.Name,
 		types.MergePatchType,
-		[]byte(patchData),
+		patchData,
 		metav1.PatchOptions{},
 		"")
 	if err != nil {

@@ -119,7 +119,7 @@ func readDecodedRole(s string) (*spec.PgUser, error) {
 	return &result, nil
 }
 
-var emptyName = (spec.NamespacedName{})
+var emptyName = spec.NamespacedName{}
 
 // Return information about what secrets we need to use to create
 // infrastructure roles and in which format are they. This is done in
@@ -206,7 +206,7 @@ func (c *Controller) getInfrastructureRoles(
 
 	errors := make([]string, 0)
 	noRolesProvided := true
-	roles := []spec.PgUser{}
+	var roles []spec.PgUser
 	uniqRoles := make(map[string]spec.PgUser)
 
 	// To be compatible with the legacy implementation we need to return nil if
@@ -274,7 +274,7 @@ func (c *Controller) getInfrastructureRole(
 	[]spec.PgUser, error) {
 
 	rolesSecret := infraRole.SecretName
-	roles := []spec.PgUser{}
+	var roles []spec.PgUser
 
 	if rolesSecret == emptyName {
 		// we don't have infrastructure roles defined, bail out

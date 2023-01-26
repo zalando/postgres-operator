@@ -42,9 +42,9 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	defer func() {
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
+			_, _ = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
 		} else if !c.Status.Running() {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			_, _ = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
 		}
 	}()
 
@@ -239,8 +239,8 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
 		c.PodDisruptionBudget = pdb
 		newPDB := c.generatePodDisruptionBudget()
-		if match, reason := k8sutil.SamePDB(pdb, newPDB); !match {
-			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
+		if match, _ := k8sutil.SamePDB(pdb, newPDB); !match {
+			c.logPDBChanges(pdb, newPDB, isUpdate)
 			if err = c.updatePodDisruptionBudget(newPDB); err != nil {
 				return err
 			}

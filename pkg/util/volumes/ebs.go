@@ -67,12 +67,12 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 		}
 	}
 
-	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: aws.StringSlice((volumeIds))})
+	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: aws.StringSlice(volumeIds)})
 	if err != nil {
 		return nil, err
 	}
 
-	p := []VolumeProperties{}
+	var p []VolumeProperties
 	if nil == volumeOutput.Volumes {
 		return p, nil
 	}
@@ -83,7 +83,7 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 		} else if *v.VolumeType == "gp2" {
 			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: *v.Size, VolumeType: *v.VolumeType})
 		} else {
-			return nil, fmt.Errorf("Discovered unexpected volume type %s %s", *v.VolumeId, *v.VolumeType)
+			return nil, fmt.Errorf("discovered unexpected volume type %s %s", *v.VolumeId, *v.VolumeType)
 		}
 	}
 

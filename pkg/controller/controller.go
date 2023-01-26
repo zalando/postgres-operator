@@ -96,7 +96,7 @@ func NewController(controllerConfig *spec.ControllerConfig, controllerId string)
 	// the operator currently duplicates a lot of log entries with this setup
 	// eventBroadcaster.StartLogging(logger.Infof)
 	scheme := scheme.Scheme
-	acidv1.AddToScheme(scheme)
+	_ = acidv1.AddToScheme(scheme)
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: myComponentName})
 
 	c := &Controller{
@@ -235,7 +235,7 @@ func (c *Controller) initPodServiceAccount() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse pod service account definition from the operator configuration: %v", err))
+		panic(fmt.Errorf("unable to parse pod service account definition from the operator configuration: %v", err))
 	case groupVersionKind.Kind != "ServiceAccount":
 		panic(fmt.Errorf("pod service account definition in the operator configuration defines another type of resource: %v", groupVersionKind.Kind))
 	default:

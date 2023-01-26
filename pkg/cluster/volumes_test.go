@@ -81,11 +81,11 @@ func TestResizeVolumeClaim(t *testing.T) {
 	pvcList.Items = append(pvcList.Items, CreatePVCs(namespace, clusterName+"-2", labels.Set{}, 1, "1Gi").Items[0])
 
 	for _, pvc := range pvcList.Items {
-		cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
+		_, _ = cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
 	}
 
 	// test resizing
-	cluster.resizeVolumeClaims(acidv1.Volume{Size: newVolumeSize})
+	_ = cluster.resizeVolumeClaims(acidv1.Volume{Size: newVolumeSize})
 
 	pvcs, err := cluster.listPersistentVolumeClaims()
 	assert.NoError(t, err)
@@ -246,7 +246,7 @@ func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustern
 			Spec: ps,
 		}
 
-		client.PersistentVolumes().Create(context.TODO(), &pv, metav1.CreateOptions{})
+		_, _ = client.PersistentVolumes().Create(context.TODO(), &pv, metav1.CreateOptions{})
 
 		pvc := v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -264,7 +264,7 @@ func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustern
 			},
 		}
 
-		client.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
+		_, _ = client.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
 
 		pod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -274,7 +274,7 @@ func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustern
 			Spec: v1.PodSpec{},
 		}
 
-		client.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+		_, _ = client.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
 
 		i = i + 1
 	}
@@ -333,7 +333,7 @@ func TestMigrateGp3Support(t *testing.T) {
 	// resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-3"), gomock.Eq(aws.String("gp3")), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	cluster.VolumeResizer = resizer
-	cluster.syncVolumes()
+	_ = cluster.syncVolumes()
 }
 
 func TestManualGp2Gp3Support(t *testing.T) {
@@ -387,7 +387,7 @@ func TestManualGp2Gp3Support(t *testing.T) {
 	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
 
 	cluster.VolumeResizer = resizer
-	cluster.syncVolumes()
+	_ = cluster.syncVolumes()
 }
 
 func TestDontTouchType(t *testing.T) {
@@ -446,5 +446,5 @@ func TestDontTouchType(t *testing.T) {
 	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Nil(), gomock.Eq(aws.Int64(177)), gomock.Nil(), gomock.Nil()).Return(nil)
 
 	cluster.VolumeResizer = resizer
-	cluster.syncVolumes()
+	_ = cluster.syncVolumes()
 }

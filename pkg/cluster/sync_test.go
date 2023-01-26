@@ -2,16 +2,11 @@ package cluster
 
 import (
 	"bytes"
-	"io/ioutil"
+	"context"
+	"io"
 	"net/http"
 	"testing"
 	"time"
-
-	"context"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/sirupsen/logrus"
@@ -25,6 +20,9 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -108,7 +106,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 		context.TODO(),
 		clusterName,
 		types.MergePatchType,
-		[]byte(patchData),
+		patchData,
 		metav1.PatchOptions{},
 		"")
 	assert.NoError(t, err)
@@ -126,7 +124,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 	}
 
 	// now sync statefulset - the diff will trigger a replacement of the statefulset
-	cluster.syncStatefulSet()
+	_ = cluster.syncStatefulSet()
 
 	// compare again after the SYNC - must be identical to the desired state
 	cmp = cluster.compareStatefulSetWith(desiredSts)
@@ -200,7 +198,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 
 	// mocking a config after setConfig is called
 	configJson := `{"postgresql": {"parameters": {"log_min_duration_statement": 200, "max_connections": 50}}}, "ttl": 20}`
-	r := ioutil.NopCloser(bytes.NewReader([]byte(configJson)))
+	r := io.NopCloser(bytes.NewReader([]byte(configJson)))
 
 	response := http.Response{
 		StatusCode: 200,
@@ -506,7 +504,7 @@ func TestUpdateSecret(t *testing.T) {
 					ApplicationId: appId,
 					Database:      dbname,
 					Tables: map[string]acidv1.StreamTable{
-						"data.foo": acidv1.StreamTable{
+						"data.foo": {
 							EventType: "stream-type-b",
 						},
 					},
@@ -542,11 +540,11 @@ func TestUpdateSecret(t *testing.T) {
 	cluster.pgUsers = map[string]spec.PgUser{}
 
 	// init all users
-	cluster.initUsers()
+	_ = cluster.initUsers()
 	// create secrets
-	cluster.syncSecrets()
+	_ = cluster.syncSecrets()
 	// initialize rotation with current time
-	cluster.syncSecrets()
+	_ = cluster.syncSecrets()
 
 	dayAfterTomorrow := time.Now().AddDate(0, 0, 2)
 
@@ -566,7 +564,7 @@ func TestUpdateSecret(t *testing.T) {
 		secretPassword := string(secret.Data["password"])
 
 		// now update the secret setting a next rotation date (tomorrow + interval)
-		cluster.updateSecret(username, secret, &retentionUsers, dayAfterTomorrow)
+		_ = cluster.updateSecret(username, secret, &retentionUsers, dayAfterTomorrow)
 		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		assert.NoError(t, err)
 

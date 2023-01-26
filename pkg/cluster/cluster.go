@@ -254,13 +254,13 @@ func (c *Cluster) Create() error {
 
 	defer func() {
 		if err == nil {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
+			_, _ = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
+			_, _ = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
 		}
 	}()
 
-	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+	_, _ = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -368,7 +368,7 @@ func (c *Cluster) Create() error {
 	//
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	c.createConnectionPooler(c.installLookupFunction)
+	_, _ = c.createConnectionPooler(c.installLookupFunction)
 
 	if len(c.Spec.Streams) > 0 {
 		if err = c.syncStreams(); err != nil {
@@ -610,7 +610,7 @@ func compareEnv(a, b []v1.EnvVar) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	equal := true
+	var equal bool
 	for _, enva := range a {
 		hasmatch := false
 		for _, envb := range b {
@@ -622,7 +622,7 @@ func compareEnv(a, b []v1.EnvVar) bool {
 					if enva.Value == "" && envb.Value == "" {
 						equal = reflect.DeepEqual(enva.ValueFrom, envb.ValueFrom)
 					} else {
-						equal = (enva.Value == envb.Value)
+						equal = enva.Value == envb.Value
 					}
 				}
 				if !equal {
@@ -763,14 +763,14 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdating)
+	_, _ = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdateFailed)
+			_, _ = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdateFailed)
 		} else {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			_, _ = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
 		}
 	}()
 
@@ -831,7 +831,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// Volume
 	if c.OpConfig.StorageResizeMode != "off" {
-		c.syncVolumes()
+		_ = c.syncVolumes()
 	} else {
 		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume sync.")
 	}
@@ -1091,7 +1091,7 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 		case <-stopCh:
 			return
 		default:
-			if _, err := c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent)); err != nil {
+			if _, err := c.podEventsQueue.Pop(c.processPodEvent); err != nil {
 				c.logger.Errorf("error when processing pod event queue %v", err)
 			}
 		}
@@ -1382,7 +1382,7 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 func (c *Cluster) initHumanUsers() error {
 
 	var clusterIsOwnedBySuperuserTeam bool
-	superuserTeams := []string{}
+	var superuserTeams []string
 
 	if c.OpConfig.EnablePostgresTeamCRD && c.OpConfig.EnablePostgresTeamCRDSuperusers && c.Config.PgTeamMap != nil {
 		superuserTeams = c.Config.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)

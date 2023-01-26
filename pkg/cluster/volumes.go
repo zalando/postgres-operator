@@ -154,7 +154,7 @@ func (c *Cluster) populateVolumeMetaData() error {
 	}
 	c.logger.Debugf("found %d persistent volumes, size of known volumes %d", len(pvs), len(c.EBSVolumes))
 
-	volumeIds := []string{}
+	var volumeIds []string
 	var volumeID string
 	for _, pv := range pvs {
 		volumeID, err = c.VolumeResizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)

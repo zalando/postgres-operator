@@ -35,7 +35,7 @@ func (ths *teamHashSet) add(newTeam string, newSet []string) {
 func (ths *teamHashSet) toMap() map[string][]string {
 	newTeamMap := make(map[string][]string)
 	for team, items := range *ths {
-		list := []string{}
+		var list []string
 		for item := range items {
 			list = append(list, item)
 		}
@@ -95,7 +95,7 @@ func (ptm *PostgresTeamMap) GetAdditionalSuperuserTeams(team string, transitive 
 // Load function to import data from PostgresTeam CRD
 func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
 	// reset the team map
-	*ptm = make(PostgresTeamMap, 0)
+	*ptm = make(PostgresTeamMap)
 
 	superuserTeamSet := teamHashSet{}
 	teamSet := teamHashSet{}

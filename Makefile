@@ -48,7 +48,8 @@ SHELL := env PATH=$(PATH) $(SHELL)
 default: local
 
 clean:
-	rm -rf build scm-source.json
+	rm -rf build e2e/manifests docker/build scm-source.json
+	rm -f mocks/httpclient.go mocks/volumes.go
 
 local: ${SOURCES}
 	hack/verify-codegen.sh
@@ -99,12 +100,17 @@ vet:
 deps: tools
 	GO111MODULE=on go mod vendor
 
-test:
-	hack/verify-codegen.sh
+test: mocks verify-codegen
 	GO111MODULE=on go test ./...
+
+verify-codegen:
+	hack/verify-codegen.sh
 
 codegen:
 	hack/update-codegen.sh
+
+lint:
+	golangci-lint run
 
 e2e: docker # build operator image to be tested
 	cd e2e; make e2etest

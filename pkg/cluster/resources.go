@@ -294,7 +294,7 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 				context.TODO(),
 				serviceName.Name,
 				types.MergePatchType,
-				[]byte(annotationsPatchData),
+				annotationsPatchData,
 				metav1.PatchOptions{},
 				"")
 

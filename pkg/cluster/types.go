@@ -81,4 +81,4 @@ type InstallFunction func(schema string, user string) error
 type SyncReason []string
 
 // no sync happened, empty value
-var NoSync SyncReason = []string{}
+var NoSync []string

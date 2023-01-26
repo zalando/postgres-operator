@@ -241,6 +241,6 @@ func (f *StringTemplate) Format(a ...string) string {
 }
 
 // MarshalJSON converts a StringTemplate to byte slice
-func (f StringTemplate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(string(f))
+func (f *StringTemplate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(*f))
 }

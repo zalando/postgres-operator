@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"testing"
 	"time"
 
-	"testing"
-
 	"github.com/stretchr/testify/assert"
-
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -18,7 +16,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -221,7 +218,7 @@ type mockConfigMap struct {
 
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
 	if name == testPodEnvironmentSecretNameAPIError {
-		return nil, fmt.Errorf("Secret PodEnvironmentSecret API error")
+		return nil, fmt.Errorf("secret PodEnvironmentSecret API error")
 	}
 	if name != testPodEnvironmentSecretName {
 		return nil, k8serrors.NewNotFound(schema.GroupResource{Group: "core", Resource: "secret"}, name)
@@ -358,7 +355,7 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 
 // Test if the keys of an existing secret are properly referenced
 func TestPodEnvironmentSecretVariables(t *testing.T) {
-	maxRetries := int(testResourceCheckTimeout / testResourceCheckInterval)
+	maxRetries := testResourceCheckTimeout / testResourceCheckInterval
 	tests := []struct {
 		subTest  string
 		opConfig config.Config
@@ -389,7 +386,7 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
 			},
-			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret API error"),
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: secret PodEnvironmentSecret API error"),
 		},
 		{
 			subTest: "Pod environment vars reference all keys from secret configured by PodEnvironmentSecret",
@@ -480,7 +477,7 @@ func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) 
 
 	for env, value := range required {
 		if !value {
-			return fmt.Errorf("Environment variable %s is not present", env)
+			return fmt.Errorf("environment variable %s is not present", env)
 		}
 	}
 
@@ -1374,9 +1371,9 @@ func TestNodeAffinity(t *testing.T) {
 	nodeAff := &v1.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				v1.NodeSelectorTerm{
+				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
-						v1.NodeSelectorRequirement{
+						{
 							Key:      "test-label",
 							Operator: v1.NodeSelectorOpIn,
 							Values: []string{
@@ -1492,18 +1489,18 @@ func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deploymen
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
 	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
-		return fmt.Errorf("Ownere reference is incorrect, got %s, expected %s",
+		return fmt.Errorf("owner reference is incorrect, got %s, expected %s",
 			owner.Name, cluster.Statefulset.ObjectMeta.Name)
 	}
 
 	return nil
 }
 
-func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role PostgresRole) error {
+func testServiceOwnerReference(cluster *Cluster, service *v1.Service, _ PostgresRole) error {
 	owner := service.ObjectMeta.OwnerReferences[0]
 
 	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
-		return fmt.Errorf("Ownere reference is incorrect, got %s, expected %s",
+		return fmt.Errorf("owner reference is incorrect, got %s, expected %s",
 			owner.Name, cluster.Statefulset.ObjectMeta.Name)
 	}
 
@@ -1590,7 +1587,7 @@ func TestTLS(t *testing.T) {
 			TLS: &acidv1.TLSDescription{
 				SecretName: tlsSecretName, CAFile: "ca.crt"},
 			AdditionalVolumes: []acidv1.AdditionalVolume{
-				acidv1.AdditionalVolume{
+				{
 					Name:      tlsSecretName,
 					MountPath: mountPath,
 					VolumeSource: v1.VolumeSource{
@@ -1879,7 +1876,7 @@ func TestAdditionalVolume(t *testing.T) {
 			if container.Name != tt.container {
 				continue
 			}
-			mounts := []string{}
+			var mounts []string
 			for _, volumeMounts := range container.VolumeMounts {
 				mounts = append(mounts, volumeMounts.Name)
 			}
@@ -2037,17 +2034,17 @@ func TestSidecars(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
 			},
@@ -2075,11 +2072,11 @@ func TestSidecars(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -2134,7 +2131,7 @@ func TestSidecars(t *testing.T) {
 		},
 	}
 	mounts := []v1.VolumeMount{
-		v1.VolumeMount{
+		{
 			Name:      "pgdata",
 			MountPath: "/home/postgres/pgdata",
 		},
@@ -2314,7 +2311,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 func TestGenerateService(t *testing.T) {
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
-	var enableLB bool = true
+	var enableLB = true
 	spec = acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: &acidv1.Resources{
@@ -2325,17 +2322,17 @@ func TestGenerateService(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
 			},
@@ -2364,11 +2361,11 @@ func TestGenerateService(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -2463,27 +2460,27 @@ func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 
 func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPolicy, clusterName string) []v1.ServiceSpec {
 	return []v1.ServiceSpec{
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler"},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"spilo-role": "replica", "application": "spilo", "cluster-name": clusterName},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
@@ -2616,14 +2613,14 @@ func TestEnableLoadBalancers(t *testing.T) {
 		cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
 		generatedServices := make([]v1.ServiceSpec, 0)
 		for _, role := range roles {
-			cluster.syncService(role)
+			_ = cluster.syncService(role)
 			cluster.ConnectionPooler[role] = &ConnectionPoolerObjects{
 				Name:        cluster.connectionPoolerName(role),
 				ClusterName: cluster.ClusterName,
 				Namespace:   cluster.Namespace,
 				Role:        role,
 			}
-			cluster.syncConnectionPoolerWorker(&tt.pgSpec, &tt.pgSpec, role)
+			_, _ = cluster.syncConnectionPoolerWorker(&tt.pgSpec, &tt.pgSpec, role)
 			generatedServices = append(generatedServices, cluster.Services[role].Spec)
 			generatedServices = append(generatedServices, cluster.ConnectionPooler[role].Service.Spec)
 		}
@@ -2703,7 +2700,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 						},
 					},
@@ -2815,7 +2812,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
 								ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "10Mi"},
@@ -2904,7 +2901,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
 								ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "10Mi"},

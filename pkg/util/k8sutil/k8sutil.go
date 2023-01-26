@@ -246,7 +246,7 @@ func SameLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string)
 	return true, ""
 }
 
-func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
+func (c *mockSecret) Get(_ context.Context, name string, _ metav1.GetOptions) (*v1.Secret, error) {
 	oldFormatSecret := &v1.Secret{}
 	oldFormatSecret.Name = "testcluster"
 	oldFormatSecret.Data = map[string][]byte{
@@ -291,7 +291,7 @@ func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOpt
 
 }
 
-func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
+func (c *mockConfigMap) Get(_ context.Context, name string, _ metav1.GetOptions) (*v1.ConfigMap, error) {
 	oldFormatConfigmap := &v1.ConfigMap{}
 	oldFormatConfigmap.Name = "testcluster"
 	oldFormatConfigmap.Data = map[string]string{
@@ -317,20 +317,20 @@ func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.Get
 }
 
 // Secrets to be mocked
-func (mock *MockSecretGetter) Secrets(namespace string) corev1.SecretInterface {
+func (mock *MockSecretGetter) Secrets(_ string) corev1.SecretInterface {
 	return &mockSecret{}
 }
 
 // ConfigMaps to be mocked
-func (mock *MockConfigMapsGetter) ConfigMaps(namespace string) corev1.ConfigMapInterface {
+func (mock *MockConfigMapsGetter) ConfigMaps(_ string) corev1.ConfigMapInterface {
 	return &mockConfigMap{}
 }
 
-func (mock *MockDeploymentGetter) Deployments(namespace string) appsv1.DeploymentInterface {
+func (mock *MockDeploymentGetter) Deployments(_ string) appsv1.DeploymentInterface {
 	return &mockDeployment{}
 }
 
-func (mock *MockDeploymentNotExistGetter) Deployments(namespace string) appsv1.DeploymentInterface {
+func (mock *MockDeploymentNotExistGetter) Deployments(_ string) appsv1.DeploymentInterface {
 	return &mockDeploymentNotExist{}
 }
 
@@ -359,7 +359,7 @@ func (mock *mockDeployment) Get(ctx context.Context, name string, opts metav1.Ge
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
-						v1.Container{
+						{
 							Image: "pooler:1.0",
 						},
 					},

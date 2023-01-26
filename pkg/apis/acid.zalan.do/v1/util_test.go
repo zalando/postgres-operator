@@ -781,8 +781,6 @@ func TestPostgresListMeta(t *testing.T) {
 			if a := tt.out.GetListMeta(); reflect.DeepEqual(a, tt.out.ListMeta) {
 				t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.ListMeta, a)
 			}
-
-			return
 		})
 	}
 }
