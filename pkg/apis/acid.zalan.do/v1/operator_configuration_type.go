@@ -3,9 +3,9 @@ package v1
 // Operator configuration CRD definition, please use snake_case for field names.
 
 import (
-	"github.com/zalando/postgres-operator/pkg/util/config"
-
 	"time"
+
+	"github.com/zalando/postgres-operator/pkg/util/config"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	v1 "k8s.io/api/core/v1"
@@ -102,6 +102,7 @@ type KubernetesMetaConfiguration struct {
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
+	DatabaseNameRegexp                       string              `json:"database_name_regexp" default:"^[a-zA-Z_][a-zA-Z0-9_]*$"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources

@@ -177,6 +177,12 @@ Those are top-level keys, containing both leaf keys and groups.
   operator's own container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
+
+* **database_name_regexp**
+  By default the operator will follow the naming conventions for PostgreSQL. However,
+  the regexp can be modified to customize the validation.
+  The default is `^[a-zA-Z_][a-zA-Z0-9_]*$`.
+
 ## Postgres users
 
 Parameters describing Postgres users. In a CRD-configuration, they are grouped

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"text/template"
 	"time"
@@ -413,6 +414,24 @@ func (c *Cluster) getSchemas() (schemas []string, err error) {
 func (c *Cluster) executeCreateDatabaseSchema(databaseName, schemaName, dbOwner string, schemaOwner string) error {
 	return c.execCreateDatabaseSchema(databaseName, schemaName, dbOwner, schemaOwner, createDatabaseSchemaSQL,
 		"creating database schema", "create database schema")
+}
+
+// readValidateDatabaseNameRegexp validates the regex expression. If the validation was
+// successful, it sets the global regex object variable for validation.
+func (c *Cluster) readValidateDatabaseNameRegexp(expr string) error {
+	if !(len(expr) > 0) {
+		return fmt.Errorf("The regex expression for the database name validation is not set")
+	}
+
+	regex, err := regexp.Compile(expr)
+	if err != nil {
+		return fmt.Errorf("The regex expression %q for the database name validation is not correct", expr)
+	}
+
+	databaseNameRegexp = regex
+	c.logger.Infof("regexp for database name/schema validation has been initialized")
+
+	return nil
 }
 
 func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, schemaOwner, statement, doing, operation string) error {

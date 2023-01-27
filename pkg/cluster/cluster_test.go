@@ -46,6 +46,7 @@ var cl = New(
 			Resources: config.Resources{
 				DownscalerAnnotations: []string{"downscaler/*"},
 			},
+			DatabaseNameRegexp: "^[a-zA-Z_][a-zA-Z0-9_]*$",
 		},
 	},
 	k8sutil.NewMockKubernetesClient(),
