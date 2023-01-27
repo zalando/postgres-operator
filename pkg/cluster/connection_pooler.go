@@ -265,6 +265,9 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		connectionPoolerSpec.Schema,
 		c.OpConfig.ConnectionPooler.Schema)
 
+	runAsUser := int64(100)
+	runAsGroup := int64(101)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
@@ -333,6 +336,8 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: util.False(),
+			RunAsUser:                &runAsUser,
+			RunAsGroup:               &runAsGroup,
 		},
 	}
 
