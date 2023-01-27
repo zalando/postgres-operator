@@ -647,7 +647,12 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 			}
 		}
 		slotsToSet[slotName] = desiredSlot
-		c.replicationSlots[slotName] = desiredSlot
+		// only add slots specified in manifest to c.replicationSlots
+		for manifestSlotName, _ := range c.Spec.Patroni.Slots {
+			if manifestSlotName == slotName {
+				c.replicationSlots[slotName] = desiredSlot
+			}
+		}
 	}
 	if len(slotsToSet) > 0 {
 		configToSet["slots"] = slotsToSet
