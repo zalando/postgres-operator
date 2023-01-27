@@ -509,9 +509,9 @@ func (c *Cluster) dnsName(role PostgresRole) string {
 	var dnsString, oldDnsString string
 
 	if role == Master {
-		dnsString = c.masterDNSName()
+		dnsString = c.masterDNSName(c.Name)
 	} else {
-		dnsString = c.replicaDNSName()
+		dnsString = c.replicaDNSName(c.Name)
 	}
 
 	// if cluster name starts with teamID we might need to provide backwards compatibility
@@ -528,17 +528,17 @@ func (c *Cluster) dnsName(role PostgresRole) string {
 	return dnsString
 }
 
-func (c *Cluster) masterDNSName() string {
+func (c *Cluster) masterDNSName(clusterName string) string {
 	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
-		"cluster", c.Name,
+		"cluster", clusterName,
 		"namespace", c.Namespace,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
-func (c *Cluster) replicaDNSName() string {
+func (c *Cluster) replicaDNSName(clusterName string) string {
 	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
-		"cluster", c.Name,
+		"cluster", clusterName,
 		"namespace", c.Namespace,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
