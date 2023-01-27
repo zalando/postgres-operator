@@ -20,4 +20,5 @@ const (
 	WriterRoleNameSuffix        = "_writer"
 	UserRoleNameSuffix          = "_user"
 	DefaultSearchPath           = "\"$user\""
+	RotationUserDateFormat      = "060102"
 )

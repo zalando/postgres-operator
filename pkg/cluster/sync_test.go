@@ -22,6 +22,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"k8s.io/client-go/kubernetes/fake"
@@ -593,7 +594,7 @@ func TestUpdateSecret(t *testing.T) {
 				t.Errorf("%s: username differs in updated secret: expected %s, got %s", testName, username, secretUsername)
 			}
 		} else {
-			rotatedUsername := username + dayAfterTomorrow.Format("060102")
+			rotatedUsername := username + dayAfterTomorrow.Format(constants.RotationUserDateFormat)
 			if secretUsername != rotatedUsername {
 				t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, rotatedUsername, secretUsername)
 			}
