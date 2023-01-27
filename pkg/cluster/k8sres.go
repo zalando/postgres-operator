@@ -993,6 +993,9 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, c.generateStandbyEnvironment(spec.StandbyCluster)...)
 	}
 
+    // add variable containing the UID of the cluster; usefull for backup paths
+	envVars = append(envVars, v1.EnvVar{Name: "CLUSTER_UID", Value: getBucketScopeSuffix(string(uid))})
+
 	// fetch variables from custom environment Secret
 	// that will override all subsequent global variables
 	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
