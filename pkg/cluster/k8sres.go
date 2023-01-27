@@ -1042,8 +1042,10 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	envVars = appendEnvVars(envVars, opConfigEnvVars...)
 
 	// add variable containing the UID of the cluster; usefull for backup paths
-	envVars = append(envVars, v1.EnvVar{Name: "CLUSTER_UID", Value: getBucketScopeSuffix(string(uid))})
-	
+	if string(uid) != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "CLUSTER_UID", Value: string(uid)})
+	}
+
 	return envVars, nil
 }
 
