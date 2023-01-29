@@ -311,7 +311,7 @@ def send_js(path):
 @app.route('/')
 @authorize
 def index():
-    return render_template('index.html', google_analytics=GOOGLE_ANALYTICS)
+    return render_template('index.html', google_analytics=GOOGLE_ANALYTICS, app_url=APP_URL)
 
 
 DEFAULT_UI_CONFIG = {
