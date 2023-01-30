@@ -79,6 +79,10 @@ spec:
                   "cost_throughput": 0.0476,
                   "cost_core": 0.0575,
                   "cost_memory": 0.014375,
+                  "free_iops": 3000,
+                  "free_throughput": 125,
+                  "limit_iops": 16000,
+                  "limit_throughput": 1000,
                   "postgresql_versions": [
                     "15",
                     "14",
