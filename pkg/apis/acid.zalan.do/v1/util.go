@@ -46,7 +46,7 @@ func parseWeekday(s string) (time.Weekday, error) {
 	return time.Weekday(weekday), nil
 }
 
-func extractClusterName(clusterName string, teamName string) (string, error) {
+func ExtractClusterName(clusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)
 	if len(clusterName) < teamNameLen+2 {
 		return "", fmt.Errorf("cluster name must match {TEAM}-{NAME} format. Got cluster name '%v', team name '%v'", clusterName, teamName)

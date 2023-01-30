@@ -19,6 +19,10 @@ spec:
       labels:
         app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "postgres-operator-ui.serviceAccountName" . }}
       {{- if .Values.imagePullSecrets }}
@@ -75,7 +79,12 @@ spec:
                   "cost_throughput": 0.0476,
                   "cost_core": 0.0575,
                   "cost_memory": 0.014375,
+                  "free_iops": 3000,
+                  "free_throughput": 125,
+                  "limit_iops": 16000,
+                  "limit_throughput": 1000,
                   "postgresql_versions": [
+                    "15",
                     "14",
                     "13",
                     "12",

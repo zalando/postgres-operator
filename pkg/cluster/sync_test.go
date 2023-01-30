@@ -20,7 +20,9 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"k8s.io/client-go/kubernetes/fake"
@@ -143,9 +145,24 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	client, _ := newFakeK8sSyncClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
+	testSlots := map[string]map[string]string{
+		"slot1": {
+			"type":     "logical",
+			"plugin":   "wal2json",
+			"database": "foo",
+		},
+	}
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+
+	defaultPgParameters := map[string]string{
+		"log_min_duration_statement": "200",
+		"max_connections":            "50",
+	}
+	defaultPatroniParameters := acidv1.Patroni{
+		TTL: 20,
+	}
 
 	pg := acidv1.Postgresql{
 		ObjectMeta: metav1.ObjectMeta{
@@ -153,14 +170,9 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 			Namespace: namespace,
 		},
 		Spec: acidv1.PostgresSpec{
-			Patroni: acidv1.Patroni{
-				TTL: 20,
-			},
+			Patroni: defaultPatroniParameters,
 			PostgresqlParam: acidv1.PostgresqlParam{
-				Parameters: map[string]string{
-					"log_min_duration_statement": "200",
-					"max_connections":            "50",
-				},
+				Parameters: defaultPgParameters,
 			},
 			Volume: acidv1.Volume{
 				Size: "1Gi",
@@ -204,11 +216,26 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 
 	// simulate existing config that differs from cluster.Spec
 	tests := []struct {
-		subtest       string
-		patroni       acidv1.Patroni
-		pgParams      map[string]string
-		restartMaster bool
+		subtest         string
+		patroni         acidv1.Patroni
+		desiredSlots    map[string]map[string]string
+		removedSlots    map[string]map[string]string
+		pgParams        map[string]string
+		shouldBePatched bool
+		restartPrimary  bool
 	}{
+		{
+			subtest: "Patroni and Postgresql.Parameters do not differ",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+			},
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: false,
+			restartPrimary:  false,
+		},
 		{
 			subtest: "Patroni and Postgresql.Parameters differ - restart replica first",
 			patroni: acidv1.Patroni{
@@ -218,48 +245,237 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 				"log_min_duration_statement": "500", // desired 200
 				"max_connections":            "100", // desired 50
 			},
-			restartMaster: false,
+			shouldBePatched: true,
+			restartPrimary:  false,
 		},
 		{
 			subtest: "multiple Postgresql.Parameters differ - restart replica first",
-			patroni: acidv1.Patroni{
-				TTL: 20,
-			},
+			patroni: defaultPatroniParameters,
 			pgParams: map[string]string{
 				"log_min_duration_statement": "500", // desired 200
 				"max_connections":            "100", // desired 50
 			},
-			restartMaster: false,
+			shouldBePatched: true,
+			restartPrimary:  false,
 		},
 		{
 			subtest: "desired max_connections bigger - restart replica first",
-			patroni: acidv1.Patroni{
-				TTL: 20,
-			},
+			patroni: defaultPatroniParameters,
 			pgParams: map[string]string{
 				"log_min_duration_statement": "200",
 				"max_connections":            "30", // desired 50
 			},
-			restartMaster: false,
+			shouldBePatched: true,
+			restartPrimary:  false,
 		},
 		{
 			subtest: "desired max_connections smaller - restart master first",
-			patroni: acidv1.Patroni{
-				TTL: 20,
-			},
+			patroni: defaultPatroniParameters,
 			pgParams: map[string]string{
 				"log_min_duration_statement": "200",
 				"max_connections":            "100", // desired 50
 			},
-			restartMaster: true,
+			shouldBePatched: true,
+			restartPrimary:  true,
+		},
+		{
+			subtest: "slot does not exist but is desired",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+			},
+			desiredSlots: testSlots,
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest: "slot exist, nothing specified in manifest",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+				Slots: map[string]map[string]string{
+					"slot1": {
+						"type":     "logical",
+						"plugin":   "pgoutput",
+						"database": "foo",
+					},
+				},
+			},
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: false,
+			restartPrimary:  false,
+		},
+		{
+			subtest: "slot is removed from manifest",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+				Slots: map[string]map[string]string{
+					"slot1": {
+						"type":     "logical",
+						"plugin":   "pgoutput",
+						"database": "foo",
+					},
+				},
+			},
+			removedSlots: testSlots,
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest: "slot plugin differs",
+			patroni: acidv1.Patroni{
+				TTL: 20,
+				Slots: map[string]map[string]string{
+					"slot1": {
+						"type":     "logical",
+						"plugin":   "pgoutput",
+						"database": "foo",
+					},
+				},
+			},
+			desiredSlots: testSlots,
+			pgParams: map[string]string{
+				"log_min_duration_statement": "200",
+				"max_connections":            "50",
+			},
+			shouldBePatched: true,
+			restartPrimary:  false,
 		},
 	}
 
 	for _, tt := range tests {
-		requireMasterRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
+		if len(tt.desiredSlots) > 0 {
+			cluster.Spec.Patroni.Slots = tt.desiredSlots
+		}
+		if len(tt.removedSlots) > 0 {
+			for slotName, removedSlot := range tt.removedSlots {
+				cluster.replicationSlots[slotName] = removedSlot
+			}
+		}
+
+		configPatched, requirePrimaryRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, cluster.Spec.Patroni, tt.pgParams, cluster.Spec.Parameters)
 		assert.NoError(t, err)
-		if requireMasterRestart != tt.restartMaster {
-			t.Errorf("%s - %s: unexpect master restart strategy, got %v, expected %v", testName, tt.subtest, requireMasterRestart, tt.restartMaster)
+		if configPatched != tt.shouldBePatched {
+			t.Errorf("%s - %s: expected config update did not happen", testName, tt.subtest)
+		}
+		if requirePrimaryRestart != tt.restartPrimary {
+			t.Errorf("%s - %s: wrong master restart strategy, got restart %v, expected restart %v", testName, tt.subtest, requirePrimaryRestart, tt.restartPrimary)
+		}
+
+		// reset slots for next tests
+		cluster.Spec.Patroni.Slots = nil
+		cluster.replicationSlots = make(map[string]interface{})
+	}
+
+	testsFailsafe := []struct {
+		subtest         string
+		operatorVal     *bool
+		effectiveVal    *bool
+		desiredVal      bool
+		shouldBePatched bool
+		restartPrimary  bool
+	}{
+		{
+			subtest:         "Not set in operator config, not set for pg cluster. Set to true in the pg config.",
+			operatorVal:     nil,
+			effectiveVal:    nil,
+			desiredVal:      true,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Not set in operator config, disabled for pg cluster. Set to true in the pg config.",
+			operatorVal:     nil,
+			effectiveVal:    util.False(),
+			desiredVal:      true,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Not set in operator config, not set for pg cluster. Set to false in the pg config.",
+			operatorVal:     nil,
+			effectiveVal:    nil,
+			desiredVal:      false,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Not set in operator config, enabled for pg cluster. Set to false in the pg config.",
+			operatorVal:     nil,
+			effectiveVal:    util.True(),
+			desiredVal:      false,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Enabled in operator config, not set for pg cluster. Set to false in the pg config.",
+			operatorVal:     util.True(),
+			effectiveVal:    nil,
+			desiredVal:      false,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Enabled in operator config, disabled for pg cluster. Set to true in the pg config.",
+			operatorVal:     util.True(),
+			effectiveVal:    util.False(),
+			desiredVal:      true,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Disabled in operator config, not set for pg cluster. Set to true in the pg config.",
+			operatorVal:     util.False(),
+			effectiveVal:    nil,
+			desiredVal:      true,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Disabled in operator config, enabled for pg cluster. Set to false in the pg config.",
+			operatorVal:     util.False(),
+			effectiveVal:    util.True(),
+			desiredVal:      false,
+			shouldBePatched: true,
+			restartPrimary:  false,
+		},
+		{
+			subtest:         "Disabled in operator config, enabled for pg cluster. Set to true in the pg config.",
+			operatorVal:     util.False(),
+			effectiveVal:    util.True(),
+			desiredVal:      true,
+			shouldBePatched: false, // should not require patching
+			restartPrimary:  false,
+		},
+	}
+
+	for _, tt := range testsFailsafe {
+		patroniConf := defaultPatroniParameters
+
+		if tt.operatorVal != nil {
+			cluster.OpConfig.EnablePatroniFailsafeMode = tt.operatorVal
+		}
+		if tt.effectiveVal != nil {
+			patroniConf.FailsafeMode = tt.effectiveVal
+		}
+		cluster.Spec.Patroni.FailsafeMode = &tt.desiredVal
+
+		configPatched, requirePrimaryRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, patroniConf, cluster.Spec.Patroni, defaultPgParameters, cluster.Spec.Parameters)
+		assert.NoError(t, err)
+		if configPatched != tt.shouldBePatched {
+			t.Errorf("%s - %s: expected update went wrong", testName, tt.subtest)
+		}
+		if requirePrimaryRestart != tt.restartPrimary {
+			t.Errorf("%s - %s: wrong master restart strategy, got restart %v, expected restart %v", testName, tt.subtest, requirePrimaryRestart, tt.restartPrimary)
 		}
 	}
 }
@@ -273,7 +489,6 @@ func TestUpdateSecret(t *testing.T) {
 	dbname := "app"
 	dbowner := "appowner"
 	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
-	rotationUsers := make(spec.PgUserMap)
 	retentionUsers := make([]string, 0)
 
 	// define manifest users and enable rotation for dbowner
@@ -286,6 +501,17 @@ func TestUpdateSecret(t *testing.T) {
 			Databases:                      map[string]string{dbname: dbowner},
 			Users:                          map[string]acidv1.UserFlags{"foo": {}, dbowner: {}},
 			UsersWithInPlaceSecretRotation: []string{dbowner},
+			Streams: []acidv1.Stream{
+				{
+					ApplicationId: appId,
+					Database:      dbname,
+					Tables: map[string]acidv1.StreamTable{
+						"data.foo": acidv1.StreamTable{
+							EventType: "stream-type-b",
+						},
+					},
+				},
+			},
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
@@ -297,6 +523,8 @@ func TestUpdateSecret(t *testing.T) {
 		Config{
 			OpConfig: config.Config{
 				Auth: config.Auth{
+					SuperUsername:                 "postgres",
+					ReplicationUsername:           "standby",
 					SecretNameTemplate:            secretTemplate,
 					EnablePasswordRotation:        true,
 					PasswordRotationInterval:      1,
@@ -312,8 +540,9 @@ func TestUpdateSecret(t *testing.T) {
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
 	cluster.pgUsers = map[string]spec.PgUser{}
-	cluster.initRobotUsers()
 
+	// init all users
+	cluster.initUsers()
 	// create secrets
 	cluster.syncSecrets()
 	// initialize rotation with current time
@@ -321,22 +550,33 @@ func TestUpdateSecret(t *testing.T) {
 
 	dayAfterTomorrow := time.Now().AddDate(0, 0, 2)
 
-	for username := range cluster.Spec.Users {
-		pgUser := cluster.pgUsers[username]
+	allUsers := make(map[string]spec.PgUser)
+	for _, pgUser := range cluster.pgUsers {
+		allUsers[pgUser.Name] = pgUser
+	}
+	for _, systemUser := range cluster.systemUsers {
+		allUsers[systemUser.Name] = systemUser
+	}
 
+	for username, pgUser := range allUsers {
 		// first, get the secret
-		secret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+		secretName := cluster.credentialSecretName(username)
+		secret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		assert.NoError(t, err)
 		secretPassword := string(secret.Data["password"])
 
 		// now update the secret setting a next rotation date (tomorrow + interval)
-		cluster.updateSecret(username, secret, &rotationUsers, &retentionUsers, dayAfterTomorrow)
-		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
+		cluster.updateSecret(username, secret, &retentionUsers, dayAfterTomorrow)
+		updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		assert.NoError(t, err)
 
 		// check that passwords are different
 		rotatedPassword := string(updatedSecret.Data["password"])
 		if secretPassword == rotatedPassword {
+			// passwords for system users should not have been rotated
+			if pgUser.Origin != spec.RoleOriginManifest {
+				continue
+			}
 			t.Errorf("%s: password unchanged in updated secret for %s", testName, username)
 		}
 
@@ -354,13 +594,13 @@ func TestUpdateSecret(t *testing.T) {
 				t.Errorf("%s: username differs in updated secret: expected %s, got %s", testName, username, secretUsername)
 			}
 		} else {
-			rotatedUsername := username + dayAfterTomorrow.Format("060102")
+			rotatedUsername := username + dayAfterTomorrow.Format(constants.RotationUserDateFormat)
 			if secretUsername != rotatedUsername {
 				t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, rotatedUsername, secretUsername)
 			}
-
-			if len(rotationUsers) != 1 && len(retentionUsers) != 1 {
-				t.Errorf("%s: unexpected number of users to rotate - expected only %s, found %d", testName, username, len(rotationUsers))
+			// whenever there's a rotation the retentionUsers list is extended or updated
+			if len(retentionUsers) != 1 {
+				t.Errorf("%s: unexpected number of users to drop - expected only %s, found %d", testName, username, len(retentionUsers))
 			}
 		}
 	}

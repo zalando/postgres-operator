@@ -2,13 +2,13 @@ package cluster
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -61,7 +61,6 @@ var cl = New(
 )
 
 func TestStatefulSetAnnotations(t *testing.T) {
-	testName := "CheckStatefulsetAnnotations"
 	spec := acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: &acidv1.Resources{
@@ -74,19 +73,59 @@ func TestStatefulSetAnnotations(t *testing.T) {
 	}
 	ss, err := cl.generateStatefulSet(&spec)
 	if err != nil {
-		t.Errorf("in %s no statefulset created %v", testName, err)
+		t.Errorf("in %s no statefulset created %v", t.Name(), err)
 	}
 	if ss != nil {
 		annotation := ss.ObjectMeta.GetAnnotations()
 		if _, ok := annotation["downscaler/downtime_replicas"]; !ok {
-			t.Errorf("in %s respective annotation not found on sts", testName)
+			t.Errorf("in %s respective annotation not found on sts", t.Name())
 		}
 	}
+}
 
+func TestStatefulSetUpdateWithEnv(t *testing.T) {
+	oldSpec := &acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: &acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+	}
+	oldSS, err := cl.generateStatefulSet(oldSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	newSpec := oldSpec.DeepCopy()
+	newSS, err := cl.generateStatefulSet(newSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	if !reflect.DeepEqual(oldSS, newSS) {
+		t.Errorf("in %s StatefulSet's must be equal", t.Name())
+	}
+
+	newSpec.Env = []v1.EnvVar{
+		{
+			Name:  "CUSTOM_ENV_VARIABLE",
+			Value: "data",
+		},
+	}
+	newSS, err = cl.generateStatefulSet(newSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	if reflect.DeepEqual(oldSS, newSS) {
+		t.Errorf("in %s StatefulSet's must be not equal", t.Name())
+	}
 }
 
 func TestInitRobotUsers(t *testing.T) {
-	testName := "TestInitRobotUsers"
 	tests := []struct {
 		manifestUsers map[string]acidv1.UserFlags
 		infraRoles    map[string]spec.PgUser
@@ -130,22 +169,20 @@ func TestInitRobotUsers(t *testing.T) {
 		cl.pgUsers = tt.infraRoles
 		if err := cl.initRobotUsers(); err != nil {
 			if tt.err == nil {
-				t.Errorf("%s got an unexpected error: %v", testName, err)
+				t.Errorf("%s got an unexpected error: %v", t.Name(), err)
 			}
 			if err.Error() != tt.err.Error() {
-				t.Errorf("%s expected error %v, got %v", testName, tt.err, err)
+				t.Errorf("%s expected error %v, got %v", t.Name(), tt.err, err)
 			}
 		} else {
 			if !reflect.DeepEqual(cl.pgUsers, tt.result) {
-				t.Errorf("%s expected: %#v, got %#v", testName, tt.result, cl.pgUsers)
+				t.Errorf("%s expected: %#v, got %#v", t.Name(), tt.result, cl.pgUsers)
 			}
 		}
 	}
 }
 
 func TestInitAdditionalOwnerRoles(t *testing.T) {
-	testName := "TestInitAdditionalOwnerRoles"
-
 	manifestUsers := map[string]acidv1.UserFlags{"foo_owner": {}, "bar_owner": {}, "app_user": {}}
 	expectedUsers := map[string]spec.PgUser{
 		"foo_owner": {Origin: spec.RoleOriginManifest, Name: "foo_owner", Namespace: cl.Namespace, Password: "f123", Flags: []string{"LOGIN"}, IsDbOwner: true, MemberOf: []string{"cron_admin", "part_man"}},
@@ -158,7 +195,7 @@ func TestInitAdditionalOwnerRoles(t *testing.T) {
 
 	// this should set IsDbOwner field for manifest users
 	if err := cl.initRobotUsers(); err != nil {
-		t.Errorf("%s could not init manifest users", testName)
+		t.Errorf("%s could not init manifest users", t.Name())
 	}
 
 	// now assign additional roles to owners
@@ -169,7 +206,7 @@ func TestInitAdditionalOwnerRoles(t *testing.T) {
 		expectedPgUser := expectedUsers[username]
 		if !util.IsEqualIgnoreOrder(expectedPgUser.MemberOf, existingPgUser.MemberOf) {
 			t.Errorf("%s unexpected membership of user %q: expected member of %#v, got member of %#v",
-				testName, username, expectedPgUser.MemberOf, existingPgUser.MemberOf)
+				t.Name(), username, expectedPgUser.MemberOf, existingPgUser.MemberOf)
 		}
 	}
 }
@@ -186,7 +223,14 @@ type mockTeamsAPIClient struct {
 }
 
 func (m *mockTeamsAPIClient) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
-	return &teams.Team{Members: m.members}, statusCode, nil
+	if len(m.members) > 0 {
+		return &teams.Team{Members: m.members}, http.StatusOK, nil
+	}
+
+	// when members are not set handle this as an error for this mock API
+	// makes it easier to test behavior when teams API is unavailable
+	return nil, http.StatusInternalServerError,
+		fmt.Errorf("mocked %d error of mock Teams API for team %q", http.StatusInternalServerError, teamID)
 }
 
 func (m *mockTeamsAPIClient) setMembers(members []string) {
@@ -195,48 +239,67 @@ func (m *mockTeamsAPIClient) setMembers(members []string) {
 
 // Test adding a member of a product team owning a particular DB cluster
 func TestInitHumanUsers(t *testing.T) {
-
 	var mockTeamsAPI mockTeamsAPIClient
 	cl.oauthTokenGetter = &mockOAuthTokenGetter{}
 	cl.teamsAPIClient = &mockTeamsAPI
-	testName := "TestInitHumanUsers"
 
 	// members of a product team are granted superuser rights for DBs of their team
 	cl.OpConfig.EnableTeamSuperuser = true
-
 	cl.OpConfig.EnableTeamsAPI = true
+	cl.OpConfig.EnableTeamMemberDeprecation = true
 	cl.OpConfig.PamRoleName = "zalandos"
 	cl.Spec.TeamID = "test"
+	cl.Spec.Users = map[string]acidv1.UserFlags{"bar": []string{}}
 
 	tests := []struct {
 		existingRoles map[string]spec.PgUser
 		teamRoles     []string
 		result        map[string]spec.PgUser
+		err           error
 	}{
 		{
 			existingRoles: map[string]spec.PgUser{"foo": {Name: "foo", Origin: spec.RoleOriginTeamsAPI,
-				Flags: []string{"NOLOGIN"}}, "bar": {Name: "bar", Flags: []string{"NOLOGIN"}}},
+				Flags: []string{"LOGIN"}}, "bar": {Name: "bar", Flags: []string{"LOGIN"}}},
 			teamRoles: []string{"foo"},
 			result: map[string]spec.PgUser{"foo": {Name: "foo", Origin: spec.RoleOriginTeamsAPI,
 				MemberOf: []string{cl.OpConfig.PamRoleName}, Flags: []string{"LOGIN", "SUPERUSER"}},
-				"bar": {Name: "bar", Flags: []string{"NOLOGIN"}}},
+				"bar": {Name: "bar", Flags: []string{"LOGIN"}}},
+			err: fmt.Errorf("could not init human users: cannot initialize members for team %q who owns the Postgres cluster: could not get list of team members for team %q: could not get team info for team %q: mocked %d error of mock Teams API for team %q",
+				cl.Spec.TeamID, cl.Spec.TeamID, cl.Spec.TeamID, http.StatusInternalServerError, cl.Spec.TeamID),
 		},
 		{
 			existingRoles: map[string]spec.PgUser{},
 			teamRoles:     []string{"admin", replicationUserName},
 			result:        map[string]spec.PgUser{},
+			err:           nil,
 		},
 	}
 
 	for _, tt := range tests {
+		// set pgUsers so that initUsers sets up pgUsersCache with team roles
+		cl.pgUsers = tt.existingRoles
+
+		// initUsers calls initHumanUsers which should fail
+		// because no members are set for mocked teams API
+		if err := cl.initUsers(); err != nil {
+			// check that at least team roles are remembered in c.pgUsers
+			if len(cl.pgUsers) < len(tt.teamRoles) {
+				t.Errorf("%s unexpected size of pgUsers: expected at least %d, got %d", t.Name(), len(tt.teamRoles), len(cl.pgUsers))
+			}
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s expected error %v, got %v", t.Name(), err, tt.err)
+			}
+		}
+
+		// set pgUsers again to test initHumanUsers with working teams API
 		cl.pgUsers = tt.existingRoles
 		mockTeamsAPI.setMembers(tt.teamRoles)
 		if err := cl.initHumanUsers(); err != nil {
-			t.Errorf("%s got an unexpected error %v", testName, err)
+			t.Errorf("%s got an unexpected error %v", t.Name(), err)
 		}
 
 		if !reflect.DeepEqual(cl.pgUsers, tt.result) {
-			t.Errorf("%s expects %#v, got %#v", testName, tt.result, cl.pgUsers)
+			t.Errorf("%s expects %#v, got %#v", t.Name(), tt.result, cl.pgUsers)
 		}
 	}
 }
@@ -254,22 +317,22 @@ type mockTeamsAPIClientMultipleTeams struct {
 func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *teams.Team, statusCode int, err error) {
 	for _, team := range m.teams {
 		if team.teamID == teamID {
-			return &teams.Team{Members: team.members}, statusCode, nil
+			return &teams.Team{Members: team.members}, http.StatusOK, nil
 		}
 	}
 
-	// should not be reached if a slice with teams is populated correctly
-	return nil, statusCode, nil
+	// when given teamId is not found in teams return StatusNotFound
+	// the operator should only return a warning in this case and not error out (#1842)
+	return nil, http.StatusNotFound,
+		fmt.Errorf("mocked %d error of mock Teams API for team %q", http.StatusNotFound, teamID)
 }
 
 // Test adding members of maintenance teams that get superuser rights for all PG databases
 func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
-
 	var mockTeamsAPI mockTeamsAPIClientMultipleTeams
 	cl.oauthTokenGetter = &mockOAuthTokenGetter{}
 	cl.teamsAPIClient = &mockTeamsAPI
 	cl.OpConfig.EnableTeamSuperuser = false
-	testName := "TestInitHumanUsersWithSuperuserTeams"
 
 	cl.OpConfig.EnableTeamsAPI = true
 	cl.OpConfig.PamRoleName = "zalandos"
@@ -360,6 +423,16 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 				"postgres_superuser": userA,
 			},
 		},
+		// case 4: the team does not exist which should not return an error
+		{
+			ownerTeam:      "acid",
+			existingRoles:  map[string]spec.PgUser{},
+			superuserTeams: []string{"postgres_superusers"},
+			teams:          []mockTeam{teamA, teamB, teamTest},
+			result: map[string]spec.PgUser{
+				"postgres_superuser": userA,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -371,17 +444,16 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 		cl.OpConfig.PostgresSuperuserTeams = tt.superuserTeams
 
 		if err := cl.initHumanUsers(); err != nil {
-			t.Errorf("%s got an unexpected error %v", testName, err)
+			t.Errorf("%s got an unexpected error %v", t.Name(), err)
 		}
 
 		if !reflect.DeepEqual(cl.pgUsers, tt.result) {
-			t.Errorf("%s expects %#v, got %#v", testName, tt.result, cl.pgUsers)
+			t.Errorf("%s expects %#v, got %#v", t.Name(), tt.result, cl.pgUsers)
 		}
 	}
 }
 
 func TestPodAnnotations(t *testing.T) {
-	testName := "TestPodAnnotations"
 	tests := []struct {
 		subTest  string
 		operator map[string]string
@@ -428,13 +500,13 @@ func TestPodAnnotations(t *testing.T) {
 		for k, v := range annotations {
 			if observed, expected := v, tt.merged[k]; observed != expected {
 				t.Errorf("%v expects annotation value %v for key %v, but found %v",
-					testName+"/"+tt.subTest, expected, observed, k)
+					t.Name()+"/"+tt.subTest, expected, observed, k)
 			}
 		}
 		for k, v := range tt.merged {
 			if observed, expected := annotations[k], v; observed != expected {
 				t.Errorf("%v expects annotation value %v for key %v, but found %v",
-					testName+"/"+tt.subTest, expected, observed, k)
+					t.Name()+"/"+tt.subTest, expected, observed, k)
 			}
 		}
 	}
@@ -450,8 +522,11 @@ func TestServiceAnnotations(t *testing.T) {
 		enableMasterLoadBalancerOC    bool
 		enableReplicaLoadBalancerSpec *bool
 		enableReplicaLoadBalancerOC   bool
+		enableTeamIdClusterPrefix     bool
 		operatorAnnotations           map[string]string
-		clusterAnnotations            map[string]string
+		serviceAnnotations            map[string]string
+		masterServiceAnnotations      map[string]string
+		replicaServiceAnnotations     map[string]string
 		expect                        map[string]string
 	}{
 		//MASTER
@@ -460,8 +535,9 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                         "master",
 			enableMasterLoadBalancerSpec: &disabled,
 			enableMasterLoadBalancerOC:   false,
+			enableTeamIdClusterPrefix:    false,
 			operatorAnnotations:          make(map[string]string),
-			clusterAnnotations:           make(map[string]string),
+			serviceAnnotations:           make(map[string]string),
 			expect:                       make(map[string]string),
 		},
 		{
@@ -469,10 +545,11 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                         "master",
 			enableMasterLoadBalancerSpec: &enabled,
 			enableMasterLoadBalancerOC:   false,
+			enableTeamIdClusterPrefix:    false,
 			operatorAnnotations:          make(map[string]string),
-			clusterAnnotations:           make(map[string]string),
+			serviceAnnotations:           make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 			},
 		},
@@ -481,18 +558,20 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                         "master",
 			enableMasterLoadBalancerSpec: &disabled,
 			enableMasterLoadBalancerOC:   true,
+			enableTeamIdClusterPrefix:    false,
 			operatorAnnotations:          make(map[string]string),
-			clusterAnnotations:           make(map[string]string),
+			serviceAnnotations:           make(map[string]string),
 			expect:                       make(map[string]string),
 		},
 		{
 			about:                      "Master with no annotations and EnableMasterLoadBalancer defined only on operator config",
 			role:                       "master",
 			enableMasterLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
-			clusterAnnotations:         make(map[string]string),
+			serviceAnnotations:         make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 			},
 		},
@@ -500,10 +579,11 @@ func TestServiceAnnotations(t *testing.T) {
 			about:                      "Master with cluster annotations and load balancer enabled",
 			role:                       "master",
 			enableMasterLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
-			clusterAnnotations:         map[string]string{"foo": "bar"},
+			serviceAnnotations:         map[string]string{"foo": "bar"},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 				"foo": "bar",
 			},
@@ -513,18 +593,20 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                         "master",
 			enableMasterLoadBalancerSpec: &disabled,
 			enableMasterLoadBalancerOC:   true,
+			enableTeamIdClusterPrefix:    false,
 			operatorAnnotations:          make(map[string]string),
-			clusterAnnotations:           map[string]string{"foo": "bar"},
+			serviceAnnotations:           map[string]string{"foo": "bar"},
 			expect:                       map[string]string{"foo": "bar"},
 		},
 		{
 			about:                      "Master with operator annotations and load balancer enabled",
 			role:                       "master",
 			enableMasterLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        map[string]string{"foo": "bar"},
-			clusterAnnotations:         make(map[string]string),
+			serviceAnnotations:         make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 				"foo": "bar",
 			},
@@ -533,12 +615,13 @@ func TestServiceAnnotations(t *testing.T) {
 			about:                      "Master with operator annotations override default annotations",
 			role:                       "master",
 			enableMasterLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
-			clusterAnnotations: make(map[string]string),
+			serviceAnnotations: make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 		},
@@ -546,12 +629,13 @@ func TestServiceAnnotations(t *testing.T) {
 			about:                      "Master with cluster annotations override default annotations",
 			role:                       "master",
 			enableMasterLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
-			clusterAnnotations: map[string]string{
+			serviceAnnotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 		},
@@ -559,26 +643,45 @@ func TestServiceAnnotations(t *testing.T) {
 			about:                      "Master with cluster annotations do not override external-dns annotations",
 			role:                       "master",
 			enableMasterLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
-			clusterAnnotations: map[string]string{
+			serviceAnnotations: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 			},
 		},
 		{
-			about:                      "Master with operator annotations do not override external-dns annotations",
+			about:                      "Master with cluster name teamId prefix enabled",
 			role:                       "master",
 			enableMasterLoadBalancerOC: true,
-			clusterAnnotations:         make(map[string]string),
-			operatorAnnotations: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
+			enableTeamIdClusterPrefix:  true,
+			serviceAnnotations:         make(map[string]string),
+			operatorAnnotations:        make(map[string]string),
+			expect: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+			},
+		},
+		{
+			about:                      "Master with master service annotations override service annotations",
+			role:                       "master",
+			enableMasterLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:  false,
+			operatorAnnotations:        make(map[string]string),
+			serviceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-nlb-target-type":         "ip",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
+			},
+			masterServiceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-nlb-target-type":         "ip",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
 			},
 		},
 		// REPLICA
@@ -587,8 +690,9 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                          "replica",
 			enableReplicaLoadBalancerSpec: &disabled,
 			enableReplicaLoadBalancerOC:   false,
+			enableTeamIdClusterPrefix:     false,
 			operatorAnnotations:           make(map[string]string),
-			clusterAnnotations:            make(map[string]string),
+			serviceAnnotations:            make(map[string]string),
 			expect:                        make(map[string]string),
 		},
 		{
@@ -596,10 +700,11 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                          "replica",
 			enableReplicaLoadBalancerSpec: &enabled,
 			enableReplicaLoadBalancerOC:   false,
+			enableTeamIdClusterPrefix:     false,
 			operatorAnnotations:           make(map[string]string),
-			clusterAnnotations:            make(map[string]string),
+			serviceAnnotations:            make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 			},
 		},
@@ -608,18 +713,20 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                          "replica",
 			enableReplicaLoadBalancerSpec: &disabled,
 			enableReplicaLoadBalancerOC:   true,
+			enableTeamIdClusterPrefix:     false,
 			operatorAnnotations:           make(map[string]string),
-			clusterAnnotations:            make(map[string]string),
+			serviceAnnotations:            make(map[string]string),
 			expect:                        make(map[string]string),
 		},
 		{
 			about:                       "Replica with no annotations and EnableReplicaLoadBalancer defined only on operator config",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
-			clusterAnnotations:          make(map[string]string),
+			serviceAnnotations:          make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 			},
 		},
@@ -627,10 +734,11 @@ func TestServiceAnnotations(t *testing.T) {
 			about:                       "Replica with cluster annotations and load balancer enabled",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
-			clusterAnnotations:          map[string]string{"foo": "bar"},
+			serviceAnnotations:          map[string]string{"foo": "bar"},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 				"foo": "bar",
 			},
@@ -640,18 +748,20 @@ func TestServiceAnnotations(t *testing.T) {
 			role:                          "replica",
 			enableReplicaLoadBalancerSpec: &disabled,
 			enableReplicaLoadBalancerOC:   true,
+			enableTeamIdClusterPrefix:     false,
 			operatorAnnotations:           make(map[string]string),
-			clusterAnnotations:            map[string]string{"foo": "bar"},
+			serviceAnnotations:            map[string]string{"foo": "bar"},
 			expect:                        map[string]string{"foo": "bar"},
 		},
 		{
 			about:                       "Replica with operator annotations and load balancer enabled",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         map[string]string{"foo": "bar"},
-			clusterAnnotations:          make(map[string]string),
+			serviceAnnotations:          make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 				"foo": "bar",
 			},
@@ -660,12 +770,13 @@ func TestServiceAnnotations(t *testing.T) {
 			about:                       "Replica with operator annotations override default annotations",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
-			clusterAnnotations: make(map[string]string),
+			serviceAnnotations: make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 		},
@@ -673,12 +784,13 @@ func TestServiceAnnotations(t *testing.T) {
 			about:                       "Replica with cluster annotations override default annotations",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
-			clusterAnnotations: map[string]string{
+			serviceAnnotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
 			},
 		},
@@ -686,26 +798,45 @@ func TestServiceAnnotations(t *testing.T) {
 			about:                       "Replica with cluster annotations do not override external-dns annotations",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
-			clusterAnnotations: map[string]string{
+			serviceAnnotations: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 			},
 		},
 		{
-			about:                       "Replica with operator annotations do not override external-dns annotations",
+			about:                       "Replica with cluster name teamId prefix enabled",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: true,
-			clusterAnnotations:          make(map[string]string),
-			operatorAnnotations: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
+			enableTeamIdClusterPrefix:   true,
+			serviceAnnotations:          make(map[string]string),
+			operatorAnnotations:         make(map[string]string),
+			expect: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+			},
+		},
+		{
+			about:                       "Replica with replica service annotations override service annotations",
+			role:                        "replica",
+			enableReplicaLoadBalancerOC: true,
+			enableTeamIdClusterPrefix:   false,
+			operatorAnnotations:         make(map[string]string),
+			serviceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-nlb-target-type":         "ip",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
+			},
+			replicaServiceAnnotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-nlb-target-type":         "ip",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "2000",
 			},
 		},
 		// COMMON
@@ -713,32 +844,40 @@ func TestServiceAnnotations(t *testing.T) {
 			about:                       "cluster annotations append to operator annotations",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: false,
+			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         map[string]string{"foo": "bar"},
-			clusterAnnotations:          map[string]string{"post": "gres"},
+			serviceAnnotations:          map[string]string{"post": "gres"},
 			expect:                      map[string]string{"foo": "bar", "post": "gres"},
 		},
 		{
 			about:                       "cluster annotations override operator annotations",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: false,
+			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         map[string]string{"foo": "bar", "post": "gres"},
-			clusterAnnotations:          map[string]string{"post": "greSQL"},
+			serviceAnnotations:          map[string]string{"post": "greSQL"},
 			expect:                      map[string]string{"foo": "bar", "post": "greSQL"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.about, func(t *testing.T) {
+			cl.OpConfig.EnableTeamIdClusternamePrefix = tt.enableTeamIdClusterPrefix
+
 			cl.OpConfig.CustomServiceAnnotations = tt.operatorAnnotations
 			cl.OpConfig.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerOC
 			cl.OpConfig.EnableReplicaLoadBalancer = tt.enableReplicaLoadBalancerOC
-			cl.OpConfig.MasterDNSNameFormat = "{cluster}.{team}.{hostedzone}"
-			cl.OpConfig.ReplicaDNSNameFormat = "{cluster}-repl.{team}.{hostedzone}"
+			cl.OpConfig.MasterDNSNameFormat = "{cluster}-stg.{namespace}.{hostedzone}"
+			cl.OpConfig.MasterLegacyDNSNameFormat = "{cluster}-stg.{team}.{hostedzone}"
+			cl.OpConfig.ReplicaDNSNameFormat = "{cluster}-stg-repl.{namespace}.{hostedzone}"
+			cl.OpConfig.ReplicaLegacyDNSNameFormat = "{cluster}-stg-repl.{team}.{hostedzone}"
 			cl.OpConfig.DbHostedZone = "db.example.com"
 
-			cl.Postgresql.Spec.ClusterName = "test"
+			cl.Postgresql.Spec.ClusterName = ""
 			cl.Postgresql.Spec.TeamID = "acid"
-			cl.Postgresql.Spec.ServiceAnnotations = tt.clusterAnnotations
+			cl.Postgresql.Spec.ServiceAnnotations = tt.serviceAnnotations
+			cl.Postgresql.Spec.MasterServiceAnnotations = tt.masterServiceAnnotations
+			cl.Postgresql.Spec.ReplicaServiceAnnotations = tt.replicaServiceAnnotations
 			cl.Postgresql.Spec.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerSpec
 			cl.Postgresql.Spec.EnableReplicaLoadBalancer = tt.enableReplicaLoadBalancerSpec
 
@@ -757,19 +896,20 @@ func TestServiceAnnotations(t *testing.T) {
 }
 
 func TestInitSystemUsers(t *testing.T) {
-	testName := "Test system users initialization"
-
-	// default cluster without connection pooler
+	// default cluster without connection pooler and event streams
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; exist {
-		t.Errorf("%s, connection pooler user is present", testName)
+		t.Errorf("%s, connection pooler user is present", t.Name())
+	}
+	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; exist {
+		t.Errorf("%s, stream user is present", t.Name())
 	}
 
 	// cluster with connection pooler
 	cl.Spec.EnableConnectionPooler = boolToPointer(true)
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; !exist {
-		t.Errorf("%s, connection pooler user is not present", testName)
+		t.Errorf("%s, connection pooler user is not present", t.Name())
 	}
 
 	// superuser is not allowed as connection pool user
@@ -780,47 +920,70 @@ func TestInitSystemUsers(t *testing.T) {
 	cl.OpConfig.ConnectionPooler.User = "pooler"
 
 	cl.initSystemUsers()
-	if _, exist := cl.pgUsers["pooler"]; !exist {
-		t.Errorf("%s, Superuser is not allowed to be a connection pool user", testName)
+	if _, exist := cl.systemUsers["pooler"]; !exist {
+		t.Errorf("%s, Superuser is not allowed to be a connection pool user", t.Name())
 	}
 
 	// neither protected users are
-	delete(cl.pgUsers, "pooler")
+	delete(cl.systemUsers, "pooler")
 	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
 		User: "admin",
 	}
 	cl.OpConfig.ProtectedRoles = []string{"admin"}
 
 	cl.initSystemUsers()
-	if _, exist := cl.pgUsers["pooler"]; !exist {
-		t.Errorf("%s, Protected user are not allowed to be a connection pool user", testName)
+	if _, exist := cl.systemUsers["pooler"]; !exist {
+		t.Errorf("%s, Protected user are not allowed to be a connection pool user", t.Name())
 	}
 
-	delete(cl.pgUsers, "pooler")
+	delete(cl.systemUsers, "pooler")
 	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
 		User: "standby",
 	}
 
 	cl.initSystemUsers()
-	if _, exist := cl.pgUsers["pooler"]; !exist {
-		t.Errorf("%s, System users are not allowed to be a connection pool user", testName)
+	if _, exist := cl.systemUsers["pooler"]; !exist {
+		t.Errorf("%s, System users are not allowed to be a connection pool user", t.Name())
+	}
+
+	// using stream user in manifest but no streams defined should be treated like normal robot user
+	streamUser := fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
+	cl.Spec.Users = map[string]acidv1.UserFlags{streamUser: []string{}}
+	cl.initSystemUsers()
+	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; exist {
+		t.Errorf("%s, stream user is present", t.Name())
+	}
+
+	// cluster with streams
+	cl.Spec.Streams = []acidv1.Stream{
+		{
+			ApplicationId: "test-app",
+			Database:      "test_db",
+			Tables: map[string]acidv1.StreamTable{
+				"data.test_table": {
+					EventType: "test_event",
+				},
+			},
+		},
+	}
+	cl.initSystemUsers()
+	if _, exist := cl.systemUsers[constants.EventStreamUserKeyName]; !exist {
+		t.Errorf("%s, stream user is not present", t.Name())
 	}
 }
 
 func TestPreparedDatabases(t *testing.T) {
-	testName := "TestDefaultPreparedDatabase"
-
 	cl.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{}
 	cl.initPreparedDatabaseRoles()
 
 	for _, role := range []string{"acid_test_owner", "acid_test_reader", "acid_test_writer",
 		"acid_test_data_owner", "acid_test_data_reader", "acid_test_data_writer"} {
 		if _, exist := cl.pgUsers[role]; !exist {
-			t.Errorf("%s, default role %q for prepared database not present", testName, role)
+			t.Errorf("%s, default role %q for prepared database not present", t.Name(), role)
 		}
 	}
 
-	testName = "TestPreparedDatabaseWithSchema"
+	testName := "TestPreparedDatabaseWithSchema"
 
 	cl.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{
 		"foo": {
@@ -1058,7 +1221,6 @@ func newService(ann map[string]string, svcT v1.ServiceType, lbSr []string) *v1.S
 }
 
 func TestCompareServices(t *testing.T) {
-	testName := "TestCompareServices"
 	cluster := Cluster{
 		Config: Config{
 			OpConfig: config.Config{
@@ -1359,16 +1521,16 @@ func TestCompareServices(t *testing.T) {
 			match, reason := cluster.compareServices(tt.current, tt.new)
 			if match && !tt.match {
 				t.Logf("match=%v current=%v, old=%v reason=%s", match, tt.current.Annotations, tt.new.Annotations, reason)
-				t.Errorf("%s - expected services to do not match: %q and %q", testName, tt.current, tt.new)
+				t.Errorf("%s - expected services to do not match: %q and %q", t.Name(), tt.current, tt.new)
 				return
 			}
 			if !match && tt.match {
-				t.Errorf("%s - expected services to be the same: %q and %q", testName, tt.current, tt.new)
+				t.Errorf("%s - expected services to be the same: %q and %q", t.Name(), tt.current, tt.new)
 				return
 			}
 			if !match && !tt.match {
 				if !strings.HasPrefix(reason, tt.reason) {
-					t.Errorf("%s - expected reason prefix %s, found %s", testName, tt.reason, reason)
+					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
 					return
 				}
 			}

@@ -36,6 +36,9 @@ type PostgresSpec struct {
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
 
+	// deprecated field storing cluster name without teamId prefix
+	ClusterName string `json:"-"`
+
 	SpiloRunAsUser  *int64 `json:"spiloRunAsUser,omitempty"`
 	SpiloRunAsGroup *int64 `json:"spiloRunAsGroup,omitempty"`
 	SpiloFSGroup    *int64 `json:"spiloFSGroup,omitempty"`
@@ -62,7 +65,6 @@ type PostgresSpec struct {
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
 	Clone                 *CloneDescription           `json:"clone,omitempty"`
-	ClusterName           string                      `json:"-"`
 	Databases             map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
 	SchedulerName         *string                     `json:"schedulerName,omitempty"`
@@ -77,10 +79,14 @@ type PostgresSpec struct {
 	StandbyCluster        *StandbyDescription         `json:"standby,omitempty"`
 	PodAnnotations        map[string]string           `json:"podAnnotations,omitempty"`
 	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
-	TLS                   *TLSDescription             `json:"tls,omitempty"`
-	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
-	Streams               []Stream                    `json:"streams,omitempty"`
-	Env                   []v1.EnvVar                 `json:"env,omitempty"`
+	// MasterServiceAnnotations takes precedence over ServiceAnnotations for master role if not empty
+	MasterServiceAnnotations map[string]string `json:"masterServiceAnnotations,omitempty"`
+	// ReplicaServiceAnnotations takes precedence over ServiceAnnotations for replica role if not empty
+	ReplicaServiceAnnotations map[string]string  `json:"replicaServiceAnnotations,omitempty"`
+	TLS                       *TLSDescription    `json:"tls,omitempty"`
+	AdditionalVolumes         []AdditionalVolume `json:"additionalVolumes,omitempty"`
+	Streams                   []Stream           `json:"streams,omitempty"`
+	Env                       []v1.EnvVar        `json:"env,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -113,10 +119,10 @@ type PreparedSchema struct {
 
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.
 type MaintenanceWindow struct {
-	Everyday  bool
-	Weekday   time.Weekday
-	StartTime metav1.Time // Start time
-	EndTime   metav1.Time // End time
+	Everyday  bool         `json:"everyday,omitempty"`
+	Weekday   time.Weekday `json:"weekday,omitempty"`
+	StartTime metav1.Time  `json:"startTime,omitempty"`
+	EndTime   metav1.Time  `json:"endTime,omitempty"`
 }
 
 // Volume describes a single volume in the manifest.
@@ -169,6 +175,7 @@ type Patroni struct {
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
 	SynchronousNodeCount  uint32                       `json:"synchronous_node_count,omitempty" defaults:"1"`
+	FailsafeMode          *bool                        `json:"failsafe_mode,omitempty"`
 }
 
 // StandbyDescription contains remote primary config or s3/gs wal path

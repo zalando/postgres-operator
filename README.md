@@ -29,13 +29,13 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 14, starting from 9.6+
+* Supports PostgreSQL 15, starting from 10+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
 [WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
 * Preload libraries: [bg_mon](https://github.com/CyberDem0n/bg_mon),
-[pg_stat_statements](https://www.postgresql.org/docs/14/pgstatstatements.html),
+[pg_stat_statements](https://www.postgresql.org/docs/15/pgstatstatements.html),
 [pgextwlist](https://github.com/dimitri/pgextwlist),
 [pg_auth_mon](https://github.com/RafiaSabih/pg_auth_mon)
 * Incl. popular Postgres extensions such as
@@ -61,7 +61,7 @@ We introduce the major version into the backup path to smoothen the [major versi
 The new operator configuration can set a compatibility flag *enable_spilo_wal_path_compat* to make Spilo look for wal segments in the current path but also old format paths.
 This comes at potential performance costs and should be disabled after a few days.
 
-The newest Spilo image is: `registry.opensource.zalan.do/acid/spilo-14:2.1-p6`
+The newest Spilo image is: `ghcr.io/zalando/spilo-15:2.1-p9`
 
 The last Spilo 12 image is: `registry.opensource.zalan.do/acid/spilo-12:1.6-p5`
 

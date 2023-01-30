@@ -17,7 +17,7 @@ data:
   # connection_pooler_default_cpu_request: "500m"
   # connection_pooler_default_memory_limit: 100Mi
   # connection_pooler_default_memory_request: 100Mi
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-22"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-26"
   # connection_pooler_max_db_connections: 60
   # connection_pooler_mode: "transaction"
   # connection_pooler_number_of_instances: 2
@@ -34,7 +34,7 @@ data:
   # default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+  docker_image: ghcr.io/zalando/spilo-15:2.1-p9
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_registration: "true"
@@ -47,16 +47,19 @@ data:
   enable_master_load_balancer: "false"
   enable_master_pooler_load_balancer: "false"
   enable_password_rotation: "false"
+  # enable_patroni_failsafe_mode: "false"
   enable_pgversion_env_var: "true"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
   # enable_postgres_team_crd: "false"
   # enable_postgres_team_crd_superusers: "false"
+  enable_readiness_probe: "false"
   enable_replica_load_balancer: "false"
   enable_replica_pooler_load_balancer: "false"
   # enable_shm_volume: "true"
   # enable_sidecars: "true"
   enable_spilo_wal_path_compat: "true"
+  enable_team_id_clustername_prefix: "false"
   enable_team_member_deprecation: "false"
   # enable_team_superuser: "false"
   enable_teams_api: "false"
@@ -66,14 +69,22 @@ data:
   # ignored_annotations: ""
   # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
   # infrastructure_roles_secrets: "secretname:monitoring-roles,userkey:user,passwordkey:password,rolekey:inrole"
+  # ignore_instance_limits_annotation_key: ""
   # inherited_annotations: owned-by
   # inherited_labels: application,environment
   # kube_iam_role: ""
   # kubernetes_use_configmaps: "false"
   # log_s3_bucket: ""
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.8.2"
+  # logical_backup_azure_storage_account_name: ""
+  # logical_backup_azure_storage_container: ""
+  # logical_backup_azure_storage_account_key: ""
+  # logical_backup_cpu_limit: ""
+  # logical_backup_cpu_request: ""
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.9.0"
   # logical_backup_google_application_credentials: ""
   logical_backup_job_prefix: "logical-backup-"
+  # logical_backup_memory_limit: ""
+  # logical_backup_memory_request: ""
   logical_backup_provider: "s3"
   # logical_backup_s3_access_key_id: ""
   logical_backup_s3_bucket: "my-bucket-url"
@@ -85,13 +96,16 @@ data:
   logical_backup_schedule: "30 00 * * *"
   major_version_upgrade_mode: "manual"
   # major_version_upgrade_team_allow_list: ""
-  master_dns_name_format: "{cluster}.{team}.{hostedzone}"
+  master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
+  # master_legacy_dns_name_format: "{cluster}.{team}.{hostedzone}"
   # master_pod_move_timeout: 20m
   # max_instances: "-1"
   # min_instances: "-1"
+  # max_cpu_request: "1"
+  # max_memory_request: 4Gi
   # min_cpu_limit: 250m
   # min_memory_limit: 250Mi
-  # minimal_major_version: "9.6"
+  # minimal_major_version: "11"
   # node_readiness_label: "status:ready"
   # node_readiness_label_merge: "OR"
   # oauth_token_secret_name: postgresql-operator
@@ -103,6 +117,7 @@ data:
   # password_rotation_interval: "90"
   # password_rotation_user_retention: "180"
   pdb_name_format: "postgres-{cluster}-pdb"
+  # pod_antiaffinity_preferred_during_scheduling: "false"
   # pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   pod_deletion_wait_timeout: 10m
   # pod_environment_configmap: "default/my-custom-config"
@@ -120,7 +135,8 @@ data:
   ready_wait_interval: 3s
   ready_wait_timeout: 30s
   repair_period: 5m
-  replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
+  replica_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
+  # replica_legacy_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
   replication_username: standby
   resource_check_interval: 3s
   resource_check_timeout: 10m
@@ -128,6 +144,7 @@ data:
   ring_log_lines: "100"
   role_deletion_suffix: "_deleted"
   secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+  share_pgsocket_with_sidecars: "false"
   # sidecar_docker_images: ""
   # set_memory_request_to_limit: "false"
   spilo_allow_privilege_escalation: "true"
@@ -137,7 +154,7 @@ data:
   spilo_privileged: "false"
   storage_resize_mode: "pvc"
   super_username: postgres
-  # target_major_version: "14"
+  # target_major_version: "15"
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local

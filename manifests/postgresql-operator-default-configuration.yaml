@@ -3,7 +3,7 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+  docker_image: ghcr.io/zalando/spilo-15:2.1-p9
   # enable_crd_registration: true
   # crd_categories:
   # - all
@@ -11,7 +11,9 @@ configuration:
   enable_pgversion_env_var: true
   # enable_shm_volume: true
   enable_spilo_wal_path_compat: false
+  enable_team_id_clustername_prefix: false
   etcd_host: ""
+  # ignore_instance_limits_annotation_key: ""
   # kubernetes_use_configmaps: false
   max_instances: -1
   min_instances: -1
@@ -37,8 +39,8 @@ configuration:
     major_version_upgrade_mode: "off"
     # major_version_upgrade_team_allow_list:
     # - acid
-    minimal_major_version: "9.6"
-    target_major_version: "14"
+    minimal_major_version: "11"
+    target_major_version: "15"
   kubernetes:
     # additional_pod_capabilities:
     # - "SYS_NICE"
@@ -58,6 +60,7 @@ configuration:
     enable_init_containers: true
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
+    enable_readiness_probe: false
     enable_sidecars: true
     # ignored_annotations:
     # - k8s.v1.cni.cncf.io/network-status
@@ -81,6 +84,7 @@ configuration:
     # node_readiness_label_merge: "OR"
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
+    pod_antiaffinity_preferred_during_scheduling: false
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
     # pod_environment_configmap: "default/my-custom-config"
     # pod_environment_secret: "my-custom-secret"
@@ -92,6 +96,7 @@ configuration:
     # pod_service_account_role_binding_definition: ""
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+    share_pgsocket_with_sidecars: false
     spilo_allow_privilege_escalation: true
     # spilo_runasuser: 101
     # spilo_runasgroup: 103
@@ -108,6 +113,8 @@ configuration:
     default_cpu_request: 100m
     default_memory_limit: 500Mi
     default_memory_request: 100Mi
+    # max_cpu_request: "1"
+    # max_memory_request: 4Gi
     # min_cpu_limit: 250m
     # min_memory_limit: 250Mi
   timeouts:
@@ -129,8 +136,10 @@ configuration:
     enable_replica_load_balancer: false
     enable_replica_pooler_load_balancer: false
     external_traffic_policy: "Cluster"
-    master_dns_name_format: "{cluster}.{team}.{hostedzone}"
-    replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
+    master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
+    # master_legacy_dns_name_format: "{cluster}.{team}.{hostedzone}"
+    replica_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
+    # replica_dns_old_name_format: "{cluster}-repl.{team}.{hostedzone}"
   aws_or_gcp:
     # additional_secret_mount: "some-secret-name"
     # additional_secret_mount_path: "/some/dir"
@@ -144,7 +153,14 @@ configuration:
     # wal_gs_bucket: ""
     # wal_s3_bucket: ""
   logical_backup:
-    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.8.2"
+    # logical_backup_azure_storage_account_name: ""
+    # logical_backup_azure_storage_container: ""
+    # logical_backup_azure_storage_account_key: ""
+    # logical_backup_cpu_limit: ""
+    # logical_backup_cpu_request: ""
+    # logical_backup_memory_limit: ""
+    # logical_backup_memory_request: ""
+    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.9.0"
     # logical_backup_google_application_credentials: ""
     logical_backup_job_prefix: "logical-backup-"
     logical_backup_provider: "s3"
@@ -187,9 +203,11 @@ configuration:
     connection_pooler_default_cpu_request: "500m"
     connection_pooler_default_memory_limit: 100Mi
     connection_pooler_default_memory_request: 100Mi
-    connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-22"
+    connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-26"
     # connection_pooler_max_db_connections: 60
     connection_pooler_mode: "transaction"
     connection_pooler_number_of_instances: 2
     # connection_pooler_schema: "pooler"
     # connection_pooler_user: "pooler"
+  # patroni:
+    # failsafe_mode: "false"

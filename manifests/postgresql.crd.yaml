@@ -221,6 +221,10 @@ spec:
                 items:
                   type: string
                   pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
+              masterServiceAnnotations:
+                type: object
+                additionalProperties:
+                  type: string
               nodeAffinity:
                 type: object
                 properties:
@@ -318,6 +322,8 @@ spec:
               patroni:
                 type: object
                 properties:
+                  failsafe_mode:
+                    type: boolean
                   initdb:
                     type: object
                     additionalProperties:
@@ -363,13 +369,12 @@ spec:
                   version:
                     type: string
                     enum:
-                      - "9.5"
-                      - "9.6"
                       - "10"
                       - "11"
                       - "12"
                       - "13"
                       - "14"
+                      - "15"
                   parameters:
                     type: object
                     additionalProperties:
@@ -399,6 +404,10 @@ spec:
               replicaLoadBalancer:
                 type: boolean
                 description: deprecated
+              replicaServiceAnnotations:
+                type: object
+                additionalProperties:
+                  type: string
               resources:
                 type: object
                 properties:
@@ -618,7 +627,7 @@ spec:
                             operator:
                               type: string
                               enum:
-                                - DoesNotExists
+                                - DoesNotExist
                                 - Exists
                                 - In
                                 - NotIn

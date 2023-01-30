@@ -43,7 +43,8 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 
 	var reqs []spec.PgSyncUserRequest
 	for name, newUser := range newUsers {
-		// do not create user that exists in DB with deletion suffix
+		// do not create user when there exists a user with the same name plus deletion suffix
+		// instead request a renaming of the deleted user back to the original name (see * below)
 		if newUser.Deleted {
 			continue
 		}
@@ -82,22 +83,28 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 		}
 	}
 
-	// No existing roles are deleted or stripped of role membership/flags
+	// no existing roles are deleted or stripped of role membership/flags
 	// but team roles will be renamed and denied from LOGIN
 	for name, dbUser := range dbUsers {
 		if _, exists := newUsers[name]; !exists {
-			// toggle LOGIN flag based on role deletion
-			userFlags := make([]string, len(dbUser.Flags))
-			userFlags = append(userFlags, dbUser.Flags...)
 			if dbUser.Deleted {
-				dbUser.Flags = util.StringSliceReplaceElement(dbUser.Flags, constants.RoleFlagNoLogin, constants.RoleFlagLogin)
+				// * user with deletion suffix and NOLOGIN found in database
+				// grant back LOGIN and rename only if original user is wanted and does not exist in database
+				originalName := strings.TrimSuffix(name, strategy.RoleDeletionSuffix)
+				_, originalUserWanted := newUsers[originalName]
+				_, originalUserAlreadyExists := dbUsers[originalName]
+				if !originalUserWanted || originalUserAlreadyExists {
+					continue
+				}
+				// a deleted dbUser has no NOLOGIN flag, so we can add the LOGIN flag
+				dbUser.Flags = append(dbUser.Flags, constants.RoleFlagLogin)
 			} else {
+				// user found in database and not wanted in newUsers - replace LOGIN flag with NOLOGIN
 				dbUser.Flags = util.StringSliceReplaceElement(dbUser.Flags, constants.RoleFlagLogin, constants.RoleFlagNoLogin)
 			}
-			if !util.IsEqualIgnoreOrder(userFlags, dbUser.Flags) {
-				reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGsyncUserAlter, User: dbUser})
-			}
-
+			// request ALTER ROLE to grant or revoke LOGIN
+			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGsyncUserAlter, User: dbUser})
+			// request RENAME which will happen on behalf of the pgUser.Deleted field
 			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserRename, User: dbUser})
 		}
 	}

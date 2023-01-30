@@ -355,6 +355,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"masterServiceAnnotations": {
+						Type: "object",
+						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type: "string",
+							},
+						},
+					},
 					"nodeAffinity": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
@@ -503,6 +511,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"patroni": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"failsafe_mode": {
+								Type: "boolean",
+							},
 							"initdb": {
 								Type: "object",
 								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
@@ -578,12 +589,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 								Enum: []apiextv1.JSON{
 									{
-										Raw: []byte(`"9.5"`),
-									},
-									{
-										Raw: []byte(`"9.6"`),
-									},
-									{
 										Raw: []byte(`"10"`),
 									},
 									{
@@ -597,6 +602,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									{
 										Raw: []byte(`"14"`),
+									},
+									{
+										Raw: []byte(`"15"`),
 									},
 								},
 							},
@@ -653,6 +661,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"replicaLoadBalancer": {
 						Type:        "boolean",
 						Description: "deprecated",
+					},
+					"replicaServiceAnnotations": {
+						Type: "object",
+						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type: "string",
+							},
+						},
 					},
 					"resources": {
 						Type: "object",
@@ -1112,7 +1128,13 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enable_spilo_wal_path_compat": {
 						Type: "boolean",
 					},
+					"enable_team_id_clustername_prefix": {
+						Type: "boolean",
+					},
 					"etcd_host": {
+						Type: "string",
+					},
+					"ignore_instance_limits_annotation_key": {
 						Type: "string",
 					},
 					"kubernetes_use_configmaps": {
@@ -1269,6 +1291,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_pod_disruption_budget": {
 								Type: "boolean",
 							},
+							"enable_readiness_probe": {
+								Type: "boolean",
+							},
 							"enable_sidecars": {
 								Type: "boolean",
 							},
@@ -1363,6 +1388,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pdb_name_format": {
 								Type: "string",
 							},
+							"pod_antiaffinity_preferred_during_scheduling": {
+								Type: "boolean",
+							},
 							"pod_antiaffinity_topology_key": {
 								Type: "string",
 							},
@@ -1404,6 +1432,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"secret_name_template": {
 								Type: "string",
 							},
+							"share_pgsocket_with_sidecars": {
+								Type: "boolean",
+							},
 							"spilo_runasuser": {
 								Type: "integer",
 							},
@@ -1426,6 +1457,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Raw: []byte(`"ebs"`),
 									},
 									{
+										Raw: []byte(`"mixed"`),
+									},
+									{
 										Raw: []byte(`"pvc"`),
 									},
 									{
@@ -1446,6 +1480,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"patroni": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"failsafe_mode": {
+								Type: "boolean",
+							},
+						},
+					},
 					"postgres_pod_resources": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
@@ -1462,6 +1504,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
 							"default_memory_request": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"max_cpu_request": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"max_memory_request": {
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
@@ -1544,7 +1594,13 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"master_dns_name_format": {
 								Type: "string",
 							},
+							"master_legacy_dns_name_format": {
+								Type: "string",
+							},
 							"replica_dns_name_format": {
+								Type: "string",
+							},
+							"replica_legacy_dns_name_format": {
 								Type: "string",
 							},
 						},
@@ -1584,6 +1640,23 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"logical_backup": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"logical_backup_azure_storage_account_name": {
+								Type: "string",
+							},
+							"logical_backup_azure_storage_container": {
+								Type: "string",
+							},
+							"logical_backup_azure_storage_account_key": {
+								Type: "string",
+							},
+							"logical_backup_cpu_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"logical_backup_cpu_request": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
 							"logical_backup_docker_image": {
 								Type: "string",
 							},
@@ -1593,8 +1666,27 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"logical_backup_job_prefix": {
 								Type: "string",
 							},
+							"logical_backup_memory_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"logical_backup_memory_request": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
 							"logical_backup_provider": {
 								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(`"az"`),
+									},
+									{
+										Raw: []byte(`"gcs"`),
+									},
+									{
+										Raw: []byte(`"s3"`),
+									},
+								},
 							},
 							"logical_backup_s3_access_key_id": {
 								Type: "string",

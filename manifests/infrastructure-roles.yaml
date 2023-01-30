@@ -21,5 +21,4 @@ data:
 kind: Secret
 metadata:
   name: postgresql-infrastructure-roles
-  namespace: default
 type: Opaque

@@ -40,6 +40,12 @@ function compress {
     pigz
 }
 
+function az_upload {
+    PATH_TO_BACKUP=$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
+
+    az storage blob upload --file "$1" --account-name "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME" --account-key "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY" -c "$LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER" -n "$PATH_TO_BACKUP"
+}
+
 function aws_delete_objects {
     args=(
       "--bucket=$LOGICAL_BACKUP_S3_BUCKET"
@@ -120,7 +126,7 @@ function upload {
         "gcs")
             gcs_upload
             ;;
-        *)
+        "s3")
             aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
             aws_delete_outdated
             ;;
@@ -174,8 +180,13 @@ for search in "${search_strategy[@]}"; do
 done
 
 set -x
-dump | compress | upload
-[[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
-set +x
+if [ "$LOGICAL_BACKUP_PROVIDER" == "az" ]; then
+    dump | compress > /tmp/azure-backup.sql.gz
+    az_upload /tmp/azure-backup.sql.gz
+else
+    dump | compress | upload
+    [[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
+    set +x
 
-exit $ERRORCOUNT
+    exit $ERRORCOUNT
+fi
