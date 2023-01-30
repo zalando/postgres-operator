@@ -1099,6 +1099,10 @@ func (c *Cluster) Delete() {
 		c.logger.Warningf("could not delete pgbackrest config: %v", err)
 	}
 
+	if err := c.deletePgbackrestRestoreConfig(); err != nil {
+		c.logger.Warningf("could not delete pgbackrest restore config: %v", err)
+	}
+
 	if err := c.deleteStatefulSet(); err != nil {
 		c.logger.Warningf("could not delete statefulset: %v", err)
 	}
