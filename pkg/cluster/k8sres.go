@@ -2579,6 +2579,8 @@ func (c *Cluster) generatePgbackrestRestoreConfigmap() (*v1.ConfigMap, error) {
 	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
 		options := strings.Join(c.Postgresql.Spec.Backup.Pgbackrest.Restore.Options, " ")
 		data["restore_command"] = fmt.Sprintf(" --repo=%s %s", c.Postgresql.Spec.Backup.Pgbackrest.Restore.Repo, options)
+	} else {
+		data["restore_command"] = "n.v."
 	}
 
 	configmap := &v1.ConfigMap{

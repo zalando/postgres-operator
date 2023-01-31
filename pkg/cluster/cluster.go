@@ -328,6 +328,12 @@ func (c *Cluster) Create() error {
 			c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
 			c.Status.PgbackrestRestoreID = c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID
 			c.logger.Info("a pgbackrest restore config has been successfully synced")
+		} else {
+			if err = c.createPgbackrestRestoreConfig(); err != nil {
+				err = fmt.Errorf("could not create a pgbackrest restore config: %v", err)
+				return err
+			}
+			c.logger.Info("a pgbackrest restore config has been successfully created")
 		}
 
 	}
