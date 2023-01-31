@@ -1482,14 +1482,26 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 				Value: fmt.Sprintf("cluster-name=%s,spilo-role=master", c.Name),
 			},
 		)
+		var cpuLimit, memLimit, cpuReq, memReq string
+		if c.Postgresql.Spec.Backup.Pgbackrest.Resources != nil {
+			cpuLimit = c.Postgresql.Spec.Backup.Pgbackrest.Resources.ResourceLimits.CPU
+			memLimit = c.Postgresql.Spec.Backup.Pgbackrest.Resources.ResourceLimits.Memory
+			cpuReq = c.Postgresql.Spec.Backup.Pgbackrest.Resources.ResourceRequests.CPU
+			memReq = c.Postgresql.Spec.Backup.Pgbackrest.Resources.ResourceRequests.Memory
+		} else {
+			cpuLimit = "500m"
+			memLimit = "1Gi"
+			cpuReq = "500m"
+			memReq = "1Gi"
+		}
 		resources := v1.ResourceRequirements{
 			Limits: v1.ResourceList{
-				"cpu":    resource.MustParse("500m"),
-				"memory": resource.MustParse("1Gi"),
+				"cpu":    resource.MustParse(cpuLimit),
+				"memory": resource.MustParse(memLimit),
 			},
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("500m"),
-				"memory": resource.MustParse("1Gi"),
+				"cpu":    resource.MustParse(cpuReq),
+				"memory": resource.MustParse(memReq),
 			},
 		}
 		initContainers = append(initContainers, v1.Container{

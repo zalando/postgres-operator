@@ -273,6 +273,7 @@ type Pgbackrest struct {
 	Repos         []Repo            `json:"repos"`
 	Restore       Restore           `json:"restore"`
 	Configuration Configuration     `json:"configuration"`
+	Resources     *Resources        `json:"resources,omitempty"`
 }
 
 type Repo struct {
