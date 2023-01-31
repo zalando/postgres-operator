@@ -1482,11 +1482,22 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 				Value: fmt.Sprintf("cluster-name=%s,spilo-role=master", c.Name),
 			},
 		)
+		resources := v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				"cpu":    resource.MustParse("500m"),
+				"memory": resource.MustParse("1Gi"),
+			},
+			Requests: v1.ResourceList{
+				"cpu":    resource.MustParse("500m"),
+				"memory": resource.MustParse("1Gi"),
+			},
+		}
 		initContainers = append(initContainers, v1.Container{
 			Name:         "pgbackrest-restore",
 			Image:        c.Postgresql.Spec.Backup.Pgbackrest.Image,
 			Env:          pgbackrestRestoreEnvVars,
 			VolumeMounts: volumeMounts,
+			Resources:    resources,
 		})
 	}
 
