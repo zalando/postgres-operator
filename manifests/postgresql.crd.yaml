@@ -718,6 +718,27 @@ spec:
                             type: array
                             items:
                               type: string
+                      resources:
+                        type: object
+                        properties:
+                          limits:
+                            type: object
+                            properties:
+                              cpu:
+                                type: string
+                                pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                              memory:
+                                type: string
+                                pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                          requests:
+                            type: object
+                            properties:
+                              cpu:
+                                type: string
+                                pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                              memory:
+                                type: string
+                                pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                     required:
                       - image
                       - repos
