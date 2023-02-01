@@ -993,7 +993,81 @@ with `USE_WALG_BACKUP: "true"`.
 
 ### Google Cloud Platform setup
 
-To configure the operator on GCP these prerequisites that are needed:
+When using GCP, there are two authentication methods to allow the postgres
+cluster to access buckets to write WAL-E logs: Workload Identity (recommended)
+or using a GCP Service Account Key (legacy).
+
+#### Workload Identity setup
+
+To configure the operator on GCP using Workload Identity these prerequisites are
+needed.
+
+* [Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) enabled on the GKE cluster where the operator will be deployed
+* A GCP service account with the proper IAM setup to access the GCS bucket for the WAL-E logs
+* An IAM policy granting the Kubernetes service account the
+  `roles/iam.workloadIdentityUser` role on the GCP service account, e.g.:
+```bash
+gcloud iam service-accounts add-iam-policy-binding <GCP_SERVICE_ACCOUNT_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:PROJECT_ID.svc.id.goog[<POSTGRES_OPERATOR_NS>/postgres-pod-custom]"
+```
+
+The configuration parameters that we will be using are:
+
+* `wal_gs_bucket`
+
+1. Create a custom Kubernetes service account to be used by Patroni running on
+the postgres cluster pods, this service account should include an annotation
+with the email address of the Google IAM service account used to communicate
+with the GCS bucket, e.g.
+
+```yml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-pod-custom
+  namespace: <POSTGRES_OPERATOR_NS>
+  annotations:
+    iam.gke.io/gcp-service-account: <GCP_SERVICE_ACCOUNT_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com
+```
+
+2. Specify the new custom service account in your [operator paramaters](./reference/operator_parameters.md)
+
+If using manual deployment or kustomize, this is done by setting
+`pod_service_account_name` in your configuration file specified in the
+[postgres-operator deployment](../manifests/postgres-operator.yaml#L37)
+
+If deploying the operator [using Helm](./quickstart.md#helm-chart), this can
+be specified in the chart's values file, e.g.:
+
+```yml
+...
+podServiceAccount:
+  name: postgres-pod-custom
+```
+
+3. Setup your operator configuration values. Ensure that the operator's configuration
+is set up like the following:
+```yml
+...
+aws_or_gcp:
+  # additional_secret_mount: ""
+  # additional_secret_mount_path: ""
+  # aws_region: eu-central-1
+  # kube_iam_role: ""
+  # log_s3_bucket: ""
+  # wal_s3_bucket: ""
+  wal_gs_bucket: "postgres-backups-bucket-28302F2"  # name of bucket on where to save the WAL-E logs
+  # gcp_credentials: ""
+...
+```
+
+Continue to shared steps below.
+
+#### GCP Service Account Key setup
+
+To configure the operator on GCP using a GCP service account key these
+prerequisites are needed.
 
 * A service account with the proper IAM setup to access the GCS bucket for the WAL-E logs
 * The credentials file for the service account.
@@ -1037,7 +1111,10 @@ aws_or_gcp:
 ...
 ```
 
-3. Setup pod environment configmap that instructs the operator to use WAL-G,
+Once you have set up authentication using one of the two methods above, continue
+with the remaining shared steps:
+
+1. Setup pod environment configmap that instructs the operator to use WAL-G,
 instead of WAL-E, for backup and restore.
 ```yml
 apiVersion: v1
@@ -1052,7 +1129,7 @@ data:
   CLONE_USE_WALG_RESTORE: "true"
 ```
 
-4. Then provide this configmap in postgres-operator settings:
+2. Then provide this configmap in postgres-operator settings:
 ```yml
 ...
 # namespaced name of the ConfigMap with environment variables to populate on every pod
