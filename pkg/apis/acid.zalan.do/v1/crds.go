@@ -1064,10 +1064,10 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						},
 					},
 					"backup": {
-						Type:     "object",
+						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
 							"pgbackrest": {
-								Type: "object",
+								Type:     "object",
 								Required: []string{"image", "repos"},
 								Properties: map[string]apiextv1.JSONSchemaProps{
 									"image": {
@@ -1077,13 +1077,13 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "object",
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"secret": {
-												Type:     "string",
+												Type: "string",
 											},
 											"protection": {
-												Type:     "object",
+												Type: "object",
 												Properties: map[string]apiextv1.JSONSchemaProps{
 													"restore": {
-														Type:     "boolean",
+														Type: "boolean",
 													},
 												},
 											},
@@ -1098,10 +1098,10 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										},
 									},
 									"repos": {
-										Type:     "array",
-										Nullable: true,
-										MinItems: &min1int64,
-										XListType: &mapString,
+										Type:         "array",
+										Nullable:     true,
+										MinItems:     &min1int64,
+										XListType:    &mapString,
 										XListMapKeys: []string{"name"},
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
@@ -1109,7 +1109,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 												Required: []string{"name", "storage", "resource"},
 												Properties: map[string]apiextv1.JSONSchemaProps{
 													"name": {
-														Type: "string",
+														Type:    "string",
 														Pattern: "^repo[1-4]",
 													},
 													"storage": {
@@ -1136,16 +1136,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Type: "string",
 													},
 													"schedule": {
-														Type:     "object",
+														Type: "object",
 														Properties: map[string]apiextv1.JSONSchemaProps{
 															"full": {
-																Type:     "string",
+																Type: "string",
 															},
 															"incr": {
-																Type:     "string",
+																Type: "string",
 															},
 															"diff": {
-																Type:     "string",
+																Type: "string",
 															},
 														},
 													},
@@ -1168,6 +1168,37 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 												Items: &apiextv1.JSONSchemaPropsOrArray{
 													Schema: &apiextv1.JSONSchemaProps{
 														Type: "string",
+													},
+												},
+											},
+										},
+									},
+									"resources": {
+										Type: "object",
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"limits": {
+												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"cpu": {
+														Type:    "string",
+														Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+													},
+													"memory": {
+														Type:    "string",
+														Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+													},
+												},
+											},
+											"requests": {
+												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"cpu": {
+														Type:    "string",
+														Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+													},
+													"memory": {
+														Type:    "string",
+														Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 													},
 												},
 											},
