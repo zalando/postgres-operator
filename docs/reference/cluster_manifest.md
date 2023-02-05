@@ -118,7 +118,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   a map of usernames to user flags for the users that should be created in the
   cluster by the operator. User flags are a list, allowed elements are
   `SUPERUSER`, `REPLICATION`, `INHERIT`, `LOGIN`, `NOLOGIN`, `CREATEROLE`,
-  `CREATEDB`, `BYPASSURL`. A login user is created by default unless NOLOGIN is
+  `CREATEDB`, `BYPASSRLS`. A login user is created by default unless NOLOGIN is
   specified, in which case the operator creates a role. One can specify empty
   flags by providing a JSON empty array '*[]*'. If the config option
   `enable_cross_namespace_secret` is enabled you can specify the namespace in
