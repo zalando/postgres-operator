@@ -1429,7 +1429,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	podAnnotations := c.generatePodAnnotations(spec)
 
-	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+	if spec.Backup != nil && spec.Backup.Pgbackrest != nil {
 
 		pgbackrestRestoreEnvVars := appendEnvVars(
 			spiloEnvVars,
@@ -1481,13 +1481,17 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 				Name:  "SELECTOR",
 				Value: fmt.Sprintf("cluster-name=%s,spilo-role=master", c.Name),
 			},
+			v1.EnvVar{
+				Name:  "MODE",
+				Value: "pgbackrest",
+			},
 		)
 		var cpuLimit, memLimit, cpuReq, memReq string
-		if c.Postgresql.Spec.Backup.Pgbackrest.Resources != nil {
-			cpuLimit = c.Postgresql.Spec.Backup.Pgbackrest.Resources.ResourceLimits.CPU
-			memLimit = c.Postgresql.Spec.Backup.Pgbackrest.Resources.ResourceLimits.Memory
-			cpuReq = c.Postgresql.Spec.Backup.Pgbackrest.Resources.ResourceRequests.CPU
-			memReq = c.Postgresql.Spec.Backup.Pgbackrest.Resources.ResourceRequests.Memory
+		if spec.Backup.Pgbackrest.Resources != nil {
+			cpuLimit = spec.Backup.Pgbackrest.Resources.ResourceLimits.CPU
+			memLimit = spec.Backup.Pgbackrest.Resources.ResourceLimits.Memory
+			cpuReq = spec.Backup.Pgbackrest.Resources.ResourceRequests.CPU
+			memReq = spec.Backup.Pgbackrest.Resources.ResourceRequests.Memory
 		} else {
 			cpuLimit = "500m"
 			memLimit = "1Gi"
@@ -1506,7 +1510,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 		initContainers = append(initContainers, v1.Container{
 			Name:         "pgbackrest-restore",
-			Image:        c.Postgresql.Spec.Backup.Pgbackrest.Image,
+			Image:        spec.Backup.Pgbackrest.Image,
 			Env:          pgbackrestRestoreEnvVars,
 			VolumeMounts: volumeMounts,
 			Resources:    resources,
