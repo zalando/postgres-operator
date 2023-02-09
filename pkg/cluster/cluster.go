@@ -473,6 +473,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		reasons = append(reasons, "new statefulset's pod tolerations does not match the current one")
 	}
 
+	if len(c.Statefulset.Spec.Template.Spec.TopologySpreadConstraints) != len(statefulSet.Spec.Template.Spec.TopologySpreadConstraints) {
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod topologySpreadConstraints does not match the current one")
+	}
+
 	// Some generated fields like creationTimestamp make it not possible to use DeepCompare on Spec.Template.ObjectMeta
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Labels, statefulSet.Spec.Template.Labels) {
 		needsReplace = true

@@ -400,6 +400,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 
 	poolerContainer.Env = envVars
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+	topologySpreadConstraintsSpec := topologySpreadConstraints(&spec.TopologySpreadConstraints)
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
@@ -411,6 +412,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers:                    []v1.Container{poolerContainer},
 			Tolerations:                   tolerationsSpec,
+			TopologySpreadConstraints:     topologySpreadConstraintsSpec,
 			Volumes:                       poolerVolumes,
 		},
 	}
