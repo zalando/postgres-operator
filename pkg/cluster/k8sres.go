@@ -596,6 +596,15 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 	return []v1.Toleration{}
 }
 
+func topologySpreadConstraints(topologySpreadConstraintsSpec *[]v1.TopologySpreadConstraint) []v1.TopologySpreadConstraint {
+	// allow to override tolerations by postgresql manifest
+	if len(*topologySpreadConstraintsSpec) > 0 {
+		return *topologySpreadConstraintsSpec
+	}
+
+	return []v1.TopologySpreadConstraint{}
+}
+
 // isBootstrapOnlyParameter checks against special Patroni bootstrap parameters.
 // Those parameters must go to the bootstrap/dcs/postgresql/parameters section.
 // See http://patroni.readthedocs.io/en/latest/dynamic_configuration.html.
@@ -772,6 +781,7 @@ func (c *Cluster) generatePodTemplate(
 	sidecarContainers []v1.Container,
 	sharePgSocketWithSidecars *bool,
 	tolerationsSpec *[]v1.Toleration,
+	topologySpreadConstraintsSpec *[]v1.TopologySpreadConstraint,
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
 	spiloFSGroup *int64,
@@ -813,6 +823,7 @@ func (c *Cluster) generatePodTemplate(
 		Containers:                    containers,
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
+		TopologySpreadConstraints:     *topologySpreadConstraintsSpec,
 		SecurityContext:               &securityContext,
 	}
 
@@ -1414,6 +1425,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+	topologySpreadConstraintsSpec := topologySpreadConstraints(&spec.TopologySpreadConstraints)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
 	podAnnotations := c.generatePodAnnotations(spec)
@@ -1428,6 +1440,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		sidecarContainers,
 		c.OpConfig.SharePgSocketWithSidecars,
 		&tolerationSpec,
+		&topologySpreadConstraintsSpec,
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
 		effectiveFSGroup,
@@ -2182,6 +2195,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.Container{},
 		util.False(),
 		&[]v1.Toleration{},
+		&[]v1.TopologySpreadConstraint{},
 		nil,
 		nil,
 		nil,
