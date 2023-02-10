@@ -352,7 +352,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			crtFile = "tls.crt"
 		}
 		if keyFile == "" {
-			crtFile = "tls.key"
+			keyFile = "tls.key"
 		}
 
 		envVars = append(
