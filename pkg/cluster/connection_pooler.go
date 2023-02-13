@@ -402,6 +402,12 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 	}
 
+	if spec.TLS != nil && spec.TLS.SecretName != "" && spec.SpiloFSGroup != nil {
+		podTemplate.Spec.SecurityContext = &v1.PodSecurityContext{
+			FSGroup: spec.SpiloFSGroup,
+		}
+	}
+
 	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity)
 	if c.OpConfig.EnablePodAntiAffinity {
 		labelsSet := labels.Set(c.connectionPoolerLabels(role, false).MatchLabels)
