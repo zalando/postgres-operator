@@ -46,7 +46,7 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           env:
             - name: "APP_URL"
-              value: "http://localhost:8081"
+              value: {{ .Values.envs.appUrl }}
             - name: "OPERATOR_API_URL"
               value: {{ .Values.envs.operatorApiUrl | quote }}
             - name: "OPERATOR_CLUSTER_NAME_LABEL"
