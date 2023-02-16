@@ -359,7 +359,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			keyFile = "tls.key"
 		}
 		if caFile == "" {
-			keyFile = "ca.crt"
+			caFile = "ca.crt"
 		}
 		if spec.TLS.CASecretName != "" {
 			mountPathCA = mountPath + "ca"
