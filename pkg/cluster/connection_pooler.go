@@ -349,6 +349,9 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		crtFile := spec.TLS.CertificateFile
 		keyFile := spec.TLS.PrivateKeyFile
 		caFile := spec.TLS.CAFile
+		mountPath := "/tls"
+		mountPathCA := mountPath
+
 		if crtFile == "" {
 			crtFile = "tls.crt"
 		}
@@ -358,17 +361,20 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		if caFile == "" {
 			keyFile = "ca.crt"
 		}
+		if spec.TLS.CASecretName != "" {
+			mountPathCA = mountPath + "ca"
+		}
 
 		envVars = append(
 			envVars,
 			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: filepath.Join("/tls", crtFile),
+				Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: filepath.Join(mountPath, crtFile),
 			},
 			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: filepath.Join("/tls", keyFile),
+				Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: filepath.Join(mountPath, keyFile),
 			},
 			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_CA_FILE", Value: filepath.Join("/tls", caFile),
+				Name: "CONNECTION_POOLER_CLIENT_CA_FILE", Value: filepath.Join(mountPathCA, caFile),
 			},
 		)
 
