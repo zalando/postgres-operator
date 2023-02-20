@@ -71,8 +71,8 @@ edit
 
     this.updateEditable = e => {
       if (this.refs.changedProperties.value) {
-        this.editablePropertiesPreview = yamlParser.safeDump(
-          yamlParser.safeLoad(
+        this.editablePropertiesPreview = yamlParser.dump(
+          yamlParser.load(
             this.refs.changedProperties.value,
           ),
         )
@@ -85,7 +85,7 @@ edit
       this.saveMessage = ''
 
       jsonPayload = JSON.stringify(
-        yamlParser.safeLoad(
+        yamlParser.load(
           this.refs.changedProperties.value,
         ),
       )
@@ -129,7 +129,7 @@ edit
         if (i.metadata.managedFields) { delete i.metadata.managedFields }
 
         this.update()
-        this.refs.yamlNice.innerHTML = yamlParser.safeDump(i.postgresql, {sortKeys: true})
+        this.refs.yamlNice.innerHTML = yamlParser.dump(i.postgresql, {sortKeys: true})
 
         // Output data:
         const o = this.editableProperties = { spec: {} }
@@ -192,7 +192,7 @@ edit
 
         this.editablePropertiesText = (
           yamlParser
-          .safeDump(this.editableProperties)
+          .dump(this.editableProperties)
           .slice(0, -1)
         )
         this.editablePropertiesPreview = this.editablePropertiesText

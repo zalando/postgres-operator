@@ -60,7 +60,7 @@ Use `--namespace` or `-n` flag if your cluster is in a different namespace to wh
 
 ```kubectl pg add-user USER01 -p CREATEDB,LOGIN -c acid-minimal-cluster```
 
-Privileges can only be [SUPERUSER, REPLICATION, INHERIT, LOGIN, NOLOGIN, CREATEROLE, CREATEDB, BYPASSURL]
+Privileges can only be [SUPERUSER, REPLICATION, INHERIT, LOGIN, NOLOGIN, CREATEROLE, CREATEDB, BYPASSRLS]
 Note: By default, a LOGIN user is created (unless NOLOGIN is specified).
 
 ## Adding databases to an existing cluster

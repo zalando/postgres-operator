@@ -793,7 +793,7 @@ new
     }
 
     this.requestCreate = e => {
-      jsonPayload = JSON.stringify(yamlParser.safeLoad(this.getYAML()))
+      jsonPayload = JSON.stringify(yamlParser.load(this.getYAML()))
 
       this.creating = true
       this.update()

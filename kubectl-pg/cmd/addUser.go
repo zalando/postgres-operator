@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var allowedPrivileges = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSURL"}
+var allowedPrivileges = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSRLS"}
 
 // addUserCmd represents the addUser command
 var addUserCmd = &cobra.Command{

@@ -94,7 +94,7 @@ postgresql
         .alert.alert-success(if='{ progress.masterLabel }') PostgreSQL master available, label is attached
         .alert.alert-success(if='{ progress.masterLabel && progress.dnsName }') PostgreSQL ready: <strong>{ progress.dnsName }</strong>
 
-        .alert.alert-success(if='{ progress.pooler }') Connection pooler deployment created
+        .alert.alert-success(if='{ progress.pooler && this.progress.postgresqlManifest.spec.enableConnectionPooler }') Pooler ready: <strong>{ progress.poolerDnsName }</strong>
 
       .col-lg-3
         help-general(config='{ opts.config }')
@@ -110,6 +110,7 @@ postgresql
 
     this.progress = {}
     this.progress.requestStatus = 'OK'
+    this.progress.pooler = false
 
     this.pollProgressTimer = false
 
@@ -126,7 +127,6 @@ postgresql
       jQuery.get(
         './postgresqls/' + this.cluster_path,
       ).done(data => {
-        this.progress.pooler = false
         this.progress.postgresql = true
         this.progress.postgresqlManifest = data
         // copy status as we delete later for edit
@@ -169,8 +169,22 @@ postgresql
               }
 
               if (this.progress.poolerEnabled == true) {
-                jQuery.get('./pooler/' + this.cluster_path).done(data => {
+                jQuery.get(
+                  './pooler/' + this.cluster_path,
+                ).done(data => {
                   this.progress.pooler = {"url": ""}
+                  jQuery.get(
+                    './services/' + this.cluster_path + "-pooler",
+                  ).done(data => {
+                    if (data.metadata && data.metadata.annotations && 'zalando.org/dnsname' in data.metadata.annotations) {
+                      this.progress.poolerDnsName = data.metadata.annotations['zalando.org/dnsname']
+                    } else if (data.metadata && data.metadata.annotations && 'external-dns.alpha.kubernetes.io/hostname' in data.metadata.annotations) {
+                      this.progress.poolerDnsName = data.metadata.annotations['external-dns.alpha.kubernetes.io/hostname']
+                    } else {
+                      this.progress.poolerDnsName = data.metadata.name +  '.' + data.metadata.namespace
+                    }
+                    this.update()
+                  })
                   this.update()
                 })
               }
@@ -220,7 +234,7 @@ postgresql
         delete manifest.status
 
         if (this.refs.yamlNice) {
-          this.refs.yamlNice.innerHTML = yamlParser.safeDump(
+          this.refs.yamlNice.innerHTML = yamlParser.dump(
             this.progress.postgresqlManifest,
             {
               sortKeys: true,
