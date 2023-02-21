@@ -2346,8 +2346,6 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
 	}
 
-	c.logger.Debugf("Generated logical backup env vars")
-	c.logger.Debugf("%v", envVars)
 	return envVars
 }
 
