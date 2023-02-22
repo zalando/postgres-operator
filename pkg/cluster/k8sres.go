@@ -42,7 +42,9 @@ const (
 	logicalBackupContainerName     = "logical-backup"
 	connectionPoolerContainer      = "connection-pooler"
 	pgPort                         = 5432
+	pgPortName                     = "postgresql"
 	operatorPort                   = 8080
+	operatorPortName               = "operator"
 )
 
 type pgUser struct {
@@ -658,14 +660,17 @@ func generateContainer(
 			{
 				ContainerPort: patroni.ApiPort,
 				Protocol:      v1.ProtocolTCP,
+				Name:          patroni.ApiPortName,
 			},
 			{
 				ContainerPort: pgPort,
 				Protocol:      v1.ProtocolTCP,
+				Name:          pgPortName,
 			},
 			{
 				ContainerPort: operatorPort,
 				Protocol:      v1.ProtocolTCP,
+				Name:          operatorPortName,
 			},
 		},
 		VolumeMounts: volumeMounts,
