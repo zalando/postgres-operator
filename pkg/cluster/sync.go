@@ -413,6 +413,7 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	// sync Patroni config
+	c.logger.Debug("syncing Patroni config")
 	if configPatched, restartPrimaryFirst, restartWait, err = c.syncPatroniConfig(pods, c.Spec.Patroni, requiredPgParameters); err != nil {
 		c.logger.Warningf("Patroni config updated? %v - errors during config sync: %v", configPatched, err)
 		isSafeToRecreatePods = false
@@ -641,18 +642,18 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 	// check if specified slots exist in config and if they differ
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
-		if effectiveSlot, exists := effectivePatroniConfig.Slots[slotName]; exists {
-			if reflect.DeepEqual(desiredSlot, effectiveSlot) {
-				continue
-			}
-		}
-		slotsToSet[slotName] = desiredSlot
 		// only add slots specified in manifest to c.replicationSlots
 		for manifestSlotName, _ := range c.Spec.Patroni.Slots {
 			if manifestSlotName == slotName {
 				c.replicationSlots[slotName] = desiredSlot
 			}
 		}
+		if effectiveSlot, exists := effectivePatroniConfig.Slots[slotName]; exists {
+			if reflect.DeepEqual(desiredSlot, effectiveSlot) {
+				continue
+			}
+		}
+		slotsToSet[slotName] = desiredSlot
 	}
 	if len(slotsToSet) > 0 {
 		configToSet["slots"] = slotsToSet
