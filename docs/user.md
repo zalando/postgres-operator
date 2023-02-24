@@ -987,6 +987,12 @@ spec:
       env:
         - name: "ENV_VAR_NAME"
           value: "any-k8s-env-things"
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        runAsNonRoot: true
 ```
 
 In addition to any environment variables you specify, the following environment

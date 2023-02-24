@@ -1999,6 +1999,8 @@ func TestSidecars(t *testing.T) {
 	var err error
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
+	allowPrivilegeEscalation := false
+	runAsNonRoot := true
 
 	generateKubernetesResources := func(cpuRequest string, cpuLimit string, memoryRequest string, memoryLimit string) v1.ResourceRequirements {
 		parsedCPURequest, err := resource.ParseQuantity(cpuRequest)
@@ -2050,6 +2052,13 @@ func TestSidecars(t *testing.T) {
 			acidv1.Sidecar{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
+			},
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar-with-security-context",
+				SecurityContext: &v1.SecurityContext{
+					AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+					RunAsNonRoot:   &runAsNonRoot,
+				},
 			},
 		},
 	}
@@ -2141,7 +2150,7 @@ func TestSidecars(t *testing.T) {
 	}
 
 	// deduplicated sidecars and Patroni
-	assert.Equal(t, 7, len(s.Spec.Template.Spec.Containers), "wrong number of containers")
+	assert.Equal(t, 8, len(s.Spec.Template.Spec.Containers), "wrong number of containers")
 
 	// cluster specific sidecar
 	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
@@ -2152,12 +2161,27 @@ func TestSidecars(t *testing.T) {
 		VolumeMounts:    mounts,
 	})
 
+	// cluster specific sidecar with security context
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "cluster-specific-sidecar-with-security-context",
+		Env:             env,
+		Resources:       generateKubernetesResources("200m", "500m", "0.7Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		VolumeMounts:    mounts,
+		SecurityContext: &v1.SecurityContext{
+					AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+					RunAsNonRoot:   &runAsNonRoot,
+				},
+	})
+
 	// container specific resources
 	expectedResources := generateKubernetesResources("210m", "510m", "0.8Gi", "1.4Gi")
 	assert.Equal(t, expectedResources.Requests[v1.ResourceCPU], s.Spec.Template.Spec.Containers[2].Resources.Requests[v1.ResourceCPU])
 	assert.Equal(t, expectedResources.Limits[v1.ResourceCPU], s.Spec.Template.Spec.Containers[2].Resources.Limits[v1.ResourceCPU])
 	assert.Equal(t, expectedResources.Requests[v1.ResourceMemory], s.Spec.Template.Spec.Containers[2].Resources.Requests[v1.ResourceMemory])
 	assert.Equal(t, expectedResources.Limits[v1.ResourceMemory], s.Spec.Template.Spec.Containers[2].Resources.Limits[v1.ResourceMemory])
+
+	assert.Equal(t, &runAsNonRoot, s.Spec.Template.Spec.Containers[4].SecurityContext.RunAsNonRoot)
 
 	// deprecated global sidecar
 	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
@@ -3141,44 +3165,132 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 func TestGenerateCapabilities(t *testing.T) {
 	tests := []struct {
 		subTest      string
-		configured   []string
+		addConfigured   []string
+		dropConfigured   []string
 		capabilities *v1.Capabilities
 		err          error
 	}{
 		{
 			subTest:      "no capabilities",
-			configured:   nil,
+			addConfigured:   nil,
+			dropConfigured:   nil,
 			capabilities: nil,
 			err:          fmt.Errorf("could not parse capabilities configuration of nil"),
 		},
 		{
 			subTest:      "empty capabilities",
-			configured:   []string{},
+			addConfigured:   []string{},
+			dropConfigured:   []string{},
 			capabilities: nil,
 			err:          fmt.Errorf("could not parse empty capabilities configuration"),
 		},
 		{
 			subTest:    "configured capability",
-			configured: []string{"SYS_NICE"},
+			addConfigured: []string{"SYS_NICE"},
+			dropConfigured: []string{"ALL"},
 			capabilities: &v1.Capabilities{
 				Add: []v1.Capability{"SYS_NICE"},
+				Drop: []v1.Capability{"ALL"},
 			},
 			err: fmt.Errorf("could not generate one configured capability"),
 		},
 		{
 			subTest:    "configured capabilities",
-			configured: []string{"SYS_NICE", "CHOWN"},
+			addConfigured: []string{"SYS_NICE", "CHOWN"},
+			dropConfigured: []string{"ALL"},
 			capabilities: &v1.Capabilities{
 				Add: []v1.Capability{"SYS_NICE", "CHOWN"},
+				Drop: []v1.Capability{"ALL"},
 			},
 			err: fmt.Errorf("could not generate multiple configured capabilities"),
 		},
 	}
 	for _, tt := range tests {
-		caps := generateCapabilities(tt.configured)
+		caps := generatePodCapabilities(tt.addConfigured, tt.dropConfigured)
 		if !reflect.DeepEqual(caps, tt.capabilities) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
 				t.Name(), tt.subTest, tt.capabilities, caps)
 		}
 	}
+}
+
+func TestGenerateSeccompProfile(t *testing.T) {
+	client, _ := newFakeK8sTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	spiloSeccompProfile := config.SeccompProfile{
+		Type: "Localhost",
+		LocalhostProfile: "profiles/audit.json",
+	}
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Resources: config.Resources{
+					SpiloSeccompProfile: &spiloSeccompProfile,
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	// create a statefulset
+	sts, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	assert.Equal(t, spiloSeccompProfile.Type, string(sts.Spec.Template.Spec.SecurityContext.SeccompProfile.Type), "has a SeccompProfileType assigned")
+	assert.Equal(t, spiloSeccompProfile.LocalhostProfile, *sts.Spec.Template.Spec.SecurityContext.SeccompProfile.LocalhostProfile, "has a LocalhostProfile assigned")
+}
+
+func TestGenerateEmtySeccompProfile(t *testing.T) {
+	client, _ := newFakeK8sTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	// create a statefulset
+	sts, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	assert.Nil(t, sts.Spec.Template.Spec.SecurityContext.SeccompProfile, "does not have a SeccompProfile assigned")
 }

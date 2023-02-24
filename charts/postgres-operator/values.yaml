@@ -98,6 +98,10 @@ configKubernetes:
   # additional_pod_capabilities:
   # - "SYS_NICE"
 
+  # list of dropped capabilities for postgres container
+  # dropped_pod_capabilities:
+  # - "ALL"
+
   # default DNS domain of K8s cluster where operator is running
   cluster_domain: cluster.local
   # additional labels assigned to the cluster objects
@@ -199,6 +203,10 @@ configKubernetes:
 
   # group ID with write-access to volumes (required to run Spilo as non-root process)
   # spilo_fsgroup: 103
+
+  # spilo_seccompprofile:
+  #   type: Localhost
+  #   localhostProfile: profiles/audit.json
 
   # whether the Spilo container should run in privileged mode
   spilo_privileged: false

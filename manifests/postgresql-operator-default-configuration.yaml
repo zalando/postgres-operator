@@ -44,6 +44,8 @@ configuration:
   kubernetes:
     # additional_pod_capabilities:
     # - "SYS_NICE"
+    # dropped_pod_capabilities:
+    # - "ALL"
     cluster_domain: cluster.local
     cluster_labels:
       application: spilo
@@ -101,6 +103,9 @@ configuration:
     # spilo_runasuser: 101
     # spilo_runasgroup: 103
     # spilo_fsgroup: 103
+    # spilo_seccompprofile:
+    #   type: Localhost
+    #   localhostProfile: profiles/audit.json
     spilo_privileged: false
     storage_resize_mode: pvc
     # toleration:

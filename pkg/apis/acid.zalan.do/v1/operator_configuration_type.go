@@ -65,7 +65,9 @@ type KubernetesMetaConfiguration struct {
 	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
 	SpiloRunAsGroup                        *int64                       `json:"spilo_runasgroup,omitempty"`
 	SpiloFSGroup                           *int64                       `json:"spilo_fsgroup,omitempty"`
+	SpiloSeccompProfile                    *SeccompProfile              `json:"spilo_seccompprofile,omitempty"`
 	AdditionalPodCapabilities              []string                     `json:"additional_pod_capabilities,omitempty"`
+	DroppedPodCapabilities                 []string                     `json:"dropped_pod_capabilities,omitempty"`
 	WatchedNamespace                       string                       `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate        `json:"pdb_name_format,omitempty"`
 	EnablePodDisruptionBudget              *bool                        `json:"enable_pod_disruption_budget,omitempty"`
@@ -102,6 +104,12 @@ type KubernetesMetaConfiguration struct {
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
+}
+
+// Seccompprofile defines the seccompProfile spec of SecurityContext resources
+type SeccompProfile struct {
+	LocalhostProfile    string `json:"localhost_profile,omitempty"`
+	Type                v1.SeccompProfileType `json:"type,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
