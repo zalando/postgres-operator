@@ -370,14 +370,20 @@ func (c *Cluster) Create() error {
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
 
+	// remember slots to detect deletion from manifest
+	for slotName, desiredSlot := range c.Spec.Patroni.Slots {
+		c.replicationSlots[slotName] = desiredSlot
+	}
+
 	if len(c.Spec.Streams) > 0 {
+		// creating streams requires syncing the statefulset first
+		err = c.syncStatefulSet()
+		if err != nil {
+			return fmt.Errorf("could not sync statefulset: %v", err)
+		}
 		if err = c.syncStreams(); err != nil {
 			c.logger.Errorf("could not create streams: %v", err)
 		}
-	}
-
-	for slotName, desiredSlot := range c.Spec.Patroni.Slots {
-		c.replicationSlots[slotName] = desiredSlot
 	}
 
 	return nil
