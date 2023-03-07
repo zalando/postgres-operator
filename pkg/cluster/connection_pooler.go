@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -261,6 +260,10 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		makeDefaultConnectionPoolerResources(&c.OpConfig),
 		connectionPoolerContainer)
 
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+	}
+
 	effectiveDockerImage := util.Coalesce(
 		connectionPoolerSpec.DockerImage,
 		c.OpConfig.ConnectionPooler.Image)
@@ -268,10 +271,6 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	effectiveSchema := util.Coalesce(
 		connectionPoolerSpec.Schema,
 		c.OpConfig.ConnectionPooler.Schema)
-
-	if err != nil {
-		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
-	}
 
 	secretSelector := func(key string) *v1.SecretKeySelector {
 		effectiveUser := util.Coalesce(
@@ -344,62 +343,68 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	//  2. Reference the secret in a volume
 	//  3. Mount the volume to the container at /tls
 	var poolerVolumes []v1.Volume
+	var volumeMounts []v1.VolumeMount
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
-		// Env vars
-		crtFile := spec.TLS.CertificateFile
-		keyFile := spec.TLS.PrivateKeyFile
-		caFile := spec.TLS.CAFile
-		mountPath := "/tls"
-		mountPathCA := mountPath
+		if spec.TLS != nil && spec.TLS.SecretName != "" {
+			getPoolerTLSEnv := func(k string) string {
+				keyName := ""
+				switch k {
+				case "tls.crt":
+					keyName = "CONNECTION_POOLER_CLIENT_TLS_CRT"
+				case "tls.key":
+					keyName = "CONNECTION_POOLER_CLIENT_TLS_KEY"
+				case "tls.ca":
+					keyName = "CONNECTION_POOLER_CLIENT_CA_FILE"
+				default:
+					panic(fmt.Sprintf("TLS env key for pooler unknown %s", k))
+				}
 
-		if crtFile == "" {
-			crtFile = "tls.crt"
+				return keyName
+			}
+			tlsEnv, tlsVolumes := generateTLSmounts(spec, getPoolerTLSEnv)
+			envVars = append(envVars, tlsEnv...)
+			for _, vol := range tlsVolumes {
+				poolerVolumes = append(poolerVolumes, v1.Volume{
+					Name:         vol.Name,
+					VolumeSource: vol.VolumeSource,
+				})
+				volumeMounts = append(volumeMounts, v1.VolumeMount{
+					Name:      vol.Name,
+					MountPath: vol.MountPath,
+				})
+			}
 		}
-		if keyFile == "" {
-			keyFile = "tls.key"
-		}
-		if caFile == "" {
-			caFile = "ca.crt"
-		}
-		if spec.TLS.CASecretName != "" {
-			mountPathCA = mountPath + "ca"
-		}
-
-		envVars = append(
-			envVars,
-			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: filepath.Join(mountPath, crtFile),
-			},
-			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: filepath.Join(mountPath, keyFile),
-			},
-			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_CA_FILE", Value: filepath.Join(mountPathCA, caFile),
-			},
-		)
-
-		// Volume
-		mode := int32(0640)
-		volume := v1.Volume{
-			Name: "tls",
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{
-					SecretName:  spec.TLS.SecretName,
-					DefaultMode: &mode,
-				},
-			},
-		}
-		poolerVolumes = append(poolerVolumes, volume)
-
-		// Mount
-		poolerContainer.VolumeMounts = []v1.VolumeMount{{
-			Name:      "tls",
-			MountPath: "/tls",
-		}}
 	}
 
 	poolerContainer.Env = envVars
+	poolerContainer.VolumeMounts = volumeMounts
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+	securityContext := v1.PodSecurityContext{}
+
+	// determine the User, Group and FSGroup for the pooler pod
+	effectiveRunAsUser := c.OpConfig.Resources.SpiloRunAsUser
+	if spec.SpiloRunAsUser != nil {
+		effectiveRunAsUser = spec.SpiloRunAsUser
+	}
+	if effectiveRunAsUser != nil {
+		securityContext.RunAsUser = effectiveRunAsUser
+	}
+
+	effectiveRunAsGroup := c.OpConfig.Resources.SpiloRunAsGroup
+	if spec.SpiloRunAsGroup != nil {
+		effectiveRunAsGroup = spec.SpiloRunAsGroup
+	}
+	if effectiveRunAsGroup != nil {
+		securityContext.RunAsGroup = effectiveRunAsGroup
+	}
+
+	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
+	if spec.SpiloFSGroup != nil {
+		effectiveFSGroup = spec.SpiloFSGroup
+	}
+	if effectiveFSGroup != nil {
+		securityContext.FSGroup = effectiveFSGroup
+	}
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
@@ -412,13 +417,8 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			Containers:                    []v1.Container{poolerContainer},
 			Tolerations:                   tolerationsSpec,
 			Volumes:                       poolerVolumes,
+			SecurityContext:               &securityContext,
 		},
-	}
-
-	if spec.TLS != nil && spec.TLS.SecretName != "" && spec.SpiloFSGroup != nil {
-		podTemplate.Spec.SecurityContext = &v1.PodSecurityContext{
-			FSGroup: spec.SpiloFSGroup,
-		}
 	}
 
 	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity)
