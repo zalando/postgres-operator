@@ -43,8 +43,8 @@ const (
 	createDatabaseSQL       = `CREATE DATABASE "%s" OWNER "%s";`
 	createDatabaseSchemaSQL = `SET ROLE TO "%s"; CREATE SCHEMA IF NOT EXISTS "%s" AUTHORIZATION "%s"`
 	alterDatabaseOwnerSQL   = `ALTER DATABASE "%s" OWNER TO "%s";`
-	createExtensionSQL      = `CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
-	alterExtensionSQL       = `ALTER EXTENSION "%s" SET SCHEMA "%s"`
+	createExtensionSQL      = `SET ROLE TO "%s"; CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
+	alterExtensionSQL       = `SET ROLE TO "%s"; ALTER EXTENSION "%s" SET SCHEMA "%s"`
 
 	getPublicationsSQL = `SELECT p.pubname, string_agg(pt.schemaname || '.' || pt.tablename, ', ' ORDER BY pt.schemaname, pt.tablename)
 	        FROM pg_publication p
@@ -69,6 +69,13 @@ const (
 			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT USAGE, UPDATE ON SEQUENCES TO "%s";
 			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT EXECUTE ON FUNCTIONS TO "%s","%s";
 			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT USAGE ON TYPES TO "%s","%s";`
+
+	extensionPostCreateSQL = `
+			GRANT SELECT ON ALL TABLES IN SCHEMA "%s" TO "%s","%s";
+			GRANT SELECT ON ALL SEQUENCES IN SCHEMA "%s" TO "%s","%s";
+			GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "%s" TO "%s","%s";
+			GRANT USAGE, UPDATE ON ALL SEQUENCES IN SCHEMA "%s" TO "%s","%s";
+			GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA "%s" TO "%s","%s","%s";`
 
 	connectionPoolerLookup = `
 		CREATE SCHEMA IF NOT EXISTS {{.pooler_schema}};
@@ -492,6 +499,19 @@ func (c *Cluster) execAlterGlobalDefaultPrivileges(owner, rolePrefix string) err
 	return nil
 }
 
+func (c *Cluster) execExtensionPostCreatePrivileges(schemaName, rolePrefix string) error {
+	if _, err := c.pgDb.Exec(fmt.Sprintf(extensionPostCreateSQL,
+		schemaName, rolePrefix+constants.OwnerRoleNameSuffix, rolePrefix+constants.ReaderRoleNameSuffix, // tables
+		schemaName, rolePrefix+constants.OwnerRoleNameSuffix, rolePrefix+constants.ReaderRoleNameSuffix, // sequences
+		schemaName, rolePrefix+constants.OwnerRoleNameSuffix, rolePrefix+constants.WriterRoleNameSuffix, // tables
+		schemaName, rolePrefix+constants.OwnerRoleNameSuffix, rolePrefix+constants.WriterRoleNameSuffix, // sequences
+		schemaName, rolePrefix+constants.OwnerRoleNameSuffix, rolePrefix+constants.ReaderRoleNameSuffix, rolePrefix+constants.WriterRoleNameSuffix)); err != nil { // functions
+		return fmt.Errorf("could not set privileges in schema %s: %v", schemaName, err)
+	}
+
+	return nil
+}
+
 func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin bool) (result []string) {
 	if rolsuper {
 		result = append(result, constants.RoleFlagSuperuser)
@@ -558,22 +578,22 @@ func (c *Cluster) getExtensions() (dbExtensions map[string]string, err error) {
 
 // executeCreateExtension creates new extension in the given schema.
 // The caller is responsible for opening and closing the database connection.
-func (c *Cluster) executeCreateExtension(extName, schemaName string) error {
-	return c.execCreateOrAlterExtension(extName, schemaName, createExtensionSQL,
+func (c *Cluster) executeCreateExtension(extName, schemaName, schemaOwner string) error {
+	return c.execCreateOrAlterExtension(extName, schemaName, schemaOwner, createExtensionSQL,
 		"creating extension", "create extension")
 }
 
 // executeAlterExtension changes the schema of the given extension.
 // The caller is responsible for opening and closing the database connection.
-func (c *Cluster) executeAlterExtension(extName, schemaName string) error {
-	return c.execCreateOrAlterExtension(extName, schemaName, alterExtensionSQL,
+func (c *Cluster) executeAlterExtension(extName, schemaName, schemaOwner string) error {
+	return c.execCreateOrAlterExtension(extName, schemaName, schemaOwner, alterExtensionSQL,
 		"changing schema for extension", "alter extension schema")
 }
 
-func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doing, operation string) error {
+func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, schemaOwner, statement, doing, operation string) error {
 
 	c.logger.Infof("%s %q schema %q", doing, extName, schemaName)
-	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, extName, schemaName)); err != nil {
+	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, schemaOwner, extName, schemaName)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}
 
