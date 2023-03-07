@@ -348,20 +348,33 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		// Env vars
 		crtFile := spec.TLS.CertificateFile
 		keyFile := spec.TLS.PrivateKeyFile
+		caFile := spec.TLS.CAFile
+		mountPath := "/tls"
+		mountPathCA := mountPath
+
 		if crtFile == "" {
 			crtFile = "tls.crt"
 		}
 		if keyFile == "" {
 			keyFile = "tls.key"
 		}
+		if caFile == "" {
+			caFile = "ca.crt"
+		}
+		if spec.TLS.CASecretName != "" {
+			mountPathCA = mountPath + "ca"
+		}
 
 		envVars = append(
 			envVars,
 			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: filepath.Join("/tls", crtFile),
+				Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: filepath.Join(mountPath, crtFile),
 			},
 			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: filepath.Join("/tls", keyFile),
+				Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: filepath.Join(mountPath, keyFile),
+			},
+			v1.EnvVar{
+				Name: "CONNECTION_POOLER_CLIENT_CA_FILE", Value: filepath.Join(mountPathCA, caFile),
 			},
 		)
 
@@ -400,6 +413,12 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			Tolerations:                   tolerationsSpec,
 			Volumes:                       poolerVolumes,
 		},
+	}
+
+	if spec.TLS != nil && spec.TLS.SecretName != "" && spec.SpiloFSGroup != nil {
+		podTemplate.Spec.SecurityContext = &v1.PodSecurityContext{
+			FSGroup: spec.SpiloFSGroup,
+		}
 	}
 
 	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity)
