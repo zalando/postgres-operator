@@ -24,6 +24,9 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
+var poolerRunAsUser = int64(100)
+var poolerRunAsGroup = int64(101)
+
 // ConnectionPoolerObjects K8s objects that are belong to connection pooler
 type ConnectionPoolerObjects struct {
 	Deployment  *appsv1.Deployment
@@ -382,21 +385,8 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	securityContext := v1.PodSecurityContext{}
 
 	// determine the User, Group and FSGroup for the pooler pod
-	effectiveRunAsUser := c.OpConfig.Resources.SpiloRunAsUser
-	if spec.SpiloRunAsUser != nil {
-		effectiveRunAsUser = spec.SpiloRunAsUser
-	}
-	if effectiveRunAsUser != nil {
-		securityContext.RunAsUser = effectiveRunAsUser
-	}
-
-	effectiveRunAsGroup := c.OpConfig.Resources.SpiloRunAsGroup
-	if spec.SpiloRunAsGroup != nil {
-		effectiveRunAsGroup = spec.SpiloRunAsGroup
-	}
-	if effectiveRunAsGroup != nil {
-		securityContext.RunAsGroup = effectiveRunAsGroup
-	}
+	securityContext.RunAsUser = &poolerRunAsUser
+	securityContext.RunAsGroup = &poolerRunAsGroup
 
 	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
 	if spec.SpiloFSGroup != nil {

@@ -939,8 +939,6 @@ func TestPoolerTLS(t *testing.T) {
 	clusterName := "acid-test-cluster"
 	namespace := "default"
 	tlsSecretName := "my-secret"
-	spiloRunAsUser := int64(101)
-	spiloRunAsGroup := int64(103)
 	spiloFSGroup := int64(103)
 	defaultMode := int32(0640)
 	mountPath := "/tls"
@@ -994,8 +992,6 @@ func TestPoolerTLS(t *testing.T) {
 					DefaultMemoryRequest: "300Mi",
 					DefaultMemoryLimit:   "300Mi",
 					PodRoleLabel:         "spilo-role",
-					SpiloRunAsUser:       &spiloRunAsUser,
-					SpiloRunAsGroup:      &spiloRunAsGroup,
 					SpiloFSGroup:         &spiloFSGroup,
 				},
 				ConnectionPooler: config.ConnectionPooler{
