@@ -334,7 +334,9 @@ explanation of `ttl` and `loop_wait` parameters.
   Patroni `synchronous_node_count` parameter value. Note, this option is only available for Spilo images with Patroni 2.0+. The default is set to `1`. Optional.
 
 * **failsafe_mode**
-  Patroni `failsafe_mode` parameter value. If enabled, allows Patroni to cope with DCS outages and avoid leader demotion. Note, this option is currently not included in any Patroni release. The default is set to `false`. Optional.
+  Patroni `failsafe_mode` parameter value. If enabled, allows Patroni to cope with DCS outages and avoid leader demotion. See the Patroni documentation
+  [here](https://patroni.readthedocs.io/en/master/dcs_failsafe_mode.html) for more details. This feature is included since Patroni 3.0.0. 
+  Hence, check the container image in use if this feature is included in the used Patroni version. The default is set to `false`. Optional.
   
 ## Postgres container resources
 
