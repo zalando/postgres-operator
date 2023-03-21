@@ -19,8 +19,6 @@ jobs:
       run: make deps mocks
     - name: Code generation
       run: make codegen
-    - name: Compile
-      run: make linux
     - name: Run unit tests
       run: make test
     - name: Run end-2-end tests
