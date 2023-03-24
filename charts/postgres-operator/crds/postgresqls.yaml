@@ -466,6 +466,8 @@ spec:
                 type: integer
               spiloRunAsGroup:
                 type: integer
+              spiloRunAsNonRoot:
+                type: boolean
               spiloFSGroup:
                 type: integer
               spiloSeccompProfile:

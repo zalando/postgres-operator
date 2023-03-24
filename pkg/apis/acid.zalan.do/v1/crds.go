@@ -728,6 +728,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"spiloRunAsGroup": {
 						Type: "integer",
 					},
+					"spiloRunAsNonRoot": {
+						Type: "boolean",
+					},
 					"spiloFSGroup": {
 						Type: "integer",
 					},
@@ -1459,6 +1462,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"spilo_runasgroup": {
 								Type: "integer",
+							},
+							"spilo_runasnonroot": {
+								Type: "boolean",
 							},
 							"spilo_fsgroup": {
 								Type: "integer",

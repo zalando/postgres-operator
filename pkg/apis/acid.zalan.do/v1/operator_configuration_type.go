@@ -64,6 +64,7 @@ type KubernetesMetaConfiguration struct {
 	SpiloAllowPrivilegeEscalation          *bool                        `json:"spilo_allow_privilege_escalation,omitempty"`
 	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
 	SpiloRunAsGroup                        *int64                       `json:"spilo_runasgroup,omitempty"`
+	SpiloRunAsNonRoot                      *bool                        `json:"spilo_runasnonroot,omitempty"`
 	SpiloFSGroup                           *int64                       `json:"spilo_fsgroup,omitempty"`
 	SpiloSeccompProfile                    *SeccompProfile              `json:"spilo_seccompprofile,omitempty"`
 	AdditionalPodCapabilities              []string                     `json:"additional_pod_capabilities,omitempty"`

@@ -41,6 +41,7 @@ type PostgresSpec struct {
 
 	SpiloRunAsUser       *int64            `json:"spiloRunAsUser,omitempty"`
 	SpiloRunAsGroup      *int64            `json:"spiloRunAsGroup,omitempty"`
+	SpiloRunAsNonRoot    *bool             `json:"spiloRunAsNonRoot,omitempty"`
 	SpiloFSGroup         *int64            `json:"spiloFSGroup,omitempty"`
 	SpiloSeccompProfile  *SeccompProfile   `json:"spiloSeccompProfile,omitempty"`
 
@@ -211,10 +212,10 @@ type CloneDescription struct {
 // Sidecar defines a container to be run in the same pod as the Postgres container.
 type Sidecar struct {
 	*Resources      `json:"resources,omitempty"`
-	Name            string              `json:"name,omitempty"`
-	DockerImage     string              `json:"image,omitempty"`
-	Ports           []v1.ContainerPort  `json:"ports,omitempty"`
-	Env             []v1.EnvVar         `json:"env,omitempty"`
+	Name            string             `json:"name,omitempty"`
+	DockerImage     string             `json:"image,omitempty"`
+	Ports           []v1.ContainerPort `json:"ports,omitempty"`
+	Env             []v1.EnvVar        `json:"env,omitempty"`
 	SecurityContext *v1.SecurityContext `json:"securityContext,omitempty"`
 }
 

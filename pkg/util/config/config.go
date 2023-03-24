@@ -32,6 +32,7 @@ type Resources struct {
 	PodTerminateGracePeriod       time.Duration       `name:"pod_terminate_grace_period" default:"5m"`
 	SpiloRunAsUser                *int64              `name:"spilo_runasuser"`
 	SpiloRunAsGroup               *int64              `name:"spilo_runasgroup"`
+	SpiloRunAsNonRoot             *bool               `name:"spilo_runasnonroot"`
 	SpiloFSGroup                  *int64              `name:"spilo_fsgroup"`
 	SpiloSeccompProfile           *SeccompProfile     `name:"spilo_seccompprofile"`
 	PodPriorityClassName          string              `name:"pod_priority_class_name"`

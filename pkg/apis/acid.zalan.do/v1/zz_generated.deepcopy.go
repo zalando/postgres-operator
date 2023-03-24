@@ -168,6 +168,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(int64)
 		**out = **in
 	}
+	if in.SpiloRunAsNonRoot != nil {
+		in, out := &in.SpiloRunAsNonRoot, &out.SpiloRunAsNonRoot
+		*out = new(bool)
+		**out = **in
+	}
 	if in.SpiloFSGroup != nil {
 		in, out := &in.SpiloFSGroup, &out.SpiloFSGroup
 		*out = new(int64)
@@ -654,6 +659,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 	if in.SpiloRunAsGroup != nil {
 		in, out := &in.SpiloRunAsGroup, &out.SpiloRunAsGroup
 		*out = new(int64)
+		**out = **in
+	}
+	if in.SpiloRunAsNonRoot != nil {
+		in, out := &in.SpiloRunAsNonRoot, &out.SpiloRunAsNonRoot
+		*out = new(bool)
 		**out = **in
 	}
 	if in.SpiloFSGroup != nil {

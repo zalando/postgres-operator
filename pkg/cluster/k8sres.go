@@ -784,6 +784,7 @@ func (c *Cluster) generatePodTemplate(
 	tolerationsSpec *[]v1.Toleration,
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
+	spiloRunAsNonRoot *bool,
 	spiloFSGroup *int64,
 	spiloSeccompProfile *acidv1.SeccompProfile,
 	nodeAffinity *v1.Affinity,
@@ -812,6 +813,10 @@ func (c *Cluster) generatePodTemplate(
 
 	if spiloRunAsGroup != nil {
 		securityContext.RunAsGroup = spiloRunAsGroup
+	}
+
+	if spiloRunAsNonRoot != nil {
+		securityContext.RunAsNonRoot = spiloRunAsNonRoot
 	}
 
 	if spiloFSGroup != nil {
@@ -1300,6 +1305,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveRunAsGroup = spec.SpiloRunAsGroup
 	}
 
+	effectiveRunAsNonRoot := c.OpConfig.Resources.SpiloRunAsNonRoot
+	if spec.SpiloRunAsNonRoot != nil {
+		effectiveRunAsNonRoot = spec.SpiloRunAsNonRoot
+	}
+
 	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
 	if spec.SpiloFSGroup != nil {
 		effectiveFSGroup = spec.SpiloFSGroup
@@ -1466,6 +1476,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		&tolerationSpec,
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
+		effectiveRunAsNonRoot,
 		effectiveFSGroup,
 		effectiveSeccompProfile,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
@@ -2219,6 +2230,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.Container{},
 		util.False(),
 		&[]v1.Toleration{},
+		nil,
 		nil,
 		nil,
 		nil,

@@ -78,6 +78,11 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   This must be set to run the container without root. By default the container
   runs with root. This option only works for Spilo versions >= 1.6-p3.
 
+* **spiloRunAsNonRoot**
+  determines whether the pod’s container should run as a non-root user. If set 
+  to true, the image is validating at runtime to make sure that it does not run 
+  as UID 0 (root) and won’t start the container if it does.
+
 * **spiloFSGroup**
   the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This will override the **spilo_fsgroup**

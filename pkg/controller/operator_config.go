@@ -77,6 +77,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.SpiloAllowPrivilegeEscalation = util.CoalesceBool(fromCRD.Kubernetes.SpiloAllowPrivilegeEscalation, util.True())
 	result.SpiloRunAsUser = fromCRD.Kubernetes.SpiloRunAsUser
 	result.SpiloRunAsGroup = fromCRD.Kubernetes.SpiloRunAsGroup
+	result.SpiloRunAsNonRoot = fromCRD.Kubernetes.SpiloRunAsNonRoot
 	result.SpiloFSGroup = fromCRD.Kubernetes.SpiloFSGroup
 	if fromCRD.Kubernetes.SpiloSeccompProfile != nil {
 		result.SpiloSeccompProfile = &config.SeccompProfile{}

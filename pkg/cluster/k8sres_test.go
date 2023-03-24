@@ -3294,3 +3294,53 @@ func TestGenerateEmtySeccompProfile(t *testing.T) {
 
 	assert.Nil(t, sts.Spec.Template.Spec.SecurityContext.SeccompProfile, "does not have a SeccompProfile assigned")
 }
+
+func TestGenerateRunAsNonRoot(t *testing.T) {
+	var client, _ = newFakeK8sTestClient()
+	var clusterName = "acid-test-cluster"
+	var namespace = "default"
+	var spiloRunAsUser = int64(101)
+	var spiloRunAsGroup = int64(103)
+	var spiloRunAsNonRoot = bool(true)
+	var spiloFSGroup = int64(103)
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Resources: config.Resources{
+					SpiloRunAsUser: &spiloRunAsUser,
+					SpiloRunAsGroup: &spiloRunAsGroup,
+					SpiloRunAsNonRoot: &spiloRunAsNonRoot,
+					SpiloFSGroup: &spiloFSGroup,
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	// create a statefulset
+	sts, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	assert.Equal(t, spiloRunAsUser, *sts.Spec.Template.Spec.SecurityContext.RunAsUser, "has a RunAsUser assigned")
+	assert.Equal(t, spiloRunAsGroup, *sts.Spec.Template.Spec.SecurityContext.RunAsGroup, "has a RunAsGroup assigned")
+	assert.Equal(t, spiloRunAsNonRoot, *sts.Spec.Template.Spec.SecurityContext.RunAsNonRoot, "has a RunAsNonRoot assigned")
+	assert.Equal(t, spiloFSGroup, *sts.Spec.Template.Spec.SecurityContext.FSGroup, "has a FSGroup assigned")
+}

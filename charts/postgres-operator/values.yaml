@@ -200,6 +200,7 @@ configKubernetes:
   # set user and group for the spilo container (required to run Spilo as non-root process)
   # spilo_runasuser: 101
   # spilo_runasgroup: 103
+  # spilo_runasnonroot: true
 
   # group ID with write-access to volumes (required to run Spilo as non-root process)
   # spilo_fsgroup: 103

@@ -151,6 +151,7 @@ data:
   spilo_allow_privilege_escalation: "true"
   # spilo_runasuser: 101
   # spilo_runasgroup: 103
+  # spilo_runasnonroot: true
   # spilo_fsgroup: 103
   # spilo_seccompprofile:
   #   type: Localhost

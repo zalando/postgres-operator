@@ -93,6 +93,7 @@ spec:
   enableShmVolume: true
 #  spiloRunAsUser: 101
 #  spiloRunAsGroup: 103
+#  spiloRunAsNonRoot: true
 #  spiloFSGroup: 103
 #  spiloSeccompProfile:
 #    type: Localhost

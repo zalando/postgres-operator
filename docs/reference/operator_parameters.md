@@ -453,6 +453,11 @@ configuration they are grouped under the `kubernetes` key.
   This must be set to run the container without root. By default the container
   runs with root. This option only works for Spilo versions >= 1.6-p3.
 
+* **spilo_runasnonroot**
+  determines whether the spilo container should run as a non-root user. If set 
+  to true, the image is validating at runtime to make sure that it does not run 
+  as UID 0 (root) and won’t start the container if it does.
+
 * **spilo_fsgroup**
   the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This is required to run Spilo as a
