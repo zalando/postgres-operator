@@ -14,7 +14,7 @@ LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 RUN apk --no-cache add curl
 RUN apk --no-cache add ca-certificates
 
-COPY --from=builder /go/src/github.com/zalando/postgres-operator/build/postgres-operator /
+COPY --from=builder /go/src/github.com/zalando/postgres-operator/build/* /
 
 RUN addgroup -g 1000 pgo
 RUN adduser -D -u 1000 -G pgo -g 'Postgres Operator' pgo

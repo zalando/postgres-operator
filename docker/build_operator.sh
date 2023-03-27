@@ -24,8 +24,8 @@ apt-get install -y wget
 
 export PATH="$PATH:$HOME/go/bin"
 export GOPATH="$HOME/go"
-mkdir -p docker/build/
-cp scm-source.json docker/build/
+mkdir -p build
+cp scm-source.json build/
 
 GO111MODULE=on go mod vendor
 CGO_ENABLED=0 go build -o build/postgres-operator -v -ldflags "-X=main.version=e1fbdd9" cmd/main.go
