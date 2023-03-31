@@ -483,7 +483,8 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 			// if synchronous mode is enabled and no SyncStandy was found
 			// return false for retry - cannot failover with no sync candidate
 			if c.Spec.Patroni.SynchronousMode && len(syncCandidates) == 0 {
-				return false, fmt.Errorf("no sync standby found")
+				c.logger.Errorf("no sync standby found")
+				return false, nil
 			}
 
 			return true, nil

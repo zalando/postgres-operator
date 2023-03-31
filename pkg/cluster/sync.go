@@ -458,7 +458,7 @@ func (c *Cluster) syncPatroniConfig(pods []v1.Pod, requiredPatroniConfig acidv1.
 	// get Postgres config, compare with manifest and update via Patroni PATCH endpoint if it differs
 	for i, pod := range pods {
 		podName := util.NameFromMeta(pods[i].ObjectMeta)
-		effectivePatroniConfig, effectivePgParameters, err = c.patroni.GetConfig(&pod)
+		effectivePatroniConfig, effectivePgParameters, err = c.getPatroniConfig(&pod)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("could not get Postgres config from pod %s: %v", podName, err))
 			continue
