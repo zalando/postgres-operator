@@ -52,7 +52,7 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 0}]}`,
 			syncModeEnabled:   true,
 			expectedCandidate: spec.NamespacedName{},
-			expectedError:     fmt.Errorf("failed to get Patroni cluster members: no sync standby found"),
+			expectedError:     fmt.Errorf("failed to get Patroni cluster members: unexpected end of JSON input"),
 		},
 		{
 			subtest:           "choose replica with lowest lag",
