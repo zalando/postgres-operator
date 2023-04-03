@@ -473,7 +473,7 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 				return false, err
 			}
 
-			// look for SyncStandby candidates
+			// look for SyncStandby candidates (which also implies pod is in running state)
 			for _, member := range members {
 				if PostgresRole(member.Role) == SyncStandby {
 					syncCandidates = append(syncCandidates, member)
@@ -483,7 +483,7 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 			// if synchronous mode is enabled and no SyncStandy was found
 			// return false for retry - cannot failover with no sync candidate
 			if c.Spec.Patroni.SynchronousMode && len(syncCandidates) == 0 {
-				c.logger.Errorf("no sync standby found")
+				c.logger.Warnf("no sync standby found - retrying fetching cluster members")
 				return false, nil
 			}
 
