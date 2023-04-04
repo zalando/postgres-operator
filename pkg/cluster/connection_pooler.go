@@ -348,34 +348,32 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	var poolerVolumes []v1.Volume
 	var volumeMounts []v1.VolumeMount
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
-		if spec.TLS != nil && spec.TLS.SecretName != "" {
-			getPoolerTLSEnv := func(k string) string {
-				keyName := ""
-				switch k {
-				case "tls.crt":
-					keyName = "CONNECTION_POOLER_CLIENT_TLS_CRT"
-				case "tls.key":
-					keyName = "CONNECTION_POOLER_CLIENT_TLS_KEY"
-				case "tls.ca":
-					keyName = "CONNECTION_POOLER_CLIENT_CA_FILE"
-				default:
-					panic(fmt.Sprintf("TLS env key for pooler unknown %s", k))
-				}
+		getPoolerTLSEnv := func(k string) string {
+			keyName := ""
+			switch k {
+			case "tls.crt":
+				keyName = "CONNECTION_POOLER_CLIENT_TLS_CRT"
+			case "tls.key":
+				keyName = "CONNECTION_POOLER_CLIENT_TLS_KEY"
+			case "tls.ca":
+				keyName = "CONNECTION_POOLER_CLIENT_CA_FILE"
+			default:
+				panic(fmt.Sprintf("TLS env key for pooler unknown %s", k))
+			}
 
-				return keyName
-			}
-			tlsEnv, tlsVolumes := generateTLSmounts(spec, getPoolerTLSEnv)
-			envVars = append(envVars, tlsEnv...)
-			for _, vol := range tlsVolumes {
-				poolerVolumes = append(poolerVolumes, v1.Volume{
-					Name:         vol.Name,
-					VolumeSource: vol.VolumeSource,
-				})
-				volumeMounts = append(volumeMounts, v1.VolumeMount{
-					Name:      vol.Name,
-					MountPath: vol.MountPath,
-				})
-			}
+			return keyName
+		}
+		tlsEnv, tlsVolumes := generateTlsMounts(spec, getPoolerTLSEnv)
+		envVars = append(envVars, tlsEnv...)
+		for _, vol := range tlsVolumes {
+			poolerVolumes = append(poolerVolumes, v1.Volume{
+				Name:         vol.Name,
+				VolumeSource: vol.VolumeSource,
+			})
+			volumeMounts = append(volumeMounts, v1.VolumeMount{
+				Name:      vol.Name,
+				MountPath: vol.MountPath,
+			})
 		}
 	}
 

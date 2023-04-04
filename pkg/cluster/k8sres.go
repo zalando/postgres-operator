@@ -1303,7 +1303,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 			return keyName
 		}
-		tlsEnv, tlsVolumes := generateTLSmounts(spec, getSpiloTLSEnv)
+		tlsEnv, tlsVolumes := generateTlsMounts(spec, getSpiloTLSEnv)
 		for _, env := range tlsEnv {
 			spiloEnvVars = appendEnvVars(spiloEnvVars, env)
 		}
@@ -1461,7 +1461,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	return statefulSet, nil
 }
 
-func generateTLSmounts(spec *acidv1.PostgresSpec, tlsEnv func(key string) string) ([]v1.EnvVar, []acidv1.AdditionalVolume) {
+func generateTlsMounts(spec *acidv1.PostgresSpec, tlsEnv func(key string) string) ([]v1.EnvVar, []acidv1.AdditionalVolume) {
 	// this is combined with the FSGroup in the section above
 	// to give read access to the postgres user
 	defaultMode := int32(0640)
