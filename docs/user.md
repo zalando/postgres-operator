@@ -1197,8 +1197,8 @@ don't know the value, use `103` which is the GID from the default Spilo image
 OpenShift allocates the users and groups dynamically (based on scc), and their
 range is different in every namespace. Due to this dynamic behaviour, it's not
 trivial to know at deploy time the uid/gid of the user in the cluster.
-Therefore, instead of using a global `spilo_fsgroup` setting, use the
-`spiloFSGroup` field per Postgres cluster.
+Therefore, instead of using a global `spilo_fsgroup` setting in operator
+configuration or use the `spiloFSGroup` field per Postgres cluster manifest.
 
 Upload the cert as a kubernetes secret:
 ```sh
@@ -1255,3 +1255,16 @@ Alternatively, it is also possible to use
 
 Certificate rotation is handled in the Spilo image which checks every 5
 minutes if the certificates have changed and reloads postgres accordingly.
+
+### TLS certificates for connection pooler
+
+By default, the pgBouncer image generates its own TLS certificate like Spilo.
+When the `tls` section is specfied in the manifest it will be used for the
+connection pooler pod(s) as well. The security context options are hard coded
+to `runAsUser: 100` and `runAsGroup: 101`. The `fsGroup` will be the same
+like for Spilo.
+
+As of now, the operator does not sync the pooler deployment automatically
+which means that changes in the pod template are not caught. You need to
+toggle `enableConnectionPooler` to set environment variables, volumes, secret
+mounts and securityContext required for TLS support in the pooler pod.

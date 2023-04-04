@@ -543,7 +543,9 @@ for both master and replica pooler services (if `enableReplicaConnectionPooler`
 
 ## Custom TLS certificates
 
-Those parameters are grouped under the `tls` top-level key.
+Those parameters are grouped under the `tls` top-level key. Note, you have to
+define `spiloFSGroup` in the Postgres cluster manifest or `spilo_fsgroup` in
+the global configuration before adding the `tls` section'.
 
 * **secretName**
   By setting the `secretName` value, the cluster will switch to load the given
