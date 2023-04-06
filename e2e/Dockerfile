@@ -15,7 +15,9 @@ RUN apt-get update \
            python3-pip \
            curl \
            vim \
+           openssl \
     && pip3 install --no-cache-dir -r requirements.txt \
+    && openssl req -x509 -nodes -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=acid.zalan.do" \
     && curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.24.3/bin/linux/amd64/kubectl \
     && chmod +x ./kubectl \
     && mv ./kubectl /usr/local/bin/kubectl \

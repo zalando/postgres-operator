@@ -623,6 +623,48 @@ class EndToEndTestCase(unittest.TestCase):
                              1, "Secret not created for user in namespace")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_custom_ssl_certificate(self):
+        '''
+        Test if spilo uses a custom SSL certificate
+        '''
+
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        tls_secret = "pg-tls"
+
+        # get nodes of master and replica(s) (expected target of new master)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+        self.assertNotEqual(replica_nodes, [])
+
+        # create secrets containing ssl certificate and clientauth
+        self.k8s.create_tls_secret_with_kubectl(tls_secret)
+
+        try:
+            # enable load balancer services
+            pg_patch_tls = {
+                "spec": {
+                    "spiloFSGroup": 103,
+                    "tls": {
+                        "secretName": tls_secret
+                    }
+                }
+            }
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_tls)
+
+            # wait for switched over
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("SSL_CERTIFICATE_FILE", cluster_label), 2, "TLS env variable SSL_CERTIFICATE_FILE missing in Spilo pods")
+            self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("SSL_PRIVATE_KEY_FILE", cluster_label), 2, "TLS env variable SSL_PRIVATE_KEY_FILE missing in Spilo pods")
+            self.eventuallyEqual(lambda: k8s.count_pods_with_volume_mount(tls_secret), cluster_label), 2, "TLS volume mount missing in Spilo pods")
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
         '''
         For a database without connection pooler, then turns it on, scale up,
