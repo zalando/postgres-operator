@@ -249,6 +249,18 @@ class K8s:
     def patch_pod(self, data, pod_name, namespace="default"):
         self.api.core_v1.patch_namespaced_pod(pod_name, namespace, data)
 
+    def create_tls_secret_with_kubectl(self, secret_name):
+        return subprocess.run(
+            ["kubectl", "create", "secret", "tls", secret_name, "--key", "tls.key", "--cert" "tls.crt"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+
+    def create_generic_secret_with_kubectl(self, secret_name, file):
+        return subprocess.run(
+            ["kubectl", "create", "secret", "generic", secret_name, "--from-file", file],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+
     def create_with_kubectl(self, path):
         return subprocess.run(
             ["kubectl", "apply", "-f", path],
@@ -455,6 +467,14 @@ class K8sBase:
 
         while not get_services():
             time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def count_pods_with_volume_mount(self, mount_name, labels, namespace='default'):
+        pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
+        return len(list(filter(lambda x: mount_name in x.spec.containers[0].volume_mounts, pods)))
+
+    def count_pods_with_env_variable(self, env_variable_key, labels, namespace='default'):
+        pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
+        return len(list(filter(lambda x: env_variable_key in x.spec.containers[0].env, pods)))
 
     def count_pods_with_rolling_update_flag(self, labels, namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
