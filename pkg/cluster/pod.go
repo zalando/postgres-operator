@@ -469,10 +469,24 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 		func() (bool, error) {
 			var err error
 			members, err = c.patroni.GetClusterMembers(master)
-
 			if err != nil {
 				return false, err
 			}
+
+			// look for SyncStandby candidates (which also implies pod is in running state)
+			for _, member := range members {
+				if PostgresRole(member.Role) == SyncStandby {
+					syncCandidates = append(syncCandidates, member)
+				}
+			}
+
+			// if synchronous mode is enabled and no SyncStandy was found
+			// return false for retry - cannot failover with no sync candidate
+			if c.Spec.Patroni.SynchronousMode && len(syncCandidates) == 0 {
+				c.logger.Warnf("no sync standby found - retrying fetching cluster members")
+				return false, nil
+			}
+
 			return true, nil
 		},
 	)
@@ -480,28 +494,26 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 		return spec.NamespacedName{}, fmt.Errorf("failed to get Patroni cluster members: %s", err)
 	}
 
-	for _, member := range members {
-		if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && member.State == "running" {
-			candidates = append(candidates, member)
-			if PostgresRole(member.Role) == SyncStandby {
-				syncCandidates = append(syncCandidates, member)
-			}
-		}
-	}
-
 	// pick candidate with lowest lag
-	// if sync_standby replicas were found assume synchronous_mode is enabled and ignore other candidates list
 	if len(syncCandidates) > 0 {
 		sort.Slice(syncCandidates, func(i, j int) bool {
 			return syncCandidates[i].Lag < syncCandidates[j].Lag
 		})
 		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
-	}
-	if len(candidates) > 0 {
-		sort.Slice(candidates, func(i, j int) bool {
-			return candidates[i].Lag < candidates[j].Lag
-		})
-		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
+	} else {
+		// in asynchronous mode find running replicas
+		for _, member := range members {
+			if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && member.State == "running" {
+				candidates = append(candidates, member)
+			}
+		}
+
+		if len(candidates) > 0 {
+			sort.Slice(candidates, func(i, j int) bool {
+				return candidates[i].Lag < candidates[j].Lag
+			})
+			return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
+		}
 	}
 
 	return spec.NamespacedName{}, fmt.Errorf("no switchover candidate found")
