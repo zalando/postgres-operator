@@ -1,9 +1,7 @@
 package cluster
 
 import (
-	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"context"
@@ -41,7 +39,6 @@ var (
 	appId       string = "test-app"
 	dbName      string = "foo"
 	fesUser     string = fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
-	fesName     string = fmt.Sprintf("%s-%s", clusterName, appId)
 	slotName    string = fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
 
 	pg = acidv1.Postgresql{
@@ -77,6 +74,7 @@ var (
 					BatchSize: k8sutil.UInt32ToPointer(uint32(100)),
 				},
 			},
+			TeamID: "acid",
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
@@ -89,7 +87,7 @@ var (
 			Kind:       constants.EventStreamCRDKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fesName,
+			Name:      fmt.Sprintf("%s-12345", clusterName),
 			Namespace: namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				metav1.OwnerReference{
@@ -167,6 +165,15 @@ var (
 	}
 )
 
+func TestGatherApplicationIds(t *testing.T) {
+	testAppIds := []string{appId}
+	appIds := gatherApplicationIds(pg.Spec.Streams)
+
+	if !util.IsEqualIgnoreOrder(testAppIds, appIds) {
+		t.Errorf("gathered applicationIds do not match, expected %#v, got %#v", testAppIds, appIds)
+	}
+}
+
 func TestGenerateFabricEventStream(t *testing.T) {
 	client, _ := newFakeK8sStreamClient()
 
@@ -196,9 +203,6 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	_, err := cluster.createStatefulSet()
 	assert.NoError(t, err)
 
-	// createOrUpdateStreams will loop over existing apps
-	cluster.streamApplications = []string{appId}
-
 	// create the streams
 	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
@@ -209,22 +213,37 @@ func TestGenerateFabricEventStream(t *testing.T) {
 		t.Errorf("malformed FabricEventStream, expected %#v, got %#v", fes, result)
 	}
 
-	// compare stream resturned from API with expected stream
-	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
+	listOptions := metav1.ListOptions{
+		LabelSelector: cluster.labelsSet(true).String(),
+	}
+	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
-	if match, _ := sameStreams(streamCRD.Spec.EventStreams, fes.Spec.EventStreams); !match {
-		t.Errorf("malformed FabricEventStream returned from API, expected %#v, got %#v", fes, streamCRD)
+
+	// check if there is only one stream
+	if len(streams.Items) > 1 {
+		t.Errorf("too many stream CRDs found: got %d, but expected only one", len(streams.Items))
+	}
+
+	// compare stream returned from API with expected stream
+	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, fes.Spec.EventStreams); !match {
+		t.Errorf("malformed FabricEventStream returned from API, expected %#v, got %#v", fes, streams.Items[0])
 	}
 
 	// sync streams once again
 	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
-	// compare stream resturned from API with generated stream
-	streamCRD, err = cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
+	streams, err = cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
-	if match, _ := sameStreams(streamCRD.Spec.EventStreams, result.Spec.EventStreams); !match {
-		t.Errorf("returned FabricEventStream differs from generated one, expected %#v, got %#v", result, streamCRD)
+
+	// check if there is still only one stream
+	if len(streams.Items) > 1 {
+		t.Errorf("too many stream CRDs found after sync: got %d, but expected only one", len(streams.Items))
+	}
+
+	// compare stream resturned from API with generated stream
+	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
+		t.Errorf("returned FabricEventStream differs from generated one, expected %#v, got %#v", result, streams.Items[0])
 	}
 }
 
@@ -331,45 +350,45 @@ func TestUpdateFabricEventStream(t *testing.T) {
 		context.TODO(), &pg, metav1.CreateOptions{})
 	assert.NoError(t, err)
 
-	// createOrUpdateStreams will loop over existing apps
-	cluster.streamApplications = []string{appId}
+	// create statefulset to have ownerReference for streams
+	_, err = cluster.createStatefulSet()
+	assert.NoError(t, err)
 
+	// now create the stream
 	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
-	var pgSpec acidv1.PostgresSpec
-	pgSpec.Streams = []acidv1.Stream{
-		{
-			ApplicationId: appId,
-			Database:      dbName,
-			Tables: map[string]acidv1.StreamTable{
-				"data.bar": acidv1.StreamTable{
-					EventType:     "stream-type-c",
-					IdColumn:      k8sutil.StringToPointer("b_id"),
-					PayloadColumn: k8sutil.StringToPointer("b_payload"),
-				},
-			},
-			BatchSize: k8sutil.UInt32ToPointer(uint32(250)),
-		},
+	// change specs of streams and patch CRD
+	for i, stream := range pg.Spec.Streams {
+		if stream.ApplicationId == appId {
+			streamTable := stream.Tables["data.bar"]
+			streamTable.EventType = "stream-type-c"
+			stream.Tables["data.bar"] = streamTable
+			stream.BatchSize = k8sutil.UInt32ToPointer(uint32(250))
+			pg.Spec.Streams[i] = stream
+		}
 	}
-	patch, err := json.Marshal(struct {
-		PostgresSpec interface{} `json:"spec"`
-	}{&pgSpec})
+
+	patchData, err := specPatch(pg.Spec)
 	assert.NoError(t, err)
 
 	pgPatched, err := cluster.KubeClient.Postgresqls(namespace).Patch(
-		context.TODO(), cluster.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "spec")
+		context.TODO(), cluster.Name, types.MergePatchType, patchData, metav1.PatchOptions{}, "spec")
 	assert.NoError(t, err)
 
 	cluster.Postgresql.Spec = pgPatched.Spec
 	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
-	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
+	// compare stream returned from API with expected stream
+	listOptions := metav1.ListOptions{
+		LabelSelector: cluster.labelsSet(true).String(),
+	}
+	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
 
 	result := cluster.generateFabricEventStream(appId)
-	if !reflect.DeepEqual(result, streamCRD) {
-		t.Errorf("Malformed FabricEventStream, expected %#v, got %#v", streamCRD, result)
+	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
+		t.Errorf("Malformed FabricEventStream, expected %#v, got %#v", streams.Items[0], result)
 	}
 }

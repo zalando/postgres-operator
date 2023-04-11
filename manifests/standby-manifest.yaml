@@ -2,14 +2,13 @@ apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
   name: acid-standby-cluster
-  namespace: default
 spec:
   teamId: "acid"
   volume:
     size: 1Gi
   numberOfInstances: 1
   postgresql:
-    version: "14"
+    version: "15"
   # Make this a standby cluster and provide either the s3 bucket path of source cluster or the remote primary host for continuous streaming.
   standby:
     # s3_wal_path: "s3://mybucket/spilo/acid-minimal-cluster/abcd1234-2a4b-4b2a-8c9c-c1234defg567/wal/14/"

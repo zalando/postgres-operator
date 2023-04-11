@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -87,6 +86,7 @@ func New(controller controllerInformer, port int, logger *logrus.Logger) *Server
 	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
 
 	mux.Handle("/status/", http.HandlerFunc(s.controllerStatus))
+	mux.Handle("/readyz/", http.HandlerFunc(s.controllerReady))
 	mux.Handle("/config/", http.HandlerFunc(s.operatorConfig))
 
 	mux.HandleFunc("/clusters/", s.clusters)
@@ -153,6 +153,10 @@ func (s *Server) respond(obj interface{}, err error, w http.ResponseWriter) {
 
 func (s *Server) controllerStatus(w http.ResponseWriter, req *http.Request) {
 	s.respond(s.controller.GetStatus(), nil, w)
+}
+
+func (s *Server) controllerReady(w http.ResponseWriter, req *http.Request) {
+	s.respond("OK", nil, w)
 }
 
 func (s *Server) operatorConfig(w http.ResponseWriter, req *http.Request) {

@@ -57,6 +57,14 @@ spec:
 {{ toYaml .Values.resources | indent 10 }}
         securityContext:
 {{ toYaml .Values.securityContext | indent 10 }}
+        {{- if .Values.readinessProbe }}
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: {{ .Values.configLoggingRestApi.api_port }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+        {{- end }}
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
 {{ toYaml .Values.imagePullSecrets | indent 8 }}

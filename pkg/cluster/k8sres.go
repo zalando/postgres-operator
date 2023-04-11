@@ -13,7 +13,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,8 +28,8 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	"golang.org/x/exp/maps"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -60,6 +60,7 @@ type patroniDCS struct {
 	SynchronousNodeCount     uint32                       `json:"synchronous_node_count,omitempty"`
 	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
 	Slots                    map[string]map[string]string `json:"slots,omitempty"`
+	FailsafeMode             *bool                        `json:"failsafe_mode,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -136,6 +137,23 @@ func makeDefaultResources(config *config.Config) acidv1.Resources {
 	return acidv1.Resources{
 		ResourceRequests: defaultRequests,
 		ResourceLimits:   defaultLimits,
+	}
+}
+
+func makeLogicalBackupResources(config *config.Config) acidv1.Resources {
+
+	logicalBackupResourceRequests := acidv1.ResourceDescription{
+		CPU:    config.LogicalBackup.LogicalBackupCPURequest,
+		Memory: config.LogicalBackup.LogicalBackupMemoryRequest,
+	}
+	logicalBackupResourceLimits := acidv1.ResourceDescription{
+		CPU:    config.LogicalBackup.LogicalBackupCPULimit,
+		Memory: config.LogicalBackup.LogicalBackupMemoryLimit,
+	}
+
+	return acidv1.Resources{
+		ResourceRequests: logicalBackupResourceRequests,
+		ResourceLimits:   logicalBackupResourceLimits,
 	}
 }
 
@@ -297,7 +315,7 @@ func (c *Cluster) generateResourceRequirements(
 	return &result, nil
 }
 
-func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, EnablePgVersionEnvVar bool, logger *logrus.Entry) (string, error) {
+func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, opConfig *config.Config, logger *logrus.Entry) (string, error) {
 	config := spiloConfiguration{}
 
 	config.Bootstrap = pgBootstrap{}
@@ -379,6 +397,11 @@ PatroniInitDBParams:
 	if patroni.SynchronousNodeCount >= 1 {
 		config.Bootstrap.DCS.SynchronousNodeCount = patroni.SynchronousNodeCount
 	}
+	if patroni.FailsafeMode != nil {
+		config.Bootstrap.DCS.FailsafeMode = patroni.FailsafeMode
+	} else if opConfig.EnablePatroniFailsafeMode != nil {
+		config.Bootstrap.DCS.FailsafeMode = opConfig.EnablePatroniFailsafeMode
+	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
 
@@ -386,7 +409,7 @@ PatroniInitDBParams:
 	// setting postgresq.bin_dir in the SPILO_CONFIGURATION still works and takes precedence over PGVERSION
 	// so we add postgresq.bin_dir only if PGVERSION is unused
 	// see PR 222 in Spilo
-	if !EnablePgVersionEnvVar {
+	if !opConfig.EnablePgVersionEnvVar {
 		config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
 	}
 	if len(pg.Parameters) > 0 {
@@ -408,7 +431,7 @@ PatroniInitDBParams:
 	}
 
 	config.Bootstrap.Users = map[string]pgUser{
-		pamRoleName: {
+		opConfig.PamRoleName: {
 			Password: "",
 			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
 		},
@@ -490,17 +513,26 @@ func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinit
 	}
 }
 
-func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1.Affinity) *v1.Affinity {
-	// generate pod anti-affinity to avoid multiple pods of the same Postgres cluster in the same topology , e.g. node
-	podAffinity := v1.Affinity{
-		PodAntiAffinity: &v1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
-				LabelSelector: &metav1.LabelSelector{
-					MatchLabels: labels,
-				},
-				TopologyKey: topologyKey,
-			}},
+func podAffinity(
+	labels labels.Set,
+	topologyKey string,
+	nodeAffinity *v1.Affinity,
+	preferredDuringScheduling bool,
+	anti bool) *v1.Affinity {
+
+	var podAffinity v1.Affinity
+
+	podAffinityTerm := v1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
 		},
+		TopologyKey: topologyKey,
+	}
+
+	if anti {
+		podAffinity.PodAntiAffinity = generatePodAntiAffinity(podAffinityTerm, preferredDuringScheduling)
+	} else {
+		podAffinity.PodAffinity = generatePodAffinity(podAffinityTerm, preferredDuringScheduling)
 	}
 
 	if nodeAffinity != nil && nodeAffinity.NodeAffinity != nil {
@@ -508,6 +540,36 @@ func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1
 	}
 
 	return &podAffinity
+}
+
+func generatePodAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuringScheduling bool) *v1.PodAffinity {
+	podAffinity := &v1.PodAffinity{}
+
+	if preferredDuringScheduling {
+		podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []v1.WeightedPodAffinityTerm{{
+			Weight:          1,
+			PodAffinityTerm: podAffinityTerm,
+		}}
+	} else {
+		podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []v1.PodAffinityTerm{podAffinityTerm}
+	}
+
+	return podAffinity
+}
+
+func generatePodAntiAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuringScheduling bool) *v1.PodAntiAffinity {
+	podAntiAffinity := &v1.PodAntiAffinity{}
+
+	if preferredDuringScheduling {
+		podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []v1.WeightedPodAffinityTerm{{
+			Weight:          1,
+			PodAffinityTerm: podAffinityTerm,
+		}}
+	} else {
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []v1.PodAffinityTerm{podAffinityTerm}
+	}
+
+	return podAntiAffinity
 }
 
 func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
@@ -708,6 +770,7 @@ func (c *Cluster) generatePodTemplate(
 	spiloContainer *v1.Container,
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
+	sharePgSocketWithSidecars *bool,
 	tolerationsSpec *[]v1.Toleration,
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
@@ -721,6 +784,7 @@ func (c *Cluster) generatePodTemplate(
 	shmVolume *bool,
 	podAntiAffinity bool,
 	podAntiAffinityTopologyKey string,
+	podAntiAffinityPreferredDuringScheduling bool,
 	additionalSecretMount string,
 	additionalSecretMountPath string,
 	additionalVolumes []acidv1.AdditionalVolume,
@@ -761,13 +825,23 @@ func (c *Cluster) generatePodTemplate(
 	}
 
 	if podAntiAffinity {
-		podSpec.Affinity = generatePodAffinity(labels, podAntiAffinityTopologyKey, nodeAffinity)
+		podSpec.Affinity = podAffinity(
+			labels,
+			podAntiAffinityTopologyKey,
+			nodeAffinity,
+			podAntiAffinityPreferredDuringScheduling,
+			true,
+		)
 	} else if nodeAffinity != nil {
 		podSpec.Affinity = nodeAffinity
 	}
 
 	if priorityClassName != "" {
 		podSpec.PriorityClassName = priorityClassName
+	}
+
+	if sharePgSocketWithSidecars != nil && *sharePgSocketWithSidecars {
+		addVarRunVolume(&podSpec)
 	}
 
 	if additionalSecretMount != "" {
@@ -798,10 +872,9 @@ func (c *Cluster) generatePodTemplate(
 
 // generatePodEnvVars generates environment variables for the Spilo Pod
 func (c *Cluster) generateSpiloPodEnvVars(
+	spec *acidv1.PostgresSpec,
 	uid types.UID,
-	spiloConfiguration string,
-	cloneDescription *acidv1.CloneDescription,
-	standbyDescription *acidv1.StandbyDescription) []v1.EnvVar {
+	spiloConfiguration string) ([]v1.EnvVar, error) {
 
 	// hard-coded set of environment variables we need
 	// to guarantee core functionality of the operator
@@ -907,24 +980,24 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_USE_CONFIGMAPS", Value: "true"})
 	}
 
-	if cloneDescription != nil && cloneDescription.ClusterName != "" {
-		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
-	}
-
-	if standbyDescription != nil {
-		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
-	}
-
 	// fetch cluster-specific variables that will override all subsequent global variables
-	if len(c.Spec.Env) > 0 {
-		envVars = appendEnvVars(envVars, c.Spec.Env...)
+	if len(spec.Env) > 0 {
+		envVars = appendEnvVars(envVars, spec.Env...)
+	}
+
+	if spec.Clone != nil && spec.Clone.ClusterName != "" {
+		envVars = append(envVars, c.generateCloneEnvironment(spec.Clone)...)
+	}
+
+	if spec.StandbyCluster != nil {
+		envVars = append(envVars, c.generateStandbyEnvironment(spec.StandbyCluster)...)
 	}
 
 	// fetch variables from custom environment Secret
 	// that will override all subsequent global variables
 	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
 	if err != nil {
-		c.logger.Warningf("%v", err)
+		return nil, err
 	}
 	envVars = appendEnvVars(envVars, secretEnvVarsList...)
 
@@ -932,7 +1005,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	// that will override all subsequent global variables
 	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
 	if err != nil {
-		c.logger.Warningf("%v", err)
+		return nil, err
 	}
 	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
 
@@ -968,7 +1041,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 
 	envVars = appendEnvVars(envVars, opConfigEnvVars...)
 
-	return envVars
+	return envVars, nil
 }
 
 func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
@@ -1150,17 +1223,18 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 
 func generateSpiloReadinessProbe() *v1.Probe {
 	return &v1.Probe{
-		Handler: v1.Handler{
+		FailureThreshold: 3,
+		ProbeHandler: v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
-				Path: "/readiness",
-				Port: intstr.IntOrString{IntVal: patroni.ApiPort},
+				Path:   "/readiness",
+				Port:   intstr.IntOrString{IntVal: patroni.ApiPort},
+				Scheme: v1.URISchemeHTTP,
 			},
 		},
 		InitialDelaySeconds: 6,
 		PeriodSeconds:       10,
-		TimeoutSeconds:      5,
 		SuccessThreshold:    1,
-		FailureThreshold:    3,
+		TimeoutSeconds:      5,
 	}
 }
 
@@ -1211,17 +1285,16 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 	}
 
-	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.OpConfig.EnablePgVersionEnvVar, c.logger)
+	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, &c.OpConfig, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
 	}
 
 	// generate environment variables for the spilo container
-	spiloEnvVars := c.generateSpiloPodEnvVars(
-		c.Postgresql.GetUID(),
-		spiloConfiguration,
-		spec.Clone,
-		spec.StandbyCluster)
+	spiloEnvVars, err := c.generateSpiloPodEnvVars(spec, c.Postgresql.GetUID(), spiloConfiguration)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate Spilo env vars: %v", err)
+	}
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
@@ -1311,7 +1384,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	)
 
 	// Patroni responds 200 to probe only if it either owns the leader lock or postgres is running and DCS is accessible
-	spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
+	if c.OpConfig.EnableReadinessProbe {
+		spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
+	}
 
 	// generate container specs for sidecars specified in the cluster manifest
 	clusterSpecificSidecars := []v1.Container{}
@@ -1382,6 +1457,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		spiloContainer,
 		initContainers,
 		sidecarContainers,
+		c.OpConfig.SharePgSocketWithSidecars,
 		&tolerationSpec,
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
@@ -1395,6 +1471,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		mountShmVolumeNeeded(c.OpConfig, spec),
 		c.OpConfig.EnablePodAntiAffinity,
 		c.OpConfig.PodAntiAffinityTopologyKey,
+		c.OpConfig.PodAntiAffinityPreferredDuringScheduling,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		additionalVolumes)
@@ -1575,6 +1652,28 @@ func addShmVolume(podSpec *v1.PodSpec) {
 	podSpec.Volumes = volumes
 }
 
+func addVarRunVolume(podSpec *v1.PodSpec) {
+	volumes := append(podSpec.Volumes, v1.Volume{
+		Name: "postgresql-run",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium: "Memory",
+			},
+		},
+	})
+
+	for i := range podSpec.Containers {
+		mounts := append(podSpec.Containers[i].VolumeMounts,
+			v1.VolumeMount{
+				Name:      constants.RunVolumeName,
+				MountPath: constants.RunVolumePath,
+			})
+		podSpec.Containers[i].VolumeMounts = mounts
+	}
+
+	podSpec.Volumes = volumes
+}
+
 func addSecretVolume(podSpec *v1.PodSpec, additionalSecretMount string, additionalSecretMountPath string) {
 	volumes := append(podSpec.Volumes, v1.Volume{
 		Name: additionalSecretMount,
@@ -1698,7 +1797,7 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 }
 
 func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
-	secrets := make(map[string]*v1.Secret, len(c.pgUsers))
+	secrets := make(map[string]*v1.Secret, len(c.pgUsers)+len(c.systemUsers))
 	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
@@ -1833,22 +1932,13 @@ func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourc
 }
 
 func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
-	annotations := make(map[string]string)
-
-	for k, v := range c.OpConfig.CustomServiceAnnotations {
-		annotations[k] = v
-	}
-	if spec != nil || spec.ServiceAnnotations != nil {
-		for k, v := range spec.ServiceAnnotations {
-			annotations[k] = v
-		}
-	}
+	annotations := c.getCustomServiceAnnotations(role, spec)
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
 		dnsName := c.dnsName(role)
 
 		// Just set ELB Timeout annotation with default value, if it does not
-		// have a cutom value
+		// have a custom value
 		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
 			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
 		}
@@ -1858,6 +1948,24 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 
 	if len(annotations) == 0 {
 		return nil
+	}
+
+	return annotations
+}
+
+func (c *Cluster) getCustomServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
+	annotations := make(map[string]string)
+	maps.Copy(annotations, c.OpConfig.CustomServiceAnnotations)
+
+	if spec != nil {
+		maps.Copy(annotations, spec.ServiceAnnotations)
+
+		switch role {
+		case Master:
+			maps.Copy(annotations, spec.MasterServiceAnnotations)
+		case Replica:
+			maps.Copy(annotations, spec.ReplicaServiceAnnotations)
+		}
 	}
 
 	return annotations
@@ -2011,7 +2119,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	return result
 }
 
-func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget {
+func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 
@@ -2020,14 +2128,14 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 		minAvailable = intstr.FromInt(0)
 	}
 
-	return &policybeta1.PodDisruptionBudget{
+	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.podDisruptionBudgetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
 			Annotations: c.annotationsSet(nil),
 		},
-		Spec: policybeta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: c.roleLabelsSet(false, Master),
@@ -2045,7 +2153,7 @@ func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (hos
 	return
 }
 
-func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
+func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	var (
 		err                  error
@@ -2057,9 +2165,12 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	c.logger.Debug("Generating logical backup pod template")
 
-	// allocate for the backup pod the same amount of resources as for normal DB pods
+	// allocate configured resources for logical backup pod
+	logicalBackupResources := makeLogicalBackupResources(&c.OpConfig)
+	// if not defined only default resources from spilo pods are used
 	resourceRequirements, err = c.generateResourceRequirements(
-		c.Spec.Resources, makeDefaultResources(&c.OpConfig), logicalBackupContainerName)
+		&logicalBackupResources, makeDefaultResources(&c.OpConfig), logicalBackupContainerName)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
 	}
@@ -2086,20 +2197,15 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		c.OpConfig.ClusterNameLabel: c.Name,
 		"application":               "spilo-logical-backup",
 	}
-	podAffinityTerm := v1.PodAffinityTerm{
-		LabelSelector: &metav1.LabelSelector{
-			MatchLabels: labels,
-		},
-		TopologyKey: "kubernetes.io/hostname",
-	}
-	podAffinity := v1.Affinity{
-		PodAffinity: &v1.PodAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
-				Weight:          1,
-				PodAffinityTerm: podAffinityTerm,
-			},
-			},
-		}}
+
+	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil)
+	podAffinity := podAffinity(
+		labels,
+		"kubernetes.io/hostname",
+		nodeAffinity,
+		true,
+		false,
+	)
 
 	annotations := c.generatePodAnnotations(&c.Spec)
 
@@ -2111,6 +2217,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},
+		util.False(),
 		&[]v1.Toleration{},
 		nil,
 		nil,
@@ -2124,6 +2231,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		util.False(),
 		false,
 		"",
+		false,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		[]acidv1.AdditionalVolume{}); err != nil {
@@ -2131,7 +2239,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	}
 
 	// overwrite specific params of logical backups pods
-	podTemplate.Spec.Affinity = &podAffinity
+	podTemplate.Spec.Affinity = podAffinity
 	podTemplate.Spec.RestartPolicy = "Never" // affects containers within a pod
 
 	// configure a batch job
@@ -2142,7 +2250,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	// configure a cron job
 
-	jobTemplateSpec := batchv1beta1.JobTemplateSpec{
+	jobTemplateSpec := batchv1.JobTemplateSpec{
 		Spec: jobSpec,
 	}
 
@@ -2151,17 +2259,17 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		schedule = c.OpConfig.LogicalBackupSchedule
 	}
 
-	cronJob := &batchv1beta1.CronJob{
+	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.getLogicalBackupJobName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
 			Annotations: c.annotationsSet(nil),
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
 			JobTemplate:       jobTemplateSpec,
-			ConcurrencyPolicy: batchv1beta1.ForbidConcurrent,
+			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 		},
 	}
 
@@ -2221,6 +2329,18 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Name:  "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials,
 		},
+		{
+			Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountName,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageContainer,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey,
+		},
 		// Postgres env vars
 		{
 			Name:  "PG_VERSION",
@@ -2263,8 +2383,6 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
 	}
 
-	c.logger.Debugf("Generated logical backup env vars")
-	c.logger.Debugf("%v", envVars)
 	return envVars
 }
 

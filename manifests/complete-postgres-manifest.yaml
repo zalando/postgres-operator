@@ -10,7 +10,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+  dockerImage: ghcr.io/zalando/spilo-15:2.1-p9
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -28,6 +28,8 @@ spec:
   enableReplicaLoadBalancer: false
   enableConnectionPooler: false # enable/disable connection pooler deployment
   enableReplicaConnectionPooler: false # set to enable connectionPooler for replica service
+  enableMasterPoolerLoadBalancer: false
+  enableReplicaPoolerLoadBalancer: false
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
@@ -44,7 +46,7 @@ spec:
           defaultRoles: true
           defaultUsers: false
   postgresql:
-    version: "14"
+    version: "15"
     parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
@@ -109,6 +111,7 @@ spec:
       cpu: 500m
       memory: 500Mi
   patroni:
+    failsafe_mode: false
     initdb:
       encoding: "UTF8"
       locale: "en_US.UTF-8"

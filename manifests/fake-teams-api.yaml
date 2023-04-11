@@ -41,7 +41,5 @@ metadata:
   namespace: default
 type: Opaque
 data:
-apiVersion: v1
-data:
   read-only-token-secret: dGVzdHRva2Vu
   read-only-token-type: QmVhcmVy

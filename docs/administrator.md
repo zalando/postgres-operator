@@ -15,7 +15,7 @@ CRDs set `enable_crd_registration` config option to `false`.
 
 CRDs are defined with a `openAPIV3Schema` structural schema against which new
 manifests of [`postgresql`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql.crd.yaml) or [`OperatorConfiguration`](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml)
-resources will be validated. On creation you can bypass the validation with 
+resources will be validated. On creation you can bypass the validation with
 `kubectl create --validate=false`.
 
 By default, the operator will register the CRDs in the `all` category so
@@ -516,6 +516,9 @@ configuration:
     enable_pod_antiaffinity: true
 ```
 
+By default the type of pod anti affinity is `requiredDuringSchedulingIgnoredDuringExecution`,
+you can switch to  `preferredDuringSchedulingIgnoredDuringExecution` by setting `pod_antiaffinity_preferred_during_scheduling: true`.
+
 By default the topology key for the pod anti affinity is set to
 `kubernetes.io/hostname`, you can set another topology key e.g.
 `failure-domain.beta.kubernetes.io/zone`. See [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys.
@@ -628,9 +631,9 @@ order (e.g. a variable defined in 4. overrides a variable with the same name
 in 5.):
 
 1. Assigned by the operator
-2. Clone section (with WAL settings from operator config when `s3_wal_path` is empty)
-3. Standby section
-4. `env` section in cluster manifest
+2. `env` section in cluster manifest
+3. Clone section (with WAL settings from operator config when `s3_wal_path` is empty)
+4. Standby section
 5. Pod environment secret via operator config
 6. Pod environment config map via operator config
 7. WAL and logical backup settings from operator config
@@ -781,9 +784,15 @@ services:
   This value can't be overwritten. If any changing in its value is needed, it
   MUST be done changing the DNS format operator config parameters; and
 - `service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout` with
-  a default value of "3600". This value can be overwritten with the operator
-  config parameter `custom_service_annotations` or the  cluster parameter
-  `serviceAnnotations`.
+  a default value of "3600".
+
+There are multiple options to specify service annotations that will be merged
+with each other and override in the following order (where latter take
+precedence):
+1. Default annotations if LoadBalancer is enabled
+2. Globally configured `custom_service_annotations`
+3. `serviceAnnotations` specified in the cluster manifest
+4. `masterServiceAnnotations` and `replicaServiceAnnotations` specified in the cluster manifest
 
 To limit the range of IP addresses that can reach a load balancer, specify the
 desired ranges in the `allowedSourceRanges` field (applies to both master and
@@ -801,6 +810,9 @@ Load balancer services can also be enabled for the [connection pooler](user.md#c
 pods with manifest flags `enableMasterPoolerLoadBalancer` and/or
 `enableReplicaPoolerLoadBalancer` or in the operator configuration with
 `enable_master_pooler_load_balancer` and/or `enable_replica_pooler_load_balancer`.
+For the `external-dns.alpha.kubernetes.io/hostname` annotation the `-pooler`
+suffix will be appended to the cluster name used in the template which is
+defined in `master|replica_dns_name_format`.
 
 ## Running periodic 'autorepair' scans of K8s objects
 
@@ -981,7 +993,81 @@ with `USE_WALG_BACKUP: "true"`.
 
 ### Google Cloud Platform setup
 
-To configure the operator on GCP these prerequisites that are needed:
+When using GCP, there are two authentication methods to allow the postgres
+cluster to access buckets to write WAL-E logs: Workload Identity (recommended)
+or using a GCP Service Account Key (legacy).
+
+#### Workload Identity setup
+
+To configure the operator on GCP using Workload Identity these prerequisites are
+needed.
+
+* [Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) enabled on the GKE cluster where the operator will be deployed
+* A GCP service account with the proper IAM setup to access the GCS bucket for the WAL-E logs
+* An IAM policy granting the Kubernetes service account the
+  `roles/iam.workloadIdentityUser` role on the GCP service account, e.g.:
+```bash
+gcloud iam service-accounts add-iam-policy-binding <GCP_SERVICE_ACCOUNT_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:PROJECT_ID.svc.id.goog[<POSTGRES_OPERATOR_NS>/postgres-pod-custom]"
+```
+
+The configuration parameters that we will be using are:
+
+* `wal_gs_bucket`
+
+1. Create a custom Kubernetes service account to be used by Patroni running on
+the postgres cluster pods, this service account should include an annotation
+with the email address of the Google IAM service account used to communicate
+with the GCS bucket, e.g.
+
+```yml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-pod-custom
+  namespace: <POSTGRES_OPERATOR_NS>
+  annotations:
+    iam.gke.io/gcp-service-account: <GCP_SERVICE_ACCOUNT_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com
+```
+
+2. Specify the new custom service account in your [operator paramaters](./reference/operator_parameters.md)
+
+If using manual deployment or kustomize, this is done by setting
+`pod_service_account_name` in your configuration file specified in the
+[postgres-operator deployment](../manifests/postgres-operator.yaml#L37)
+
+If deploying the operator [using Helm](./quickstart.md#helm-chart), this can
+be specified in the chart's values file, e.g.:
+
+```yml
+...
+podServiceAccount:
+  name: postgres-pod-custom
+```
+
+3. Setup your operator configuration values. Ensure that the operator's configuration
+is set up like the following:
+```yml
+...
+aws_or_gcp:
+  # additional_secret_mount: ""
+  # additional_secret_mount_path: ""
+  # aws_region: eu-central-1
+  # kube_iam_role: ""
+  # log_s3_bucket: ""
+  # wal_s3_bucket: ""
+  wal_gs_bucket: "postgres-backups-bucket-28302F2"  # name of bucket on where to save the WAL-E logs
+  # gcp_credentials: ""
+...
+```
+
+Continue to shared steps below.
+
+#### GCP Service Account Key setup
+
+To configure the operator on GCP using a GCP service account key these
+prerequisites are needed.
 
 * A service account with the proper IAM setup to access the GCS bucket for the WAL-E logs
 * The credentials file for the service account.
@@ -1025,7 +1111,10 @@ aws_or_gcp:
 ...
 ```
 
-3. Setup pod environment configmap that instructs the operator to use WAL-G,
+Once you have set up authentication using one of the two methods above, continue
+with the remaining shared steps:
+
+1. Setup pod environment configmap that instructs the operator to use WAL-G,
 instead of WAL-E, for backup and restore.
 ```yml
 apiVersion: v1
@@ -1040,7 +1129,7 @@ data:
   CLONE_USE_WALG_RESTORE: "true"
 ```
 
-4. Then provide this configmap in postgres-operator settings:
+2. Then provide this configmap in postgres-operator settings:
 ```yml
 ...
 # namespaced name of the ConfigMap with environment variables to populate on every pod
@@ -1091,7 +1180,7 @@ data:
   USE_WALG_BACKUP: "true"
   USE_WALG_RESTORE: "true"
   CLONE_USE_WALG_RESTORE: "true"
-  WALG_AZ_PREFIX: "azure://container-name/$(SCOPE)/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version) 
+  WALG_AZ_PREFIX: "azure://container-name/$(SCOPE)/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version)
 ```
 
 3. Setup your operator configuration values. With the `psql-backup-creds`
@@ -1099,9 +1188,10 @@ and `pod-env-overrides` resources applied to your cluster, ensure that the opera
 is set up like the following:
 ```yml
 ...
-aws_or_gcp:
+kubernetes:
   pod_environment_secret: "psql-backup-creds"
   pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
+aws_or_gcp:
   wal_az_storage_account: "postgresbackupsbucket28302F2"  # name of storage account to save the WAL-G logs
 ...
 ```
@@ -1110,7 +1200,7 @@ aws_or_gcp:
 
 If cluster members have to be (re)initialized restoring physical backups
 happens automatically either from the backup location or by running
-[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html)
+[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html)
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.
@@ -1196,6 +1286,10 @@ of the backup cron job.
 6. For that feature to work, your RBAC policy must enable operations on the
 `cronjobs` resource from the `batch` API group for the operator service account.
 See [example RBAC](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml)
+
+7. Resources of the pod template in the cron job can be configured. When left
+empty [default values of spilo pods](reference/operator_parameters.md#kubernetes-resource-requests)
+will be used.
 
 ## Sidecars for Postgres clusters
 

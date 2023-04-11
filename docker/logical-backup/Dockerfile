@@ -15,6 +15,7 @@ RUN apt-get update     \
         gnupg \
         gcc \
         libffi-dev \
+    && curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
     && pip3 install --upgrade pip \
     && pip3 install --no-cache-dir awscli --upgrade \
     && pip3 install --no-cache-dir gsutil --upgrade \
@@ -23,13 +24,12 @@ RUN apt-get update     \
     && curl --silent https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     && apt-get update \
     && apt-get install --no-install-recommends -y  \
+        postgresql-client-15  \
         postgresql-client-14  \
         postgresql-client-13  \
         postgresql-client-12  \
         postgresql-client-11  \
         postgresql-client-10  \
-        postgresql-client-9.6 \
-        postgresql-client-9.5 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

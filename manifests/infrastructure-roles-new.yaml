@@ -8,5 +8,4 @@ data:
 kind: Secret
 metadata:
   name: postgresql-infrastructure-roles-new
-  namespace: default
 type: Opaque

@@ -26,6 +26,7 @@ _testmain.go
 *.test
 *.prof
 /vendor/
+/kubectl-pg/vendor/
 /build/
 /docker/build/
 /github.com/

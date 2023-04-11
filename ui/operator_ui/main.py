@@ -79,7 +79,7 @@ TOKENINFO_URL = getenv('OAUTH2_TOKEN_INFO_URL')
 
 OPERATOR_API_URL = getenv('OPERATOR_API_URL', 'http://postgres-operator')
 OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-name')
-OPERATOR_UI_CONFIG = getenv('OPERATOR_UI_CONFIG', '{}')
+OPERATOR_UI_CONFIG = loads(getenv('OPERATOR_UI_CONFIG', '{}'))
 OPERATOR_UI_MAINTENANCE_CHECK = getenv('OPERATOR_UI_MAINTENANCE_CHECK', '{}')
 READ_ONLY_MODE = getenv('READ_ONLY_MODE', False) in [True, 'true']
 SPILO_S3_BACKUP_PREFIX = getenv('SPILO_S3_BACKUP_PREFIX', 'spilo/')
@@ -101,6 +101,7 @@ COST_THROUGHPUT = float(getenv('COST_THROUGHPUT', 0.0476))  # MB/s per month abo
 # compute costs, i.e. https://www.ec2instances.info/?region=eu-central-1&selected=m5.2xlarge
 COST_CORE = float(getenv('COST_CORE', 0.0575))  # Core per hour m5.2xlarge / 8.
 COST_MEMORY = float(getenv('COST_MEMORY', 0.014375))  # Memory GB m5.2xlarge / 32.
+COST_ELB = float(getenv('COST_ELB', 0.03))     # per hour
 
 # maximum and limitation of IOPS and throughput 
 FREE_IOPS = float(getenv('FREE_IOPS', 3000)) 
@@ -310,7 +311,7 @@ def send_js(path):
 @app.route('/')
 @authorize
 def index():
-    return render_template('index.html', google_analytics=GOOGLE_ANALYTICS)
+    return render_template('index.html', google_analytics=GOOGLE_ANALYTICS, app_url=APP_URL)
 
 
 DEFAULT_UI_CONFIG = {
@@ -320,7 +321,7 @@ DEFAULT_UI_CONFIG = {
     'users_visible': True,
     'databases_visible': True,
     'resources_visible': RESOURCES_VISIBLE,
-    'postgresql_versions': ['11','12','13','14'],
+    'postgresql_versions': ['11', '12', '13', '14', '15'],
     'dns_format_string': '{0}.{1}',
     'pgui_link': '',
     'static_network_whitelist': {},
@@ -334,6 +335,7 @@ DEFAULT_UI_CONFIG = {
     'cost_throughput': COST_THROUGHPUT,
     'cost_core': COST_CORE,
     'cost_memory': COST_MEMORY,
+    'cost_elb': COST_ELB,
     'min_pods': MIN_PODS,
     'free_iops': FREE_IOPS, 
     'free_throughput': FREE_THROUGHPUT,
@@ -346,7 +348,7 @@ DEFAULT_UI_CONFIG = {
 @authorize
 def get_config():
     config = DEFAULT_UI_CONFIG.copy() 
-    config.update(loads(OPERATOR_UI_CONFIG))
+    config.update(OPERATOR_UI_CONFIG)
 
     config['namespaces'] = (
         [TARGET_NAMESPACE]
@@ -506,10 +508,10 @@ def get_postgresqls():
     postgresqls = [
         {
             'nodes': spec.get('numberOfInstances', ''),
-            'memory': spec.get('resources', {}).get('requests', {}).get('memory', 0),
-            'memory_limit': spec.get('resources', {}).get('limits', {}).get('memory', 0),
-            'cpu': spec.get('resources', {}).get('requests', {}).get('cpu', 0),
-            'cpu_limit': spec.get('resources', {}).get('limits', {}).get('cpu', 0),
+            'memory': spec.get('resources', {}).get('requests', {}).get('memory', OPERATOR_UI_CONFIG.get("default_memory", DEFAULT_MEMORY)),
+            'memory_limit': spec.get('resources', {}).get('limits', {}).get('memory', OPERATOR_UI_CONFIG.get("default_memory_limit", DEFAULT_MEMORY_LIMIT)),
+            'cpu': spec.get('resources', {}).get('requests', {}).get('cpu', OPERATOR_UI_CONFIG.get("default_cpu", DEFAULT_CPU)),
+            'cpu_limit': spec.get('resources', {}).get('limits', {}).get('cpu', OPERATOR_UI_CONFIG.get("default_cpu_limit", DEFAULT_CPU_LIMIT)),
             'volume_size': spec.get('volume', {}).get('size', 0),
             'iops': spec.get('volume', {}).get('iops', 3000),
             'throughput': spec.get('volume', {}).get('throughput', 125),
@@ -523,6 +525,8 @@ def get_postgresqls():
             'namespaced_name': namespace + '/' + name,
             'full_name': namespace + '/' + name + ('/' + uid if uid else ''),
             'status': status,
+            'num_elb': spec.get('enableMasterLoadBalancer', 0) + spec.get('enableReplicaLoadBalancer', 0) + \
+                       spec.get('enableMasterPoolerLoadBalancer', 0) + spec.get('enableReplicaPoolerLoadBalancer', 0),
         }
         for cluster in these(
             read_postgresqls(
@@ -662,49 +666,20 @@ def update_postgresql(namespace: str, cluster: str):
 
         spec['volume']['throughput'] = throughput
 
-    if 'enableConnectionPooler' in postgresql['spec']:
-        cp = postgresql['spec']['enableConnectionPooler']
-        if not cp:
-            if 'enableConnectionPooler' in o['spec']:
-                del o['spec']['enableConnectionPooler']
-        else:
-            spec['enableConnectionPooler'] = True
-    else:
-        if 'enableConnectionPooler' in o['spec']:
-            del o['spec']['enableConnectionPooler']
+    additional_specs = ['enableMasterLoadBalancer',
+                        'enableReplicaLoadBalancer',
+                        'enableConnectionPooler',
+                        'enableReplicaConnectionPooler',
+                        'enableMasterPoolerLoadBalancer',
+                        'enableReplicaPoolerLoadBalancer',
+                        ]
 
-    if 'enableReplicaConnectionPooler' in postgresql['spec']:
-        cp = postgresql['spec']['enableReplicaConnectionPooler']
-        if not cp:
-            if 'enableReplicaConnectionPooler' in o['spec']:
-                del o['spec']['enableReplicaConnectionPooler']
+    for var in additional_specs:
+        if postgresql['spec'].get(var):
+            spec[var] = True
         else:
-            spec['enableReplicaConnectionPooler'] = True
-    else:
-        if 'enableReplicaConnectionPooler' in o['spec']:
-            del o['spec']['enableReplicaConnectionPooler']
-
-    if 'enableReplicaLoadBalancer' in postgresql['spec']:
-        rlb = postgresql['spec']['enableReplicaLoadBalancer']
-        if not rlb:
-            if 'enableReplicaLoadBalancer' in o['spec']:
-                del o['spec']['enableReplicaLoadBalancer']
-        else:
-            spec['enableReplicaLoadBalancer'] = True
-    else:
-        if 'enableReplicaLoadBalancer' in o['spec']:
-            del o['spec']['enableReplicaLoadBalancer']
-
-    if 'enableMasterLoadBalancer' in postgresql['spec']:
-        rlb = postgresql['spec']['enableMasterLoadBalancer']
-        if not rlb:
-            if 'enableMasterLoadBalancer' in o['spec']:
-                del o['spec']['enableMasterLoadBalancer']
-        else:
-            spec['enableMasterLoadBalancer'] = True
-    else:
-        if 'enableMasterLoadBalancer' in o['spec']:
-            del o['spec']['enableMasterLoadBalancer']
+            if var in o['spec']:
+                del o['spec'][var]
 
     if 'users' in postgresql['spec']:
         spec['users'] = postgresql['spec']['users']

@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "14"
+    version: "15"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -109,7 +109,7 @@ metadata:
 spec:
   [...]
   postgresql:
-    version: "14"
+    version: "15"
     parameters:
       password_encryption: scram-sha-256
 ```
@@ -517,7 +517,7 @@ Postgres Operator will create the following NOLOGIN roles:
 
 The `<dbname>_owner` role is the database owner and should be used when creating
 new database objects. All members of the `admin` role, e.g. teams API roles, can
-become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/12/sql-alterdefaultprivileges.html)
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/15/sql-alterdefaultprivileges.html)
 are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
@@ -592,7 +592,7 @@ spec:
 
 ### Schema `search_path` for default roles
 
-The schema [`search_path`](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH)
+The schema [`search_path`](https://www.postgresql.org/docs/15/ddl-schemas.html#DDL-SCHEMAS-PATH)
 for each role will include the role name and the schemas, this role should have
 access to. So `foo_bar_writer` does not have to schema-qualify tables from
 schemas `foo_bar_writer, bar`, while `foo_writer` can look up `foo_writer` and
@@ -812,7 +812,7 @@ spec:
 ### Clone directly
 
 Another way to get a fresh copy of your source DB cluster is via
-[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html). To
+[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html). To
 use this feature simply leave out the timestamp field from the clone section.
 The operator will connect to the service of the source cluster by name. If the
 cluster is called test, then the connection string will look like host=test
@@ -1006,6 +1006,42 @@ option must be set to `true`.
 
 If you want to add a sidecar to every cluster managed by the operator, you can specify it in the [operator configuration](administrator.md#sidecars-for-postgres-clusters) instead.
 
+### Accessing the PostgreSQL socket from sidecars
+
+If enabled by the `share_pgsocket_with_sidecars` option in the operator
+configuration the PostgreSQL socket is placed in a volume of type `emptyDir`
+named `postgresql-run`. To allow access to the socket from any sidecar
+container simply add a VolumeMount to this volume to your sidecar spec.
+
+```yaml
+  - name: "container-name"
+    image: "company/image:tag"
+    volumeMounts:
+    - mountPath: /var/run
+      name: postgresql-run
+```
+
+If you do not want to globally enable this feature and only use it for single
+Postgres clusters, specify an `EmptyDir` volume under `additionalVolumes` in
+the manifest:
+
+```yaml
+spec:
+  additionalVolumes:
+  - name: postgresql-run
+    mountPath: /var/run/postgresql
+    targetContainers:
+    - all
+    volumeSource:
+      emptyDir: {}
+  sidecars: 
+  - name: "container-name"
+    image: "company/image:tag"
+    volumeMounts:
+    - mountPath: /var/run
+      name: postgresql-run
+```
+
 ## InitContainers Support
 
 Each cluster can specify arbitrary init containers to run. These containers can
@@ -1049,7 +1085,7 @@ When using AWS with gp3 volumes you should set the mode to `mixed` because it
 will also adjust the IOPS and throughput that can be defined in the manifest.
 Check the [AWS docs](https://aws.amazon.com/ebs/general-purpose/) to learn
 about default and maximum values. Keep in mind that AWS rate-limits updating
-volume specs to no more than once every 6 hours. 
+volume specs to no more than once every 6 hours.
 
 ```yaml
 spec:
