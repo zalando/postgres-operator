@@ -1200,11 +1200,16 @@ trivial to know at deploy time the uid/gid of the user in the cluster.
 Therefore, instead of using a global `spilo_fsgroup` setting in operator
 configuration or use the `spiloFSGroup` field per Postgres cluster manifest.
 
+For testing purposes, you can generate a self-signed certificate with openssl:
+```sh
+openssl req -x509 -nodes -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=acid.zalan.do"
+```
+
 Upload the cert as a kubernetes secret:
 ```sh
 kubectl create secret tls pg-tls \
-  --key pg-tls.key \
-  --cert pg-tls.crt
+  --key tls.key \
+  --cert tls.crt
 ```
 
 When doing client auth, CA can come optionally from the same secret:
@@ -1231,8 +1236,7 @@ spec:
 
 Optionally, the CA can be provided by a different secret:
 ```sh
-kubectl create secret generic pg-tls-ca \
-  --from-file=ca.crt=ca.crt
+kubectl create secret generic pg-tls-ca --from-file=ca.crt=ca.crt
 ```
 
 Then configure the postgres resource with the TLS secret:

@@ -636,10 +636,11 @@ class EndToEndTestCase(unittest.TestCase):
         _, replica_nodes = k8s.get_pg_nodes(cluster_label)
         self.assertNotEqual(replica_nodes, [])
 
-        # create secrets containing ssl certificate and clientauth
-        self.k8s.create_tls_secret_with_kubectl(tls_secret)
-
         try:
+            # create secret containing ssl certificate
+            result = self.k8s.create_tls_secret_with_kubectl(tls_secret)
+            print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
+
             # enable load balancer services
             pg_patch_tls = {
                 "spec": {
@@ -694,6 +695,11 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_running_pods(replica_pooler_label), 2, "No pooler replica pods found")
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label), 2, "No pooler service found")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label), 1, "Pooler secret not created")
+
+        # TLS still enabled so check existing env variables and volume mounts
+        self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("CONNECTION_POOLER_CLIENT_TLS_CRT", pooler_label), 4, "TLS env variable CONNECTION_POOLER_CLIENT_TLS_CRT missing in pooler pods")
+        self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("CONNECTION_POOLER_CLIENT_TLS_KEY", pooler_label), 4, "TLS env variable CONNECTION_POOLER_CLIENT_TLS_KEY missing in pooler pods")
+        self.eventuallyEqual(lambda: k8s.count_pods_with_volume_mount("pg-tls", pooler_label), 4, "TLS volume mount missing in pooler pods")
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
