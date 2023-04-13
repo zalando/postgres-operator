@@ -40,6 +40,7 @@ const (
 	localHost                      = "127.0.0.1/32"
 	scalyrSidecarName              = "scalyr-sidecar"
 	logicalBackupContainerName     = "logical-backup"
+	pgbackrestContainerName        = "pgbackrest-backup"
 	connectionPoolerContainer      = "connection-pooler"
 	pgPort                         = 5432
 	operatorPort                   = 8080
@@ -596,6 +597,15 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 	return []v1.Toleration{}
 }
 
+func topologySpreadConstraints(topologySpreadConstraintsSpec *[]v1.TopologySpreadConstraint) []v1.TopologySpreadConstraint {
+	// allow to override tolerations by postgresql manifest
+	if len(*topologySpreadConstraintsSpec) > 0 {
+		return *topologySpreadConstraintsSpec
+	}
+
+	return []v1.TopologySpreadConstraint{}
+}
+
 // isBootstrapOnlyParameter checks against special Patroni bootstrap parameters.
 // Those parameters must go to the bootstrap/dcs/postgresql/parameters section.
 // See http://patroni.readthedocs.io/en/latest/dynamic_configuration.html.
@@ -772,6 +782,7 @@ func (c *Cluster) generatePodTemplate(
 	sidecarContainers []v1.Container,
 	sharePgSocketWithSidecars *bool,
 	tolerationsSpec *[]v1.Toleration,
+	topologySpreadConstraintsSpec *[]v1.TopologySpreadConstraint,
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
 	spiloFSGroup *int64,
@@ -813,6 +824,7 @@ func (c *Cluster) generatePodTemplate(
 		Containers:                    containers,
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
+		TopologySpreadConstraints:     *topologySpreadConstraintsSpec,
 		SecurityContext:               &securityContext,
 	}
 
@@ -822,6 +834,12 @@ func (c *Cluster) generatePodTemplate(
 
 	if shmVolume != nil && *shmVolume {
 		addShmVolume(&podSpec)
+	}
+
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		configmapName := c.getPgbackrestConfigmapName()
+		secretName := c.Postgresql.Spec.Backup.Pgbackrest.Configuration.Secret
+		addPgbackrestConfigVolume(&podSpec, configmapName, secretName)
 	}
 
 	if podAntiAffinity {
@@ -955,6 +973,10 @@ func (c *Cluster) generateSpiloPodEnvVars(
 
 	if c.OpConfig.EnableSpiloWalPathCompat {
 		envVars = append(envVars, v1.EnvVar{Name: "ENABLE_WAL_PATH_COMPAT", Value: "true"})
+	}
+
+	if spec.Backup != nil && spec.Backup.Pgbackrest != nil {
+		envVars = append(envVars, v1.EnvVar{Name: "USE_PGBACKREST", Value: "true"})
 	}
 
 	if c.OpConfig.EnablePgVersionEnvVar {
@@ -1290,7 +1312,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
 		// this is combined with the FSGroup in the section above
 		// to give read access to the postgres user
-		defaultMode := int32(0640)
+		defaultMode := int32(0644)
 		mountPath := "/tls"
 		additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
 			Name:      spec.TLS.SecretName,
@@ -1414,9 +1436,98 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+	topologySpreadConstraintsSpec := topologySpreadConstraints(&spec.TopologySpreadConstraints)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
 	podAnnotations := c.generatePodAnnotations(spec)
+
+	if spec.Backup != nil && spec.Backup.Pgbackrest != nil {
+
+		pgbackrestRestoreEnvVars := appendEnvVars(
+			spiloEnvVars,
+			v1.EnvVar{
+				Name: "RESTORE_ENABLE",
+				ValueFrom: &v1.EnvVarSource{
+					ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: c.getPgbackrestRestoreConfigmapName(),
+						},
+						Key: "restore_enable",
+					},
+				},
+			},
+			v1.EnvVar{
+				Name: "RESTORE_BASEBACKUP",
+				ValueFrom: &v1.EnvVarSource{
+					ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: c.getPgbackrestRestoreConfigmapName(),
+						},
+						Key: "restore_basebackup",
+					},
+				},
+			},
+			v1.EnvVar{
+				Name: "RESTORE_METHOD",
+				ValueFrom: &v1.EnvVarSource{
+					ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: c.getPgbackrestRestoreConfigmapName(),
+						},
+						Key: "restore_method",
+					},
+				},
+			},
+			v1.EnvVar{
+				Name: "RESTORE_COMMAND",
+				ValueFrom: &v1.EnvVarSource{
+					ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: c.getPgbackrestRestoreConfigmapName(),
+						},
+						Key: "restore_command",
+					},
+				},
+			},
+			v1.EnvVar{
+				Name:  "SELECTOR",
+				Value: fmt.Sprintf("cluster-name=%s,spilo-role=master", c.Name),
+			},
+			v1.EnvVar{
+				Name:  "MODE",
+				Value: "pgbackrest",
+			},
+		)
+		var cpuLimit, memLimit, cpuReq, memReq string
+		if spec.Backup.Pgbackrest.Resources != nil {
+			cpuLimit = spec.Backup.Pgbackrest.Resources.ResourceLimits.CPU
+			memLimit = spec.Backup.Pgbackrest.Resources.ResourceLimits.Memory
+			cpuReq = spec.Backup.Pgbackrest.Resources.ResourceRequests.CPU
+			memReq = spec.Backup.Pgbackrest.Resources.ResourceRequests.Memory
+		} else {
+			cpuLimit = "500m"
+			memLimit = "1Gi"
+			cpuReq = "500m"
+			memReq = "1Gi"
+		}
+		resources := v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				"cpu":    resource.MustParse(cpuLimit),
+				"memory": resource.MustParse(memLimit),
+			},
+			Requests: v1.ResourceList{
+				"cpu":    resource.MustParse(cpuReq),
+				"memory": resource.MustParse(memReq),
+			},
+		}
+		initContainers = append(initContainers, v1.Container{
+			Name:         "pgbackrest-restore",
+			Image:        spec.Backup.Pgbackrest.Image,
+			Env:          pgbackrestRestoreEnvVars,
+			VolumeMounts: volumeMounts,
+			Resources:    resources,
+		})
+	}
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	podTemplate, err = c.generatePodTemplate(
@@ -1428,6 +1539,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		sidecarContainers,
 		c.OpConfig.SharePgSocketWithSidecars,
 		&tolerationSpec,
+		&topologySpreadConstraintsSpec,
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
 		effectiveFSGroup,
@@ -1582,6 +1694,9 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	if newcur != cur {
 		c.logger.Infof("adjusted number of instances from %d to %d (min: %d, max: %d)", cur, newcur, min, max)
 	}
+	if spec.Backup != nil && spec.Backup.Pgbackrest != nil && spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+		newcur = 0
+	}
 
 	return newcur
 }
@@ -1724,6 +1839,63 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 			}
 		}
 		podSpec.Containers[i].VolumeMounts = mounts
+	}
+
+	podSpec.Volumes = volumes
+}
+
+func addPgbackrestConfigVolume(podSpec *v1.PodSpec, configmapName string, secretName string) {
+
+	name := "pgbackrest-config"
+	path := "/etc/pgbackrest/conf.d"
+	defaultMode := int32(0644)
+	postgresContainerIdx := 0
+	postgresInitContainerIdx := -1
+
+	volumes := append(podSpec.Volumes, v1.Volume{
+		Name: name,
+		VolumeSource: v1.VolumeSource{
+			Projected: &v1.ProjectedVolumeSource{
+				DefaultMode: &defaultMode,
+				Sources: []v1.VolumeProjection{
+					{ConfigMap: &v1.ConfigMapProjection{
+						LocalObjectReference: v1.LocalObjectReference{Name: configmapName},
+						Optional:             util.True(),
+					},
+					},
+					{Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{Name: secretName},
+						Optional:             util.True(),
+					},
+					},
+				},
+			},
+		},
+	})
+
+	for i, container := range podSpec.Containers {
+		if container.Name == constants.PostgresContainerName {
+			postgresContainerIdx = i
+		}
+	}
+
+	mounts := append(podSpec.Containers[postgresContainerIdx].VolumeMounts,
+		v1.VolumeMount{
+			Name:      name,
+			MountPath: path,
+		})
+
+	podSpec.Containers[postgresContainerIdx].VolumeMounts = mounts
+
+	// Add pgbackrest-Config to init-container
+	for i, container := range podSpec.InitContainers {
+		if container.Name == "pgbackrest-restore" {
+			postgresInitContainerIdx = i
+		}
+	}
+
+	if postgresInitContainerIdx >= 0 {
+		podSpec.InitContainers[postgresInitContainerIdx].VolumeMounts = mounts
 	}
 
 	podSpec.Volumes = volumes
@@ -2182,6 +2354,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.Container{},
 		util.False(),
 		&[]v1.Toleration{},
+		&[]v1.TopologySpreadConstraint{},
 		nil,
 		nil,
 		nil,
@@ -2354,6 +2527,14 @@ func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return trimCronjobName(fmt.Sprintf("%s%s", c.OpConfig.LogicalBackupJobPrefix, c.clusterName().Name))
 }
 
+func (c *Cluster) getPgbackrestConfigmapName() (jobName string) {
+	return fmt.Sprintf("%s-pgbackrest-config", c.Name)
+}
+
+func (c *Cluster) getPgbackrestRestoreConfigmapName() (jobName string) {
+	return fmt.Sprintf("%s-pgbackrest-restore", c.Name)
+}
+
 // Return an array of ownerReferences to make an arbitraty object dependent on
 // the StatefulSet. Dependency is made on StatefulSet instead of PostgreSQL CRD
 // while the former is represent the actual state, and only it's deletion means
@@ -2387,4 +2568,228 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 		return path.Join(defaultDir, file)
 	}
 	return file
+}
+
+func (c *Cluster) generatePgbackrestConfigmap() (*v1.ConfigMap, error) {
+	config := "[db]\npg1-path = /home/postgres/pgdata/pgroot/data\npg1-port = 5432\npg1-socket-path = /var/run/postgresql/\n"
+	config += "\n[global]\nlog-path = /home/postgres/pgdata/pgbackrest/log\nspool-path = /home/postgres/pgdata/pgbackrest/spool-path"
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		if global := c.Postgresql.Spec.Backup.Pgbackrest.Global; global != nil {
+			for k, v := range global {
+				config += fmt.Sprintf("\n%s = %s", k, v)
+			}
+		}
+		repos := c.Postgresql.Spec.Backup.Pgbackrest.Repos
+		if len(repos) >= 1 {
+			for _, repo := range repos {
+				config += fmt.Sprintf("\n%s-%s-bucket = %s", repo.Name, repo.Storage, repo.Resource)
+				config += fmt.Sprintf("\n%s-%s-endpoint = %s", repo.Name, repo.Storage, repo.Endpoint)
+				config += fmt.Sprintf("\n%s-%s-region = %s", repo.Name, repo.Storage, repo.Region)
+				config += fmt.Sprintf("\n%s-type = %s", repo.Name, repo.Storage)
+			}
+		}
+	}
+
+	data := map[string]string{"pgbackrest_instance.conf": config}
+	configmap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: c.Namespace,
+			Name:      c.getPgbackrestConfigmapName(),
+		},
+		Data: data,
+	}
+	return configmap, nil
+}
+
+func (c *Cluster) generatePgbackrestRestoreConfigmap() (*v1.ConfigMap, error) {
+	data := make(map[string]string)
+	data["restore_enable"] = "true"
+	data["restore_basebackup"] = "false"
+	data["restore_method"] = "pgbackrest"
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		options := strings.Join(c.Postgresql.Spec.Backup.Pgbackrest.Restore.Options, " ")
+		data["restore_command"] = fmt.Sprintf(" --repo=%s %s", c.Postgresql.Spec.Backup.Pgbackrest.Restore.Repo, options)
+	} else {
+		data["restore_command"] = "n.v."
+	}
+
+	configmap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: c.Namespace,
+			Name:      c.getPgbackrestRestoreConfigmapName(),
+		},
+		Data: data,
+	}
+	return configmap, nil
+}
+
+func (c *Cluster) generatePgbackrestJob(repo string, name string, schedule string) (*batchv1.CronJob, error) {
+
+	var (
+		err                  error
+		podTemplate          *v1.PodTemplateSpec
+		resourceRequirements *v1.ResourceRequirements
+	)
+
+	// NB: a cron job creates standard batch jobs according to schedule; these batch jobs manage pods and clean-up
+
+	c.logger.Debug("Generating pgbackrest pod template")
+
+	// allocate for the backup pod the same amount of resources as for normal DB pods
+	resourceRequirements, err = c.generateResourceRequirements(
+		c.Spec.Resources, makeDefaultResources(&c.OpConfig), pgbackrestContainerName)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
+	}
+
+	envVars := c.generatePgbbackrestPodEnvVars(name)
+	pgbackrestContainer := generateContainer(
+		pgbackrestContainerName,
+		&c.Postgresql.Spec.Backup.Pgbackrest.Image,
+		resourceRequirements,
+		envVars,
+		[]v1.VolumeMount{},
+		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
+		c.OpConfig.SpiloAllowPrivilegeEscalation,
+		nil,
+	)
+
+	labels := map[string]string{
+		c.OpConfig.ClusterNameLabel: c.Name,
+		"application":               "pgbackrest-backup",
+	}
+	podAffinityTerm := v1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+		TopologyKey: "kubernetes.io/hostname",
+	}
+	podAffinity := v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
+				Weight:          1,
+				PodAffinityTerm: podAffinityTerm,
+			},
+			},
+		}}
+
+	annotations := c.generatePodAnnotations(&c.Spec)
+
+	// re-use the method that generates DB pod templates
+	if podTemplate, err = c.generatePodTemplate(
+		c.Namespace,
+		labels,
+		annotations,
+		pgbackrestContainer,
+		[]v1.Container{},
+		[]v1.Container{},
+		util.False(),
+		&[]v1.Toleration{},
+		&[]v1.TopologySpreadConstraint{},
+		nil,
+		nil,
+		nil,
+		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
+		nil,
+		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		c.OpConfig.PodServiceAccountName,
+		c.OpConfig.KubeIAMRole,
+		"",
+		util.False(),
+		false,
+		"",
+		false,
+		c.OpConfig.AdditionalSecretMount,
+		c.OpConfig.AdditionalSecretMountPath,
+		[]acidv1.AdditionalVolume{}); err != nil {
+		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
+	}
+
+	// overwrite specific params of logical backups pods
+	podTemplate.Spec.Affinity = &podAffinity
+	podTemplate.Spec.RestartPolicy = "Never" // affects containers within a pod
+
+	// configure a batch job
+
+	jobSpec := batchv1.JobSpec{
+		Template: *podTemplate,
+	}
+
+	// configure a cron job
+
+	jobTemplateSpec := batchv1.JobTemplateSpec{
+		Spec: jobSpec,
+	}
+
+	if schedule == "" {
+		schedule = c.OpConfig.LogicalBackupSchedule
+	}
+
+	cronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.getPgbackrestJobName(repo, name),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(nil),
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule:          schedule,
+			JobTemplate:       jobTemplateSpec,
+			ConcurrencyPolicy: batchv1.ForbidConcurrent,
+		},
+	}
+
+	return cronJob, nil
+}
+
+func (c *Cluster) generatePgbbackrestPodEnvVars(name string) []v1.EnvVar {
+
+	envVars := []v1.EnvVar{
+		{
+			Name:  "COMMAND",
+			Value: "backup",
+		},
+		{
+			Name:  "COMMAND_OPTS",
+			Value: fmt.Sprintf("--stanza=db --repo=1 --type=%s", name),
+		},
+		{
+			Name:  "COMPARE_HASH",
+			Value: "true",
+		},
+		{
+			Name:  "CONTAINER",
+			Value: "postgres",
+		},
+		{
+			Name:  "PGUSER",
+			Value: "postgres",
+		},
+		{
+			Name:  "MODE",
+			Value: "pgbackrest",
+		},
+		{
+			Name: "NAMESPACE",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "SELECTOR",
+			Value: fmt.Sprintf("cluster-name=%s,spilo-role=master", c.Name),
+		},
+	}
+
+	c.logger.Debugf("Generated logical backup env vars")
+	c.logger.Debugf("%v", envVars)
+	return envVars
+}
+
+// getLogicalBackupJobName returns the name; the job itself may not exists
+func (c *Cluster) getPgbackrestJobName(repo string, name string) (jobName string) {
+	return trimCronjobName(fmt.Sprintf("%s-%s-%s-%s", "pgbackrest", c.clusterName().Name, repo, name))
 }

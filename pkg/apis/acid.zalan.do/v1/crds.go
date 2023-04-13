@@ -110,6 +110,8 @@ var OperatorConfigCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition
 
 var min0 = 0.0
 var min1 = 1.0
+var mapString = "map"
+var min1int64 = int64(1)
 var minDisable = -1.0
 
 // PostgresCRDResourceValidation to check applied manifest parameters
@@ -333,6 +335,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						},
 					},
 					"initContainers": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
+						},
+					},
+					"topologySpreadConstraints": {
 						Type:     "array",
 						Nullable: true,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -1058,6 +1070,151 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"throughput": {
 								Type: "integer",
+							},
+						},
+					},
+					"backup": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"pgbackrest": {
+								Type:     "object",
+								Required: []string{"image", "repos"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"image": {
+										Type: "string",
+									},
+									"configuration": {
+										Type: "object",
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"secret": {
+												Type: "string",
+											},
+											"protection": {
+												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"restore": {
+														Type: "boolean",
+													},
+												},
+											},
+										},
+									},
+									"global": {
+										Type: "object",
+										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"repos": {
+										Type:         "array",
+										Nullable:     true,
+										MinItems:     &min1int64,
+										XListType:    &mapString,
+										XListMapKeys: []string{"name"},
+										Items: &apiextv1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type:     "object",
+												Required: []string{"name", "storage", "resource"},
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"name": {
+														Type:    "string",
+														Pattern: "^repo[1-4]",
+													},
+													"storage": {
+														Type: "string",
+														Enum: []apiextv1.JSON{
+															{
+																Raw: []byte(`"s3"`),
+															},
+															{
+																Raw: []byte(`"gcs"`),
+															},
+															{
+																Raw: []byte(`"azure"`),
+															},
+														},
+													},
+													"resource": {
+														Type: "string",
+													},
+													"endpoint": {
+														Type: "string",
+													},
+													"region": {
+														Type: "string",
+													},
+													"schedule": {
+														Type: "object",
+														Properties: map[string]apiextv1.JSONSchemaProps{
+															"full": {
+																Type: "string",
+															},
+															"incr": {
+																Type: "string",
+															},
+															"diff": {
+																Type: "string",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+									"restore": {
+										Type: "object",
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"id": {
+												Type: "string",
+											},
+											"repo": {
+												Type: "string",
+											},
+											"options": {
+												Type:     "array",
+												Nullable: true,
+												Items: &apiextv1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1.JSONSchemaProps{
+														Type: "string",
+													},
+												},
+											},
+										},
+									},
+									"resources": {
+										Type: "object",
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"limits": {
+												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"cpu": {
+														Type:    "string",
+														Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+													},
+													"memory": {
+														Type:    "string",
+														Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+													},
+												},
+											},
+											"requests": {
+												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"cpu": {
+														Type:    "string",
+														Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+													},
+													"memory": {
+														Type:    "string",
+														Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},

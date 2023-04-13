@@ -314,6 +314,30 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		if err = c.syncPgbackrestConfig(); err != nil {
+			err = fmt.Errorf("could not sync pgbackrest config: %v", err)
+			return err
+		}
+		c.logger.Info("a pgbackrest config has been successfully synced")
+		if c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+			if err = c.syncPgbackrestRestoreConfig(); err != nil {
+				err = fmt.Errorf("could not sync pgbackrest restore config: %v", err)
+				return err
+			}
+			c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+			c.Status.PgbackrestRestoreID = c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID
+			c.logger.Info("a pgbackrest restore config has been successfully synced")
+		} else {
+			if err = c.createPgbackrestRestoreConfig(); err != nil {
+				err = fmt.Errorf("could not create a pgbackrest restore config: %v", err)
+				return err
+			}
+			c.logger.Info("a pgbackrest restore config has been successfully created")
+		}
+
+	}
+
 	if c.Statefulset != nil {
 		return fmt.Errorf("statefulset already exists in the cluster")
 	}
@@ -356,6 +380,13 @@ func (c *Cluster) Create() error {
 			return fmt.Errorf("could not create a k8s cron job for logical backups: %v", err)
 		}
 		c.logger.Info("a k8s cron job for logical backup has been successfully created")
+	}
+
+	if c.Postgresql.Spec.Backup != nil && c.Postgresql.Spec.Backup.Pgbackrest != nil {
+		if err := c.syncPgbackrestJob(false); err != nil {
+			return fmt.Errorf("could not create a k8s cron job for pgbackrest: %v", err)
+		}
+		c.logger.Info("a k8s cron job for pgbackrest has been successfully created")
 	}
 
 	if err := c.listResources(); err != nil {
@@ -440,6 +471,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		needsReplace = true
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's pod tolerations does not match the current one")
+	}
+
+	if len(c.Statefulset.Spec.Template.Spec.TopologySpreadConstraints) != len(statefulSet.Spec.Template.Spec.TopologySpreadConstraints) {
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod topologySpreadConstraints does not match the current one")
 	}
 
 	// Some generated fields like creationTimestamp make it not possible to use DeepCompare on Spec.Template.ObjectMeta
@@ -871,6 +908,31 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 				c.logger.Errorf("could not sync statefulsets: %v", err)
 				updateFailed = true
 			}
+
+			if c.Spec.Backup != nil && c.Spec.Backup.Pgbackrest != nil && c.Spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+				if err := c.syncPgbackrestRestoreConfig(); err != nil {
+					updateFailed = true
+					return
+				}
+
+				if err = c.waitStatefulsetPodsReady(); err != nil {
+					updateFailed = true
+					return
+				}
+
+				c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+				c.Status.PgbackrestRestoreID = c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID
+				c.logger.Info("a pgbackrest restore config has been successfully synced")
+			} else {
+				return
+			}
+			// TODO: avoid generating the StatefulSet object twice by passing it to syncStatefulSet
+			if err := c.syncStatefulSet(); err != nil {
+				c.logger.Errorf("could not sync statefulsets: %v", err)
+				updateFailed = true
+				return
+			}
+
 		}
 	}()
 
@@ -882,6 +944,40 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			updateFailed = true
 		}
 	}
+
+	// Pgrest backup job
+	func() {
+
+		if newSpec.Spec.Backup != nil && newSpec.Spec.Backup.Pgbackrest != nil {
+			if err := c.syncPgbackrestConfig(); err != nil {
+				err = fmt.Errorf("could not sync pgbackrest config: %v", err)
+				updateFailed = true
+				return
+			}
+			c.logger.Info("a pgbackrest config has been successfully created")
+			if err := c.syncPgbackrestJob(false); err != nil {
+				err = fmt.Errorf("could not create a k8s cron job for pgbackrest: %v", err)
+				updateFailed = true
+				return
+			}
+			c.logger.Info("a k8s cron job for pgbackrest has been successfully created")
+			if c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+				if err := c.syncPgbackrestRestoreConfig(); err != nil {
+					updateFailed = true
+					return
+				}
+				c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+				c.Status.PgbackrestRestoreID = c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID
+				c.logger.Info("a pgbackrest restore config has been successfully synced")
+			}
+		} else {
+
+			if err := c.deletePgbackrestConfig(); err != nil {
+				c.logger.Warningf("could not delete pgbackrest config: %v", err)
+			}
+		}
+
+	}()
 
 	// logical backup job
 	func() {
@@ -1005,6 +1101,18 @@ func (c *Cluster) Delete() {
 	// deleting the cron job also removes pods and batch jobs it created
 	if err := c.deleteLogicalBackupJob(); err != nil {
 		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
+	}
+
+	if err := c.syncPgbackrestJob(true); err != nil {
+		c.logger.Warningf("could not delete pgbackrest jobs: %v", err)
+	}
+
+	if err := c.deletePgbackrestConfig(); err != nil {
+		c.logger.Warningf("could not delete pgbackrest config: %v", err)
+	}
+
+	if err := c.deletePgbackrestRestoreConfig(); err != nil {
+		c.logger.Warningf("could not delete pgbackrest restore config: %v", err)
 	}
 
 	if err := c.deleteStatefulSet(); err != nil {

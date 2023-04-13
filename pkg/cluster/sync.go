@@ -64,6 +64,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
+	if err = c.syncPgbackrestConfig(); err != nil {
+		err = fmt.Errorf("could not sync pgbackrest config: %v", err)
+		return err
+	}
+
 	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
 	if err = c.syncVolumes(); err != nil {
 		return err
@@ -97,6 +102,22 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		if err = c.syncLogicalBackupJob(); err != nil {
 			err = fmt.Errorf("could not sync the logical backup job: %v", err)
 			return err
+		}
+	}
+
+	if c.Spec.Backup != nil && c.Spec.Backup.Pgbackrest != nil {
+
+		c.logger.Debug("syncing pgbackrest jobs")
+		if err = c.syncPgbackrestJob(false); err != nil {
+			err = fmt.Errorf("could not sync the pgbackrest jobs: %v", err)
+			return err
+		}
+		if c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID != c.Status.PgbackrestRestoreID {
+			if err = c.syncPgbackrestRestoreConfig(); err != nil {
+				return err
+			}
+			c.KubeClient.SetPgbackrestRestoreCRDStatus(c.clusterName(), c.Postgresql.Spec.Backup.Pgbackrest.Restore.ID)
+			c.logger.Info("a pgbackrest restore config has been successfully synced")
 		}
 	}
 
@@ -1298,6 +1319,71 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			return fmt.Errorf("could not fetch existing logical backup job: %v", err)
 		}
 	}
+	return nil
+}
 
+func (c *Cluster) syncPgbackrestConfig() error {
+	if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), c.getPgbackrestConfigmapName(), metav1.GetOptions{}); err == nil {
+		if err := c.updatePgbackrestConfig(cm); err != nil {
+			return fmt.Errorf("could not update a pgbackrest config: %v", err)
+		}
+		c.logger.Info("a pgbackrest config has been successfully updated")
+	} else {
+		if err := c.createPgbackrestConfig(); err != nil {
+			return fmt.Errorf("could not create a pgbackrest config: %v", err)
+		}
+		c.logger.Info("a pgbackrest config has been successfully created")
+	}
+	return nil
+}
+
+func (c *Cluster) syncPgbackrestRestoreConfig() error {
+	if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), c.getPgbackrestRestoreConfigmapName(), metav1.GetOptions{}); err == nil {
+		if err := c.updatePgbackrestRestoreConfig(cm); err != nil {
+			return fmt.Errorf("could not update a pgbackrest restore config: %v", err)
+		}
+		c.logger.Info("a pgbackrest restore config has been successfully updated")
+	} else {
+		if err := c.createPgbackrestRestoreConfig(); err != nil {
+			return fmt.Errorf("could not create a pgbackrest restore config: %v", err)
+		}
+		c.logger.Info("a pgbackrest restore config has been successfully created")
+	}
+	return nil
+}
+
+func (c *Cluster) syncPgbackrestJob(forceRemove bool) error {
+	repos := []string{"repo1", "repo2", "repo3", "repo4"}
+	schedules := []string{"full", "incr", "diff"}
+	for _, rep := range repos {
+		for _, schedul := range schedules {
+			remove := true
+			if !forceRemove && len(c.Postgresql.Spec.Backup.Pgbackrest.Repos) >= 1 {
+				for _, repo := range c.Postgresql.Spec.Backup.Pgbackrest.Repos {
+					for name, schedule := range repo.Schedule {
+						c.logger.Info(fmt.Sprintf("%s %s:%s %s", rep, schedul, repo.Name, name))
+						if rep == repo.Name && name == schedul {
+							remove = false
+							if cj, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(context.TODO(), c.getPgbackrestJobName(repo.Name, name), metav1.GetOptions{}); err == nil {
+								if err := c.patchPgbackrestJob(cj, repo.Name, name, schedule); err != nil {
+									return fmt.Errorf("could not update a pgbackrest cronjob: %v", err)
+								}
+								c.logger.Info("a pgbackrest cronjob has been successfully updated")
+							} else {
+								if err := c.createPgbackrestJob(repo.Name, name, schedule); err != nil {
+									return fmt.Errorf("could not create a pgbackrest cronjob: %v", err)
+								}
+								c.logger.Info("a pgbackrest cronjob has been successfully created")
+							}
+						}
+					}
+				}
+			}
+			if remove {
+				c.deletePgbackrestJob(rep, schedul)
+				c.logger.Info("a pgbackrest cronjob has been successfully deleted")
+			}
+		}
+	}
 	return nil
 }

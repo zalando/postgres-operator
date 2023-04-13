@@ -62,23 +62,24 @@ type PostgresSpec struct {
 	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
 	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
 
-	NumberOfInstances     int32                       `json:"numberOfInstances"`
-	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                 *CloneDescription           `json:"clone,omitempty"`
-	Databases             map[string]string           `json:"databases,omitempty"`
-	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
-	SchedulerName         *string                     `json:"schedulerName,omitempty"`
-	NodeAffinity          *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
-	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
-	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
-	InitContainers        []v1.Container              `json:"initContainers,omitempty"`
-	PodPriorityClassName  string                      `json:"podPriorityClassName,omitempty"`
-	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
-	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
-	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster        *StandbyDescription         `json:"standby,omitempty"`
-	PodAnnotations        map[string]string           `json:"podAnnotations,omitempty"`
-	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
+	NumberOfInstances         int32                         `json:"numberOfInstances"`
+	MaintenanceWindows        []MaintenanceWindow           `json:"maintenanceWindows,omitempty"`
+	Clone                     *CloneDescription             `json:"clone,omitempty"`
+	Databases                 map[string]string             `json:"databases,omitempty"`
+	PreparedDatabases         map[string]PreparedDatabase   `json:"preparedDatabases,omitempty"`
+	SchedulerName             *string                       `json:"schedulerName,omitempty"`
+	NodeAffinity              *v1.NodeAffinity              `json:"nodeAffinity,omitempty"`
+	Tolerations               []v1.Toleration               `json:"tolerations,omitempty"`
+	Sidecars                  []Sidecar                     `json:"sidecars,omitempty"`
+	InitContainers            []v1.Container                `json:"initContainers,omitempty"`
+	TopologySpreadConstraints []v1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty" patchStrategy:"merge" patchMergeKey:"topologyKey" protobuf:"bytes,33,opt,name=topologySpreadConstraints"`
+	PodPriorityClassName      string                        `json:"podPriorityClassName,omitempty"`
+	ShmVolume                 *bool                         `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup       bool                          `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupSchedule     string                        `json:"logicalBackupSchedule,omitempty"`
+	StandbyCluster            *StandbyDescription           `json:"standby,omitempty"`
+	PodAnnotations            map[string]string             `json:"podAnnotations,omitempty"`
+	ServiceAnnotations        map[string]string             `json:"serviceAnnotations,omitempty"`
 	// MasterServiceAnnotations takes precedence over ServiceAnnotations for master role if not empty
 	MasterServiceAnnotations map[string]string `json:"masterServiceAnnotations,omitempty"`
 	// ReplicaServiceAnnotations takes precedence over ServiceAnnotations for replica role if not empty
@@ -91,6 +92,7 @@ type PostgresSpec struct {
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
 	PodPriorityClassNameOld string         `json:"pod_priority_class_name,omitempty"`
+	Backup                  *Backup        `json:"backup,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -222,6 +224,7 @@ type UserFlags []string
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus struct {
 	PostgresClusterStatus string `json:"PostgresClusterStatus"`
+	PgbackrestRestoreID   string `json:"PgbackrestRestoreID"`
 }
 
 // ConnectionPooler Options for connection pooler
@@ -259,4 +262,36 @@ type StreamTable struct {
 	EventType     string  `json:"eventType"`
 	IdColumn      *string `json:"idColumn,omitempty"`
 	PayloadColumn *string `json:"payloadColumn,omitempty"`
+}
+
+type Backup struct {
+	Pgbackrest *Pgbackrest `json:"pgbackrest"`
+}
+
+type Pgbackrest struct {
+	Image         string            `json:"image"`
+	Global        map[string]string `json:"global"`
+	Repos         []Repo            `json:"repos"`
+	Restore       Restore           `json:"restore"`
+	Configuration Configuration     `json:"configuration"`
+	Resources     *Resources        `json:"resources,omitempty"`
+}
+
+type Repo struct {
+	Name     string            `json:"name"`
+	Storage  string            `json:"storage"`
+	Resource string            `json:"resource"`
+	Endpoint string            `json:"endpoint"`
+	Region   string            `json:"region"`
+	Schedule map[string]string `json:"schedule"`
+}
+
+type Restore struct {
+	ID      string   `json:"id"`
+	Repo    string   `json:"repo"`
+	Options []string `json:"options"`
+}
+
+type Configuration struct {
+	Secret string `json:"secret"`
 }

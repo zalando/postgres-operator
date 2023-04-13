@@ -148,6 +148,12 @@ func specPatch(spec interface{}) ([]byte, error) {
 	}{spec})
 }
 
+func dataPatch(data interface{}) ([]byte, error) {
+	return json.Marshal(struct {
+		Data interface{} `json:"data"`
+	}{data})
+}
+
 // metaAnnotationsPatch produces a JSON of the object metadata that has only the annotation
 // field in order to use it in a MergePatch. Note that we don't patch the complete metadata, since
 // it contains the current revision of the object that could be outdated at the time we patch.
