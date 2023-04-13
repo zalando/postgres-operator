@@ -12,14 +12,18 @@ DUMP_SIZE_COEFF=5
 ERRORCOUNT=0
 
 TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+KUBERNETES_SERVICE_PORT=${KUBERNETES_SERVICE_PORT:-443}
 if [ "$KUBERNETES_SERVICE_HOST" != "${KUBERNETES_SERVICE_HOST#*[0-9].[0-9]}" ]; then
   echo "IPv4"
   K8S_API_URL=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/api/v1
 elif [ "$KUBERNETES_SERVICE_HOST" != "${KUBERNETES_SERVICE_HOST#*:[0-9a-fA-F]}" ]; then
   echo "IPv6"
   K8S_API_URL=https://[$KUBERNETES_SERVICE_HOST]:$KUBERNETES_SERVICE_PORT/api/v1
+elif [ -n "$KUBERNETES_SERVICE_HOST" ]; then
+    echo "Hostname"
+    K8S_API_URL=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/api/v1
 else
-  echo "Unrecognized IP format '$KUBERNETES_SERVICE_HOST'"
+  echo "KUBERNETES_SERVICE_HOST was not set"
 fi
 echo "API Endpoint: ${K8S_API_URL}"
 CERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
