@@ -66,7 +66,7 @@ docker: ${DOCKERDIR}/${DOCKERFILE} scm-source.json
 	echo "Version ${VERSION}"
 	echo "CDP tag ${CDP_TAG}"
 	echo "git describe $(shell git describe --tags --always --dirty)"
-	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERDIR}/${DOCKERFILE}" .
+	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERDIR}/${DOCKERFILE}" --build-arg VERSION="${VERSION}" .
 
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.18.9 bash -c "make linux"

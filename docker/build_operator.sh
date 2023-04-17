@@ -28,4 +28,4 @@ mkdir -p build
 cp scm-source.json build/
 
 GO111MODULE=on go mod vendor
-CGO_ENABLED=0 go build -o build/postgres-operator -v -ldflags "-X=main.version=e1fbdd9" cmd/main.go
+CGO_ENABLED=0 go build -o build/postgres-operator -v -ldflags "$OPERATOR_LDFLAGS" cmd/main.go
