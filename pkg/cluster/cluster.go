@@ -241,12 +241,11 @@ func (c *Cluster) initUsers() error {
 }
 
 // Create creates the new kubernetes objects associated with the cluster.
-func (c *Cluster) Create() error {
+func (c *Cluster) Create() (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var (
-		err error
 
+	var (
 		service *v1.Service
 		ep      *v1.Endpoints
 		ss      *appsv1.StatefulSet
