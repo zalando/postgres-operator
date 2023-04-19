@@ -51,7 +51,7 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 [timescaledb](https://github.com/timescale/timescaledb)
 
 The Postgres Operator has been developed at Zalando and is being used in
-production for over three years.
+production for over five years.
 
 ## Supported Postgres & K8s versions
 
