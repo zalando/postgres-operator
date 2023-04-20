@@ -491,6 +491,12 @@ configuration they are grouped under the `kubernetes` key.
   override [topology key](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#built-in-node-labels)
   for pod anti affinity. The default is `kubernetes.io/hostname`.
 
+* **pod_antiaffinity_preferred_during_scheduling**
+  when scaling the number of pods beyond the available number of topology
+  keys the anti affinity has to be configured to preferred during scheduling.
+  The default is `false` which means the pod anti affinity will use
+  `requiredDuringSchedulingIgnoredDuringExecution`.
+
 * **pod_management_policy**
   specify the [pod management policy](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-management-policies)
   of stateful sets of PG clusters. The default is `ordered_ready`, the second
@@ -768,7 +774,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.9.0"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
