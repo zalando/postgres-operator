@@ -210,4 +210,4 @@ configuration:
     # connection_pooler_schema: "pooler"
     # connection_pooler_user: "pooler"
   patroni:
-   failsafe_mode: "false"
+   failsafe_mode: false
