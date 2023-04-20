@@ -34,7 +34,7 @@ data:
   # default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: ghcr.io/zalando/spilo-15:2.1-p9
+  docker_image: ghcr.io/zalando/spilo-15:3.0-p1
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_registration: "true"
@@ -80,7 +80,7 @@ data:
   # logical_backup_azure_storage_account_key: ""
   # logical_backup_cpu_limit: ""
   # logical_backup_cpu_request: ""
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.9.0"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.0"
   # logical_backup_google_application_credentials: ""
   logical_backup_job_prefix: "logical-backup-"
   # logical_backup_memory_limit: ""

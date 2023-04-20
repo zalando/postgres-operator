@@ -127,7 +127,7 @@ func TestInheritedAnnotations(t *testing.T) {
 	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
 	cluster.ConnectionPooler[role] = &ConnectionPoolerObjects{
 		Name:        cluster.connectionPoolerName(role),
-		ClusterName: cluster.ClusterName,
+		ClusterName: cluster.Name,
 		Namespace:   cluster.Namespace,
 		Role:        role,
 	}
