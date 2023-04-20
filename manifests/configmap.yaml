@@ -47,7 +47,7 @@ data:
   enable_master_load_balancer: "false"
   enable_master_pooler_load_balancer: "false"
   enable_password_rotation: "false"
-  # enable_patroni_failsafe_mode: "false"
+  enable_patroni_failsafe_mode: "false"
   enable_pgversion_env_var: "true"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"

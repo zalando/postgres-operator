@@ -555,6 +555,19 @@ CRD-based configuration.
   hard memory minimum what we consider to be required to properly run Postgres
   clusters with Patroni on Kubernetes. The default is `250Mi`.
 
+## Patroni options
+
+Parameters configuring Patroni. In the CRD-based configuration they are grouped
+under the `patroni` key.
+
+* **enable_patroni_failsafe_mode**
+  If enabled, Patroni copes with DCS outages by avoiding leader demotion.
+  See the Patroni documentation [here](https://patroni.readthedocs.io/en/master/dcs_failsafe_mode.html) for more details.
+  This feature is included since Patroni 3.0.0. Hence, check the container image
+  in use if this feature is included in the used Patroni version. It can also be
+  enabled cluster-wise with the `failsafe_mode` flag under the `patroni` section
+  in the manifest. The default for the global config option is set to `false`.
+
 ## Operator timeouts
 
 This set of parameters define various timeouts related to some operator

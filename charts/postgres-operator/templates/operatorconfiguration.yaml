@@ -40,4 +40,6 @@ configuration:
 {{ toYaml .Values.configLoggingRestApi | indent 4 }}
   connection_pooler:
 {{ toYaml .Values.configConnectionPooler | indent 4 }}
+  patroni:
+{{ toYaml .Values.configPatroni | indent 4 }}
 {{- end }}
