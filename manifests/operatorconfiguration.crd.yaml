@@ -668,7 +668,7 @@ spec:
               patroni:
                 type: object
                 properties:
-                  failsafe_mode:
+                  enable_patroni_failsafe_mode:
                     type: boolean
                     default: false
           status:

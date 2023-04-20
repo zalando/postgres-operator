@@ -431,7 +431,7 @@ configConnectionPooler:
 
 configPatroni:
   # enable Patroni DCS failsafe_mode feature
-  failsafe_mode: false
+  enable_patroni_failsafe_mode: false
 
 # Zalando's internal CDC stream feature
 enableStreams: false

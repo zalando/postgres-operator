@@ -1483,7 +1483,7 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"patroni": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
-							"failsafe_mode": {
+							"enable_patroni_failsafe_mode": {
 								Type: "boolean",
 							},
 						},
