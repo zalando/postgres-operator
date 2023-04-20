@@ -12,4 +12,4 @@ kubernetes==11.0.0
 requests==2.28.2
 stups-tokens>=1.1.19
 wal_e==1.1.1
-werkzeug==2.2.2
+werkzeug==2.2.3

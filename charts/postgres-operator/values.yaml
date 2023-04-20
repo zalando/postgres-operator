@@ -348,7 +348,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.8.0"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.9.0"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -416,7 +416,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-26"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-27"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode
@@ -431,7 +431,7 @@ configConnectionPooler:
 
 configPatroni:
   # enable Patroni DCS failsafe_mode feature
-  failsafe_mode: false
+  enable_patroni_failsafe_mode: false
 
 # Zalando's internal CDC stream feature
 enableStreams: false

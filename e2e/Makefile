@@ -29,10 +29,12 @@ default: tools
 
 clean:
 	rm -rf manifests
+	rm -rf tls
 
 copy: clean
 	mkdir manifests
 	cp -r ../manifests .
+	mkdir tls
 
 docker: scm-source.json
 	docker build -t "$(IMAGE):$(TAG)" .

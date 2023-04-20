@@ -23,7 +23,7 @@ spec:
       serviceAccountName: postgres-operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/pgbouncer:master-26
+        image: registry.opensource.zalan.do/acid/pgbouncer:master-27
         imagePullPolicy: IfNotPresent
         resources:
           requests:

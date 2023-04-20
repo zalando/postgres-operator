@@ -240,7 +240,7 @@ type OperatorLogicalBackupConfiguration struct {
 
 // PatroniConfiguration defines configuration for Patroni
 type PatroniConfiguration struct {
-	FailsafeMode *bool `json:"failsafe_mode,omitempty"`
+	FailsafeMode *bool `json:"enable_patroni_failsafe_mode,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config

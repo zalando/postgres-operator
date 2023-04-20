@@ -216,7 +216,7 @@ Non-encrypted connections are rejected by default, so set the SSL mode to
 require:
 
 ```bash
-export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d)
 export PGSSLMODE=require
 psql -U postgres
 ```

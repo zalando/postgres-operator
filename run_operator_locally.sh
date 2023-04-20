@@ -30,8 +30,8 @@ function retry(){
     local -r retry_cmd="$1"
     local -r retry_msg="$2"
 
-    # times out after 1 minute
-    for i in {1..20}; do
+    # Time out after three minutes.
+    for i in {1..60}; do
         if  eval "$retry_cmd"; then
             return 0
         fi
@@ -165,11 +165,63 @@ function forward_ports(){
     local operator_pod
     operator_pod=$(kubectl get pod -l name=postgres-operator -o jsonpath={.items..metadata.name})
 
-    # runs in the background to keep current terminal responsive
-    # stdout redirect removes the info message about forwarded ports; the message sometimes garbles the cli prompt
-    kubectl port-forward "$operator_pod" "$LOCAL_PORT":"$OPERATOR_PORT" &> /dev/null &
+    # Spawn `kubectl port-forward` in the background to keep current terminal
+    # responsive. Hide stdout because otherwise there is a note about each TCP
+    # connection. Do not hide stderr so port-forward setup errors can be
+    # debugged. Sometimes the port-forward setup fails because expected k8s
+    # state isn't achieved yet. Try to detect that case and then run the
+    # command again (in a finite loop).
+    for _attempt in {1..20}; do
+        # Delay between retry attempts. First attempt should already be
+        # delayed.
+        echo "soon: invoke kubectl port-forward command (attempt $_attempt)"
+        sleep 5
 
-    echo $! > "$PATH_TO_PORT_FORWARED_KUBECTL_PID"
+        # With the --pod-running-timeout=4s argument the process is expected
+        # to terminate within about that time if the pod isn't ready yet.
+        kubectl port-forward --pod-running-timeout=4s "$operator_pod" "$LOCAL_PORT":"$OPERATOR_PORT" 1> /dev/null &
+        _kubectl_pid=$!
+        _pf_success=true
+
+        # A successful `kubectl port-forward` setup can pragmatically be
+        # detected with a time-based criterion: it is a long-running process if
+        # successfully set up. If it does not terminate within deadline then
+        # consider the setup successful. Overall, observe the process for
+        # roughly 7 seconds. If it terminates before that it's certainly an
+        # error. If it did not terminate within that time frame then consider
+        # setup successful.
+        for ib in {1..7}; do
+            sleep 1
+            # Portable and non-blocking test: is process still running?
+            if kill -s 0 -- "${_kubectl_pid}" >/dev/null 2>&1; then
+                echo "port-forward process is still running"
+            else
+                # port-forward process seems to have terminated, reap zombie
+                set +e
+                # `wait` is now expected to be non-blocking, and exits with the
+                # exit code of pid (first arg).
+                wait $_kubectl_pid
+                _kubectl_rc=$?
+                set -e
+                echo "port-forward process terminated with exit code ${_kubectl_rc}"
+                _pf_success=false
+                break
+            fi
+        done
+
+        if [ ${_pf_success} = true ]; then
+            echo "port-forward setup seems successful. leave retry loop."
+            break
+        fi
+
+    done
+
+    if [ "${_pf_success}" = false ]; then
+        echo "port-forward setup failed after retrying. exit."
+        exit 1
+    fi
+
+    echo "${_kubectl_pid}" > "$PATH_TO_PORT_FORWARED_KUBECTL_PID"
 }
 
 

@@ -53,17 +53,13 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 The Postgres Operator has been developed at Zalando and is being used in
 production for over three years.
 
-## Using Spilo 12 images or lower
+## Supported Postgres & K8s versions
 
-If you are already using the Postgres operator in older version with a Spilo 12 Docker image you need to be aware of the changes for the backup path.
-We introduce the major version into the backup path to smoothen the [major version upgrade](docs/administrator.md#minor-and-major-version-upgrade) that is now supported.
-
-The new operator configuration can set a compatibility flag *enable_spilo_wal_path_compat* to make Spilo look for wal segments in the current path but also old format paths.
-This comes at potential performance costs and should be disabled after a few days.
-
-The newest Spilo image is: `ghcr.io/zalando/spilo-15:2.1-p9`
-
-The last Spilo 12 image is: `registry.opensource.zalan.do/acid/spilo-12:1.6-p5`
+| Release   | Postgres versions | K8s versions      | Golang  |
+| :-------- | :---------------: | :---------------: | :-----: |
+| v1.9.*    | 10 &rarr; 15      | 1.25+             | 1.18.9  |
+| v1.8.*    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
+| v1.7.1    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.16.9  |
 
 
 ## Getting started

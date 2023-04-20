@@ -95,6 +95,7 @@ coverage.xml
 
 # e2e tests
 e2e/manifests
+e2e/tls
 
 # Translations
 *.mo
