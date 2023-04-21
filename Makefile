@@ -1,4 +1,4 @@
-.PHONY: clean local test linux macos mocks docker push scm-source.json e2e
+.PHONY: clean local test linux macos mocks docker push e2e
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
@@ -48,7 +48,7 @@ SHELL := env PATH=$(PATH) $(SHELL)
 default: local
 
 clean:
-	rm -rf build scm-source.json
+	rm -rf build
 
 local: ${SOURCES}
 	hack/verify-codegen.sh
@@ -60,7 +60,7 @@ linux: ${SOURCES}
 macos: ${SOURCES}
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
 
-docker: ${DOCKERDIR}/${DOCKERFILE} scm-source.json
+docker: ${DOCKERDIR}/${DOCKERFILE}
 	echo `(env)`
 	echo "Tag ${TAG}"
 	echo "Version ${VERSION}"
@@ -73,9 +73,6 @@ indocker-race:
 
 push:
 	docker push "$(IMAGE):$(TAG)$(CDP_TAG)"
-
-scm-source.json: .git
-	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
 mocks:
 	GO111MODULE=on go generate ./...
