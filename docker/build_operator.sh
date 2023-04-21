@@ -25,7 +25,6 @@ apt-get install -y wget
 export PATH="$PATH:$HOME/go/bin"
 export GOPATH="$HOME/go"
 mkdir -p build
-cp scm-source.json build/
 
 GO111MODULE=on go mod vendor
 CGO_ENABLED=0 go build -o build/postgres-operator -v -ldflags "$OPERATOR_LDFLAGS" cmd/main.go
