@@ -3,10 +3,11 @@ package v1
 import (
 	"fmt"
 
-	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
-	"github.com/zalando/postgres-operator/pkg/util"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
+	"github.com/zalando/postgres-operator/pkg/util"
 )
 
 // CRDResource* define names necesssary for the k8s CRD API
@@ -684,6 +685,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type:    "string",
 										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 									},
+									"hugepages-2Mi": {
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+									},
+									"hugepages-1Gi": {
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+									},
 								},
 							},
 							"requests": {
@@ -694,6 +703,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 									},
 									"memory": {
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+									},
+									"hugepages-2Mi": {
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+									},
+									"hugepages-1Gi": {
 										Type:    "string",
 										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 									},

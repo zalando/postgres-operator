@@ -20,6 +20,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"golang.org/x/exp/maps"
+	batchv1 "k8s.io/api/batch/v1"
+	"k8s.io/apimachinery/pkg/labels"
+
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -28,9 +32,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
-	"golang.org/x/exp/maps"
-	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
@@ -264,6 +265,19 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 		requests[v1.ResourceMemory], err = resource.ParseQuantity(defaults.Memory)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse default memory quantity: %v", err)
+		}
+	}
+
+	if spec.HugePages2Mi != "" {
+		requests[v1.ResourceHugePagesPrefix+"1Mi"], err = resource.ParseQuantity(spec.HugePages2Mi)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse hugepages-2Mi quantity: %v", err)
+		}
+	}
+	if spec.HugePages1Gi != "" {
+		requests[v1.ResourceHugePagesPrefix+"1Gi"], err = resource.ParseQuantity(spec.HugePages1Gi)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse hugepages-1Gi quantity: %v", err)
 		}
 	}
 
