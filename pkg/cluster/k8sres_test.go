@@ -3021,6 +3021,55 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 		},
+		{
+			subTest: "test HugePages are passed through on sidecars",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Sidecars: []acidv1.Sidecar{
+						{
+							Name:        "test-sidecar",
+							DockerImage: "test-image",
+							Resources: &acidv1.Resources{
+								ResourceRequests: acidv1.ResourceDescription{
+									HugePages2Mi: "128Mi",
+									HugePages1Gi: "1Gi",
+								},
+								ResourceLimits: acidv1.ResourceDescription{
+									HugePages2Mi: "256Mi",
+									HugePages1Gi: "2Gi",
+								},
+							},
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:          "100m",
+					Memory:       "100Mi",
+					HugePages2Mi: "128Mi",
+					HugePages1Gi: "1Gi",
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:          "1",
+					Memory:       "500Mi",
+					HugePages2Mi: "256Mi",
+					HugePages1Gi: "2Gi",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
