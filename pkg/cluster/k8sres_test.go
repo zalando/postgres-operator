@@ -2021,6 +2021,8 @@ func TestSidecars(t *testing.T) {
 		}
 	}
 
+	var trueBool = true
+
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
 			PgVersion: "15",
@@ -2050,6 +2052,12 @@ func TestSidecars(t *testing.T) {
 			acidv1.Sidecar{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
+			},
+			{
+				Name: "cluster-specific-sidecar-with-security-context",
+				SecurityContext: &v1.SecurityContext{
+					ReadOnlyRootFilesystem: &trueBool,
+				},
 			},
 		},
 	}
@@ -2141,7 +2149,7 @@ func TestSidecars(t *testing.T) {
 	}
 
 	// deduplicated sidecars and Patroni
-	assert.Equal(t, 7, len(s.Spec.Template.Spec.Containers), "wrong number of containers")
+	assert.Equal(t, 8, len(s.Spec.Template.Spec.Containers), "wrong number of containers")
 
 	// cluster specific sidecar
 	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
@@ -2198,6 +2206,10 @@ func TestSidecars(t *testing.T) {
 		VolumeMounts:    mounts,
 	})
 
+	// cluster specific sidecar with SecurityContext
+	container := s.Spec.Template.Spec.Containers[4]
+	assert.Equal(t, container.Name, "cluster-specific-sidecar-with-security-context")
+	assert.Equal(t, *container.SecurityContext.ReadOnlyRootFilesystem, trueBool)
 }
 
 func TestGeneratePodDisruptionBudget(t *testing.T) {
