@@ -129,6 +129,7 @@ spec:
     ttl: 30
     loop_wait: 10
     retry_timeout: 10
+    master_start_timeout: 300
     synchronous_mode: false
     synchronous_mode_strict: false
     synchronous_node_count: 1

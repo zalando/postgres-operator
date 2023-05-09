@@ -408,6 +408,7 @@ class EndToEndTestCase(unittest.TestCase):
                     "ttl": 29,
                     "loop_wait": 9,
                     "retry_timeout": 9,
+                    "master_start_timeout": 400,
                     "synchronous_mode": True,
                     "failsafe_mode": True,
                  }
@@ -434,6 +435,8 @@ class EndToEndTestCase(unittest.TestCase):
                             "loop_wait not updated")
                 self.assertEqual(desired_config["retry_timeout"], effective_config["retry_timeout"],
                             "retry_timeout not updated")
+                self.assertEqual(desired_config["master_start_timeout"], effective_config["master_start_timeout"],
+                                 "master_start_timeout not updated")
                 self.assertEqual(desired_config["synchronous_mode"], effective_config["synchronous_mode"],
                             "synchronous_mode not updated")
                 self.assertEqual(desired_config["failsafe_mode"], effective_config["failsafe_mode"],
