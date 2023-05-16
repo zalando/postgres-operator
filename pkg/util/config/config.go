@@ -61,6 +61,7 @@ type Resources struct {
 	NodeReadinessLabel            map[string]string   `name:"node_readiness_label" default:""`
 	NodeReadinessLabelMerge       string              `name:"node_readiness_label_merge" default:"OR"`
 	ShmVolume                     *bool               `name:"enable_shm_volume" default:"true"`
+	LivenessProbe                 *v1.Probe           `name:"liveness_probe"`
 
 	MaxInstances                      int32  `name:"max_instances" default:"-1"`
 	MinInstances                      int32  `name:"min_instances" default:"-1"`
