@@ -245,6 +245,7 @@ type Config struct {
 	TargetMajorVersion                       string            `name:"target_major_version" default:"15"`
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
+	LivenessProbe                            *v1.Probe         `json:"liveness_probe,omitempty"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
 }
 

@@ -205,6 +205,19 @@ configKubernetes:
   # whether the Spilo container should run with additional permissions other than parent.
   # required by cron which needs setuid
   spilo_allow_privilege_escalation: true
+
+  # liveness probe for the spilo pod
+  # liveness_probe:
+  #   httpGet:
+  #     scheme: HTTP
+  #     path: /liveness
+  #     port: 8008
+  #   initialDelaySeconds: 10
+  #   periodSeconds: 10
+  #   timeoutSeconds: 5
+  #   successThreshold: 1
+  #   failureThreshold: 3
+
   # storage resize strategy, available options are: ebs, pvc, off or mixed
   storage_resize_mode: pvc
   # pod toleration assigned to instances of every Postgres cluster
