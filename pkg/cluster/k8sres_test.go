@@ -2224,7 +2224,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
+						MatchLabels: map[string]string{"cluster-name": "myapp-database"},
 					},
 				},
 			},
@@ -2248,7 +2248,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
+						MatchLabels: map[string]string{"cluster-name": "myapp-database"},
 					},
 				},
 			},
@@ -2272,7 +2272,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
+						MatchLabels: map[string]string{"cluster-name": "myapp-database"},
 					},
 				},
 			},
@@ -2296,7 +2296,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
+						MatchLabels: map[string]string{"cluster-name": "myapp-database"},
 					},
 				},
 			},
