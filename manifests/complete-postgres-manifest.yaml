@@ -157,6 +157,7 @@ spec:
 #    mode: "transaction"
 #    schema: "pooler"
 #    user: "pooler"
+#    maxDBConnections: 300
 #    resources:
 #      requests:
 #        cpu: 300m
