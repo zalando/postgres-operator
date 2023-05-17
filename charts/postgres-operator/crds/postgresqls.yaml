@@ -217,7 +217,6 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
               logicalBackupSchedule:
                 type: string
-                pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
               maintenanceWindows:
                 type: array
                 items:
