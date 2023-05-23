@@ -9,7 +9,7 @@ gevent==22.10.2
 jq==1.4.0
 json_delta>=2.0.2
 kubernetes==11.0.0
-requests==2.28.2
+requests==2.31.0
 stups-tokens>=1.1.19
 wal_e==1.1.1
 werkzeug==2.2.3
