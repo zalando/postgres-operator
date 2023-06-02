@@ -546,7 +546,6 @@ func newCheck(msg string, cond containerCondition) containerCheck {
 // * a list of reasons in a human readable format
 
 func (c *Cluster) compareContainers(description string, setA, setB []v1.Container, needsRollUpdate bool, reasons []string) (bool, []string) {
-	fmt.Println(needsRollUpdate)
 	if len(setA) != len(setB) {
 		return true, append(reasons, fmt.Sprintf("new statefulset %s's length does not match the current ones", description))
 	}
