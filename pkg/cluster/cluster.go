@@ -409,7 +409,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		reasons = append(reasons, "new statefulset's pod management policy do not match")
 	}
 
-	if c.Statefulset.Spec.PersistentVolumeClaimRetentionPolicy != statefulSet.Spec.PersistentVolumeClaimRetentionPolicy {
+	if !reflect.DeepEqual(c.Statefulset.Spec.PersistentVolumeClaimRetentionPolicy, statefulSet.Spec.PersistentVolumeClaimRetentionPolicy) {
 		match = false
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's persistent volume claim retention policy do not match")
@@ -546,6 +546,7 @@ func newCheck(msg string, cond containerCondition) containerCheck {
 // * a list of reasons in a human readable format
 
 func (c *Cluster) compareContainers(description string, setA, setB []v1.Container, needsRollUpdate bool, reasons []string) (bool, []string) {
+	fmt.Println(needsRollUpdate)
 	if len(setA) != len(setB) {
 		return true, append(reasons, fmt.Sprintf("new statefulset %s's length does not match the current ones", description))
 	}
