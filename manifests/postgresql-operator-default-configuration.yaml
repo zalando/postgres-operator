@@ -84,6 +84,9 @@ configuration:
     # node_readiness_label_merge: "OR"
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
+    persistent_volume_claim_retention_policy: 
+      when_deleted: "retain"
+      when_scaled: "retain"
     pod_antiaffinity_preferred_during_scheduling: false
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
     # pod_environment_configmap: "default/my-custom-config"
