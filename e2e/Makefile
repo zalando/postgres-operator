@@ -29,16 +29,15 @@ default: tools
 
 clean:
 	rm -rf manifests
+	rm -rf tls
 
 copy: clean
 	mkdir manifests
 	cp -r ../manifests .
+	mkdir tls
 
-docker: scm-source.json
+docker:
 	docker build -t "$(IMAGE):$(TAG)" .
-
-scm-source.json: ../.git
-	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
 push: docker
 	docker push "$(IMAGE):$(TAG)"

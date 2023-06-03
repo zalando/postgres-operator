@@ -2699,7 +2699,7 @@ func TestEnableLoadBalancers(t *testing.T) {
 			cluster.syncService(role)
 			cluster.ConnectionPooler[role] = &ConnectionPoolerObjects{
 				Name:        cluster.connectionPoolerName(role),
-				ClusterName: cluster.ClusterName,
+				ClusterName: cluster.Name,
 				Namespace:   cluster.Namespace,
 				Role:        role,
 			}

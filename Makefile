@@ -1,4 +1,4 @@
-.PHONY: clean local test linux macos mocks docker push scm-source.json e2e
+.PHONY: clean local test linux macos mocks docker push e2e
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
@@ -48,7 +48,7 @@ SHELL := env PATH=$(PATH) $(SHELL)
 default: local
 
 clean:
-	rm -rf build scm-source.json
+	rm -rf build
 
 local: ${SOURCES}
 	hack/verify-codegen.sh
@@ -60,32 +60,25 @@ linux: ${SOURCES}
 macos: ${SOURCES}
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
 
-docker-context: scm-source.json linux
-	mkdir -p docker/build/
-	cp build/linux/${BINARY} scm-source.json docker/build/
-
-docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
+docker: ${DOCKERDIR}/${DOCKERFILE}
 	echo `(env)`
 	echo "Tag ${TAG}"
 	echo "Version ${VERSION}"
 	echo "CDP tag ${CDP_TAG}"
 	echo "git describe $(shell git describe --tags --always --dirty)"
-	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
+	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERDIR}/${DOCKERFILE}" --build-arg VERSION="${VERSION}" .
 
 indocker-race:
-	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.18.9 bash -c "make linux"
+	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.19.8 bash -c "make linux"
 
 push:
 	docker push "$(IMAGE):$(TAG)$(CDP_TAG)"
-
-scm-source.json: .git
-	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
 mocks:
 	GO111MODULE=on go generate ./...
 
 tools:
-	GO111MODULE=on go get -d k8s.io/client-go@kubernetes-1.23.5
+	GO111MODULE=on go get -d k8s.io/client-go@kubernetes-1.25.9
 	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.6.0
 	GO111MODULE=on go mod tidy
 

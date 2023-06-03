@@ -55,6 +55,10 @@ function set_kind_api_server_ip(){
   sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}"
 }
 
+function generate_certificate(){
+  openssl req -x509 -nodes -newkey rsa:2048 -keyout tls/tls.key -out tls/tls.crt -subj "/CN=acid.zalan.do"
+}
+
 function run_tests(){
   echo "Running tests... image: ${e2e_test_runner_image}"
   # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
@@ -62,6 +66,7 @@ function run_tests(){
   docker run --rm --network=host -e "TERM=xterm-256color" \
   --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \
   --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
+  --mount type=bind,source="$(readlink -f tls)",target=/tls \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
   --mount type=bind,source="$(readlink -f scripts)",target=/scripts \
@@ -82,6 +87,7 @@ function main(){
   [[ ! -f ${kubeconfig_path} ]] && start_kind
   load_operator_image
   set_kind_api_server_ip
+  generate_certificate
 
   shift
   run_tests $@
