@@ -493,24 +493,35 @@ func TestCronjobEnvironmentSecretVariables(t *testing.T) {
 			},
 			envVars: []v1.EnvVar{
 				{
-					Name: "minio_access_key",
+					Name: "clone_aws_access_key_id",
 					ValueFrom: &v1.EnvVarSource{
 						SecretKeyRef: &v1.SecretKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
-								Name: testCronjobEnvironmentSecretName,
+								Name: testPodEnvironmentSecretName,
 							},
-							Key: "minio_access_key",
+							Key: "clone_aws_access_key_id",
 						},
 					},
 				},
 				{
-					Name: "minio_secret_key",
+					Name: "custom_variable",
 					ValueFrom: &v1.EnvVarSource{
 						SecretKeyRef: &v1.SecretKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
-								Name: testCronjobEnvironmentSecretName,
+								Name: testPodEnvironmentSecretName,
 							},
-							Key: "minio_secret_key",
+							Key: "custom_variable",
+						},
+					},
+				},
+				{
+					Name: "standby_google_application_credentials",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "standby_google_application_credentials",
 						},
 					},
 				},
