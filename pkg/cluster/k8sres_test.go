@@ -482,7 +482,7 @@ func TestCronjobEnvironmentSecretVariables(t *testing.T) {
 					LogicalBackupCronjobEnvironmentSecret: "idonotexist",
 				},
 			},
-			err: fmt.Errorf("could not read Secret CronjobEnvironmentSecretName: Secret PodEnvironmentSecret not found"),
+			err: fmt.Errorf("could not read Secret CronjobEnvironmentSecretName: secret.core \"idonotexist\" not found"),
 		},
 		{
 			subTest: "Cronjob environment vars reference all keys from secret configured by CronjobEnvironmentSecret",
