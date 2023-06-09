@@ -12,24 +12,24 @@ func TestExtractVolumeID(t *testing.T) {
 		expectedErr    error
 	}{
 		{
-			input:          "aws://eu-central-1c/vol-084b93528a2088348",
-			expectedResult: "vol-084b93528a2088348",
+			input:          "aws://eu-central-1c/vol-01234a5b6c78df9gh",
+			expectedResult: "vol-01234a5b6c78df9gh",
 			expectedErr:    nil,
 		},
 		{
-			input:          "vol-07944cf16c8d8c579",
-			expectedResult: "vol-07944cf16c8d8c579",
+			input:          "vol-0g9fd87c6b5a43210",
+			expectedResult: "vol-0g9fd87c6b5a43210",
 			expectedErr:    nil,
 		},
 		{
-			input:          "aws://eu-central-1c/09e4d6662560d622d",
+			input:          "aws://eu-central-1c/01234a5b6c78df9g0",
 			expectedResult: "",
-			expectedErr:    fmt.Errorf("malformed EBS volume id %q", "aws://eu-central-1c/09e4d6662560d622d"),
+			expectedErr:    fmt.Errorf("malformed EBS volume id %q", "aws://eu-central-1c/01234a5b6c78df9g0"),
 		},
 		{
-			input:          "09e4d6662560d622d",
+			input:          "hg9fd87c6b5a43210",
 			expectedResult: "",
-			expectedErr:    fmt.Errorf("malformed EBS volume id %q", "09e4d6662560d622d"),
+			expectedErr:    fmt.Errorf("malformed EBS volume id %q", "hg9fd87c6b5a43210"),
 		},
 	}
 
