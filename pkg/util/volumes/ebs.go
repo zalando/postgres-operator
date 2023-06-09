@@ -41,6 +41,9 @@ func (r *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool
 
 // ExtractVolumeID extracts volumeID
 func (r *EBSVolumeResizer) ExtractVolumeID(volumeID string) (string, error) {
+	if !(strings.Contains(volumeID, "/vol")) {
+		volumeID = "/" + volumeID
+	}
 	idx := strings.LastIndex(volumeID, constants.EBSVolumeIDStart) + 1
 	if idx == 0 {
 		return "", fmt.Errorf("malformed EBS volume id %q", volumeID)
