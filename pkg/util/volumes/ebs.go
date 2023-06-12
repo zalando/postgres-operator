@@ -42,7 +42,7 @@ func (r *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool
 // ExtractVolumeID extracts volumeID from "aws://eu-central-1a/vol-075ddfc4a127d0bd4"
 // or return only the vol-075ddfc4a127d0bd4 when it doesn't have "aws://"
 func (r *EBSVolumeResizer) ExtractVolumeID(volumeID string) (string, error) {
-	if (strings.Contains(volumeID, "vol-")) && !(strings.Contains(volumeID, "aws://")) {
+	if (strings.HasPrefix(volumeID, "vol-")) && !(strings.HasPrefix(volumeID, "aws://")) {
 		return volumeID, nil
 	}
 	idx := strings.LastIndex(volumeID, constants.EBSVolumeIDStart) + 1
