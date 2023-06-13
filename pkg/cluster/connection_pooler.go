@@ -406,6 +406,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			Tolerations:                   tolerationsSpec,
 			Volumes:                       poolerVolumes,
 			SecurityContext:               &securityContext,
+			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
 		},
 	}
 

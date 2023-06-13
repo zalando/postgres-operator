@@ -1000,6 +1000,7 @@ func TestPoolerTLS(t *testing.T) {
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
+				PodServiceAccountName: "postgres-pod",
 			},
 		}, client, pg, logger, eventRecorder)
 
@@ -1027,6 +1028,8 @@ func TestPoolerTLS(t *testing.T) {
 
 	fsGroup := int64(103)
 	assert.Equal(t, &fsGroup, deploy.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
+
+	assert.Equal(t, "postgres-pod", deploy.Spec.Template.Spec.ServiceAccountName, "need to add a service account name")
 
 	volume := v1.Volume{
 		Name: "my-secret",
