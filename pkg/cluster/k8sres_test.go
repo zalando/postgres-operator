@@ -2301,6 +2301,30 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				},
 			},
 		},
+		// With PDBMasterLabelSelector disabled.
+		{
+			New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", PDBMasterLabelSelector: util.False()}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+				logger,
+				eventRecorder),
+			policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "postgres-myapp-database-pdb",
+					Namespace: "myapp",
+					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
+				},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					MinAvailable: util.ToIntStr(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"cluster-name": "myapp-database"},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

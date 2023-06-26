@@ -219,6 +219,7 @@ type Config struct {
 	ReplicaDNSNameFormat                     StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{namespace}.{hostedzone}"`
 	ReplicaLegacyDNSNameFormat               StringTemplate    `name:"replica_legacy_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat                            StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	PDBMasterLabelSelector                   *bool             `name:"pdb_master_label_selector" default:"true"`
 	EnablePodDisruptionBudget                *bool             `name:"enable_pod_disruption_budget" default:"true"`
 	EnableInitContainers                     *bool             `name:"enable_init_containers" default:"true"`
 	EnableSidecars                           *bool             `name:"enable_sidecars" default:"true"`

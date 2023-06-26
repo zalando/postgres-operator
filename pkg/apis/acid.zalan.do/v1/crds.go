@@ -1388,6 +1388,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pdb_name_format": {
 								Type: "string",
 							},
+							"pdb_master_label_selector": {
+								Type: "boolean",
+							},
 							"pod_antiaffinity_preferred_during_scheduling": {
 								Type: "boolean",
 							},
