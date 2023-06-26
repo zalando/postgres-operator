@@ -5,8 +5,7 @@ Learn how to work with the Postgres Operator in a Kubernetes (K8s) environment.
 ## Create a manifest for a new PostgreSQL cluster
 
 Make sure you have [set up](quickstart.md) the operator. Then you can create a
-new Postgres cluster by applying manifest like
-this [minimal example](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
+new Postgres cluster by applying manifest like this [minimal example](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -21,8 +20,8 @@ spec:
   users:
     # database owner
     zalando:
-      - superuser
-      - createdb
+    - superuser
+    - createdb
 
     # role for application foo
     foo_user: # or 'foo_user: []'
@@ -108,7 +107,7 @@ kind: postgresql
 metadata:
   name: acid-minimal-cluster
 spec:
-  [ ... ]
+  [...]
   postgresql:
     version: "15"
     parameters:
@@ -121,11 +120,11 @@ Postgres Operator allows defining roles to be created in the resulting database
 cluster. It covers three use-cases:
 
 * `manifest roles`: create application roles specific to the cluster described
-  in the manifest.
+in the manifest.
 * `infrastructure roles`: create application roles that should be automatically
-  created on every cluster managed by the operator.
+created on every cluster managed by the operator.
 * `teams API roles`: automatically create users for every member of the team
-  owning the database cluster.
+owning the database cluster.
 
 In the next sections, we will cover those use cases in more details. Note, that
 the Postgres Operator can also create databases with pre-defined owner, reader
@@ -142,8 +141,7 @@ Manifest roles are defined as a dictionary, with a role name as a key and a
 list of role options as a value. For a role without any options it is best to
 supply the empty list `[]`. It is also possible to leave this field empty as in
 our example manifests. In certain cases such empty field may be missing later
-removed by
-K8s [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes)
+removed by K8s [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes)
 (`foobar_user:` is equivalent to `foobar_user: null`).
 
 The operator accepts the following options:  `superuser`, `inherit`, `login`,
@@ -172,7 +170,7 @@ spec:
   users:
     # users with secret in different namespace
     appspace.db_user:
-      - createdb
+    - createdb
   databases:
     # namespace notation is part of user name
     app_db: appspace.db_user
@@ -232,21 +230,20 @@ metadata:
 configuration:
   kubernetes:
     infrastructure_roles_secrets:
-      - secretname: "postgresql-infrastructure-roles"
-        userkey: "user1"
-        passwordkey: "password1"
-        rolekey: "inrole1"
-      - secretname: "postgresql-infrastructure-roles"
-        userkey: "user2"
-        ...
+    - secretname: "postgresql-infrastructure-roles"
+      userkey: "user1"
+      passwordkey: "password1"
+      rolekey: "inrole1"
+    - secretname: "postgresql-infrastructure-roles"
+      userkey: "user2"
+      ...
 ```
 
 Note, only the CRD-based configuration allows for referencing multiple secrets.
 As of now, the ConfigMap is restricted to either one or the existing template
 option with `infrastructure_roles_secret_name`. Please, refer to the example
 manifests to understand how `infrastructure_roles_secrets` has to be configured
-for the [configmap](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
-or [CRD configuration](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml).
+for the [configmap](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml) or [CRD configuration](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml).
 
 If both `infrastructure_roles_secret_name` and `infrastructure_roles_secrets`
 are defined the operator will create roles for both of them. So make sure,
@@ -308,8 +305,7 @@ returns usernames. A minimal Teams API should work like this:
 /.../<teamname> -> ["name","anothername"]
 ```
 
-A ["fake" Teams API](https://github.com/zalando/postgres-operator/blob/master/manifests/fake-teams-api.yaml) deployment
-is provided
+A ["fake" Teams API](https://github.com/zalando/postgres-operator/blob/master/manifests/fake-teams-api.yaml) deployment is provided
 in the manifests folder to set up a basic API around whatever services is used
 for user management. The Teams API's URL is set in the operator's
 [configuration](reference/operator_parameters.md#automatic-creation-of-human-users-in-the-database)
@@ -324,14 +320,12 @@ Postgres clusters are associated with one team by providing the `teamID` in
 the manifest. Additional superuser teams can be configured as mentioned in
 the previous paragraph. However, this is a global setting. To assign
 additional teams, superuser teams and single users to clusters of a given
-team, use
-the [PostgresTeam CRD](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresteam.crd.yaml).
+team, use the [PostgresTeam CRD](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresteam.crd.yaml).
 
 Note, by default the `PostgresTeam` support is disabled in the configuration.
 Switch `enable_postgres_team_crd` flag to `true` and the operator will start to
 watch for this CRD. Make sure, the cluster role is up to date and contains a
-section
-for [PostgresTeam](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml#L30).
+section for [PostgresTeam](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml#L30).
 
 #### Additional teams
 
@@ -347,7 +341,7 @@ metadata:
 spec:
   additionalTeams:
     a-team:
-      - "b-team"
+    - "b-team"
 ```
 
 With the example above the operator will create login roles for all members
@@ -358,9 +352,9 @@ for clusters of `b-team` in one manifest:
 spec:
   additionalTeams:
     a-team:
-      - "b-team"
+    - "b-team"
     b-team:
-      - "a-team"
+    - "a-team"
 ```
 
 You see, the `PostgresTeam` CRD is a global team mapping and independent from
@@ -373,10 +367,10 @@ users for their `additionalTeams`, e.g.:
 spec:
   additionalTeams:
     a-team:
-      - "b-team"
-      - "c-team"
+    - "b-team"
+    - "c-team"
     b-team:
-      - "a-team"
+    - "a-team"
 ```
 
 This creates roles for members of the `c-team` team not only in all clusters
@@ -396,12 +390,12 @@ it easier to map a group of teams to many other teams:
 spec:
   additionalTeams:
     a-team:
-      - "virtual-team"
+    - "virtual-team"
     b-team:
-      - "virtual-team"
+    - "virtual-team"
     virtual-team:
-      - "c-team"
-      - "d-team"
+    - "c-team"
+    - "d-team"
 ```
 
 This example would create roles for members of `c-team` and `d-team` plus
@@ -418,7 +412,7 @@ could be reflected in a `PostgresTeam` mapping with just two lines:
 spec:
   additionalTeams:
     a-team:
-      - "f-team"
+    - "f-team"
 ```
 
 This is helpful, because Postgres cluster names are immutable and can not
@@ -440,7 +434,7 @@ metadata:
 spec:
   additionalMembers:
     a-team:
-      - "tia"
+    - "tia"
 ```
 
 This will create the login role `tia` in every cluster owned by `a-team`.
@@ -453,9 +447,9 @@ teams, e.g. for `virtual-team` we used above:
 spec:
   additionalMembers:
     virtual-team:
-      - "flynch"
-      - "rdecker"
-      - "briggs"
+    - "flynch"
+    - "rdecker"
+    - "briggs"
 ```
 
 #### Removed members
@@ -495,7 +489,7 @@ called `data`.
 
 ```yaml
 spec:
-  preparedDatabases: { }
+  preparedDatabases: {}
 ```
 
 ### Default NOLOGIN roles
@@ -507,13 +501,13 @@ spec:
   preparedDatabases:
     foo:
       schemas:
-        bar: { }
+        bar: {}
 ```
 
 Postgres Operator will create the following NOLOGIN roles:
 
 | Role name      | Member of      | Admin         |
-|----------------|----------------|---------------|
+| -------------- | -------------- | ------------- |
 | foo_owner      |                | admin         |
 | foo_reader     |                | foo_owner     |
 | foo_writer     | foo_reader     | foo_owner     |
@@ -523,8 +517,7 @@ Postgres Operator will create the following NOLOGIN roles:
 
 The `<dbname>_owner` role is the database owner and should be used when creating
 new database objects. All members of the `admin` role, e.g. teams API roles, can
-become the owner with the `SET ROLE`
-command. [Default privileges](https://www.postgresql.org/docs/15/sql-alterdefaultprivileges.html)
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/15/sql-alterdefaultprivileges.html)
 are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
@@ -559,7 +552,7 @@ counterparts. Therefore, you cannot have `defaultRoles` set to `false` and enabl
 `defaultUsers` at the same time.
 
 | Role name           | Member of      | Admin         |
-|---------------------|----------------|---------------|
+| ------------------- | -------------- | ------------- |
 | foo_owner_user      | foo_owner      | admin         |
 | foo_reader_user     | foo_reader     | foo_owner     |
 | foo_writer_user     | foo_writer     | foo_owner     |
@@ -663,7 +656,7 @@ spec:
   preparedDatabases:
     foo:
       schemas:
-        my_existing_schema: { }
+        my_existing_schema: {}
 ```
 
 Adding existing database schemas to the manifest to create roles for them as
@@ -697,8 +690,8 @@ configured [default requests](reference/operator_parameters.md#kubernetes-resour
 
 ### HugePages support
 
-The operator supports [HugePages](https://www.postgresql.org/docs/15/kernel-resources.html#LINUX-HUGEPAGES). To enable
-HugePages, set the matching resource requests and/or limits in the manifest:
+The operator supports [HugePages](https://www.postgresql.org/docs/15/kernel-resources.html#LINUX-HUGEPAGES).
+To enable HugePages, set the matching resource requests and/or limits in the manifest:
 
 ```yaml
 spec:
@@ -711,8 +704,8 @@ spec:
       hugepages-1Gi: 2Gi
 ```
 
-There are no minimums or maximums, but Kubernetes will not spin up the pod if the requested HugePages cannot be
-allocated.
+There are no minimums or maximums and the default is 0 for both HugePage sizes,
+but Kubernetes will not spin up the pod if the requested HugePages cannot be allocated.
 
 ## Use taints, tolerations and node affinity for dedicated PostgreSQL nodes
 
@@ -725,13 +718,12 @@ to apply for all Postgres clusters.
 ```yaml
 spec:
   tolerations:
-    - key: postgres
-      operator: Exists
-      effect: NoSchedule
+  - key: postgres
+    operator: Exists
+    effect: NoSchedule
 ```
 
-If you need the pods to be scheduled on specific nodes you may
-use [node affinity](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/)
+If you need the pods to be scheduled on specific nodes you may use [node affinity](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/)
 to specify a set of label(s), of which a prospective host node must have at least one. This could be used to
 place nodes with certain hardware capabilities (e.g. SSD drives) in certain environments or network segments,
 e.g. for PCI compliance.
@@ -746,11 +738,11 @@ spec:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
-        - matchExpressions:
-            - key: environment
-              operator: In
-              values:
-                - pci
+      - matchExpressions:
+        - key: environment
+          operator: In
+          values:
+          - pci
 ```
 
 If you need to define a `nodeAffinity` for all your Postgres clusters use the
@@ -818,6 +810,7 @@ configuration you can specify the full path under `s3_wal_path`. For
 or [Azure](administrator.md#azure-setup)
 it can only be set globally with [custom Pod environment variables](administrator.md#custom-pod-environment-variables)
 or locally in the Postgres manifest's [`env`](administrator.md#via-postgres-cluster-manifest) section.
+
 
 For non AWS S3 following settings can be set to support cloning from other S3
 implementations:
@@ -893,8 +886,7 @@ point you should restore.
 
 ## Setting up a standby cluster
 
-Standby cluster is
-a [Patroni feature](https://github.com/zalando/patroni/blob/master/docs/replica_bootstrap.rst#standby-cluster)
+Standby cluster is a [Patroni feature](https://github.com/zalando/patroni/blob/master/docs/replica_bootstrap.rst#standby-cluster)
 that first clones a database, and keeps replicating changes afterwards. It can
 exist in a different location than its source database, but unlike cloning,
 the PostgreSQL version between source and target cluster has to be the same.
@@ -943,10 +935,10 @@ standby, postgres etc.) all have a password that does not match the credentials
 stored in secrets which are created by the operator. You have two options:
 
 a. Create secrets manually beforehand and paste the credentials of the source
-cluster
+   cluster
 b. Let the operator create the secrets when it bootstraps the standby cluster.
-Patch the secrets with the credentials of the source cluster. Replace the
-spilo pods.
+   Patch the secrets with the credentials of the source cluster. Replace the
+   spilo pods.
 
 Otherwise, you will see errors in the Postgres logs saying users cannot log in
 and the operator logs will complain about not being able to sync resources.
@@ -978,7 +970,7 @@ standby_cluster:
     - bootstrap_standby_with_wale
     - basebackup_fast_xlog
   restore_command: envdir "/home/postgres/etc/wal-e.d/env-standby" /scripts/restore_command.sh
-    "%f" "%p"
+     "%f" "%p"
 ```
 
 Finally, remove the `standby` section from the postgres cluster manifest.
@@ -1019,10 +1011,10 @@ spec:
 In addition to any environment variables you specify, the following environment
 variables are always passed to sidecars:
 
-- `POD_NAME` - field reference to `metadata.name`
-- `POD_NAMESPACE` - field reference to `metadata.namespace`
-- `POSTGRES_USER` - the superuser that can be used to connect to the database
-- `POSTGRES_PASSWORD` - the password for the superuser
+  - `POD_NAME` - field reference to `metadata.name`
+  - `POD_NAMESPACE` - field reference to `metadata.namespace`
+  - `POSTGRES_USER` - the superuser that can be used to connect to the database
+  - `POSTGRES_PASSWORD` - the password for the superuser
 
 The PostgreSQL volume is shared with sidecars and is mounted at
 `/home/postgres/pgdata`.
@@ -1031,8 +1023,7 @@ The PostgreSQL volume is shared with sidecars and is mounted at
 specified but globally disabled in the configuration. The `enable_sidecars`
 option must be set to `true`.
 
-If you want to add a sidecar to every cluster managed by the operator, you can specify it in
-the [operator configuration](administrator.md#sidecars-for-postgres-clusters) instead.
+If you want to add a sidecar to every cluster managed by the operator, you can specify it in the [operator configuration](administrator.md#sidecars-for-postgres-clusters) instead.
 
 ### Accessing the PostgreSQL socket from sidecars
 
@@ -1045,8 +1036,8 @@ container simply add a VolumeMount to this volume to your sidecar spec.
   - name: "container-name"
     image: "company/image:tag"
     volumeMounts:
-      - mountPath: /var/run
-        name: postgresql-run
+    - mountPath: /var/run
+      name: postgresql-run
 ```
 
 If you do not want to globally enable this feature and only use it for single
@@ -1056,18 +1047,18 @@ the manifest:
 ```yaml
 spec:
   additionalVolumes:
-    - name: postgresql-run
-      mountPath: /var/run/postgresql
-      targetContainers:
-        - all
-      volumeSource:
-        emptyDir: { }
-  sidecars:
-    - name: "container-name"
-      image: "company/image:tag"
-      volumeMounts:
-        - mountPath: /var/run
-          name: postgresql-run
+  - name: postgresql-run
+    mountPath: /var/run/postgresql
+    targetContainers:
+    - all
+    volumeSource:
+      emptyDir: {}
+  sidecars: 
+  - name: "container-name"
+    image: "company/image:tag"
+    volumeMounts:
+    - mountPath: /var/run
+      name: postgresql-run
 ```
 
 ## InitContainers Support
@@ -1140,8 +1131,7 @@ spec:
 ```
 
 The operator will create and sync a K8s cron job to do periodic logical backups
-of this particular Postgres cluster. Due to
-the [limitation of K8s cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
+of this particular Postgres cluster. Due to the [limitation of K8s cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
 it is highly advisable to set up additional monitoring for this feature; such
 monitoring is outside the scope of operator responsibilities. See
 [configuration reference](reference/cluster_manifest.md) and
@@ -1230,13 +1220,11 @@ Therefore, instead of using a global `spilo_fsgroup` setting in operator
 configuration or use the `spiloFSGroup` field per Postgres cluster manifest.
 
 For testing purposes, you can generate a self-signed certificate with openssl:
-
 ```sh
 openssl req -x509 -nodes -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=acid.zalan.do"
 ```
 
 Upload the cert as a kubernetes secret:
-
 ```sh
 kubectl create secret tls pg-tls \
   --key tls.key \
@@ -1244,7 +1232,6 @@ kubectl create secret tls pg-tls \
 ```
 
 When doing client auth, CA can come optionally from the same secret:
-
 ```sh
 kubectl create secret generic pg-tls \
   --from-file=tls.crt=server.crt \
@@ -1267,7 +1254,6 @@ spec:
 ```
 
 Optionally, the CA can be provided by a different secret:
-
 ```sh
 kubectl create secret generic pg-tls-ca --from-file=ca.crt=ca.crt
 ```
