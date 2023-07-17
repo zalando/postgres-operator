@@ -218,6 +218,8 @@ spec:
               logicalBackupSchedule:
                 type: string
                 pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
+              logicalBackupTimezone:
+                type: string
               maintenanceWindows:
                 type: array
                 items:

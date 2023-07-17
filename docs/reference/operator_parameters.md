@@ -825,6 +825,11 @@ grouped under the `logical_backup` key.
   [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Default: "30 00 \* \* \*"
 
+* **logical_backup_timezone**
+  Backup timezone in the timezone format. Please take the
+  [reference timezone format](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones)
+  into account. The default is empty.
+
 ## Debugging the operator
 
 Options to aid debugging of the operator itself. Grouped under the `debug` key.

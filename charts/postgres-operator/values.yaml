@@ -372,6 +372,8 @@ configLogicalBackup:
   logical_backup_s3_retention_time: ""
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
+  # backup cronjob timezone in the timezone format, for example "Etc/UTC"
+  logical_backup_timezone: ""
 
 # automate creation of human users with teams API service
 configTeamsApi:

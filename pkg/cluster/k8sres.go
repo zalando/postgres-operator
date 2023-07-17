@@ -2258,6 +2258,15 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		},
 	}
 
+	timezone := c.Postgresql.Spec.LogicalBackupTimezone
+	if timezone == "" {
+		timezone = c.OpConfig.LogicalBackupTimezone
+	}
+
+	if timezone != "" {
+		cronJob.Spec.TimeZone = &timezone
+	}
+
 	return cronJob, nil
 }
 
