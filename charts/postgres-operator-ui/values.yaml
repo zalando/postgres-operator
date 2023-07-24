@@ -82,6 +82,9 @@ extraEnvs:
   #       key: AWS_DEFAULT_REGION
   # - name: SPILO_S3_BACKUP_BUCKET
   #   value: <s3 bucket used by the operator>
+  # if you want to use instance role attached to your ec2 instance or pod (either instance profile or using IRSA or any other method.) 
+  # - name: AWS_INSTANCE_PROFILE
+  #   value: "1"
 
 # configure UI service
 service:
