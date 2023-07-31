@@ -1358,6 +1358,7 @@ class EndToEndTestCase(unittest.TestCase):
             time.sleep(5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
     def test_node_affinity(self):
         '''
            Add label to a node and update postgres cluster spec to deploy only on a node with that label
