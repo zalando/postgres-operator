@@ -128,6 +128,7 @@ data:
   pod_role_label: spilo-role
   # pod_service_account_definition: ""
   pod_service_account_name: "postgres-pod"
+  pod_service_account_annotations: "keya:valuea"
   # pod_service_account_role_binding_definition: ""
   pod_terminate_grace_period: 5m
   # postgres_superuser_teams: "postgres_superusers"
