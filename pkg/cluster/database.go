@@ -154,7 +154,6 @@ func (c *Cluster) initDbConnWithName(dbname string) error {
 				return false, err2
 			}
 
-			// Ping verifies a connection to the database return EOF error.
 			// Retry open connection until succeeded.
 			c.logger.Warningf("could not connect to Postgres database: %v", err)
 			return false, nil
