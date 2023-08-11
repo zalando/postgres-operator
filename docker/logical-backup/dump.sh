@@ -11,6 +11,11 @@ PG_BIN=$PG_DIR/$PG_VERSION/bin
 DUMP_SIZE_COEFF=5
 ERRORCOUNT=0
 
+PG_DUMP_EXTRA_ARGUMENTS=${PG_DUMP_EXTRA_ARGUMENTS:=""}
+PG_DUMPALL_EXTRA_ARGUMENTS=${PG_DUMPALL_EXTRA_ARGUMENTS:=""}
+PG_DUMP_NJOBS=${PG_DUMP_NJOBS:-4}
+PG_DUMP_COMPRESS=${PG_DUMP_COMPRESS:-6}
+
 TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 KUBERNETES_SERVICE_PORT=${KUBERNETES_SERVICE_PORT:-443}
 if [ "$KUBERNETES_SERVICE_HOST" != "${KUBERNETES_SERVICE_HOST#*[0-9].[0-9]}" ]; then
@@ -40,14 +45,26 @@ function dump {
     "$PG_BIN"/pg_dumpall
 }
 
+function dump_global {
+    # settings are taken from the environment
+    "$PG_BIN"/pg_dumpall --globals-only $PG_DUMPALL_EXTRA_ARGUMENTS
+}
+
+function dump_db {
+    # settings are taken from the environment
+    "$PG_BIN"/pg_dump --jobs=$PG_DUMP_NJOBS --format=d --compress=$PG_DUMP_COMPRESS --blobs --file "/tmp/db-$1" $PG_DUMP_EXTRA_ARGUMENTS $1
+}
+
 function compress {
     pigz
 }
 
-function az_upload {
-    PATH_TO_BACKUP=$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
+function az_upload { 
+    az storage blob upload --data @- --account-name "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME" --account-key "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY" -c "$LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER" -n "$1"
+}
 
-    az storage blob upload --file "$1" --account-name "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME" --account-key "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY" -c "$LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER" -n "$PATH_TO_BACKUP"
+function az_upload_dir { 
+    az storage blob upload-batch --account-name "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME" --account-key "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY" -d "$LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER" --destination-path $2 -s "$1"
 }
 
 function aws_delete_objects {
@@ -119,6 +136,11 @@ function aws_upload {
     aws s3 cp - "$PATH_TO_BACKUP" "${args[@]//\'/}"
 }
 
+function list_databases {
+    # SQL from dumpall
+    psql -c "SELECT datname FROM pg_database d WHERE datallowconn AND datconnlimit != -2 ORDER BY (datname <> 'template1'), datname" --csv | tail -n +2
+}
+
 function gcs_upload {
     PATH_TO_BACKUP=gs://$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
 
@@ -185,8 +207,27 @@ done
 
 set -x
 if [ "$LOGICAL_BACKUP_PROVIDER" == "az" ]; then
-    dump | compress > /tmp/azure-backup.sql.gz
-    az_upload /tmp/azure-backup.sql.gz
+    PATH_TO_BACKUP="spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%Y-%m-%dT%H%M%S)
+
+    echo Dumping and uploading global items...
+    dump_global | compress | az_upload $PATH_TO_BACKUP/global.sql.gz
+
+    [[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
+    set +x
+
+    list_databases > /tmp/database-list
+    while read dbname; do 
+        echo Dumping $dbname...
+        dump_db $dbname
+        echo Uploading directory /tmp/db-$dbname to $PATH_TO_BACKUP/$dbname...
+        az_upload_dir /tmp/db-$dbname $PATH_TO_BACKUP/$dbname
+        echo Cleaning up /tmp/db-$dbname...
+        rm -rf /tmp/db-$dbname
+    done < /tmp/database-list
+
+    rm /tmp/database-list
+
+    exit $ERRORCOUNT
 else
     dump | compress | upload
     [[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
