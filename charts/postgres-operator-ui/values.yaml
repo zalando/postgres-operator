@@ -104,7 +104,7 @@ ingress:
     # kubernetes.io/tls-acme: "true"
   ingressClassName: ""
   hosts:
-    - host: localhost
+    - host: ui.example.org
       paths: ["/"]
   tls: []
   #  - secretName: ui-tls
