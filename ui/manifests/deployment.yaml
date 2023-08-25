@@ -101,3 +101,5 @@ spec:
             #       key: AWS_DEFAULT_REGION
             # - name: SPILO_S3_BACKUP_BUCKET
             #   value: <s3 bucket used by the operator>
+            # - name: "USE_AWS_INSTANCE_PROFILE"
+            #   value: "true"

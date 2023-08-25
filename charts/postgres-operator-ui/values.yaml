@@ -82,6 +82,8 @@ extraEnvs:
   #       key: AWS_DEFAULT_REGION
   # - name: SPILO_S3_BACKUP_BUCKET
   #   value: <s3 bucket used by the operator>
+  # - name: "USE_AWS_INSTANCE_PROFILE"
+  #   value: "true"
 
 # configure UI service
 service:
@@ -102,8 +104,8 @@ ingress:
     # kubernetes.io/tls-acme: "true"
   ingressClassName: ""
   hosts:
-    - host: ui.example.org
-      paths: [""]
+    - host: localhost
+      paths: ["/"]
   tls: []
   #  - secretName: ui-tls
   #    hosts:
