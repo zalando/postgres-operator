@@ -658,14 +658,17 @@ func generateContainer(
 			{
 				ContainerPort: patroni.ApiPort,
 				Protocol:      v1.ProtocolTCP,
+				Name:          "patroni",
 			},
 			{
 				ContainerPort: pgPort,
 				Protocol:      v1.ProtocolTCP,
+				Name:          "postgresql",
 			},
 			{
 				ContainerPort: operatorPort,
 				Protocol:      v1.ProtocolTCP,
+				Name:          "operator",
 			},
 		},
 		VolumeMounts: volumeMounts,
