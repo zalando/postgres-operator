@@ -218,6 +218,7 @@ type ConnectionPoolerConfiguration struct {
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
 type OperatorLogicalBackupConfiguration struct {
 	Schedule                     string `json:"logical_backup_schedule,omitempty"`
+	Timezone                     string `json:"logical_backup_timezone,omitempty"`
 	DockerImage                  string `json:"logical_backup_docker_image,omitempty"`
 	BackupProvider               string `json:"logical_backup_provider,omitempty"`
 	AzureStorageAccountName      string `json:"logical_backup_azure_storage_account_name,omitempty"`
