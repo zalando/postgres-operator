@@ -676,6 +676,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
+				PodServiceAccountName: "postgres-pod",
 				ConnectionPooler: config.ConnectionPooler{
 					MaxDBConnections:                     k8sutil.Int32ToPointer(60),
 					ConnectionPoolerDefaultCPURequest:    "100m",
@@ -724,6 +725,15 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 			expected: nil,
 			cluster:  cluster,
 			check:    noCheck,
+		},
+		{
+			subTest: "pooler uses pod service account",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    testServiceAccount,
 		},
 		{
 			subTest: "no default resources",
@@ -870,6 +880,17 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 				testName, tt.subTest, err)
 		}
 	}
+}
+
+func testServiceAccount(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
+	poolerServiceAccount := podSpec.Spec.ServiceAccountName
+
+	if poolerServiceAccount != cluster.OpConfig.PodServiceAccountName {
+		return fmt.Errorf("Pooler service account does not match, got %+v, expected %+v",
+			poolerServiceAccount, cluster.OpConfig.PodServiceAccountName)
+	}
+
+	return nil
 }
 
 func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
