@@ -1,14 +1,14 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.10.0
+  tag: v1.10.1
   pullPolicy: "IfNotPresent"
 
-  # Optionally specify an array of imagePullSecrets.
-  # Secrets must be manually created in the namespace.
-  # ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
-  # imagePullSecrets:
-  # - name: myRegistryKeySecretName
+# Optionally specify an array of imagePullSecrets.
+# Secrets must be manually created in the namespace.
+# ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+# imagePullSecrets:
+# - name: myRegistryKeySecretName
 
 podAnnotations: {}
 podLabels: {}
@@ -348,7 +348,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.0"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
