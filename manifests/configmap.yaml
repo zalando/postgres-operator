@@ -26,6 +26,7 @@ data:
   crd_categories: "all"
   # custom_service_annotations: "keyx:valuez,keya:valuea"
   # custom_pod_annotations: "keya:valuea,keyb:valueb"
+  # database_name_regexp: "^[a-zA-Z_][a-zA-Z0-9_]*$"
   db_hosted_zone: db.example.com
   debug_logging: "true"
   # default_cpu_limit: "1"

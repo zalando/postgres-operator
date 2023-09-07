@@ -2,10 +2,9 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
-
-	"fmt"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -246,6 +245,7 @@ type Config struct {
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
+	DatabaseNameRegexp                       string            `name:"database_name_regexp" default:"^[a-zA-Z_][a-zA-Z0-9_]*$"`
 }
 
 // MustMarshal marshals the config or panics

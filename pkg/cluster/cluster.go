@@ -293,6 +293,10 @@ func (c *Cluster) Create() (err error) {
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Services", "The service %q for role %s has been successfully created", util.NameFromMeta(service.ObjectMeta), role)
 	}
 
+	if err = c.readValidateDatabaseNameRegexp(c.OpConfig.DatabaseNameRegexp); err != nil {
+		return err
+	}
+
 	if err = c.initUsers(); err != nil {
 		return err
 	}
@@ -336,6 +340,7 @@ func (c *Cluster) Create() (err error) {
 	// that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		c.logger.Infof("Create roles")
+
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
@@ -344,9 +349,11 @@ func (c *Cluster) Create() (err error) {
 		if err = c.syncDatabases(); err != nil {
 			return fmt.Errorf("could not sync databases: %v", err)
 		}
+
 		if err = c.syncPreparedDatabases(); err != nil {
 			return fmt.Errorf("could not sync prepared databases: %v", err)
 		}
+
 		c.logger.Infof("databases have been successfully created")
 	}
 

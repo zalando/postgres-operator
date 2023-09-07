@@ -66,6 +66,9 @@ spec:
                 nullable: true
                 items:
                   type: string
+              database_name_regexp:
+                type: string
+                default: "^[a-zA-Z_][a-zA-Z0-9_]*$"
               docker_image:
                 type: string
                 default: "ghcr.io/zalando/spilo-15:3.0-p1"
