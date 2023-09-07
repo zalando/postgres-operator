@@ -309,6 +309,11 @@ spec:
                   pod_terminate_grace_period:
                     type: string
                     default: "5m"
+                  pod_fs_group_change_policy:
+                    type: string
+                    enum:
+                      - OnRootMismatch
+                      - Always
                   secret_name_template:
                     type: string
                     default: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"

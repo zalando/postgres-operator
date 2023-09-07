@@ -1429,6 +1429,17 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pod_terminate_grace_period": {
 								Type: "string",
 							},
+							"pod_fs_group_change_policy": {
+								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(`"OnRootMismatch"`),
+									},
+									{
+										Raw: []byte(`"Always"`),
+									},
+								},
+							},
 							"secret_name_template": {
 								Type: "string",
 							},

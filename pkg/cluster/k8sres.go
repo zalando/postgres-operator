@@ -778,6 +778,7 @@ func (c *Cluster) generatePodTemplate(
 	nodeAffinity *v1.Affinity,
 	schedulerName *string,
 	terminateGracePeriod int64,
+	podFsGroupChangePolicy v1.PodFSGroupChangePolicy,
 	podServiceAccountName string,
 	kubeIAMRole string,
 	priorityClassName string,
@@ -805,6 +806,10 @@ func (c *Cluster) generatePodTemplate(
 
 	if spiloFSGroup != nil {
 		securityContext.FSGroup = spiloFSGroup
+	}
+
+	if len(podFsGroupChangePolicy) > 0 {
+		securityContext.FSGroupChangePolicy = &podFsGroupChangePolicy
 	}
 
 	podSpec := v1.PodSpec{
@@ -1284,6 +1289,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveFSGroup = spec.SpiloFSGroup
 	}
 
+	fsGroupChangePolicy := c.OpConfig.PodFsGroupChangePolicy
+
 	volumeMounts := generateVolumeMounts(spec.Volume)
 
 	// configure TLS with a custom secret volume
@@ -1403,6 +1410,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
 		spec.SchedulerName,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		fsGroupChangePolicy,
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
@@ -2210,6 +2218,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		nil,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		"",
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		"",
