@@ -1222,8 +1222,8 @@ class EndToEndTestCase(unittest.TestCase):
 
         pg_patch_scale_down_instances = {
             'spec': {
-                    'numberOfInstances': 1
-                }
+                'numberOfInstances': 1
+            }
         }
         # decrease the number of instances
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -1233,8 +1233,8 @@ class EndToEndTestCase(unittest.TestCase):
 
         pg_patch_scale_up_instances = {
             'spec': {
-                    'numberOfInstances': 2
-                }
+                'numberOfInstances': 2
+            }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', pg_patch_scale_up_instances)
