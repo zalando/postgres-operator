@@ -1388,6 +1388,33 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pdb_name_format": {
 								Type: "string",
 							},
+							"persistent_volume_claim_retention_policy": {
+								Type: "object",
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"when_deleted": {
+										Type: "string",
+										Enum: []apiextv1.JSON{
+											{
+												Raw: []byte(`"delete"`),
+											},
+											{
+												Raw: []byte(`"retain"`),
+											},
+										},
+									},
+									"when_scaled": {
+										Type: "string",
+										Enum: []apiextv1.JSON{
+											{
+												Raw: []byte(`"delete"`),
+											},
+											{
+												Raw: []byte(`"retain"`),
+											},
+										},
+									},
+								},
+							},
 							"pod_antiaffinity_preferred_during_scheduling": {
 								Type: "boolean",
 							},

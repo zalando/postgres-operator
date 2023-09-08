@@ -119,6 +119,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.NodeReadinessLabelMerge = fromCRD.Kubernetes.NodeReadinessLabelMerge
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
 	result.PodManagementPolicy = util.Coalesce(fromCRD.Kubernetes.PodManagementPolicy, "ordered_ready")
+	result.PersistentVolumeClaimRetentionPolicy = fromCRD.Kubernetes.PersistentVolumeClaimRetentionPolicy
 	result.EnableReadinessProbe = fromCRD.Kubernetes.EnableReadinessProbe
 	result.MasterPodMoveTimeout = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout), "10m")
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity

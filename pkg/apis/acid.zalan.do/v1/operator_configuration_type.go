@@ -100,6 +100,7 @@ type KubernetesMetaConfiguration struct {
 	PodAntiAffinityPreferredDuringScheduling bool                `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
 	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
+	PersistentVolumeClaimRetentionPolicy     map[string]string   `json:"persistent_volume_claim_retention_policy,omitempty"`
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
 }

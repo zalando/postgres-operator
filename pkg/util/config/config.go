@@ -246,6 +246,7 @@ type Config struct {
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
+	PersistentVolumeClaimRetentionPolicy     map[string]string `name:"persistent_volume_claim_retention_policy" default:"when_deleted:retain,when_scaled:retain"`
 }
 
 // MustMarshal marshals the config or panics
