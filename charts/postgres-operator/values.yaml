@@ -170,7 +170,7 @@ configKubernetes:
   # defines the template for PDB (Pod Disruption Budget) names
   pdb_name_format: "postgres-{cluster}-pdb"
   # specify the PVC retention policy when scaling down and/or deleting
-  persistent_volume_claim_retention_policy: 
+  persistent_volume_claim_retention_policy:
     when_deleted: "retain"
     when_scaled: "retain"
   # switches pod anti affinity type to `preferredDuringSchedulingIgnoredDuringExecution`
