@@ -262,9 +262,11 @@ func (c *Cluster) Create() (err error) {
 	}()
 
 	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
-	c.logger.Info("Adding finalizer.")
-	if err = c.AddFinalizer(); err != nil {
-		return fmt.Errorf("could not add Finalizer: %v", err)
+	if c.OpConfig.EnableFinalizers {
+		c.logger.Info("Adding finalizer.")
+		if err = c.AddFinalizer(); err != nil {
+			return fmt.Errorf("could not add Finalizer: %v", err)
+		}
 	}
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 

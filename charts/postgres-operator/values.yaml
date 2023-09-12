@@ -123,6 +123,10 @@ configKubernetes:
 
   # allow user secrets in other namespaces than the Postgres cluster
   enable_cross_namespace_secret: false
+  # use finalizers to ensure all managed resources are deleted prior to the postgresql CR
+  # this avoids stale resources in case the operator misses a delete event or is not running
+  # during deletion
+  enable_finalizers: false
   # enables initContainers to run actions before Spilo is started
   enable_init_containers: true
   # toggles pod anti affinity on the Postgres pods
