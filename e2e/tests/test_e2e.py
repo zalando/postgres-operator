@@ -1260,7 +1260,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', pg_patch_scale_up_instances)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},"Operator does not get in sync")
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "Scale up to 2 failed")
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 2, "PVCs is not equal to number of instances")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
