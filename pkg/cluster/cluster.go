@@ -567,6 +567,10 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
 		newCheck("new statefulset %s's %s (index %d) volume mounts do not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.VolumeMounts, b.VolumeMounts) }),
+		newCheck("new statefulset %s's %s (index %d) readiness probe do not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.ReadinessProbe, b.ReadinessProbe) }),
+		newCheck("new statefulset %s's %s (index %d) liveness probe do not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.LivenessProbe, b.LivenessProbe) }),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {

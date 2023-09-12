@@ -87,6 +87,7 @@ type PostgresSpec struct {
 	AdditionalVolumes         []AdditionalVolume `json:"additionalVolumes,omitempty"`
 	Streams                   []Stream           `json:"streams,omitempty"`
 	Env                       []v1.EnvVar        `json:"env,omitempty"`
+	LivenessProbe             *v1.Probe          `json:"livenessProbe,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`

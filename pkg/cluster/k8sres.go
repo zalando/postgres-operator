@@ -1207,6 +1207,19 @@ func generateSpiloReadinessProbe() *v1.Probe {
 	}
 }
 
+func generateSpiloLivenessProbe(probe, defaultProbe *v1.Probe) *v1.Probe {
+
+	if probe != nil {
+		return probe
+	}
+
+	if defaultProbe != nil {
+		return defaultProbe
+	}
+
+	return nil
+}
+
 func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
 
 	var (
@@ -1325,6 +1338,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	if c.OpConfig.EnableReadinessProbe {
 		spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
 	}
+
+	spiloContainer.LivenessProbe = generateSpiloLivenessProbe(spec.LivenessProbe, c.OpConfig.LivenessProbe)
 
 	// generate container specs for sidecars specified in the cluster manifest
 	clusterSpecificSidecars := []v1.Container{}

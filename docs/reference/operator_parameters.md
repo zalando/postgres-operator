@@ -469,6 +469,10 @@ configuration they are grouped under the `kubernetes` key.
   process. Required by cron which needs setuid. Without this parameter,
   certification rotation & backups will not be done. The default is `true`.
 
+* **liveness_probe**
+  Allows for adding a liveness probe to the Spilo container to detect if it's
+  running properly.
+
 * **additional_pod_capabilities**
   list of additional capabilities to be added to the postgres container's
   SecurityContext (e.g. SYS_NICE etc.). Please, make sure first that the
