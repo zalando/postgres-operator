@@ -3,6 +3,9 @@
 export DEBIAN_FRONTEND=noninteractive
 
 arch=$(dpkg --print-architecture)
+if [ "$arch" = "ppc64el" ]; then
+    arch" = "ppc64le"
+fi
 
 set -ex
 
