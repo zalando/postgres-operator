@@ -59,10 +59,6 @@ function generate_certificate(){
   openssl req -x509 -nodes -newkey rsa:2048 -keyout tls/tls.key -out tls/tls.crt -subj "/CN=acid.zalan.do"
 }
 
-function mount_config(){
-  mount --bind /tmp/kind-config-postgres-operator-e2e-tests /home/user/tmp/kind-config-postgres-operator-e2e-tests
-}
-
 function run_tests(){
   echo "Running tests... image: ${e2e_test_runner_image}"
   # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
@@ -92,7 +88,6 @@ function main(){
   load_operator_image
   set_kind_api_server_ip
   generate_certificate
-  mount_config
 
   shift
   run_tests $@
