@@ -89,6 +89,7 @@ function main(){
   set_kind_api_server_ip
   generate_certificate
 
+  sleep 60
   shift
   run_tests $@
   exit 0

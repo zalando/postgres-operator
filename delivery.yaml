@@ -41,7 +41,6 @@ pipeline:
             go test ./...
         - desc: 'Run e2e tests'
           cmd: |
-            export PATH=$PATH:$HOME/tmp/kind-config-postgres-operator-e2e-tests
             make e2e
         - desc: 'Push docker image'
           cmd: |
