@@ -63,6 +63,7 @@ function run_tests(){
   echo "Running tests... image: ${e2e_test_runner_image}"
   # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
 
+  export KUBECONFIG="${kubeconfig_path}"
   docker run --rm --network=host -e "TERM=xterm-256color" \
   --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \
   --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
@@ -89,7 +90,6 @@ function main(){
   set_kind_api_server_ip
   generate_certificate
 
-  sleep 60
   shift
   run_tests $@
   exit 0
