@@ -52,21 +52,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multiarch image to ghcr
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: docker/Dockerfile
-          push: true
-          build-args: BASE_IMAGE=alpine:3.15
-          tags: "${{ steps.image.outputs.NAME }}"
-          platforms: linux/amd64,linux/arm64
+      # - name: Build and push multiarch image to ghcr
+      #   uses: docker/build-push-action@v3
+      #   with:
+      #     context: .
+      #     file: docker/Dockerfile
+      #     push: true
+      #     build-args: BASE_IMAGE=alpine:3.15
+      #     tags: "${{ steps.image.outputs.NAME }}"
+      #     platforms: linux/amd64,linux/arm64
 
       - name: Build and push multiarch image to ghcr for UI
         uses: docker/build-push-action@v3
         with:
-          context: ./ui
-          file: Dockerfile
+          context: ${{ github.workspace }}/ui
+          file: ${{ github.workspace }}/ui/Dockerfile
           push: true
           build-args: BASE_IMAGE=alpine:3.15
           tags: "${{ steps.image_ui.outputs.NAME }}"
