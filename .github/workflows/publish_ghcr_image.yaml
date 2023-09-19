@@ -65,8 +65,8 @@ jobs:
       - name: Build and push multiarch image to ghcr for UI
         uses: docker/build-push-action@v3
         with:
-          context: .
-          file: ui/Dockerfile
+          context: ./ui
+          file: Dockerfile
           push: true
           build-args: BASE_IMAGE=alpine:3.15
           tags: "${{ steps.image_ui.outputs.NAME }}"
