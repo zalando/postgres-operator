@@ -580,7 +580,9 @@ For all LOGIN roles the operator will create K8s secrets in the namespace
 specified in `secretNamespace`, if `enable_cross_namespace_secret` is set to
 `true` in the config. Otherwise, they are created in the same namespace like
 the Postgres cluster. Unlike roles specified with `namespace.username` under
-`users`, the namespace will not be part of the role name here.
+`users`, the namespace will not be part of the role name here. Keep in mind
+that the underscores in a role name are replaced with dashes in the K8s
+secret name.
 
 ```yaml
 spec:
