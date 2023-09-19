@@ -1281,6 +1281,11 @@ func (in *Stream) DeepCopyInto(out *Stream) {
 		*out = new(uint32)
 		**out = **in
 	}
+	if in.EnableRecovery != nil {
+		in, out := &in.EnableRecovery, &out.EnableRecovery
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
