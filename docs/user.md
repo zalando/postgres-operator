@@ -582,6 +582,8 @@ specified in `secretNamespace`, if `enable_cross_namespace_secret` is set to
 the Postgres cluster. Unlike roles specified with `namespace.username` under
 `users`, the namespace will not be part of the role name here.
 
+Note that a Role name as `foo_owner_user` will be appears as K8S secret `foo-owner-user`
+
 ```yaml
 spec:
   preparedDatabases:
