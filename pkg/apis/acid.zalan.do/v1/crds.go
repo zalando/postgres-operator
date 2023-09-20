@@ -769,6 +769,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									"database": {
 										Type: "string",
 									},
+									"enableRecovery": {
+										Type: "boolean",
+									},
 									"filter": {
 										Type: "object",
 										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
@@ -791,6 +794,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Type: "string",
 													},
 													"payloadColumn": {
+														Type: "string",
+													},
+													"recoveryEventType": {
 														Type: "string",
 													},
 												},
