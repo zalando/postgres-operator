@@ -138,6 +138,7 @@ type LogicalBackup struct {
 	LogicalBackupS3SecretAccessKey            string `name:"logical_backup_s3_secret_access_key" default:""`
 	LogicalBackupS3SSE                        string `name:"logical_backup_s3_sse" default:""`
 	LogicalBackupS3RetentionTime              string `name:"logical_backup_s3_retention_time" default:""`
+	LogicalBackupGSBucket                     string `name:"logical_backup_gs_bucket" default:""`
 	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
 	LogicalBackupCPURequest                   string `name:"logical_backup_cpu_request"`

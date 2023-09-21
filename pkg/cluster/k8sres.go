@@ -2325,6 +2325,14 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
 		},
 		{
+			Name:  "LOGICAL_BACKUP_GS_BUCKET",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupGSBucket,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_GS_BUCKET_SCOPE_SUFFIX",
+			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
+		{
 			Name:  "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials,
 		},

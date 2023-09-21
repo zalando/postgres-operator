@@ -120,7 +120,7 @@ function aws_upload {
 }
 
 function gcs_upload {
-    PATH_TO_BACKUP=gs://$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
+    PATH_TO_BACKUP=gs://$LOGICAL_BACKUP_GS_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_GS_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
 
     gsutil -o Credentials:gs_service_key_file=$LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS cp - "$PATH_TO_BACKUP"
 }

@@ -503,6 +503,8 @@ spec:
                   logical_backup_docker_image:
                     type: string
                     default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
+                  logical_backup_gs_bucket:
+                    type: string
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:

@@ -355,6 +355,9 @@ configLogicalBackup:
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
+  # GS bucket to store backup results
+  # logical_backup_gs_bucket: "my-bucket-url"
+
 
   # prefix for the backup job name
   logical_backup_job_prefix: "logical-backup-"
