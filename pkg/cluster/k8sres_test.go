@@ -2979,6 +2979,39 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			},
 		},
 		{
+			subTest: "test HugePages are not set on container when not requested in manifest",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{},
+						ResourceLimits:   acidv1.ResourceDescription{},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:    "100m",
+					Memory: "100Mi",
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:    "1",
+					Memory: "500Mi",
+				},
+			},
+		},
+		{
 			subTest: "test HugePages are passed through to the postgres container",
 			config: config.Config{
 				Resources:           configResources,
