@@ -706,6 +706,8 @@ spec:
 
 There are no minimums or maximums and the default is 0 for both HugePage sizes,
 but Kubernetes will not spin up the pod if the requested HugePages cannot be allocated.
+For more information on HugePages in Kubernetes, see also
+[https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/](https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/)
 
 ## Use taints, tolerations and node affinity for dedicated PostgreSQL nodes
 
