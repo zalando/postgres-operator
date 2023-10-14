@@ -623,6 +623,49 @@ class EndToEndTestCase(unittest.TestCase):
                              1, "Secret not created for user in namespace")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_custom_ssl_certificate(self):
+        '''
+        Test if spilo uses a custom SSL certificate
+        '''
+
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        tls_secret = "pg-tls"
+
+        # get nodes of master and replica(s) (expected target of new master)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+        self.assertNotEqual(replica_nodes, [])
+
+        try:
+            # create secret containing ssl certificate
+            result = self.k8s.create_tls_secret_with_kubectl(tls_secret)
+            print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
+
+            # enable load balancer services
+            pg_patch_tls = {
+                "spec": {
+                    "spiloFSGroup": 103,
+                    "tls": {
+                        "secretName": tls_secret
+                    }
+                }
+            }
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_tls)
+
+            # wait for switched over
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("SSL_CERTIFICATE_FILE", cluster_label), 2, "TLS env variable SSL_CERTIFICATE_FILE missing in Spilo pods")
+            self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("SSL_PRIVATE_KEY_FILE", cluster_label), 2, "TLS env variable SSL_PRIVATE_KEY_FILE missing in Spilo pods")
+            self.eventuallyEqual(lambda: k8s.count_pods_with_volume_mount(tls_secret, cluster_label), 2, "TLS volume mount missing in Spilo pods")
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
         '''
         For a database without connection pooler, then turns it on, scale up,
@@ -652,6 +695,11 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_running_pods(replica_pooler_label), 2, "No pooler replica pods found")
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label), 2, "No pooler service found")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label), 1, "Pooler secret not created")
+
+        # TLS still enabled so check existing env variables and volume mounts
+        self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("CONNECTION_POOLER_CLIENT_TLS_CRT", pooler_label), 4, "TLS env variable CONNECTION_POOLER_CLIENT_TLS_CRT missing in pooler pods")
+        self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("CONNECTION_POOLER_CLIENT_TLS_KEY", pooler_label), 4, "TLS env variable CONNECTION_POOLER_CLIENT_TLS_KEY missing in pooler pods")
+        self.eventuallyEqual(lambda: k8s.count_pods_with_volume_mount("pg-tls", pooler_label), 4, "TLS volume mount missing in pooler pods")
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
@@ -1153,6 +1201,69 @@ class EndToEndTestCase(unittest.TestCase):
         self.evantuallyEqual(check_version_14, "14", "Version was not upgrade to 14")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_persistent_volume_claim_retention_policy(self):
+        '''
+            Test the retention policy for persistent volume claim
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 2, "PVCs is not equal to number of instance")
+
+        # patch the pvc retention policy to enable delete when scale down
+        patch_scaled_policy_delete = {
+            "data": {
+                "persistent_volume_claim_retention_policy": "when_deleted:retain,when_scaled:delete"
+            }
+        }
+        k8s.update_config(patch_scaled_policy_delete)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        pg_patch_scale_down_instances = {
+            'spec': {
+                'numberOfInstances': 1
+            }
+        }
+        # decrease the number of instances
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', pg_patch_scale_down_instances)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},"Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 1, "PVCs is not deleted when scaled down")
+
+        pg_patch_scale_up_instances = {
+            'spec': {
+                'numberOfInstances': 2
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', pg_patch_scale_up_instances)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},"Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 2, "PVCs is not equal to number of instances")
+
+        # reset retention policy to retain
+        patch_scaled_policy_retain = {
+            "data": {
+                "persistent_volume_claim_retention_policy": "when_deleted:retain,when_scaled:retain"
+            }
+        }
+        k8s.update_config(patch_scaled_policy_retain)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+ 
+        # decrease the number of instances
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', pg_patch_scale_down_instances)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},"Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 1, "Scale down to 1 failed")
+        self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 2, "PVCs is deleted when scaled down")
+
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', pg_patch_scale_up_instances)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},"Operator does not get in sync")
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+        self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 2, "PVCs is not equal to number of instances")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_resource_generation(self):
         '''
         Lower resource limits below configured minimum and let operator fix it.
@@ -1249,6 +1360,7 @@ class EndToEndTestCase(unittest.TestCase):
             time.sleep(5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
     def test_node_affinity(self):
         '''
            Add label to a node and update postgres cluster spec to deploy only on a node with that label

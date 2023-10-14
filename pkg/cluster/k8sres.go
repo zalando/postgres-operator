@@ -1293,57 +1293,26 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// configure TLS with a custom secret volume
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
-		// this is combined with the FSGroup in the section above
-		// to give read access to the postgres user
-		defaultMode := int32(0640)
-		mountPath := "/tls"
-		additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
-			Name:      spec.TLS.SecretName,
-			MountPath: mountPath,
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{
-					SecretName:  spec.TLS.SecretName,
-					DefaultMode: &defaultMode,
-				},
-			},
-		})
-
-		// use the same filenames as Secret resources by default
-		certFile := ensurePath(spec.TLS.CertificateFile, mountPath, "tls.crt")
-		privateKeyFile := ensurePath(spec.TLS.PrivateKeyFile, mountPath, "tls.key")
-		spiloEnvVars = appendEnvVars(
-			spiloEnvVars,
-			v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: certFile},
-			v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: privateKeyFile},
-		)
-
-		if spec.TLS.CAFile != "" {
-			// support scenario when the ca.crt resides in a different secret, diff path
-			mountPathCA := mountPath
-			if spec.TLS.CASecretName != "" {
-				mountPathCA = mountPath + "ca"
+		getSpiloTLSEnv := func(k string) string {
+			keyName := ""
+			switch k {
+			case "tls.crt":
+				keyName = "SSL_CERTIFICATE_FILE"
+			case "tls.key":
+				keyName = "SSL_PRIVATE_KEY_FILE"
+			case "tls.ca":
+				keyName = "SSL_CA_FILE"
+			default:
+				panic(fmt.Sprintf("TLS env key unknown %s", k))
 			}
 
-			caFile := ensurePath(spec.TLS.CAFile, mountPathCA, "")
-			spiloEnvVars = appendEnvVars(
-				spiloEnvVars,
-				v1.EnvVar{Name: "SSL_CA_FILE", Value: caFile},
-			)
-
-			// the ca file from CASecretName secret takes priority
-			if spec.TLS.CASecretName != "" {
-				additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
-					Name:      spec.TLS.CASecretName,
-					MountPath: mountPathCA,
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName:  spec.TLS.CASecretName,
-							DefaultMode: &defaultMode,
-						},
-					},
-				})
-			}
+			return keyName
 		}
+		tlsEnv, tlsVolumes := generateTlsMounts(spec, getSpiloTLSEnv)
+		for _, env := range tlsEnv {
+			spiloEnvVars = appendEnvVars(spiloEnvVars, env)
+		}
+		additionalVolumes = append(additionalVolumes, tlsVolumes...)
 	}
 
 	// generate the spilo container
@@ -1476,6 +1445,19 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
+	var persistentVolumeClaimRetentionPolicy appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy
+	if c.OpConfig.PersistentVolumeClaimRetentionPolicy["when_deleted"] == "delete" {
+		persistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.DeletePersistentVolumeClaimRetentionPolicyType
+	} else {
+		persistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	}
+
+	if c.OpConfig.PersistentVolumeClaimRetentionPolicy["when_scaled"] == "delete" {
+		persistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.DeletePersistentVolumeClaimRetentionPolicyType
+	} else {
+		persistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	}
+
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
@@ -1484,17 +1466,71 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas:             &numberOfInstances,
-			Selector:             c.labelsSelector(),
-			ServiceName:          c.serviceName(Master),
-			Template:             *podTemplate,
-			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
-			UpdateStrategy:       updateStrategy,
-			PodManagementPolicy:  podManagementPolicy,
+			Replicas:                             &numberOfInstances,
+			Selector:                             c.labelsSelector(),
+			ServiceName:                          c.serviceName(Master),
+			Template:                             *podTemplate,
+			VolumeClaimTemplates:                 []v1.PersistentVolumeClaim{*volumeClaimTemplate},
+			UpdateStrategy:                       updateStrategy,
+			PodManagementPolicy:                  podManagementPolicy,
+			PersistentVolumeClaimRetentionPolicy: &persistentVolumeClaimRetentionPolicy,
 		},
 	}
 
 	return statefulSet, nil
+}
+
+func generateTlsMounts(spec *acidv1.PostgresSpec, tlsEnv func(key string) string) ([]v1.EnvVar, []acidv1.AdditionalVolume) {
+	// this is combined with the FSGroup in the section above
+	// to give read access to the postgres user
+	defaultMode := int32(0640)
+	mountPath := "/tls"
+	env := make([]v1.EnvVar, 0)
+	volumes := make([]acidv1.AdditionalVolume, 0)
+
+	volumes = append(volumes, acidv1.AdditionalVolume{
+		Name:      spec.TLS.SecretName,
+		MountPath: mountPath,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  spec.TLS.SecretName,
+				DefaultMode: &defaultMode,
+			},
+		},
+	})
+
+	// use the same filenames as Secret resources by default
+	certFile := ensurePath(spec.TLS.CertificateFile, mountPath, "tls.crt")
+	privateKeyFile := ensurePath(spec.TLS.PrivateKeyFile, mountPath, "tls.key")
+	env = append(env, v1.EnvVar{Name: tlsEnv("tls.crt"), Value: certFile})
+	env = append(env, v1.EnvVar{Name: tlsEnv("tls.key"), Value: privateKeyFile})
+
+	if spec.TLS.CAFile != "" {
+		// support scenario when the ca.crt resides in a different secret, diff path
+		mountPathCA := mountPath
+		if spec.TLS.CASecretName != "" {
+			mountPathCA = mountPath + "ca"
+		}
+
+		caFile := ensurePath(spec.TLS.CAFile, mountPathCA, "")
+		env = append(env, v1.EnvVar{Name: tlsEnv("tls.ca"), Value: caFile})
+
+		// the ca file from CASecretName secret takes priority
+		if spec.TLS.CASecretName != "" {
+			volumes = append(volumes, acidv1.AdditionalVolume{
+				Name:      spec.TLS.CASecretName,
+				MountPath: mountPathCA,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName:  spec.TLS.CASecretName,
+						DefaultMode: &defaultMode,
+					},
+				},
+			})
+		}
+	}
+
+	return env, volumes
 }
 
 func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]string {
@@ -1771,7 +1807,7 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 }
 
 func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
-	secrets := make(map[string]*v1.Secret, len(c.pgUsers))
+	secrets := make(map[string]*v1.Secret, len(c.pgUsers)+len(c.systemUsers))
 	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
@@ -2351,8 +2387,6 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
 	}
 
-	c.logger.Debugf("Generated logical backup env vars")
-	c.logger.Debugf("%v", envVars)
 	return envVars
 }
 

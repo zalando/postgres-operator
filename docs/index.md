@@ -89,7 +89,13 @@ Please, report any issues discovered to https://github.com/zalando/postgres-oper
 
 ## Posts
 
-- "Getting started with the Zalando Operator for PostgreSQL" by Daniel Westermann on [dbi services blog](https://blog.dbi-services.com/getting-started-with-the-zalando-operator-for-postgresql/), Mar. 2021.
+- Series of blog posts on how to use the Zalando Operator, configure backups and use etcd as DCS by [thedatabaseme](https://thedatabaseme.de/tag/zalando-operator/), Mar. 2022-23.
+
+- "Zalando Postgres Operator in Production: the way of Helm" by Zangir Kapishov on [medium](https://medium.com/@zkapishov/zalando-postgres-operator-in-production-the-way-of-helm-ccfd639ccb2d), Jan. 2023.
+
+- "Chaos testing of a Postgres cluster managed by the Zalando Postgres Operator" by Nikolay Sivko on [coroot](https://coroot.com/blog/chaos-testing-zalando-postgres-operator), Aug. 2022.
+
+- "Getting started with the Zalando Operator for PostgreSQL" by Daniel Westermann on [dbi services blog](https://www.dbi-services.com/blog/getting-started-with-the-zalando-operator-for-postgresql/), Mar. 2021.
 
 - "Our experience with Postgres Operator for Kubernetes by Zalando" by Nikolay Bogdanov on [Palark blog](https://blog.palark.com/our-experience-with-postgres-operator-for-kubernetes-by-zalando/), Feb. 2021.
 

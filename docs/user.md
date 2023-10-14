@@ -580,7 +580,9 @@ For all LOGIN roles the operator will create K8s secrets in the namespace
 specified in `secretNamespace`, if `enable_cross_namespace_secret` is set to
 `true` in the config. Otherwise, they are created in the same namespace like
 the Postgres cluster. Unlike roles specified with `namespace.username` under
-`users`, the namespace will not be part of the role name here.
+`users`, the namespace will not be part of the role name here. Keep in mind
+that the underscores in a role name are replaced with dashes in the K8s
+secret name.
 
 ```yaml
 spec:
@@ -1197,14 +1199,19 @@ don't know the value, use `103` which is the GID from the default Spilo image
 OpenShift allocates the users and groups dynamically (based on scc), and their
 range is different in every namespace. Due to this dynamic behaviour, it's not
 trivial to know at deploy time the uid/gid of the user in the cluster.
-Therefore, instead of using a global `spilo_fsgroup` setting, use the
-`spiloFSGroup` field per Postgres cluster.
+Therefore, instead of using a global `spilo_fsgroup` setting in operator
+configuration or use the `spiloFSGroup` field per Postgres cluster manifest.
+
+For testing purposes, you can generate a self-signed certificate with openssl:
+```sh
+openssl req -x509 -nodes -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=acid.zalan.do"
+```
 
 Upload the cert as a kubernetes secret:
 ```sh
 kubectl create secret tls pg-tls \
-  --key pg-tls.key \
-  --cert pg-tls.crt
+  --key tls.key \
+  --cert tls.crt
 ```
 
 When doing client auth, CA can come optionally from the same secret:
@@ -1231,8 +1238,7 @@ spec:
 
 Optionally, the CA can be provided by a different secret:
 ```sh
-kubectl create secret generic pg-tls-ca \
-  --from-file=ca.crt=ca.crt
+kubectl create secret generic pg-tls-ca --from-file=ca.crt=ca.crt
 ```
 
 Then configure the postgres resource with the TLS secret:
@@ -1255,3 +1261,16 @@ Alternatively, it is also possible to use
 
 Certificate rotation is handled in the Spilo image which checks every 5
 minutes if the certificates have changed and reloads postgres accordingly.
+
+### TLS certificates for connection pooler
+
+By default, the pgBouncer image generates its own TLS certificate like Spilo.
+When the `tls` section is specfied in the manifest it will be used for the
+connection pooler pod(s) as well. The security context options are hard coded
+to `runAsUser: 100` and `runAsGroup: 101`. The `fsGroup` will be the same
+like for Spilo.
+
+As of now, the operator does not sync the pooler deployment automatically
+which means that changes in the pod template are not caught. You need to
+toggle `enableConnectionPooler` to set environment variables, volumes, secret
+mounts and securityContext required for TLS support in the pooler pod.

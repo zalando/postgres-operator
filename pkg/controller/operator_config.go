@@ -39,7 +39,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableTeamIdClusternamePrefix = fromCRD.EnableTeamIdClusternamePrefix
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
-	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "ghcr.io/zalando/spilo-15:2.1-p9")
+	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "ghcr.io/zalando/spilo-15:3.0-p1")
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
@@ -119,6 +119,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.NodeReadinessLabelMerge = fromCRD.Kubernetes.NodeReadinessLabelMerge
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
 	result.PodManagementPolicy = util.Coalesce(fromCRD.Kubernetes.PodManagementPolicy, "ordered_ready")
+	result.PersistentVolumeClaimRetentionPolicy = fromCRD.Kubernetes.PersistentVolumeClaimRetentionPolicy
 	result.EnableReadinessProbe = fromCRD.Kubernetes.EnableReadinessProbe
 	result.MasterPodMoveTimeout = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout), "10m")
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity
@@ -174,7 +175,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.9.0")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.10.1")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupAzureStorageAccountName = fromCRD.LogicalBackup.AzureStorageAccountName
 	result.LogicalBackupAzureStorageAccountKey = fromCRD.LogicalBackup.AzureStorageAccountKey

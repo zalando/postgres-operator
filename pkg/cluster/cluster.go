@@ -241,12 +241,11 @@ func (c *Cluster) initUsers() error {
 }
 
 // Create creates the new kubernetes objects associated with the cluster.
-func (c *Cluster) Create() error {
+func (c *Cluster) Create() (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var (
-		err error
 
+	var (
 		service *v1.Service
 		ep      *v1.Endpoints
 		ss      *appsv1.StatefulSet
@@ -370,14 +369,20 @@ func (c *Cluster) Create() error {
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
 
+	// remember slots to detect deletion from manifest
+	for slotName, desiredSlot := range c.Spec.Patroni.Slots {
+		c.replicationSlots[slotName] = desiredSlot
+	}
+
 	if len(c.Spec.Streams) > 0 {
+		// creating streams requires syncing the statefulset first
+		err = c.syncStatefulSet()
+		if err != nil {
+			return fmt.Errorf("could not sync statefulset: %v", err)
+		}
 		if err = c.syncStreams(); err != nil {
 			c.logger.Errorf("could not create streams: %v", err)
 		}
-	}
-
-	for slotName, desiredSlot := range c.Spec.Patroni.Slots {
-		c.replicationSlots[slotName] = desiredSlot
 	}
 
 	return nil
@@ -402,6 +407,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		match = false
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's pod management policy do not match")
+	}
+
+	if !reflect.DeepEqual(c.Statefulset.Spec.PersistentVolumeClaimRetentionPolicy, statefulSet.Spec.PersistentVolumeClaimRetentionPolicy) {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's persistent volume claim retention policy do not match")
 	}
 
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)

@@ -415,6 +415,7 @@ func (c *Controller) postgresTeamAdd(obj interface{}) {
 	pgTeam, ok := obj.(*acidv1.PostgresTeam)
 	if !ok {
 		c.logger.Errorf("could not cast to PostgresTeam spec")
+		return
 	}
 	c.logger.Debugf("PostgreTeam %q added. Reloading postgres team CRDs and overwriting cached map", pgTeam.Name)
 	c.loadPostgresTeams()
@@ -424,6 +425,7 @@ func (c *Controller) postgresTeamUpdate(prev, obj interface{}) {
 	pgTeam, ok := obj.(*acidv1.PostgresTeam)
 	if !ok {
 		c.logger.Errorf("could not cast to PostgresTeam spec")
+		return
 	}
 	c.logger.Debugf("PostgreTeam %q updated. Reloading postgres team CRDs and overwriting cached map", pgTeam.Name)
 	c.loadPostgresTeams()

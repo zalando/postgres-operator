@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,6 +23,9 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
+
+var poolerRunAsUser = int64(100)
+var poolerRunAsGroup = int64(101)
 
 // ConnectionPoolerObjects K8s objects that are belong to connection pooler
 type ConnectionPoolerObjects struct {
@@ -261,6 +263,10 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		makeDefaultConnectionPoolerResources(&c.OpConfig),
 		connectionPoolerContainer)
 
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+	}
+
 	effectiveDockerImage := util.Coalesce(
 		connectionPoolerSpec.DockerImage,
 		c.OpConfig.ConnectionPooler.Image)
@@ -268,10 +274,6 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	effectiveSchema := util.Coalesce(
 		connectionPoolerSpec.Schema,
 		c.OpConfig.ConnectionPooler.Schema)
-
-	if err != nil {
-		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
-	}
 
 	secretSelector := func(key string) *v1.SecretKeySelector {
 		effectiveUser := util.Coalesce(
@@ -344,49 +346,53 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	//  2. Reference the secret in a volume
 	//  3. Mount the volume to the container at /tls
 	var poolerVolumes []v1.Volume
+	var volumeMounts []v1.VolumeMount
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
-		// Env vars
-		crtFile := spec.TLS.CertificateFile
-		keyFile := spec.TLS.PrivateKeyFile
-		if crtFile == "" {
-			crtFile = "tls.crt"
-		}
-		if keyFile == "" {
-			keyFile = "tls.key"
-		}
+		getPoolerTLSEnv := func(k string) string {
+			keyName := ""
+			switch k {
+			case "tls.crt":
+				keyName = "CONNECTION_POOLER_CLIENT_TLS_CRT"
+			case "tls.key":
+				keyName = "CONNECTION_POOLER_CLIENT_TLS_KEY"
+			case "tls.ca":
+				keyName = "CONNECTION_POOLER_CLIENT_CA_FILE"
+			default:
+				panic(fmt.Sprintf("TLS env key for pooler unknown %s", k))
+			}
 
-		envVars = append(
-			envVars,
-			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: filepath.Join("/tls", crtFile),
-			},
-			v1.EnvVar{
-				Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: filepath.Join("/tls", keyFile),
-			},
-		)
-
-		// Volume
-		mode := int32(0640)
-		volume := v1.Volume{
-			Name: "tls",
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{
-					SecretName:  spec.TLS.SecretName,
-					DefaultMode: &mode,
-				},
-			},
+			return keyName
 		}
-		poolerVolumes = append(poolerVolumes, volume)
-
-		// Mount
-		poolerContainer.VolumeMounts = []v1.VolumeMount{{
-			Name:      "tls",
-			MountPath: "/tls",
-		}}
+		tlsEnv, tlsVolumes := generateTlsMounts(spec, getPoolerTLSEnv)
+		envVars = append(envVars, tlsEnv...)
+		for _, vol := range tlsVolumes {
+			poolerVolumes = append(poolerVolumes, v1.Volume{
+				Name:         vol.Name,
+				VolumeSource: vol.VolumeSource,
+			})
+			volumeMounts = append(volumeMounts, v1.VolumeMount{
+				Name:      vol.Name,
+				MountPath: vol.MountPath,
+			})
+		}
 	}
 
 	poolerContainer.Env = envVars
+	poolerContainer.VolumeMounts = volumeMounts
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+	securityContext := v1.PodSecurityContext{}
+
+	// determine the User, Group and FSGroup for the pooler pod
+	securityContext.RunAsUser = &poolerRunAsUser
+	securityContext.RunAsGroup = &poolerRunAsGroup
+
+	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
+	if spec.SpiloFSGroup != nil {
+		effectiveFSGroup = spec.SpiloFSGroup
+	}
+	if effectiveFSGroup != nil {
+		securityContext.FSGroup = effectiveFSGroup
+	}
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
@@ -399,6 +405,8 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			Containers:                    []v1.Container{poolerContainer},
 			Tolerations:                   tolerationsSpec,
 			Volumes:                       poolerVolumes,
+			SecurityContext:               &securityContext,
+			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
 		},
 	}
 

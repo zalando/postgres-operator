@@ -252,8 +252,8 @@ information, see [user docs](../user.md#prepared-databases-with-roles-and-defaul
   map of schemas that the operator will create. Optional - if no schema is
   listed, the operator will create a schema called `data`. Under each schema
   key, it can be defined if `defaultRoles` (NOLOGIN) and `defaultUsers` (LOGIN)
-  roles shall be created that have schema-exclusive privileges. Both flags are
-  set to `false` by default.
+  roles shall be created that have schema-exclusive privileges.
+  By default, `defaultRoles` is `true` and `defaultUsers` is false.
 
 * **secretNamespace**
   for each default LOGIN role the operator will create a secret. You can
@@ -334,7 +334,12 @@ explanation of `ttl` and `loop_wait` parameters.
   Patroni `synchronous_node_count` parameter value. Note, this option is only available for Spilo images with Patroni 2.0+. The default is set to `1`. Optional.
 
 * **failsafe_mode**
-  Patroni `failsafe_mode` parameter value. If enabled, allows Patroni to cope with DCS outages and avoid leader demotion. Note, this option is currently not included in any Patroni release. The default is set to `false`. Optional.
+  Patroni `failsafe_mode` parameter value. If enabled, Patroni will cope
+  with DCS outages by avoiding leader demotion. See the Patroni documentation
+  [here](https://patroni.readthedocs.io/en/master/dcs_failsafe_mode.html) for more details.
+  This feature is included since Patroni 3.0.0. Hence, check the container
+  image in use if this feature is included in the used Patroni version. The
+  default is set to `false`. Optional. 
   
 ## Postgres container resources
 
@@ -541,7 +546,9 @@ for both master and replica pooler services (if `enableReplicaConnectionPooler`
 
 ## Custom TLS certificates
 
-Those parameters are grouped under the `tls` top-level key.
+Those parameters are grouped under the `tls` top-level key. Note, you have to
+define `spiloFSGroup` in the Postgres cluster manifest or `spilo_fsgroup` in
+the global configuration before adding the `tls` section'.
 
 * **secretName**
   By setting the `secretName` value, the cluster will switch to load the given

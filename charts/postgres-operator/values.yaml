@@ -1,14 +1,14 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.9.0
+  tag: v1.10.1
   pullPolicy: "IfNotPresent"
 
-  # Optionally specify an array of imagePullSecrets.
-  # Secrets must be manually created in the namespace.
-  # ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
-  # imagePullSecrets:
-  # - name: myRegistryKeySecretName
+# Optionally specify an array of imagePullSecrets.
+# Secrets must be manually created in the namespace.
+# ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+# imagePullSecrets:
+# - name: myRegistryKeySecretName
 
 podAnnotations: {}
 podLabels: {}
@@ -38,7 +38,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: ghcr.io/zalando/spilo-15:2.1-p9
+  docker_image: ghcr.io/zalando/spilo-15:3.0-p1
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
@@ -165,6 +165,10 @@ configKubernetes:
 
   # defines the template for PDB (Pod Disruption Budget) names
   pdb_name_format: "postgres-{cluster}-pdb"
+  # specify the PVC retention policy when scaling down and/or deleting
+  persistent_volume_claim_retention_policy: 
+    when_deleted: "retain"
+    when_scaled: "retain"
   # switches pod anti affinity type to `preferredDuringSchedulingIgnoredDuringExecution`
   pod_antiaffinity_preferred_during_scheduling: false
   # override topology key for pod anti affinity
@@ -348,7 +352,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.8.0"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -416,7 +420,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-26"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-27"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode
@@ -431,7 +435,7 @@ configConnectionPooler:
 
 configPatroni:
   # enable Patroni DCS failsafe_mode feature
-  failsafe_mode: false
+  enable_patroni_failsafe_mode: false
 
 # Zalando's internal CDC stream feature
 enableStreams: false

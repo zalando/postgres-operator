@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -18,6 +20,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+func newFakeK8sPoolerTestClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset()
+
+	return k8sutil.KubernetesClient{
+		PodsGetter:         clientSet.CoreV1(),
+		PostgresqlsGetter:  acidClientSet.AcidV1(),
+		StatefulSetsGetter: clientSet.AppsV1(),
+		DeploymentsGetter:  clientSet.AppsV1(),
+		ServicesGetter:     clientSet.CoreV1(),
+	}, clientSet
+}
 
 func mockInstallLookupFunction(schema string, user string) error {
 	return nil
@@ -661,6 +676,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
+				PodServiceAccountName: "postgres-pod",
 				ConnectionPooler: config.ConnectionPooler{
 					MaxDBConnections:                     k8sutil.Int32ToPointer(60),
 					ConnectionPoolerDefaultCPURequest:    "100m",
@@ -709,6 +725,15 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 			expected: nil,
 			cluster:  cluster,
 			check:    noCheck,
+		},
+		{
+			subTest: "pooler uses pod service account",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    testServiceAccount,
 		},
 		{
 			subTest: "no default resources",
@@ -857,6 +882,17 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 	}
 }
 
+func testServiceAccount(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
+	poolerServiceAccount := podSpec.Spec.ServiceAccountName
+
+	if poolerServiceAccount != cluster.OpConfig.PodServiceAccountName {
+		return fmt.Errorf("Pooler service account does not match, got %+v, expected %+v",
+			poolerServiceAccount, cluster.OpConfig.PodServiceAccountName)
+	}
+
+	return nil
+}
+
 func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
 	if cpuReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest {
@@ -917,6 +953,125 @@ func testServiceSelector(cluster *Cluster, service *v1.Service, role PostgresRol
 	}
 
 	return nil
+}
+
+func TestPoolerTLS(t *testing.T) {
+	client, _ := newFakeK8sPoolerTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	tlsSecretName := "my-secret"
+	spiloFSGroup := int64(103)
+	defaultMode := int32(0640)
+	mountPath := "/tls"
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			EnableConnectionPooler: util.True(),
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+			TLS: &acidv1.TLSDescription{
+				SecretName: tlsSecretName, CAFile: "ca.crt"},
+			AdditionalVolumes: []acidv1.AdditionalVolume{
+				acidv1.AdditionalVolume{
+					Name:      tlsSecretName,
+					MountPath: mountPath,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  tlsSecretName,
+							DefaultMode: &defaultMode,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+					SpiloFSGroup:         &spiloFSGroup,
+				},
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+				},
+				PodServiceAccountName: "postgres-pod",
+			},
+		}, client, pg, logger, eventRecorder)
+
+	// create a statefulset
+	_, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	// create pooler resources
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
+	cluster.ConnectionPooler[Master] = &ConnectionPoolerObjects{
+		Deployment:     nil,
+		Service:        nil,
+		Name:           cluster.connectionPoolerName(Master),
+		ClusterName:    clusterName,
+		Namespace:      namespace,
+		LookupFunction: false,
+		Role:           Master,
+	}
+
+	_, err = cluster.syncConnectionPoolerWorker(nil, &pg, Master)
+	assert.NoError(t, err)
+
+	deploy, err := client.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(Master), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	fsGroup := int64(103)
+	assert.Equal(t, &fsGroup, deploy.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
+
+	assert.Equal(t, "postgres-pod", deploy.Spec.Template.Spec.ServiceAccountName, "need to add a service account name")
+
+	volume := v1.Volume{
+		Name: "my-secret",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  "my-secret",
+				DefaultMode: &defaultMode,
+			},
+		},
+	}
+	assert.Contains(t, deploy.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
+
+	poolerContainer := deploy.Spec.Template.Spec.Containers[constants.ConnectionPoolerContainer]
+	assert.Contains(t, poolerContainer.VolumeMounts, v1.VolumeMount{
+		MountPath: "/tls",
+		Name:      "my-secret",
+	}, "the volume gets mounted in /tls")
+
+	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: "/tls/tls.crt"})
+	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: "/tls/tls.key"})
+	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_CA_FILE", Value: "/tls/ca.crt"})
 }
 
 func TestConnectionPoolerServiceSpec(t *testing.T) {

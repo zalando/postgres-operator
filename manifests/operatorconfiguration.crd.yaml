@@ -66,7 +66,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "ghcr.io/zalando/spilo-15:2.1-p9"
+                default: "ghcr.io/zalando/spilo-15:3.0-p1"
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -276,6 +276,19 @@ spec:
                   pdb_name_format:
                     type: string
                     default: "postgres-{cluster}-pdb"
+                  persistent_volume_claim_retention_policy:
+                    type: object
+                    properties:
+                      when_deleted:
+                        type: string
+                        enum:
+                          - "delete"
+                          - "retain"
+                      when_scaled:
+                        type: string
+                        enum:
+                          - "delete"
+                          - "retain"
                   pod_antiaffinity_preferred_during_scheduling:
                     type: boolean
                     default: false
@@ -487,7 +500,7 @@ spec:
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.9.0"
+                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
@@ -635,7 +648,7 @@ spec:
                     default: "pooler"
                   connection_pooler_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-26"
+                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-27"
                   connection_pooler_max_db_connections:
                     type: integer
                     default: 60
@@ -668,7 +681,7 @@ spec:
               patroni:
                 type: object
                 properties:
-                  failsafe_mode:
+                  enable_patroni_failsafe_mode:
                     type: boolean
                     default: false
           status:
