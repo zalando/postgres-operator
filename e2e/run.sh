@@ -64,7 +64,7 @@ function run_tests(){
   # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
 
   docker run --rm --network=host -e "TERM=xterm-256color" \
-  --mount type=bind,source="/tmp",target=/root/.kube/config \
+  --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \
   --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
   --mount type=bind,source="$(readlink -f tls)",target=/tls \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
