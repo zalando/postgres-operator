@@ -68,12 +68,12 @@ func (ptm *PostgresTeamMap) fetchAdditionalTeams(team string, superuserTeams boo
 	if transitive {
 		for _, additionalTeam := range teams {
 			if !(util.SliceContains(exclude, additionalTeam)) {
-				// remember to no check team and additionalTeam again
+				// remember to not check team and additionalTeam again
 				exclude = append(exclude, additionalTeam)
 				transitiveTeams := (*ptm).fetchAdditionalTeams(additionalTeam, superuserTeams, transitive, exclude)
 				for _, transitiveTeam := range transitiveTeams {
 					if !(util.SliceContains(exclude, transitiveTeam)) {
-						// remember to no check transitive team again in case
+						// remember to not check transitive team again in case
 						// it is one of the next additional teams of the outer loop
 						exclude = append(exclude, transitiveTeam)
 						if !(util.SliceContains(teams, transitiveTeam)) {
