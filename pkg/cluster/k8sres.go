@@ -2213,7 +2213,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 	if podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
 		labels,
-		annotations,
+		c.annotationsSet(annotations),
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},
