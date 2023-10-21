@@ -2192,10 +2192,11 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		nil,
 	)
 
-	labels := map[string]string{
-		c.OpConfig.ClusterNameLabel: c.Name,
-		"application":               "spilo-logical-backup",
+	logicalBackupJobLabel := map[string]string{
+		"application": "spilo-logical-backup",
 	}
+
+	labels := labels.Merge(c.labelsSet(true), logicalBackupJobLabel)
 
 	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil)
 	podAffinity := podAffinity(
