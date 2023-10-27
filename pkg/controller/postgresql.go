@@ -571,8 +571,9 @@ func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
 func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 
 	namespace := event.NewSpec.GetNamespace()
+	clusterName := event.NewSpec.GetName()
 
-	if err := c.createPodServiceAccount(namespace); err != nil {
+	if err := c.createPodServiceAccount(namespace, clusterName); err != nil {
 		return fmt.Errorf("could not create pod service account %q : %v", c.opConfig.PodServiceAccountName, err)
 	}
 
@@ -582,7 +583,7 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 	return nil
 }
 
-func (c *Controller) createPodServiceAccount(namespace string) error {
+func (c *Controller) createPodServiceAccount(namespace string, clusterName string) error {
 
 	podServiceAccountName := c.opConfig.PodServiceAccountName
 	_, err := c.KubeClient.ServiceAccounts(namespace).Get(context.TODO(), podServiceAccountName, metav1.GetOptions{})
@@ -593,6 +594,12 @@ func (c *Controller) createPodServiceAccount(namespace string) error {
 		// get a separate copy of service account
 		// to prevent a race condition when setting a namespace for many clusters
 		sa := *c.PodServiceAccount
+
+		// Append clusterName to the PodServiceAccount Annotation
+		for _, s := range c.opConfig.PodServiceAccountAnnotationPerCluster {
+			sa.ObjectMeta.Annotations[s] = fmt.Sprintf("%s-%s", sa.ObjectMeta.Annotations[s], clusterName)
+		}
+
 		if _, err = c.KubeClient.ServiceAccounts(namespace).Create(context.TODO(), &sa, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("cannot deploy the pod service account %q defined in the configuration to the %q namespace: %v", podServiceAccountName, namespace, err)
 		}
