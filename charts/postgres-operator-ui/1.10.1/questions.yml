@@ -27,7 +27,7 @@ questions:
   description: "Set the image tag"
   label: "Image Tag"
   type: "string"
-  default: "v1.10.0"
+  default: "v1.10.1"
   required: true
   # Rancher-specific annotations
   group: "Postgres Operator UI"
@@ -53,6 +53,7 @@ questions:
   type: "boolean"
   default: "true"
   required: true
+  group: "Postgres Operator UI"
   show_subquestions_if: true
   subquestions:
   - variable: serviceAccount.name

@@ -12,7 +12,7 @@ questions:
   label: Docker Repository
   group: "Image"
 - variable: image.tag
-  default: "v1.9.0"
+  default: "v1.10.0"
   description: "Docker Image Tag"
   type: string
   label: Docker Image Tag

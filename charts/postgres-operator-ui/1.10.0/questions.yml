@@ -53,6 +53,7 @@ questions:
   type: "boolean"
   default: "true"
   required: true
+  group: "Postgres Operator UI"
   show_subquestions_if: true
   subquestions:
   - variable: serviceAccount.name
