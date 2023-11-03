@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
+    helm.sh/chart: {{ template "postgres-operator-ui.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: {{ template "postgres-operator-ui.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ include "postgres-operator-ui.serviceAccountName" . }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{ toYaml .Values.imagePullSecrets | indent 8 }}
+      {{- end }}
+      containers:
+        - name: "service"
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8081
+              protocol: "TCP"
+          readinessProbe:
+            httpGet:
+              path: "/health"
+              port: 8081
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: "APP_URL"
+              value: "http://localhost:8081"
+            - name: "OPERATOR_API_URL"
+              value: {{ .Values.envs.operatorApiUrl | quote }}
+            - name: "OPERATOR_CLUSTER_NAME_LABEL"
+              value: {{ .Values.envs.operatorClusterNameLabel | quote }}
+            - name: "RESOURCES_VISIBLE"
+              value: {{ .Values.envs.resourcesVisible | quote }}
+            - name: "TARGET_NAMESPACE"
+              value: {{ .Values.envs.targetNamespace | quote }}
+            - name: "TEAMS"
+              value: |-
+                [
+                  {{- range(initial .Values.envs.teams) }}
+                  {{ . | quote }},
+                  {{- end }}
+                  {{ last .Values.envs.teams | quote }}
+                ]
+            - name: "OPERATOR_UI_CONFIG"
+              value: |-
+                {
+                  "docs_link":"https://postgres-operator.readthedocs.io/en/latest/",
+                  "dns_format_string": "{1}-{0}.{2}",
+                  "databases_visible": true,
+                  "master_load_balancer_visible": true,
+                  "nat_gateways_visible": false,
+                  "replica_load_balancer_visible": true,
+                  "resources_visible": true,
+                  "users_visible": true,
+                  "cost_ebs": 0.0952,
+                  "cost_iops": 0.006,
+                  "cost_throughput": 0.0476,
+                  "cost_core": 0.0575,
+                  "cost_memory": 0.014375,
+                  "postgresql_versions": [
+                    "14",
+                    "13",
+                    "12",
+                    "11"
+                  ]
+                }
+            {{- if .Values.extraEnvs }}
+            {{- .Values.extraEnvs | toYaml | nindent 12 }}
+            {{- end }}

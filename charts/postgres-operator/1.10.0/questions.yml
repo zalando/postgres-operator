@@ -1,0 +1,949 @@
+questions:
+- variable: image.registry
+  default: "registry.opensource.zalan.do"
+  description: "Docker Registry"
+  type: string
+  label: Docker Registry
+  group: "Image"
+- variable: image.repository
+  default: "acid/postgres-operator"
+  description: "Docker Repository"
+  type: string
+  label: Docker Repository
+  group: "Image"
+- variable: image.tag
+  default: "v1.9.0"
+  description: "Docker Image Tag"
+  type: string
+  label: Docker Image Tag
+  group: "Image"
+- variable: image.pullPolicy
+  default: "IfNotPresent"
+  description: "Docker Image Pull Policy"
+  type: enum
+  label: Docker Image PUll Policy
+  group: "Image"
+  options:
+  - "IfNotPresent"
+  - "Always"
+  - "Never"
+- variable: imagePullSecret
+  default: false
+  description: "Optionally specify an array of imagePullSecrets"
+  label: Use Image Pull Secrets
+  type: boolean
+  show_subquestion_if: true
+  group: "Image"
+  subquestions:
+  - variable: imagePullSecrets.name
+    description: "Secrets must be manually created in the namespace. ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod"
+    label: Choose imagePullSecret
+- variable: configGeneral.enable_crd_registration
+  default: true
+  description: "the deployment should create/update the CRDs"
+  label: Enable CRD Registration
+  type: boolean
+  group: "General"
+#- variable: configGeneral.crd_categories
+#  default: '- "all"'
+#  description: "specify categories under which crds should be listed"
+#  label: CRD Categories
+#  type: multiline
+#  group: "General"
+- variable: configGeneral.enable_lazy_spilo_upgrade
+  default: false
+  description: "update only the statefulsets without immediately doing the rolling update"
+  label: Enable Lazy Spilo Upgrade
+  type: boolean
+  group: "General"
+- variable: configGeneral.enable_pgversion_env_var
+  default: true
+  description: "set the PGVERSION env var instead of providing the version via postgresql.bin_dir in SPILO_CONFIGURATION"
+  label: Enable PGVERSION ENV_VAR
+  type: boolean
+  group: "General"
+- variable: configGeneral.enable_shm_volume
+  default: true
+  description: "start any new database pod without limitations on shm memory"
+  label: Enable SHM-Volume
+  type: boolean
+  group: "General"
+- variable: configGeneral.enable_spilo_wal_path_compat
+  default: false
+  description: "enables backwards compatible path between Spilo 12 and Spilo 13+ images"
+  label: Enable Spillo WAL Path Compat
+  type: boolean
+  group: "General"
+- variable: configGeneral.enable_team_id_clustername_prefix
+  default: false
+  description: "operator will sync only clusters where name starts with teamId prefix"
+  label: Enable Team ID Clustername Prefix
+  type: boolean
+  group: "General"
+- variable: configGeneral.etcd_host
+  default: ""
+  description: "etcd connection string for Patroni. Empty uses K8s-native DCS"
+  label: ETCD Host
+  type: string
+  group: "General"
+- variable: configGeneral.docker_image
+  default: "ghcr.io/zalando/spilo-15:2.1-p9"
+  description: "default Spilo docker image"
+  label: Default Spilo Docker Image
+  type: string
+  group: "General"
+- variable: configGeneral.min_instances
+  default: "-1"
+  description: "min number of instances in Postgres cluster. -1 = no limit"
+  label: Minimum Number of Instances
+  group: "General"
+  type: string
+- variable: configGeneral.max_instances
+  default: "-1"
+  description: "max number of instances in Postgres cluster. -1 = no limit"
+  label: Maximum Number of INstances
+  type: string
+  group: "General"
+- variable: configGeneral.repair_period
+  default: "5m"
+  description: "period between consecutive repair requests"
+  label: Repair Period
+  type: string
+  group: "General"
+- variable: configGeneral.resync_period
+  default: "30m"
+  description: "period between consecutive sync requests"
+  label: Resync Period
+  type: string
+  group: "General"
+- variable: configGeneral.workers
+  default: 8
+  description: "number of routines the operator spawns to process requests concurrently"
+  label: Number of Workers
+  type: int
+  group: "General"
+- variable: configUsers.replication_username
+  default: "standby"
+  description: "postgres username used for replication between instances"
+  label: Replication Username
+  type: string
+  group: Users
+- variable: configUsers.super_username
+  default: "postgres"
+  description: "postgres superuser name to be created by initdb"
+  label: Super-User Name
+  type: string
+  group: Users
+- variable: configUsers.enable_password_rotation
+  default: false
+  description: "enable password rotation for app users that are not database owners"
+  label: Enable Password Rotation
+  type: boolean
+  group: Users
+  show_subquestions_if: true
+  subquestions:
+  - variable: configUsers.password_rotation_interval
+    default: 90
+    description: "retention interval to keep rotation users"
+    label: Password Rotation Interval
+    type: int
+  - variable: configUsers.password_rotation_user_retention
+    default: 180
+    description: "retention interval to keep rotation users"
+    label: Password Rotation User Retention
+    type: int
+- variable: configMajorVersionUpgrade.major_version_upgrade_mode
+  default: "off"
+  description: '"off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too'
+  label: Major Version Upgrade Mode
+  type: enum
+  group: Major Version Upgrade
+  options:
+    - "off"
+    - "manual"
+    - "full"
+  show_subquestions_if: "full"
+  subquestions:
+  - variable: configMajorVersionUpgrade.minimal_major_version
+    default: "11"
+    description: "minimal Postgres major version that will not automatically be upgraded"
+    label: Minimal Major Version
+    type: enum
+    options:
+      - "10"
+      - "11"
+      - "12"
+      - "13"
+      - "14"
+      - "15"
+  - variable: configMajorVersionUpgrade.target_major_version
+    default: "15"
+    description: "target Postgres major version when upgrading clusters automatically"
+    label: Target Major Version
+    type: enum
+    options:
+      - "10"
+      - "11"
+      - "12"
+      - "13"
+      - "14"
+      - "15"
+- variable: configKubernetes.cluster_domain
+  default: "cluster.local"
+  description: "default DNS domain of K8s cluster where operator is running"
+  label:  Cluster Domain
+  type: string
+  group: Kubernetes
+- variable: configKubernetes.cluster_name_label
+  default: "cluster-name"
+  description: "label assigned to Kubernetes objects created by the operator"
+  label: Cluster Name Label
+  type: string
+  group: Kubernetes
+- variable: configKubernetes.enable_cross_namespace_secret
+  default: "false"
+  description: "allow user secrets in other namespaces than the Postgres cluster"
+  label: Enable Cross Namespace Secret
+  type: boolean
+  group: Kubernetes
+- variable: configKubernetes.enable_init_containers
+  default: "true"
+  description: "enables initContainers to run actions before Spilo is started"
+  label: Enable Init Containers
+  type: boolean
+  group: Kubernetes
+- variable: configKubernetes.enable_pod_antiaffinity
+  default: "false"
+  description: "toggles pod anti affinity on the Postgres pods"
+  label: Enable Pod Antiaffinity
+  type: boolean
+  group: Kubernetes
+- variable: configKubernetes.enable_pod_disruption_budget
+  default: "true"
+  description: "toggles PDB to set to MinAvailabe 0 or 1"
+  label: Enable Pod Disruption Budget
+  type: boolean
+  group: Kubernetes
+- variable: configKubernetes.enable_readiness_probe
+  default: "false"
+  description: "toogles readiness probe for database pods"
+  label: Enable Rediness Probe
+  type: boolean
+  group: Kubernetes
+- variable: configKubernetes.enable_sidecars
+  default: "true"
+  description: "enables sidecar containers to run alongside Spilo in the same pod"
+  label: Enable Sidecars
+  type: boolean
+  group: Kubernetes
+- variable: configKubernetes.pdb_name_format
+  default: "postgres-{cluster}-pdb"
+  description: "defines the template for PDB (Pod Disruption Budget) names"
+  label: Pod Disruption Budget Name Format
+  type: string
+  group: Kubernetes
+- variable: configKubernetes.pod_antiaffinity_preferred_during_scheduling
+  default: "false"
+  description: "switches pod anti affinity type to `preferredDuringSchedulingIgnoredDuringExecution`"
+  label: Pod Disruption Budget Antiaffinity Preferred During Scheduling
+  type: boolean
+  group: Kubernetes
+- variable: configKubernetes.pod_antiaffinity_topology_key
+  default: "kubernetes.io/hostname"
+  description: "override topology key for pod anti affinity"
+  label: Pod Disruption Budget Antiaffinity Topology Key
+  type: string
+  group: Kubernetes
+- variable: configKubernetes.pod_management_policy
+  default: "ordered_ready"
+  description: "specify the pod management policy of stateful sets of Postgres clusters"
+  label: Pod Management Policy
+  type: string
+  group: Kubernetes
+- variable: configKubernetes.pod_role_label
+  default: "spilo-role"
+  description: "label assigned to the Postgres pods (and services/endpoints)"
+  label: Pod Role Label
+  type: string
+  group: Kubernetes
+- variable: configKubernetes.pod_terminate_grace_period
+  default: "5m"
+  description: "Postgres pods are terminated forcefully after this timeout"
+  label: Pod Terminate Grace Period
+  type: string
+  group: Kubernetes
+- variable: configKubernetes.secret_name_template
+  default: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+  description: "template for database user secrets generated by the operator, here username contains the namespace in the format namespace.username if the user is in different namespace than cluster and cross namespace secrets are enabled via `enable_cross_namespace_secret` flag in the configuration."
+  label: Secret Name Template
+  type: string
+  group: Kubernetes
+- variable: configKubernetes.share_pgsocket_with_sidecars
+  default: "false"
+  description: "sharing unix socket of PostgreSQL (`pg_socket`) with the sidecars"
+  label: Share PGsocket With Sidecars
+  type: boolean
+  group: Kubernetes
+- variable: configKubernetes.spilo_privileged
+  default: "false"
+  description: "if Spilo Privileged true you can set user and group for spil container"
+  label: Spilo Privileged
+  type: boolean
+  group: Kubernetes
+  show_subquestions_if: "true"
+  subquestions:
+  - variable: configKubernetes.spilo_runasuser
+    default: 101
+    description: "set user for the spilo container (required to run Spilo as non-root process)"
+    label: Spilo RunAsUser
+    type: int
+  - variable: configKubernetes.spilo_runasgroup
+    default: 103
+    description: "set group for the spilo container (required to run Spilo as non-root process)"
+    label: Spilo RunAsGroup
+    type: int
+- variable: configKubernetes.spilo_allow_privilege_escalation
+  default: "true"
+  description: "required by cron which needs setuid"
+  label: Spilo Allow Privilege Escalation
+  type: boolean
+  group: Kubernetes
+- variable: configKubernetes.storage_resize_mode
+  default: "pvc"
+  description: "storage resize strategy, availabel options are: ebs, pvc, off or mixed"
+  label: Storage Resize Mode
+  type: enum
+  group: Kubernetes
+  options:
+  - "pvc"
+  - "ebs"
+  - "off"
+  - "mixed"
+- variable: configKubernetes.watched_namespace
+  default: "*"
+  description: "operator watches for postgres objects in the given namespace"
+  label: Watched Namespace
+  type: string
+  group: Kubernetes
+- variable: configPostgresPodResources.default_cpu_limit
+  default: "1"
+  description: "CPU limits for the postgres containers"
+  type: string
+  group: "Postgres Pod Resources"
+  label: "Default CPU Limit"
+- variable: configPostgresPodResources.default_cpu_request
+  default: "100m"
+  description: "CPU request value for the postgres containers"
+  type: string
+  group: "Postgres Pod Resources"
+  label: "Default CPU Request"
+- variable: configPostgresPodResources.default_memory_limit
+  default: "500Mi"
+  description: "Memory limits for the postgres containers"
+  type: string
+  group: "Postgres Pod Resources"
+  label: "Default Memory Limit"
+- variable: configPostgresPodResources.default_memory_request
+  default: "100Mi"
+  description: "Memory request value for the postgres containers"
+  type: string
+  group: "Postgres Pod Resources"
+  label: "Default Memory Request"
+- variable: configPostgresPodResources.min_cpu_limit
+  default: "250m"
+  description: "Hard CPU minimum required to properly run a Postgres cluster"
+  type: string
+  group: "Postgres Pod Resources"
+  label: "Minimum CPU Limit"
+- variable: configPostgresPodResources.min_memory_limit
+  default: "250Mi"
+  description: "Hard memory minimum required to properly run a Postgres cluster"
+  type: string
+  group: "Postgres Pod Resources"
+  label: "Minimum Memory Limit"
+- variable: configTimeouts.patroni_api_check_interval
+  default: "1s"
+  description: "Interval between consecutive attempts of operator calling the Patroni API"
+  type: string
+  group: "Timeouts"
+  label: "Patroni API Check Interval"
+- variable: configTimeouts.patroni_api_check_timeout
+  default: "5s"
+  description: "Timeout when waiting for successful response from Patroni API"
+  type: string
+  group: "Timeouts"
+  label: "Patroni API Check Timeout"
+- variable: configTimeouts.pod_deletion_wait_timeout
+  default: "10m"
+  description: "Timeout when waiting for the Postgres pods to be deleted"
+  type: string
+  group: "Timeouts"
+  label: "Pod Deletion Wait Timeout"
+- variable: configTimeouts.pod_label_wait_timeout
+  default: "10m"
+  description: "Timeout when waiting for pod role and cluster labels"
+  type: string
+  group: "Timeouts"
+  label: "Pod Label Wait Timeout"
+- variable: configTimeouts.ready_wait_interval
+  default: "3s"
+  description: "Interval between consecutive attempts waiting for postgresql CRD to be created"
+  type: string
+  group: "Timeouts"
+  label: "Ready Wait Interval"
+- variable: configTimeouts.ready_wait_timeout
+  default: "30s"
+  description: "Timeout for the complete postgres CRD creation"
+  type: string
+  group: "Timeouts"
+  label: "Ready Wait Timeout"
+- variable: configTimeouts.resource_check_interval
+  default: "3s"
+  description: "Interval to wait between consecutive attempts to check for some K8s resources"
+  type: string
+  group: "Timeouts"
+  label: "Resource Check Interval"
+- variable: configTimeouts.resource_check_timeout
+  default: "10m"
+  description: "Timeout when waiting for the presence of a certain K8s resource (e.g. Sts, PDB)"
+  type: string
+  group: "Timeouts"
+  label: "Resource Check Timeout"
+- variable: configLoadBalancer.db_hosted_zone
+  default: db.example.com
+  description: "DNS zone for cluster DNS name when load balancer is configured for cluster"
+  type: string
+  group: Load Balancer
+  label: DB Hosted Zone
+- variable: configLoadBalancer.enable_master_load_balancer
+  default: false
+  description: "Toggles service type load balancer pointing to the master pod of the cluster"
+  type: boolean
+  group: Load Balancer
+  label: Enable Master Load Balancer
+- variable: configLoadBalancer.enable_master_pooler_load_balancer
+  default: false
+  description: "Toggles service type load balancer pointing to the master pooler pod of the cluster"
+  type: boolean
+  group: Load Balancer
+  label: Enable Master Pooler Load Balancer
+- variable: configLoadBalancer.enable_replica_load_balancer
+  default: false
+  description: "Toggles service type load balancer pointing to the replica pod of the cluster"
+  type: boolean
+  group: Load Balancer
+  label: Enable Replica Load Balancer
+- variable: configLoadBalancer.enable_replica_pooler_load_balancer
+  default: false
+  description: "Toggles service type load balancer pointing to the replica pooler pod of the cluster"
+  type: boolean
+  group: Load Balancer
+  label: Enable Replica Pooler Load Balancer
+- variable: configLoadBalancer.external_traffic_policy
+  default: Cluster
+  description: "Define external traffic policy for the load balancer"
+  type: enum
+  options:
+    - Cluster
+    - Local
+  group: Load Balancer
+  label: External Traffic Policy
+- variable: configLoadBalancer.master_dns_name_format
+  default: "{cluster}.{namespace}.{hostedzone}"
+  description: "Defines the DNS name string template for the master load balancer cluster"
+  type: string
+  group: Load Balancer
+  label: Master DNS Name Format
+- variable: configLoadBalancer.master_legacy_dns_name_format
+  default: "{cluster}.{team}.{hostedzone}"
+  description: "Deprecated DNS template for master load balancer using team name"
+  type: string
+  group: Load Balancer
+  label: Master Legacy DNS Name Format
+- variable: configLoadBalancer.replica_dns_name_format
+  default: "{cluster}-repl.{namespace}.{hostedzone}"
+  description: "Defines the DNS name string template for the replica load balancer cluster"
+  type: string
+  group: Load Balancer
+  label: Replica DNS Name Format
+- variable: configLoadBalancer.replica_legacy_dns_name_format
+  default: "{cluster}-repl.{team}.{hostedzone}"
+  description: "Deprecated DNS template for replica load balancer using team name"
+  type: string
+  group: Load Balancer
+  label: Replica Legacy DNS Name Format
+- variable: configDebug.debug_logging
+  default: true
+  description: "Toggle verbose debug logs from the operator"
+  type: boolean
+  group: Debug
+  label: Enable debug logging
+- variable: configDebug.enable_database_access
+  default: true
+  description: "Toggle operator functionality that require access to the postgres database"
+  type: boolean
+  group: Debug
+  label: Enable database access
+- variable: configLoggingRestApi.api_port
+  default: 8080
+  description: "REST API listener listens to this port"
+  type: int
+  group: Logging REST API
+  label: API port
+- variable: configLoggingRestApi.cluster_history_entries
+  default: 1000
+  description: "Number of entries in the cluster history ring buffer"
+  type: int
+  group: Logging REST API
+  label: Cluster history entries
+- variable: configLoggingRestApi.ring_log_lines
+  default: 100
+  description: "Number of lines in the ring buffer used to store cluster logs"
+  type: int
+  group: Logging REST API
+  label: Ring log lines
+
+- variable: configAwsOrGcp.additional_secret_mount
+  default: ""
+  description: "Additional Secret (aws or gcp credentials) to mount in the pod"
+  type: string
+  group: AWS or GCP
+  label: Additional secret mount
+- variable: configAwsOrGcp.additional_secret_mount_path
+  default: ""
+  description: "Path to mount the above Secret in the filesystem of the container(s)"
+  type: string
+  group: AWS or GCP
+  label: Additional secret mount path
+- variable: configAwsOrGcp.aws_region
+  default: "eu-central-1"
+  description: "AWS region used to store EBS volumes"
+  type: string
+  group: AWS or GCP
+  label: AWS region
+- variable: configAwsOrGcp.enable_ebs_gp3_migration
+  default: false
+  description: "Enable automatic migration on AWS from gp2 to gp3 volumes"
+  type: boolean
+  group: AWS or GCP
+  label: Enable EBS GP3 migration
+  show_subquestion_if: true
+  subquestions:
+    - variable: configAwsOrGcp.enable_ebs_gp3_migration_max_size
+      default: 1000
+      description: "Defines maximum volume size in GB until which auto migration happens"
+      type: int
+      group: AWS or GCP
+      label: Enable EBS GP3 migration max size
+- variable: configAwsOrGcp.gcp_credentials
+  default: ""
+  description: "GCP credentials that will be used by the operator / pods"
+  type: string
+  group: AWS or GCP
+  label: GCP credentials
+- variable: configAwsOrGcp.kube_iam_role
+  default: ""
+  description: "AWS IAM role to supply in the iam.amazonaws.com/role annotation of Postgres pods"
+  type: string
+  group: AWS or GCP
+  label: Kube IAM role
+- variable: configAwsOrGcp.log_s3_bucket
+  default: ""
+  description: "S3 bucket to use for shipping postgres daily logs"
+  type: string
+  group: AWS or GCP
+  label: Log S3 bucket
+- variable: configAwsOrGcp.wal_s3_bucket
+  default: ""
+  description: "S3 bucket to use for shipping WAL segments with WAL-E"
+  type: string
+  group: AWS or GCP
+  label: WAL S3 bucket
+- variable: configAwsOrGcp.wal_gs_bucket
+  default: ""
+  description: "GCS bucket to use for shipping WAL segments with WAL-E"
+  type: string
+  group: AWS or GCP
+  label: WAL GCS bucket
+- variable: configAwsOrGcp.wal_az_storage_account
+  default: ""
+  description: "Azure Storage Account to use for shipping WAL segments with WAL-G"
+  type: string
+  group: AWS or GCP
+  label: WAL Azure Storage Account
+- variable: configLogicalBackup.logical_backup_azure_storage_account_name
+  default: ""
+  description: "Azure Storage Account specs to store backup results"
+  type: string
+  group: Logical Backup
+  label: Logical backup azure storage account name
+- variable: configLogicalBackup.logical_backup_azure_storage_container
+  default: ""
+  description: "Azure Storage Container specs to store backup results"
+  type: string
+  group: Logical Backup
+  label: Logical backup azure storage container
+- variable: configLogicalBackup.logical_backup_azure_storage_account_key
+  default: ""
+  description: "Azure Storage Account Key specs to store backup results"
+  type: string
+  group: Logical Backup
+  label: Logical backup azure storage account key
+- variable: defaultConfigLogicalBackupCPUMemory
+  default: "false"
+  description: "Enable CPU and memory limits for logical backup pod"
+  type: boolean
+  group: Logical Backup
+  label: CPU and memory limits
+  show_subquestion_if: true
+  subquestions:
+  - variable: configLogicalBackup.logical_backup_cpu_limit
+    default: ""
+    description: "CPU limit for logical backup pod"
+    type: string
+    group: Logical Backup
+    label: Logical backup CPU limit
+  - variable: configLogicalBackup.logical_backup_cpu_request
+    default: ""
+    description: "CPU request for logical backup pod"
+    type: string
+    group: Logical Backup
+    label: Logical backup CPU request
+  - variable: configLogicalBackup.logical_backup_memory_limit
+    default: ""
+    description: "Memory limit for logical backup pod"
+    type: string
+    group: Logical Backup
+    label: Logical backup memory limit
+  - variable: configLogicalBackup.logical_backup_memory_request
+    default: ""
+    description: "Memory request for logical backup pod"
+    type: string
+    group: Logical Backup
+    label: Logical backup memory request
+- variable: configLogicalBackup.logical_backup_docker_image
+  default: "registry.opensource.zalan.do/acid/logical-backup:v1.8.0"
+  description: "Image for pods of the logical backup job (example runs pg_dumpall)"
+  type: string
+  group: Logical Backup
+  label: Logical backup docker image
+- variable: configLogicalBackup.logical_backup_job_prefix
+  default: "logical-backup-"
+  description: "Prefix for the backup job name"
+  type: string
+  group: Logical Backup
+  label: Logical backup job prefix
+- variable: configLogicalBackup.logical_backup_provider
+  default: "s3"
+  description: "Storage provider - either s3, gcs or az"
+  type: enum
+  group: Logical Backup
+  label: Logical backup provider
+  options:
+    - "s3"
+    - "gcs"
+    - "az"
+- variable: configLogicalBackup.logical_backup_s3_access_key_id
+  default: ""
+  description: "S3 Access Key ID"
+  type: string
+  group: Logical Backup
+  label: Logical backup S3 access key ID
+- variable: configLogicalBackup.logical_backup_s3_bucket
+  default: "my-bucket-url"
+  description: "S3 bucket to store backup results"
+  type: string
+  group: Logical Backup
+  label: Logical backup S3 bucket
+- variable: configLogicalBackup.logical_backup_s3_region
+  default: ""
+  description: "S3 region of bucket"
+  type: string
+  group: Logical Backup
+  label: Logical backup S3 region
+- variable: configLogicalBackup.logical_backup_s3_endpoint
+  default: ""
+  description: "S3 endpoint url when not using AWS"
+  type: string
+  group: Logical Backup
+  label: Logical backup S3 endpoint
+- variable: configLogicalBackup.logical_backup_s3_secret_access_key
+  default: ""
+  description: "S3 Secret Access Key"
+  type: string
+  group: Logical Backup
+  label: Logical backup S3 secret access key
+- variable: configLogicalBackup.logical_backup_s3_sse
+  default: "AES256"
+  description: "S3 server side encryption"
+  type: string
+  group: Logical Backup
+  label: Logical backup S3 SSE
+- variable: configLogicalBackup.logical_backup_s3_retention_time
+  default: ""
+  description: "S3 retention time for stored backups for example 2 week or 7 days"
+  type: string
+  group: Logical Backup
+  label: Logical backup S3 retention time
+- variable: configLogicalBackup.logical_backup_schedule
+  default: "30 00 * * *"
+  description: "Backup schedule in the cron format"
+  type: string
+  group: Logical Backup
+  label: Logical backup schedule
+- variable: configTeamsApi.enable_admin_role_for_users
+  default: true
+  description: "team_admin_role will have the rights to grant roles coming from PG manifests"
+  type: boolean
+  group: Teams API
+  label: Enable admin role for users
+- variable: configTeamsApi.enable_postgres_team_crd
+  default: false
+  description: "operator watches for PostgresTeam CRs to assign additional teams and members to clusters"
+  type: boolean
+  group: Teams API
+  label: Enable PostgresTeam CRD
+- variable: configTeamsApi.enable_postgres_team_crd_superusers
+  default: false
+  description: "toogle to create additional superuser teams from PostgresTeam CRs"
+  type: boolean
+  group: Teams API
+  label: Enable PostgresTeam CRD superusers
+- variable: configTeamsApi.enable_team_member_deprecation
+  default: false
+  description: "toggle to automatically rename roles of former team members and deny LOGIN"
+  type: boolean
+  group: Teams API
+  label: Enable team member deprecation
+- variable: configTeamsApi.enable_team_superuser
+  default: false
+  description: "toggle to grant superuser to team members created from the Teams API"
+  type: boolean
+  group: Teams API
+  label: Enable team superuser
+- variable: configTeamsApi.enable_teams_api
+  default: false
+  description: "toggles usage of the Teams API by the operator"
+  type: boolean
+  group: Teams API
+  label: Enable Teams API
+- variable: configTeamsApi.pam_configuration
+  default: "https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"
+  description: "should contain a URL to use for authentication (username and token)"
+  type: string
+  group: Teams API
+  label: PAM configuration
+- variable: configTeamsApi.pam_role_name
+  default: "zalandos"
+  description: "operator will add all team member roles to this group and add a pg_hba line"
+  type: string
+  group: Teams API
+  label: PAM role name
+- variable: configTeamsApi.postgres_superuser_teams
+  default: "postgres_superusers"
+  description: "List of teams which members need the superuser role in each Postgres cluster"
+  type: string
+  group: Teams API
+  label: Postgres superuser teams
+- variable: configTeamsApi.role_deletion_suffix
+  default: "_deleted"
+  description: "Suffix to add if members are removed from TeamsAPI or PostgresTeam CRD"
+  type: string
+  group: Teams API
+  label: Role deletion suffix
+- variable: configTeamsApi.team_admin_role
+  default: "admin"
+  description: "role name to grant to team members created from the Teams API"
+  type: string
+  group: Teams API
+  label: Team admin role
+- variable: configConnectionPooler.connection_pooler_schema
+  default: "pooler"
+  description: "db schema to install lookup function into"
+  type: string
+  group: Connection Pooler
+  label: Connection pooler schema
+- variable: configConnectionPooler.connection_pooler_user
+  default: "pooler"
+  description: "db user for pooler to use"
+  type: string
+  group: Connection Pooler
+  label: Connection pooler user
+- variable: configConnectionPooler.connection_pooler_image
+  default: "registry.opensource.zalan.do/acid/pgbouncer:master-26"
+  description: "docker image"
+  type: string
+  group: Connection Pooler
+  label: Connection pooler image
+- variable: configConnectionPooler.connection_pooler_max_db_connections
+  default: 60
+  description: "max db connections the pooler should hold"
+  type: int
+  group: Connection Pooler
+  label: Connection pooler max db connections
+- variable: configConnectionPooler.connection_pooler_mode
+  default: "transaction"
+  description: "default pooling mode"
+  type: string
+  group: Connection Pooler
+  label: Connection pooler mode
+- variable: configConnectionPooler.connection_pooler_number_of_instances
+  default: 2
+  description: "number of pooler instances"
+  type: int
+  group: Connection Pooler
+  label: Connection pooler number of instances
+- variable: configConnectionPooler.connection_pooler_default_cpu_request
+  default: "500m"
+  description: "default cpu request"
+  type: string
+  group: Connection Pooler
+  label: Connection pooler default cpu request
+- variable: configConnectionPooler.connection_pooler_default_memory_request
+  default: "100Mi"
+  description: "default memory request"
+  type: string
+  group: Connection Pooler
+  label: Connection pooler default memory request
+- variable: configConnectionPooler.connection_pooler_default_cpu_limit
+  default: "1"
+  description: "default cpu limit"
+  type: string
+  group: Connection Pooler
+  label: Connection pooler default cpu limit
+- variable: configConnectionPooler.connection_pooler_default_memory_limit
+  default: "100Mi"
+  description: "default memory limit"
+  type: string
+  group: Connection Pooler
+  label: Connection pooler default memory limit
+- variable: configPatroni.failesafe_mode
+  default: false
+  description: "enable Patroni DCS failsafe_mode feature"
+  type: boolean
+  group: Patroni
+  label: Enable failsafe mode
+- variable: enableStreams
+  default: false
+  description: "Zalando's internal CDC stream feature"
+  type: boolean
+  group: Remaining
+  label: Enable Streams
+- variable: rbac.create
+  default: true
+  description: "Create RBAC resources"
+  type: boolean
+  group: Remaining
+  label: Create RBAC resources
+- variable: rbac.createAggregateClusterRoles
+  default: false
+  description: "Specifies whether ClusterRoles that are aggregated into the K8s default roles should be created. (https://kubernetes.io/docs/reference/access-authn-authz/rbac/#default-roles-and-role-bindings)"
+  type: boolean
+  group: Remaining
+  label: Create aggregate cluster roles
+- variable: serviceAccount.create
+  default: true
+  description: "Create service account"
+  type: boolean
+  group: Remaining
+  label: Create service account
+  show_subquestion_if: true
+  subquestions:
+    - variable: serviceAccount.name
+      default:
+      description: "The name of the ServiceAccount to use. If not set and create is true, a name is generated using the fullname template."
+      type: string
+      group: Remaining
+      label: Service account name
+- variable: podServiceAccount.name
+  default: "postgres-pod"
+  description: "The name of the ServiceAccount to be used by postgres cluster pods. If not set a name is generated using the fullname template and '-pod' suffix."
+  type: string
+  group: Remaining
+  label: Pod service account name
+- variable: priorityClassName
+  default: ""
+  description: "Priority class name for operator pod"
+  type: string
+  group: Remaining
+  label: Priority class name
+- variable: podPriorityClassName
+  default: ""
+  description: "Priority class name for database pods"
+  type: string
+  group: Remaining
+  label: Pod priority class name
+- variable: resources.limits.cpu
+  default: "500m"
+  description: "CPU limit for operator pod"
+  type: string
+  group: Remaining
+  label: CPU limit
+- variable: resources.limits.memory
+  default: "500Mi"
+  description: "Memory limit for operator pod"
+  type: string
+  group: Remaining
+  label: Memory limit
+- variable: resources.requests.cpu
+  default: "100m"
+  description: "CPU request for operator pod"
+  type: string
+  group: Remaining
+  label: CPU request
+- variable: resources.requests.memory
+  default: "250Mi"
+  description: "Memory request for operator pod"
+  type: string
+  group: Remaining
+  label: Memory request
+- variable: securityContext.runAsUser
+  default: "1000"
+  description: "User ID for operator pod"
+  type: string
+  group: Remaining
+  label: Run as user
+- variable: securityContext.runAsNonRoot
+  default: true
+  description: "Run operator pod as non-root"
+  type: boolean
+  group: Remaining
+  label: Run as non-root
+- variable: securityContext.readOnlyRootFilesystem
+  default: true
+  description: "Run operator pod with read-only root filesystem"
+  type: boolean
+  group: Remaining
+  label: Read-only root filesystem
+- variable: securityContext.allowPrivilegeEscalation
+  default: false
+  description: "Allow privilege escalation for operator pod"
+  type: boolean
+  group: Remaining
+  label: Allow privilege escalation
+- variable: readinessProbe.initialDelaySeconds
+  default: "5"
+  description: "Initial delay for readiness probe"
+  type: string
+  group: Remaining
+  label: Initial delay
+- variable: readinessProbe.periodSeconds
+  default: "10"
+  description: "Period for readiness probe"
+  type: string
+  group: Remaining
+  label: Period
+- variable: controllerID.create
+  default: false
+  description: "Specifies whether a controller ID should be defined for the operator"
+  type: boolean
+  group: Remaining
+  label: Create controller ID
+  show_subquestion_if: true
+  subquestions:
+  - variable: controllerID.name
+    default:
+    description: "The name of the controller ID to use. If not set and create is true, a name is generated using the fullname template."
+    type: string
+    group: Remaining
+    label: Controller ID name

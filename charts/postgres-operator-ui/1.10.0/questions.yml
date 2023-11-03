@@ -1,0 +1,156 @@
+questions:
+- variable: replicaCount
+  description: "Set the number of replicas"
+  label: "Replicas Count"
+  type: "int"
+  default: "1"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: image.registry
+  description: "Set the image registry"
+  label: "Image Registry"
+  type: "string"
+  default: "registry.opensource.zalan.do"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: image.repository
+  description: "Set the image repository"
+  label: "Image Repository"
+  type: "string"
+  default: "acid/postgres-operator-ui"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: image.tag
+  description: "Set the image tag"
+  label: "Image Tag"
+  type: "string"
+  default: "v1.10.0"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: image.pullPolicy
+  description: "Set the image pull policy"
+  label: "Image Pull Policy"
+  type: "string"
+  default: "IfNotPresent"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: rbac.create
+  description: "Specify whether RBAC resources should be created"
+  label: "Create RBAC"
+  type: "boolean"
+  default: "true"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: serviceAccount.create
+  description: "Specify whether a ServiceAccount should be created"
+  label: "Create ServiceAccount"
+  type: "boolean"
+  default: "true"
+  required: true
+  show_subquestions_if: true
+  subquestions:
+  - variable: serviceAccount.name
+    description: "The name of the ServiceAccount to use. If not set and create is true, a name is generated using the fullname template"
+    type: "string"
+    default: ""
+    label: "ServiceAccount Name"
+    # Rancher-specific annotations
+    group: "Postgres Operator UI"
+- variable: resources.limits.cpu
+  description: "CPU resource limits"
+  label: "CPU Resource Limits"
+  type: "string"
+  default: "200m"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: resources.limits.memory
+  description: "Memory resource limits"
+  label: "Memory Resource Limits"
+  type: "string"
+  default: "200Mi"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: resources.requests.cpu
+  description: "CPU resource requests"
+  label: "CPU Resource Requests"
+  type: "string"
+  default: "100m"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: resources.requests.memory
+  description: "Memory resource requests"
+  label: "Memory Resource Requests"
+  type: "string"
+  default: "100Mi"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: envs.appUrl
+  description: "The URL of the Postgres Operator UI"
+  label: "Postgres Operator UI URL"
+  type: "string"
+  default: "http://localhost:8081"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: envs.operatorApiUrl
+  description: "The URL of the Postgres Operator API"
+  label: "Postgres Operator API URL"
+  type: "string"
+  default: "http://postgres-operator:8080"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: envs.operatorClusterNameLabel
+  description: "The label used to identify the Postgres Operator cluster"
+  label: "Postgres Operator Cluster Label"
+  type: "string"
+  default: "cluster-name"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: envs.resourcesVisible
+  description: "Whether to show resource usage information in the UI"
+  label: "Show Resource Usage"
+  type: "boolean"
+  default: "False"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: envs.targetNamespace
+  description: "The namespace in which the Postgres Operator is running"
+  label: "Postgres Operator Namespace"
+  type: "string"
+  default: "default"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+- variable: service.type
+  description: "The type of service to create"
+  label: "Service Type"
+  type: "enum"
+  options:
+  - "ClusterIP"
+  - "NodePort"
+  default: "ClusterIP"
+  required: true
+  # Rancher-specific annotations
+  group: "Postgres Operator UI"
+  show_subquestions_if: "NodePort"
+  subquestions:
+  - variable: service.nodePort
+    description: "The node port to use for the NodePort service type"
+    label: "Node Port"
+    type: "int"
+    default: "30080"
+    # Rancher-specific annotations
+    group: "Postgres Operator UI"
