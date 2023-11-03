@@ -3009,7 +3009,9 @@ func TestGenerateResourceRequirements(t *testing.T) {
 
 func TestGenerateLogicalBackupJob(t *testing.T) {
 	clusterName := "acid-test-cluster"
+	teamId := "test"
 	configResources := config.Resources{
+		ClusterNameLabel:     "cluster-name",
 		DefaultCPURequest:    "100m",
 		DefaultCPULimit:      "1",
 		DefaultMemoryRequest: "100Mi",
@@ -3017,12 +3019,14 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 	}
 
 	tests := []struct {
-		subTest           string
-		config            config.Config
-		specSchedule      string
-		expectedSchedule  string
-		expectedJobName   string
-		expectedResources acidv1.Resources
+		subTest            string
+		config             config.Config
+		specSchedule       string
+		expectedSchedule   string
+		expectedJobName    string
+		expectedResources  acidv1.Resources
+		expectedAnnotation map[string]string
+		expectedLabel      map[string]string
 	}{
 		{
 			subTest: "test generation of logical backup pod resources when not configured",
@@ -3042,6 +3046,8 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
 		},
 		{
 			subTest: "test generation of logical backup pod resources when configured",
@@ -3065,6 +3071,8 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "50Mi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "300m", Memory: "300Mi"},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
 		},
 		{
 			subTest: "test generation of logical backup pod resources when partly configured",
@@ -3086,6 +3094,8 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: "50m", Memory: "100Mi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "250m", Memory: "500Mi"},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
 		},
 		{
 			subTest: "test generation of logical backup pod resources with SetMemoryRequestToLimit enabled",
@@ -3107,6 +3117,52 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "200Mi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "200Mi"},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of pod annotations when cluster InheritedLabel is set",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:     "cluster-name",
+					InheritedLabels:      []string{"labelKey"},
+					DefaultCPURequest:    "100m",
+					DefaultCPULimit:      "1",
+					DefaultMemoryRequest: "100Mi",
+					DefaultMemoryLimit:   "500Mi",
+				},
+			},
+			specSchedule:     "",
+			expectedJobName:  "acid-test-cluster",
+			expectedSchedule: "",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+			expectedLabel:      map[string]string{"labelKey": "labelValue", "cluster-name": clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of pod annotations when cluster InheritedAnnotations is set",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:     "cluster-name",
+					InheritedAnnotations: []string{"annotationKey"},
+					DefaultCPURequest:    "100m",
+					DefaultCPULimit:      "1",
+					DefaultMemoryRequest: "100Mi",
+					DefaultMemoryLimit:   "500Mi",
+				},
+			},
+			specSchedule:     "",
+			expectedJobName:  "acid-test-cluster",
+			expectedSchedule: "",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: map[string]string{"annotationKey": "annotationValue"},
 		},
 	}
 
@@ -3115,18 +3171,33 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 			Config{
 				OpConfig: tt.config,
 			}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
-
 		cluster.ObjectMeta.Name = clusterName
+		cluster.Spec.TeamID = teamId
+		if cluster.ObjectMeta.Labels == nil {
+			cluster.ObjectMeta.Labels = make(map[string]string)
+		}
+		if cluster.ObjectMeta.Annotations == nil {
+			cluster.ObjectMeta.Annotations = make(map[string]string)
+		}
+		cluster.ObjectMeta.Labels["labelKey"] = "labelValue"
+		cluster.ObjectMeta.Annotations["annotationKey"] = "annotationValue"
 		cluster.Spec.LogicalBackupSchedule = tt.specSchedule
 		cronJob, err := cluster.generateLogicalBackupJob()
 		assert.NoError(t, err)
-
 		if cronJob.Spec.Schedule != tt.expectedSchedule {
 			t.Errorf("%s - %s: expected schedule %s, got %s", t.Name(), tt.subTest, tt.expectedSchedule, cronJob.Spec.Schedule)
 		}
 
 		if cronJob.Name != tt.expectedJobName {
 			t.Errorf("%s - %s: expected job name %s, got %s", t.Name(), tt.subTest, tt.expectedJobName, cronJob.Name)
+		}
+
+		if !reflect.DeepEqual(cronJob.Labels, tt.expectedLabel) {
+			t.Errorf("%s - %s: expected labels %s, got %s", t.Name(), tt.subTest, tt.expectedLabel, cronJob.Labels)
+		}
+
+		if !reflect.DeepEqual(cronJob.Annotations, tt.expectedAnnotation) {
+			t.Errorf("%s - %s: expected annotations %s, got %s", t.Name(), tt.subTest, tt.expectedAnnotation, cronJob.Annotations)
 		}
 
 		containers := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers
