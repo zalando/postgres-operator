@@ -437,6 +437,26 @@ configPatroni:
   # enable Patroni DCS failsafe_mode feature
   enable_patroni_failsafe_mode: false
 
+# Specifies a list of sidecars to include in all deployments
+configSidecars: {}
+  # - name: exporter
+  #   image: quay.io/prometheuscommunity/postgres-exporter
+  #   ports:
+  #   - name: exporter
+  #     containerPort: 9187
+  #     protocol: TCP
+  #   resources:
+  #     requests:
+  #       cpu: 50m
+  #       memory: 200M
+  #   env:
+  #   - name: "DATA_SOURCE_URI"
+  #     value: "$(POD_NAME)/postgres?sslmode=disable"
+  #   - name: "DATA_SOURCE_USER"
+  #     value: "$(POSTGRES_USER)"
+  #   - name: "DATA_SOURCE_PASS"
+  #     value: "$(POSTGRES_PASSWORD)"
+
 # Zalando's internal CDC stream feature
 enableStreams: false
 
