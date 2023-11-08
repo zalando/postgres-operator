@@ -1,27 +1,30 @@
 questions:
 - variable: image.registry
   default: "registry.opensource.zalan.do"
-  description: "Docker Registry"
+  description: "The Docker registry URL to use for pulling the Postgres Operator image."
   type: string
   label: Docker Registry
   group: "Image"
 - variable: image.repository
   default: "acid/postgres-operator"
-  description: "Docker Repository"
+  description: >
+    The Docker repository where the Postgres Operator image is located. This variable specifies the
+    repository part of the image name, which is used to uniquely identify the image. The default value
+    is "acid/postgres-operator", which is the official repository for the Postgres Operator image.
   type: string
   label: Docker Repository
   group: "Image"
 - variable: image.tag
   default: "v1.10.0"
-  description: "Docker Image Tag"
+  description: "Specifies the tag of the Docker image to be used for the Postgres Operator. The default value is v1.10.0."
   type: string
   label: Docker Image Tag
   group: "Image"
 - variable: image.pullPolicy
   default: "IfNotPresent"
-  description: "Docker Image Pull Policy"
+  description: "Specifies the Docker image pull policy for the Postgres Operator. The default value is IfNotPresent, which means that the image will only be pulled if it's not already present on the node. Other available options are Always (which will always pull the latest image) and Never (which will never pull the image and instead use a cached version)."
   type: enum
-  label: Docker Image PUll Policy
+  label: Docker Image Pull Policy
   group: "Image"
   options:
   - "IfNotPresent"
@@ -29,96 +32,97 @@ questions:
   - "Never"
 - variable: imagePullSecret
   default: false
-  description: "Optionally specify an array of imagePullSecrets"
+  description: "This variable allows users to optionally specify an array of imagePullSecrets for the Postgres Operator Helm chart."
   label: Use Image Pull Secrets
   type: boolean
   show_subquestion_if: true
   group: "Image"
   subquestions:
   - variable: imagePullSecrets.name
-    description: "Secrets must be manually created in the namespace. ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod"
+    description: "Specify the name of the imagePullSecret to use. Secrets must be manually created in the namespace. ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod"
     label: Choose imagePullSecret
 - variable: configGeneral.enable_crd_registration
   default: true
-  description: "the deployment should create/update the CRDs"
+  description: "Specifies whether the deployment should create/update the Custom Resource Definitions (CRDs) for the Postgres Operator. If set to true, the CRDs will be created/updated during deployment. If set to false, the CRDs will not be created/updated. It is recommended to keep this option enabled unless you have already created the CRDs manually."
   label: Enable CRD Registration
   type: boolean
   group: "General"
-#- variable: configGeneral.crd_categories
-#  default: '- "all"'
-#  description: "specify categories under which crds should be listed"
-#  label: CRD Categories
-#  type: multiline
-#  group: "General"
 - variable: configGeneral.enable_lazy_spilo_upgrade
   default: false
-  description: "update only the statefulsets without immediately doing the rolling update"
+  description: "Specifies whether to enable lazy Spilo upgrade or not. When set to true, only the statefulsets will be updated without immediately doing the rolling update."
   label: Enable Lazy Spilo Upgrade
   type: boolean
   group: "General"
 - variable: configGeneral.enable_pgversion_env_var
   default: true
-  description: "set the PGVERSION env var instead of providing the version via postgresql.bin_dir in SPILO_CONFIGURATION"
+  description: "Specifies whether to set the PGVERSION environment variable instead of providing the version via postgresql.bin_dir in SPILO_CONFIGURATION. If set to true, the PGVERSION environment variable will be used. If set to false, the version will be provided via postgresql.bin_dir in SPILO_CONFIGURATION."
   label: Enable PGVERSION ENV_VAR
   type: boolean
   group: "General"
 - variable: configGeneral.enable_shm_volume
   default: true
-  description: "start any new database pod without limitations on shm memory"
+  description: "Specifies whether to enable shm volume or not. When set to true, new database pods will be started without limitations on shm memory."
   label: Enable SHM-Volume
   type: boolean
   group: "General"
 - variable: configGeneral.enable_spilo_wal_path_compat
   default: false
-  description: "enables backwards compatible path between Spilo 12 and Spilo 13+ images"
-  label: Enable Spillo WAL Path Compat
+  description: "Specifies whether to enable Spilo WAL Path Compat or not. When set to true, the Spilo WAL path compatibility feature is enabled."
+  label: Enable Spilo WAL Path Compat
   type: boolean
   group: "General"
 - variable: configGeneral.enable_team_id_clustername_prefix
   default: false
-  description: "operator will sync only clusters where name starts with teamId prefix"
+  description: >
+    This variable determines whether the operator will sync only clusters where the name starts with a team ID prefix. 
+    If set to true, the operator will only sync clusters whose names start with the team ID prefix. 
+    If set to false, the operator will sync all clusters regardless of their name prefix.
   label: Enable Team ID Clustername Prefix
   type: boolean
   group: "General"
 - variable: configGeneral.etcd_host
   default: ""
-  description: "etcd connection string for Patroni. Empty uses K8s-native DCS"
+  description: "Specifies the etcd connection string for Patroni. If left empty, K8s-native DCS will be used instead."
   label: ETCD Host
   type: string
   group: "General"
 - variable: configGeneral.docker_image
   default: "ghcr.io/zalando/spilo-15:2.1-p9"
-  description: "default Spilo docker image"
+  description: "Specifies the default Spilo docker image used by the postgres-operator chart."
   label: Default Spilo Docker Image
   type: string
   group: "General"
 - variable: configGeneral.min_instances
   default: "-1"
-  description: "min number of instances in Postgres cluster. -1 = no limit"
+  description: >
+    The minimum number of instances that should be present in the Postgres cluster. 
+    A value of -1 indicates that there is no minimum number of instances.
   label: Minimum Number of Instances
   group: "General"
   type: string
 - variable: configGeneral.max_instances
   default: "-1"
-  description: "max number of instances in Postgres cluster. -1 = no limit"
-  label: Maximum Number of INstances
+  description: >
+    The maximum number of instances that should be present in the Postgres cluster. 
+    A value of -1 indicates that there is no limit to the maximum number of instances.
+  label: Maximum Number of Instances
   type: string
   group: "General"
 - variable: configGeneral.repair_period
   default: "5m"
-  description: "period between consecutive repair requests"
+  description: "Specify the period between consecutive repair requests for the Postgres operator."
   label: Repair Period
   type: string
   group: "General"
 - variable: configGeneral.resync_period
   default: "30m"
-  description: "period between consecutive sync requests"
+  description: "Specify the period between consecutive sync requests for the Postgres operator."
   label: Resync Period
   type: string
   group: "General"
 - variable: configGeneral.workers
   default: 8
-  description: "number of routines the operator spawns to process requests concurrently"
+  description: "Specifies the number of routines the operator spawns to process requests concurrently. Increasing the number of workers can improve the performance of the operator, but it also increases resource usage. The default value is 8."
   label: Number of Workers
   type: int
   group: "General"
