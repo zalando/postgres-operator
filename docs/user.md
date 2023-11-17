@@ -940,33 +940,25 @@ established between standby replica(s).
 One big advantage of standby clusters is that they can be promoted to a proper
 database cluster. This means it will stop replicating changes from the source,
 and start accept writes itself. This mechanism makes it possible to move
-databases from one place to another with minimal downtime. Currently, the
-operator does not support promoting a standby cluster. It has to be done
-manually using `patronictl edit-config` inside the postgres container of the
-standby leader pod. Remove the following lines from the YAML structure and the
-leader promotion happens immediately. Before doing so, make sure that the
-standby is not behind the source database.
+databases from one place to another with minimal downtime.
 
-```yaml
-standby_cluster:
-  create_replica_methods:
-    - bootstrap_standby_with_wale
-    - basebackup_fast_xlog
-  restore_command: envdir "/home/postgres/etc/wal-e.d/env-standby" /scripts/restore_command.sh
-     "%f" "%p"
-```
+Before promoting a standby cluster, make sure that the standby is not behind
+the source database. You should ideally stop writes to your source cluster and
+then create a dummy database object that you check for being replicated in the
+target to verify all data has been copies.
 
-Finally, remove the `standby` section from the postgres cluster manifest.
+To promote, remove the `standby` section from the postgres cluster manifest.
+A rolling update will be triggered removing the `STANDBY_*` environment
+variables from the pods, followed by a Patroni config update that promotes the
+cluster.
 
 ### Turn a normal cluster into a standby
 
-There is no way to transform a non-standby cluster to a standby cluster through
-the operator. Adding the `standby` section to the manifest of a running
-Postgres cluster will have no effect. But, as explained in the previous
-paragraph it can be done manually through `patronictl edit-config`. This time,
-by adding the `standby_cluster` section to the Patroni configuration. However,
-the transformed standby cluster will not be doing any streaming. It will be in
-standby mode and allow read-only transactions only.
+Adding the `standby` section to the manifest of a running Postgres cluster
+will set create the necessary `STANDBY_*` environment variables to the pods
+via rolling update and enable the `standby_cluster` section in the Patroni
+configuration. However, the transformed standby cluster will not be doing any
+streaming. It will be in standby mode and allow read-only transactions only.
 
 ## Sidecar Support
 
