@@ -285,5 +285,23 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		fromCRD.ConnectionPooler.MaxDBConnections,
 		k8sutil.Int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
 
+	result.EnableTopologySpreadConstraints = fromCRD.Kubernetes.EnableTopologySpreadConstraints
+	if fromCRD.Kubernetes.TopologySpreadConstraints != nil {
+		result.TopologySpreadConstraints = []*config.TopologySpreadConstraint{}
+		for _, topologySpreadConstraint := range fromCRD.Kubernetes.TopologySpreadConstraints {
+			result.TopologySpreadConstraints = append(
+				result.TopologySpreadConstraints,
+				&config.TopologySpreadConstraint{
+					MaxSkew:            topologySpreadConstraint.MaxSkew,
+					TopologyKey:        topologySpreadConstraint.TopologyKey,
+					WhenUnsatisfiable:  topologySpreadConstraint.WhenUnsatisfiable,
+					MinDomains:         topologySpreadConstraint.MinDomains,
+					NodeAffinityPolicy: topologySpreadConstraint.NodeAffinityPolicy,
+					NodeTaintsPolicy:   topologySpreadConstraint.NodeTaintsPolicy,
+					MatchLabelKeys:     topologySpreadConstraint.MatchLabelKeys,
+				})
+		}
+	}
+
 	return result
 }

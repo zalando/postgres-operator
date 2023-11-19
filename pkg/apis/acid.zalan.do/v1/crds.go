@@ -1323,6 +1323,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_sidecars": {
 								Type: "boolean",
 							},
+							"enable_topology_spread_constraints": {
+								Type: "boolean",
+							},
 							"ignored_annotations": {
 								Type: "array",
 								Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -1528,6 +1531,74 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
 									Schema: &apiextv1.JSONSchemaProps{
 										Type: "string",
+									},
+								},
+							},
+							"topology_spread_constraints": {
+								Type:     "array",
+								Nullable: true,
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type:     "object",
+										Required: []string{"max_skew", "topology_key", "when_unsatisfiable"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"max_skew": {
+												Type:   "integer",
+												Format: "int32",
+											},
+											"topology_key": {
+												Type: "string",
+											},
+											"when_unsatisfiable": {
+												Type: "string",
+												Enum: []apiextv1.JSON{
+													{
+														Raw: []byte(`"DoNotSchedule"`),
+													},
+													{
+														Raw: []byte(`"ScheduleAnyway"`),
+													},
+												},
+											},
+											"min_domains": {
+												Type:     "integer",
+												Nullable: true,
+												Format:   "int32",
+											},
+											"node_affinity_policy": {
+												Type:     "string",
+												Nullable: true,
+												Enum: []apiextv1.JSON{
+													{
+														Raw: []byte(`"Ignore"`),
+													},
+													{
+														Raw: []byte(`"Honor"`),
+													},
+												},
+											},
+											"node_taints_policy": {
+												Type:     "string",
+												Nullable: true,
+												Enum: []apiextv1.JSON{
+													{
+														Raw: []byte(`"Ignore"`),
+													},
+													{
+														Raw: []byte(`"Honor"`),
+													},
+												},
+											},
+											"match_label_keys": {
+												Type:     "array",
+												Nullable: true,
+												Items: &apiextv1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1.JSONSchemaProps{
+														Type: "string",
+													},
+												},
+											},
+										},
 									},
 								},
 							},

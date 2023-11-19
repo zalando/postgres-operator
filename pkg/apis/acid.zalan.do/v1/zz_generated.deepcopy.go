@@ -277,6 +277,18 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(bool)
 		**out = **in
 	}
+	out.EnableTopologySpreadConstraints = in.EnableTopologySpreadConstraints
+	if in.TopologySpreadConstraints != nil {
+		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
+		*out = make([]*config.TopologySpreadConstraint, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(config.TopologySpreadConstraint)
+				**out = **in
+			}
+		}
+	}
 	return
 }
 

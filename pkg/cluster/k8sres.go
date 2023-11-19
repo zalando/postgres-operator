@@ -578,6 +578,36 @@ func generatePodAntiAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuring
 	return podAntiAffinity
 }
 
+func generateTopologySpreadConstraints(labels labels.Set, topologySpreadConstraintObjs []*config.TopologySpreadConstraint) []v1.TopologySpreadConstraint {
+	var topologySpreadConstraints []v1.TopologySpreadConstraint
+	var nodeAffinityPolicy *v1.NodeInclusionPolicy
+	var nodeTaintsPolicy *v1.NodeInclusionPolicy
+	for _, topologySpreadConstraintObj := range topologySpreadConstraintObjs {
+		if topologySpreadConstraintObj.NodeAffinityPolicy != nil {
+			nodeAffinityPolicy = (*v1.NodeInclusionPolicy)(topologySpreadConstraintObj.NodeAffinityPolicy)
+		}
+		if topologySpreadConstraintObj.NodeTaintsPolicy != nil {
+			nodeTaintsPolicy = (*v1.NodeInclusionPolicy)(topologySpreadConstraintObj.NodeTaintsPolicy)
+		}
+		topologySpreadConstraint := v1.TopologySpreadConstraint{
+			MaxSkew:           topologySpreadConstraintObj.MaxSkew,
+			TopologyKey:       topologySpreadConstraintObj.TopologyKey,
+			WhenUnsatisfiable: v1.UnsatisfiableConstraintAction(topologySpreadConstraintObj.WhenUnsatisfiable),
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			MinDomains:         topologySpreadConstraintObj.MinDomains,
+			NodeAffinityPolicy: nodeAffinityPolicy,
+			NodeTaintsPolicy:   nodeTaintsPolicy,
+			MatchLabelKeys:     topologySpreadConstraintObj.MatchLabelKeys,
+		}
+		topologySpreadConstraints = append(topologySpreadConstraints, topologySpreadConstraint)
+		nodeAffinityPolicy = nil
+		nodeTaintsPolicy = nil
+	}
+	return topologySpreadConstraints
+}
+
 func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
 	// allow to override tolerations by postgresql manifest
 	if len(*tolerationsSpec) > 0 {
@@ -794,6 +824,8 @@ func (c *Cluster) generatePodTemplate(
 	additionalSecretMount string,
 	additionalSecretMountPath string,
 	additionalVolumes []acidv1.AdditionalVolume,
+	topologySpreadConstraint bool,
+	topologySpreadConstraintsArr []*config.TopologySpreadConstraint,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -840,6 +872,10 @@ func (c *Cluster) generatePodTemplate(
 		)
 	} else if nodeAffinity != nil {
 		podSpec.Affinity = nodeAffinity
+	}
+
+	if topologySpreadConstraint && len(topologySpreadConstraintsArr) > 0 {
+		podSpec.TopologySpreadConstraints = generateTopologySpreadConstraints(labels, topologySpreadConstraintsArr)
 	}
 
 	if priorityClassName != "" {
@@ -1449,7 +1485,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.PodAntiAffinityPreferredDuringScheduling,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
-		additionalVolumes)
+		additionalVolumes,
+		c.OpConfig.EnableTopologySpreadConstraints,
+		c.OpConfig.TopologySpreadConstraints)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
@@ -2284,7 +2322,9 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		false,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
-		[]acidv1.AdditionalVolume{}); err != nil {
+		[]acidv1.AdditionalVolume{},
+		false,
+		[]*config.TopologySpreadConstraint{}); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
