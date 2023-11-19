@@ -441,6 +441,12 @@ spec:
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                         # Note: the value specified here must not be zero or be higher
                         # than the corresponding limit.
+                      hugepages-2Mi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-1Gi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                   requests:
                     type: object
                     properties:
@@ -448,6 +454,12 @@ spec:
                         type: string
                         pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                       memory:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-2Mi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-1Gi:
                         type: string
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
               schedulerName:
