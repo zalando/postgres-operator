@@ -141,6 +141,7 @@ type AdditionalVolume struct {
 	Name             string          `json:"name"`
 	MountPath        string          `json:"mountPath"`
 	SubPath          string          `json:"subPath,omitempty"`
+	IsSubPathExpr    bool            `json:"isSubPathExpr,omitemtpy"`
 	TargetContainers []string        `json:"targetContainers"`
 	VolumeSource     v1.VolumeSource `json:"volumeSource"`
 }

@@ -167,6 +167,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									"subPath": {
 										Type: "string",
 									},
+									"isSubPathExpr": {
+										Type: "boolean",
+									},
 								},
 							},
 						},

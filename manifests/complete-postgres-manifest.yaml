@@ -81,6 +81,16 @@ spec:
 #        PersistentVolumeClaim:
 #          claimName: pvc-postgresql-data-partitions
 #          readyOnly: false
+#    - name: data
+#      mountPath: /home/postgres/pgdata/partitions
+#      subPath: $(NODE_NAME)/$(POD_NAME)
+#      isSubPathExpr: true
+#      targetContainers:
+#        - postgres
+#      volumeSource:
+#        PersistentVolumeClaim:
+#          claimName: pvc-postgresql-data-partitions
+#          readyOnly: false
 #    - name: conf
 #      mountPath: /etc/telegraf
 #      subPath: telegraf.conf
