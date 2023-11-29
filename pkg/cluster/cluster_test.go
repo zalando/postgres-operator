@@ -164,6 +164,7 @@ func TestInitRobotUsers(t *testing.T) {
 			err:           nil,
 		},
 	}
+	cl.initSystemUsers()
 	for _, tt := range tests {
 		cl.Spec.Users = tt.manifestUsers
 		cl.pgUsers = tt.infraRoles
