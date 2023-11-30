@@ -64,9 +64,8 @@ type patroniDCS struct {
 }
 
 type pgBootstrap struct {
-	Initdb []interface{}     `json:"initdb"`
-	Users  map[string]pgUser `json:"users"`
-	DCS    patroniDCS        `json:"dcs,omitempty"`
+	Initdb []interface{} `json:"initdb"`
+	DCS    patroniDCS    `json:"dcs,omitempty"`
 }
 
 type spiloConfiguration struct {
@@ -428,13 +427,6 @@ PatroniInitDBParams:
 	// relevant section in the manifest.
 	if len(patroni.PgHba) > 0 {
 		config.PgLocalConfiguration[patroniPGHBAConfParameterName] = patroni.PgHba
-	}
-
-	config.Bootstrap.Users = map[string]pgUser{
-		opConfig.PamRoleName: {
-			Password: "",
-			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
-		},
 	}
 
 	res, err := json.Marshal(config)
