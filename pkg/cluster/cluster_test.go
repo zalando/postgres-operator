@@ -944,6 +944,11 @@ func TestServiceAnnotations(t *testing.T) {
 }
 
 func TestInitSystemUsers(t *testing.T) {
+	// reset system users, pooler and stream section
+	cl.systemUsers = make(map[string]spec.PgUser)
+	cl.Spec.EnableConnectionPooler = boolToPointer(false)
+	cl.Spec.Streams = []acidv1.Stream{}
+
 	// default cluster without connection pooler and event streams
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; exist {
@@ -1008,8 +1013,8 @@ func TestInitSystemUsers(t *testing.T) {
 			ApplicationId: "test-app",
 			Database:      "test_db",
 			Tables: map[string]acidv1.StreamTable{
-				"data.test_table": {
-					EventType: "test_event",
+				"test_table": {
+					EventType: "test-app.test",
 				},
 			},
 		},
