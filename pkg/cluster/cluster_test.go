@@ -26,6 +26,8 @@ import (
 const (
 	superUserName       = "postgres"
 	replicationUserName = "standby"
+	poolerUserName      = "pooler"
+	adminUserName       = "admin"
 	exampleSpiloConfig  = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
 	spiloConfigDiff     = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
 )
@@ -37,7 +39,7 @@ var cl = New(
 	Config{
 		OpConfig: config.Config{
 			PodManagementPolicy: "ordered_ready",
-			ProtectedRoles:      []string{"admin", "cron_admin", "part_man"},
+			ProtectedRoles:      []string{adminUserName, "cron_admin", "part_man"},
 			Auth: config.Auth{
 				SuperUsername:        superUserName,
 				ReplicationUsername:  replicationUserName,
@@ -45,6 +47,9 @@ var cl = New(
 			},
 			Resources: config.Resources{
 				DownscalerAnnotations: []string{"downscaler/*"},
+			},
+			ConnectionPooler: config.ConnectionPooler{
+				User: poolerUserName,
 			},
 		},
 	},
@@ -54,6 +59,20 @@ var cl = New(
 			Name:        "acid-test",
 			Namespace:   "test",
 			Annotations: map[string]string{"downscaler/downtime_replicas": "0"},
+		},
+		Spec: acidv1.PostgresSpec{
+			EnableConnectionPooler: util.True(),
+			Streams: []acidv1.Stream{
+				acidv1.Stream{
+					ApplicationId: "test-app",
+					Database:      "test_db",
+					Tables: map[string]acidv1.StreamTable{
+						"test_table": acidv1.StreamTable{
+							EventType: "test-app.test",
+						},
+					},
+				},
+			},
 		},
 	},
 	logger,
@@ -127,56 +146,85 @@ func TestStatefulSetUpdateWithEnv(t *testing.T) {
 
 func TestInitRobotUsers(t *testing.T) {
 	tests := []struct {
+		testCase      string
 		manifestUsers map[string]acidv1.UserFlags
 		infraRoles    map[string]spec.PgUser
 		result        map[string]spec.PgUser
 		err           error
 	}{
 		{
+			testCase:      "manifest user called like infrastructure role - latter should take percedence",
 			manifestUsers: map[string]acidv1.UserFlags{"foo": {"superuser", "createdb"}},
 			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Namespace: cl.Namespace, Password: "bar"}},
 			result:        map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Namespace: cl.Namespace, Password: "bar"}},
 			err:           nil,
 		},
 		{
+			testCase:      "manifest user with forbidden characters",
 			manifestUsers: map[string]acidv1.UserFlags{"!fooBar": {"superuser", "createdb"}},
 			err:           fmt.Errorf(`invalid username: "!fooBar"`),
 		},
 		{
+			testCase:      "manifest user with unknown privileges (should be catched by CRD, too)",
 			manifestUsers: map[string]acidv1.UserFlags{"foobar": {"!superuser", "createdb"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`user flag "!superuser" is not alphanumeric`),
 		},
 		{
+			testCase:      "manifest user with unknown privileges - part 2 (should be catched by CRD, too)",
 			manifestUsers: map[string]acidv1.UserFlags{"foobar": {"superuser1", "createdb"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`user flag "SUPERUSER1" is not valid`),
 		},
 		{
+			testCase:      "manifest user with conflicting flags",
 			manifestUsers: map[string]acidv1.UserFlags{"foobar": {"inherit", "noinherit"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`conflicting user flags: "NOINHERIT" and "INHERIT"`),
 		},
 		{
-			manifestUsers: map[string]acidv1.UserFlags{"admin": {"superuser"}, superUserName: {"createdb"}},
+			testCase:      "manifest user called like Spilo system users",
+			manifestUsers: map[string]acidv1.UserFlags{superUserName: {"createdb"}, replicationUserName: {"replication"}},
+			infraRoles:    map[string]spec.PgUser{},
+			result:        map[string]spec.PgUser{},
+			err:           nil,
+		},
+		{
+			testCase:      "manifest user called like protected user name",
+			manifestUsers: map[string]acidv1.UserFlags{adminUserName: {"superuser"}},
+			infraRoles:    map[string]spec.PgUser{},
+			result:        map[string]spec.PgUser{},
+			err:           nil,
+		},
+		{
+			testCase:      "manifest user called like pooler system user",
+			manifestUsers: map[string]acidv1.UserFlags{poolerUserName: {}},
+			infraRoles:    map[string]spec.PgUser{},
+			result:        map[string]spec.PgUser{},
+			err:           nil,
+		},
+		{
+			testCase:      "manifest user called like stream system user",
+			manifestUsers: map[string]acidv1.UserFlags{"fes_user": {"replication"}},
 			infraRoles:    map[string]spec.PgUser{},
 			result:        map[string]spec.PgUser{},
 			err:           nil,
 		},
 	}
+	cl.initSystemUsers()
 	for _, tt := range tests {
 		cl.Spec.Users = tt.manifestUsers
 		cl.pgUsers = tt.infraRoles
 		if err := cl.initRobotUsers(); err != nil {
 			if tt.err == nil {
-				t.Errorf("%s got an unexpected error: %v", t.Name(), err)
+				t.Errorf("%s - %s: got an unexpected error: %v", tt.testCase, t.Name(), err)
 			}
 			if err.Error() != tt.err.Error() {
-				t.Errorf("%s expected error %v, got %v", t.Name(), tt.err, err)
+				t.Errorf("%s - %s: expected error %v, got %v", tt.testCase, t.Name(), tt.err, err)
 			}
 		} else {
 			if !reflect.DeepEqual(cl.pgUsers, tt.result) {
-				t.Errorf("%s expected: %#v, got %#v", t.Name(), tt.result, cl.pgUsers)
+				t.Errorf("%s - %s: expected: %#v, got %#v", tt.testCase, t.Name(), tt.result, cl.pgUsers)
 			}
 		}
 	}
@@ -269,7 +317,7 @@ func TestInitHumanUsers(t *testing.T) {
 		},
 		{
 			existingRoles: map[string]spec.PgUser{},
-			teamRoles:     []string{"admin", replicationUserName},
+			teamRoles:     []string{adminUserName, replicationUserName},
 			result:        map[string]spec.PgUser{},
 			err:           nil,
 		},
@@ -896,6 +944,11 @@ func TestServiceAnnotations(t *testing.T) {
 }
 
 func TestInitSystemUsers(t *testing.T) {
+	// reset system users, pooler and stream section
+	cl.systemUsers = make(map[string]spec.PgUser)
+	cl.Spec.EnableConnectionPooler = boolToPointer(false)
+	cl.Spec.Streams = []acidv1.Stream{}
+
 	// default cluster without connection pooler and event streams
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; exist {
@@ -914,35 +967,35 @@ func TestInitSystemUsers(t *testing.T) {
 
 	// superuser is not allowed as connection pool user
 	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
-		User: "postgres",
+		User: superUserName,
 	}
-	cl.OpConfig.SuperUsername = "postgres"
-	cl.OpConfig.ConnectionPooler.User = "pooler"
+	cl.OpConfig.SuperUsername = superUserName
+	cl.OpConfig.ConnectionPooler.User = poolerUserName
 
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers["pooler"]; !exist {
+	if _, exist := cl.systemUsers[poolerUserName]; !exist {
 		t.Errorf("%s, Superuser is not allowed to be a connection pool user", t.Name())
 	}
 
 	// neither protected users are
-	delete(cl.systemUsers, "pooler")
+	delete(cl.systemUsers, poolerUserName)
 	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
-		User: "admin",
+		User: adminUserName,
 	}
-	cl.OpConfig.ProtectedRoles = []string{"admin"}
+	cl.OpConfig.ProtectedRoles = []string{adminUserName}
 
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers["pooler"]; !exist {
+	if _, exist := cl.systemUsers[poolerUserName]; !exist {
 		t.Errorf("%s, Protected user are not allowed to be a connection pool user", t.Name())
 	}
 
-	delete(cl.systemUsers, "pooler")
+	delete(cl.systemUsers, poolerUserName)
 	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
-		User: "standby",
+		User: replicationUserName,
 	}
 
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers["pooler"]; !exist {
+	if _, exist := cl.systemUsers[poolerUserName]; !exist {
 		t.Errorf("%s, System users are not allowed to be a connection pool user", t.Name())
 	}
 
@@ -960,8 +1013,8 @@ func TestInitSystemUsers(t *testing.T) {
 			ApplicationId: "test-app",
 			Database:      "test_db",
 			Tables: map[string]acidv1.StreamTable{
-				"data.test_table": {
-					EventType: "test_event",
+				"test_table": {
+					EventType: "test-app.test",
 				},
 			},
 		},
@@ -1017,7 +1070,7 @@ func TestPreparedDatabases(t *testing.T) {
 			subTest:  "Test admin role of owner",
 			role:     "foo_owner",
 			memberOf: "",
-			admin:    "admin",
+			admin:    adminUserName,
 		},
 		{
 			subTest:  "Test writer is a member of reader",

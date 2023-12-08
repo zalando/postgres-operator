@@ -78,7 +78,14 @@ func (c *Cluster) isProtectedUsername(username string) bool {
 }
 
 func (c *Cluster) isSystemUsername(username string) bool {
-	return (username == c.OpConfig.SuperUsername || username == c.OpConfig.ReplicationUsername)
+	// is there a pooler system user defined
+	for _, systemUser := range c.systemUsers {
+		if username == systemUser.Name {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isValidFlag(flag string) bool {
