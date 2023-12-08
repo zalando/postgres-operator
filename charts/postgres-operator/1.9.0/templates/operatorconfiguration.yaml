@@ -1,0 +1,43 @@
+{{- if eq .Values.configTarget "OperatorConfigurationCRD" }}
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: {{ template "postgres-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
+    helm.sh/chart: {{ template "postgres-operator.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+configuration:
+{{ tpl (toYaml .Values.configGeneral) . | indent 2 }}
+  users:
+{{ tpl (toYaml .Values.configUsers) . | indent 4 }}
+  major_version_upgrade:
+{{ toYaml .Values.configMajorVersionUpgrade | indent 4 }}
+  kubernetes:
+    {{- if .Values.podPriorityClassName }}
+    pod_priority_class_name: {{ .Values.podPriorityClassName }}
+    {{- end }}
+    pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
+    oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}
+{{ tpl (toYaml .Values.configKubernetes) . | indent 4 }}
+  postgres_pod_resources:
+{{ toYaml .Values.configPostgresPodResources | indent 4 }}
+  timeouts:
+{{ toYaml .Values.configTimeouts | indent 4 }}
+  load_balancer:
+{{ toYaml .Values.configLoadBalancer | indent 4 }}
+  aws_or_gcp:
+{{ toYaml .Values.configAwsOrGcp | indent 4 }}
+  logical_backup:
+{{ toYaml .Values.configLogicalBackup | indent 4 }}
+  debug:
+{{ toYaml .Values.configDebug | indent 4 }}
+  teams_api:
+{{ tpl (toYaml .Values.configTeamsApi) . | indent 4 }}
+  logging_rest_api:
+{{ toYaml .Values.configLoggingRestApi | indent 4 }}
+  connection_pooler:
+{{ toYaml .Values.configConnectionPooler | indent 4 }}
+{{- end }}
