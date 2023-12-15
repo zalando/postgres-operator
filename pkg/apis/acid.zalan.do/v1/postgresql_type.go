@@ -241,6 +241,7 @@ type ConnectionPooler struct {
 	Mode              string `json:"mode,omitempty"`
 	DockerImage       string `json:"dockerImage,omitempty"`
 	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 
 	*Resources `json:"resources,omitempty"`
 }

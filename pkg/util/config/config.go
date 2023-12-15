@@ -158,6 +158,7 @@ type ConnectionPooler struct {
 	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request" default:"100Mi"`
 	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit" default:"1"`
 	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit" default:"100Mi"`
+	ConnectionPoolerPriorityClassName    string `name:"connection_pooler_priority_class_name"`
 }
 
 // Config describes operator config

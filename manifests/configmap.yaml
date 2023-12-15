@@ -23,6 +23,7 @@ data:
   # connection_pooler_number_of_instances: 2
   # connection_pooler_schema: "pooler"
   # connection_pooler_user: "pooler"
+  # connection_pooler_priority_class_name: ""
   crd_categories: "all"
   # custom_service_annotations: "keyx:valuez,keya:valuea"
   # custom_pod_annotations: "keya:valuea,keyb:valueb"

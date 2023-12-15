@@ -282,5 +282,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		fromCRD.ConnectionPooler.MaxDBConnections,
 		k8sutil.Int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
 
+	result.ConnectionPooler.ConnectionPoolerPriorityClassName = fromCRD.ConnectionPooler.PriorityClassName
+
 	return result
 }
