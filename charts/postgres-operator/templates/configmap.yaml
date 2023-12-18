@@ -10,9 +10,9 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
-  {{- if .Values.podPriorityClassName }}
-  pod_priority_class_name: {{ .Values.podPriorityClassName }}
-  {{- end }}
+{{- if or .Values.podPriorityClassName.create .Values.podPriorityClassName.name }}
+  pod_priority_class_name: {{ include "postgres-pod.priorityClassName" . }}
+{{- end }}
   pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
 {{- include "flattenValuesForConfigMap" .Values.configGeneral | indent 2 }}
 {{- include "flattenValuesForConfigMap" .Values.configUsers | indent 2 }}

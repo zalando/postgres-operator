@@ -468,7 +468,14 @@ podServiceAccount:
 priorityClassName: ""
 
 # priority class for database pods
-podPriorityClassName: ""
+podPriorityClassName:
+  # If create is false with no name set, no podPriorityClassName is specified.
+  # Hence, the pod priorityClass is the one with globalDefault set. 
+  # If there is no PriorityClass with globalDefault set, the priority of Pods with no priorityClassName is zero.
+  create: true
+  # If not set a name is generated using the fullname template and "-pod" suffix
+  name: ""
+  priority: 1000000
 
 resources:
   limits:
