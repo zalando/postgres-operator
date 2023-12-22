@@ -62,6 +62,8 @@ var substractTest = []struct {
 }{
 	{[]string{"a", "b", "c", "d"}, []string{"a", "b", "c", "d"}, []string{}, true},
 	{[]string{"a", "b", "c", "d"}, []string{"a", "bb", "c", "d"}, []string{"b"}, false},
+	{[]string{""}, []string{"b"}, []string{""}, false},
+	{[]string{"a"}, []string{""}, []string{"a"}, false},
 }
 
 var sliceContaintsTest = []struct {

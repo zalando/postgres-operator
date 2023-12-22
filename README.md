@@ -16,7 +16,7 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Rolling updates on Postgres cluster changes, incl. quick minor version updates
 * Live volume resize without pod restarts (AWS EBS, PVC)
 * Database connection pooling with PGBouncer
-* Support fast in place major version upgrade to PG13. Supports global upgrade of all clusters.
+* Support fast in place major version upgrade. Supports global upgrade of all clusters.
 * Restore and cloning Postgres clusters on AWS, GCS and Azure
 * Additionally logical backups to S3 or GCS bucket can be configured
 * Standby cluster from S3 or GCS WAL archive
@@ -29,13 +29,13 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 14, starting from 9.6+
+* Supports PostgreSQL 15, starting from 10+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
 [WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
 * Preload libraries: [bg_mon](https://github.com/CyberDem0n/bg_mon),
-[pg_stat_statements](https://www.postgresql.org/docs/14/pgstatstatements.html),
+[pg_stat_statements](https://www.postgresql.org/docs/15/pgstatstatements.html),
 [pgextwlist](https://github.com/dimitri/pgextwlist),
 [pg_auth_mon](https://github.com/RafiaSabih/pg_auth_mon)
 * Incl. popular Postgres extensions such as
@@ -51,19 +51,16 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 [timescaledb](https://github.com/timescale/timescaledb)
 
 The Postgres Operator has been developed at Zalando and is being used in
-production for over three years.
+production for over five years.
 
-## Using Spilo 12 images or lower
+## Supported Postgres & K8s versions
 
-If you are already using the Postgres operator in older version with a Spilo 12 Docker image you need to be aware of the changes for the backup path.
-We introduce the major version into the backup path to smoothen the [major version upgrade](docs/administrator.md#minor-and-major-version-upgrade) that is now supported.
-
-The new operator configuration can set a compatibility flag *enable_spilo_wal_path_compat* to make Spilo look for wal segments in the current path but also old format paths.
-This comes at potential performance costs and should be disabled after a few days.
-
-The newest Spilo image is: `registry.opensource.zalan.do/acid/spilo-14:2.1-p5`
-
-The last Spilo 12 image is: `registry.opensource.zalan.do/acid/spilo-12:1.6-p5`
+| Release   | Postgres versions | K8s versions      | Golang  |
+| :-------- | :---------------: | :---------------: | :-----: |
+| v1.10.*   | 10 &rarr; 15      | 1.21+             | 1.19.8  |
+| v1.9.0    | 10 &rarr; 15      | 1.21+             | 1.18.9  |
+| v1.8.*    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
+| v1.7.1    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.16.9  |
 
 
 ## Getting started
@@ -73,7 +70,8 @@ For a quick first impression follow the instructions of this
 
 ## Supported setups of Postgres and Applications
 
-![Features](docs/diagrams/neutral_operator.png)
+![Features](docs/diagrams/neutral_operator_dark.png#gh-dark-mode-only)
+![Features](docs/diagrams/neutral_operator_light.png#gh-light-mode-only)
 
 ## Documentation
 

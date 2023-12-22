@@ -36,30 +36,42 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 	tests := []struct {
 		subtest           string
 		clusterJson       string
+		syncModeEnabled   bool
 		expectedCandidate spec.NamespacedName
 		expectedError     error
 	}{
 		{
 			subtest:           "choose sync_standby over replica",
 			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "sync_standby", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 0}, {"name": "acid-test-cluster-2", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 0}]}`,
+			syncModeEnabled:   true,
 			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-1"},
 			expectedError:     nil,
 		},
 		{
+			subtest:           "no running sync_standby available",
+			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 0}]}`,
+			syncModeEnabled:   true,
+			expectedCandidate: spec.NamespacedName{},
+			expectedError:     fmt.Errorf("failed to get Patroni cluster members: unexpected end of JSON input"),
+		},
+		{
 			subtest:           "choose replica with lowest lag",
 			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 5}, {"name": "acid-test-cluster-2", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 2}]}`,
+			syncModeEnabled:   false,
 			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-2"},
 			expectedError:     nil,
 		},
 		{
 			subtest:           "choose first replica when lag is equal evrywhere",
 			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 5}, {"name": "acid-test-cluster-2", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 5}]}`,
+			syncModeEnabled:   false,
 			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-1"},
 			expectedError:     nil,
 		},
 		{
 			subtest:           "no running replica available",
 			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 2}, {"name": "acid-test-cluster-1", "role": "replica", "state": "starting", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 2}]}`,
+			syncModeEnabled:   false,
 			expectedCandidate: spec.NamespacedName{},
 			expectedError:     fmt.Errorf("no switchover candidate found"),
 		},
@@ -81,6 +93,7 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 		cluster.patroni = p
 		mockMasterPod := newMockPod("192.168.100.1")
 		mockMasterPod.Namespace = namespace
+		cluster.Spec.Patroni.SynchronousMode = tt.syncModeEnabled
 
 		candidate, err := cluster.getSwitchoverCandidate(mockMasterPod)
 		if err != nil && err.Error() != tt.expectedError.Error() {

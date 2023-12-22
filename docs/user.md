@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "14"
+    version: "15"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -45,11 +45,12 @@ Make sure, the `spec` section of the manifest contains at least a `teamId`, the
 The minimum volume size to run the `postgresql` resource on Elastic Block
 Storage (EBS) is `1Gi`.
 
-Note, that the name of the cluster must start with the `teamId` and `-`. At
-Zalando we use team IDs (nicknames) to lower the chance of duplicate cluster
-names and colliding entities. The team ID would also be used to query an API to
-get all members of a team and create [database roles](#teams-api-roles) for
-them. Besides, the maximum cluster name length is 53 characters.
+Note, that when `enable_team_id_clustername_prefix` is set to `true` the name
+of the cluster must start with the `teamId` and `-`. At Zalando we use team IDs
+(nicknames) to lower chances of duplicate cluster names and colliding entities.
+The team ID would also be used to query an API to get all members of a team
+and create [database roles](#teams-api-roles) for them. Besides, the maximum
+cluster name length is 53 characters.
 
 ## Watch pods being created
 
@@ -108,7 +109,7 @@ metadata:
 spec:
   [...]
   postgresql:
-    version: "14"
+    version: "15"
     parameters:
       password_encryption: scram-sha-256
 ```
@@ -151,7 +152,7 @@ specified explicitly.
 
 The operator automatically generates a password for each manifest role and
 places it in the secret named
-`{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do` in the
+`{username}.{clustername}.credentials.postgresql.acid.zalan.do` in the
 same namespace as the cluster. This way, the application running in the
 K8s cluster and connecting to Postgres can obtain the password right from the
 secret, without ever sharing it outside of the cluster.
@@ -181,7 +182,7 @@ be in the form of `namespace.username`.
 
 For such usernames, the secret is created in the given namespace and its name is
 of the following form,
-`{namespace}.{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do`
+`{namespace}.{username}.{clustername}.credentials.postgresql.acid.zalan.do`
 
 ### Infrastructure roles
 
@@ -222,7 +223,7 @@ the user name, password etc. The secret itself is referenced by the
 above list them separately.
 
 ```yaml
-apiVersion: v1
+apiVersion: "acid.zalan.do/v1"
 kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-configuration
@@ -516,7 +517,7 @@ Postgres Operator will create the following NOLOGIN roles:
 
 The `<dbname>_owner` role is the database owner and should be used when creating
 new database objects. All members of the `admin` role, e.g. teams API roles, can
-become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/12/sql-alterdefaultprivileges.html)
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/15/sql-alterdefaultprivileges.html)
 are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
@@ -579,7 +580,9 @@ For all LOGIN roles the operator will create K8s secrets in the namespace
 specified in `secretNamespace`, if `enable_cross_namespace_secret` is set to
 `true` in the config. Otherwise, they are created in the same namespace like
 the Postgres cluster. Unlike roles specified with `namespace.username` under
-`users`, the namespace will not be part of the role name here.
+`users`, the namespace will not be part of the role name here. Keep in mind
+that the underscores in a role name are replaced with dashes in the K8s
+secret name.
 
 ```yaml
 spec:
@@ -591,7 +594,7 @@ spec:
 
 ### Schema `search_path` for default roles
 
-The schema [`search_path`](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH)
+The schema [`search_path`](https://www.postgresql.org/docs/15/ddl-schemas.html#DDL-SCHEMAS-PATH)
 for each role will include the role name and the schemas, this role should have
 access to. So `foo_bar_writer` does not have to schema-qualify tables from
 schemas `foo_bar_writer, bar`, while `foo_writer` can look up `foo_writer` and
@@ -811,7 +814,7 @@ spec:
 ### Clone directly
 
 Another way to get a fresh copy of your source DB cluster is via
-[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html). To
+[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html). To
 use this feature simply leave out the timestamp field from the clone section.
 The operator will connect to the service of the source cluster by name. If the
 cluster is called test, then the connection string will look like host=test
@@ -1005,6 +1008,42 @@ option must be set to `true`.
 
 If you want to add a sidecar to every cluster managed by the operator, you can specify it in the [operator configuration](administrator.md#sidecars-for-postgres-clusters) instead.
 
+### Accessing the PostgreSQL socket from sidecars
+
+If enabled by the `share_pgsocket_with_sidecars` option in the operator
+configuration the PostgreSQL socket is placed in a volume of type `emptyDir`
+named `postgresql-run`. To allow access to the socket from any sidecar
+container simply add a VolumeMount to this volume to your sidecar spec.
+
+```yaml
+  - name: "container-name"
+    image: "company/image:tag"
+    volumeMounts:
+    - mountPath: /var/run
+      name: postgresql-run
+```
+
+If you do not want to globally enable this feature and only use it for single
+Postgres clusters, specify an `EmptyDir` volume under `additionalVolumes` in
+the manifest:
+
+```yaml
+spec:
+  additionalVolumes:
+  - name: postgresql-run
+    mountPath: /var/run/postgresql
+    targetContainers:
+    - all
+    volumeSource:
+      emptyDir: {}
+  sidecars: 
+  - name: "container-name"
+    image: "company/image:tag"
+    volumeMounts:
+    - mountPath: /var/run
+      name: postgresql-run
+```
+
 ## InitContainers Support
 
 Each cluster can specify arbitrary init containers to run. These containers can
@@ -1029,9 +1068,9 @@ specified but globally disabled in the configuration. The
 
 ## Increase volume size
 
-Postgres operator supports statefulset volume resize if you're using the
-operator on top of AWS. For that you need to change the size field of the
-volume description in the cluster manifest and apply the change:
+Postgres operator supports statefulset volume resize without doing a rolling
+update. For that you need to change the size field of the volume description
+in the cluster manifest and apply the change:
 
 ```yaml
 spec:
@@ -1040,22 +1079,29 @@ spec:
 ```
 
 The operator compares the new value of the size field with the previous one and
-acts on differences.
+acts on differences. The `storage_resize_mode` can be configured. By default,
+the operator will adjust the PVCs and leave it to K8s and the infrastructure to
+apply the change.
 
-You can only enlarge the volume with the process described above, shrinking is
-not supported and will emit a warning. After this update all the new volumes in
-the statefulset are allocated according to the new size. To enlarge persistent
-volumes attached to the running pods, the operator performs the following
-actions:
+When using AWS with gp3 volumes you should set the mode to `mixed` because it
+will also adjust the IOPS and throughput that can be defined in the manifest.
+Check the [AWS docs](https://aws.amazon.com/ebs/general-purpose/) to learn
+about default and maximum values. Keep in mind that AWS rate-limits updating
+volume specs to no more than once every 6 hours.
 
-* call AWS API to change the volume size
+```yaml
+spec:
+  volume:
+    size: 5Gi # new volume size
+    iops: 4000
+    throughput: 500
+```
 
-* connect to pod using `kubectl exec` and resize filesystem with `resize2fs`.
-
-Fist step has a limitation, AWS rate-limits this operation to no more than once
-every 6 hours. Note, that if the statefulset is scaled down before resizing the
-new size is only applied to the volumes attached to the running pods. The
-size of volumes that correspond to the previously running pods is not changed.
+The operator can only enlarge volumes. Shrinking is not supported and will emit
+a warning. However, it can be done manually after updating the manifest. You
+have to delete the PVC, which will hang until you also delete the corresponding
+pod. Proceed with the next pod when the cluster is healthy again and replicas
+are streaming.
 
 ## Logical backups
 
@@ -1153,14 +1199,19 @@ don't know the value, use `103` which is the GID from the default Spilo image
 OpenShift allocates the users and groups dynamically (based on scc), and their
 range is different in every namespace. Due to this dynamic behaviour, it's not
 trivial to know at deploy time the uid/gid of the user in the cluster.
-Therefore, instead of using a global `spilo_fsgroup` setting, use the
-`spiloFSGroup` field per Postgres cluster.
+Therefore, instead of using a global `spilo_fsgroup` setting in operator
+configuration or use the `spiloFSGroup` field per Postgres cluster manifest.
+
+For testing purposes, you can generate a self-signed certificate with openssl:
+```sh
+openssl req -x509 -nodes -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=acid.zalan.do"
+```
 
 Upload the cert as a kubernetes secret:
 ```sh
 kubectl create secret tls pg-tls \
-  --key pg-tls.key \
-  --cert pg-tls.crt
+  --key tls.key \
+  --cert tls.crt
 ```
 
 When doing client auth, CA can come optionally from the same secret:
@@ -1187,8 +1238,7 @@ spec:
 
 Optionally, the CA can be provided by a different secret:
 ```sh
-kubectl create secret generic pg-tls-ca \
-  --from-file=ca.crt=ca.crt
+kubectl create secret generic pg-tls-ca --from-file=ca.crt=ca.crt
 ```
 
 Then configure the postgres resource with the TLS secret:
@@ -1211,3 +1261,16 @@ Alternatively, it is also possible to use
 
 Certificate rotation is handled in the Spilo image which checks every 5
 minutes if the certificates have changed and reloads postgres accordingly.
+
+### TLS certificates for connection pooler
+
+By default, the pgBouncer image generates its own TLS certificate like Spilo.
+When the `tls` section is specfied in the manifest it will be used for the
+connection pooler pod(s) as well. The security context options are hard coded
+to `runAsUser: 100` and `runAsGroup: 101`. The `fsGroup` will be the same
+like for Spilo.
+
+As of now, the operator does not sync the pooler deployment automatically
+which means that changes in the pod template are not caught. You need to
+toggle `enableConnectionPooler` to set environment variables, volumes, secret
+mounts and securityContext required for TLS support in the pooler pod.
