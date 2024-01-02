@@ -945,20 +945,20 @@ databases from one place to another with minimal downtime.
 Before promoting a standby cluster, make sure that the standby is not behind
 the source database. You should ideally stop writes to your source cluster and
 then create a dummy database object that you check for being replicated in the
-target to verify all data has been copies.
+target to verify all data has been copied.
 
 To promote, remove the `standby` section from the postgres cluster manifest.
 A rolling update will be triggered removing the `STANDBY_*` environment
 variables from the pods, followed by a Patroni config update that promotes the
 cluster.
 
-### Turn a normal cluster into a standby
+### Adding standby section after promotion
 
-Adding the `standby` section to the manifest of a running Postgres cluster
-will set create the necessary `STANDBY_*` environment variables to the pods
-via rolling update and enable the `standby_cluster` section in the Patroni
-configuration. However, the transformed standby cluster will not be doing any
-streaming. It will be in standby mode and allow read-only transactions only.
+Turning a running cluster into a standby is not easily possible and should be
+avoided. The best way is to remove the cluster and resubmit the manifest
+after a short wait of a few minutes. Adding the `standby` section would turn
+the database cluster in read-only mode on next operator SYNC cycle but it
+does not sync automatically with the source cluster again.
 
 ## Sidecar Support
 
