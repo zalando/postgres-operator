@@ -45,6 +45,7 @@ spec:
             - name: "RESOURCES_VISIBLE"
               value: "False"
             - name: "TARGET_NAMESPACE"
+              # Set to "*" to allow viewing/creation of clusters in all namespaces
               value: "default"
             - name: "TEAMS"
               value: |-

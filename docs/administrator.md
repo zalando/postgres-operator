@@ -1348,6 +1348,8 @@ You can also expose the operator API through a [service](https://github.com/zala
 Some displayed options can be disabled from UI using simple flags under the
 `OPERATOR_UI_CONFIG` field in the deployment.
 
+The viewing and creation of clusters within the UI is limited to the namespace specified by the `TARGET_NAMESPACE` option. To allow the creation and viewing of clusters in all namespaces, set `TARGET_NAMESPACE` to `*`.
+
 ### Deploy the UI on K8s
 
 Now, apply all manifests from the `ui/manifests` folder to deploy the Postgres
