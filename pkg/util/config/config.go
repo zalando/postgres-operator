@@ -32,12 +32,15 @@ type Resources struct {
 	PodTerminateGracePeriod       time.Duration       `name:"pod_terminate_grace_period" default:"5m"`
 	SpiloRunAsUser                *int64              `name:"spilo_runasuser"`
 	SpiloRunAsGroup               *int64              `name:"spilo_runasgroup"`
+	SpiloRunAsNonRoot             *bool               `name:"spilo_runasnonroot"`
 	SpiloFSGroup                  *int64              `name:"spilo_fsgroup"`
+	SpiloSeccompProfile           *SeccompProfile     `name:"spilo_seccompprofile"`
 	PodPriorityClassName          string              `name:"pod_priority_class_name"`
 	ClusterDomain                 string              `name:"cluster_domain" default:"cluster.local"`
 	SpiloPrivileged               bool                `name:"spilo_privileged" default:"false"`
 	SpiloAllowPrivilegeEscalation *bool               `name:"spilo_allow_privilege_escalation" default:"true"`
 	AdditionalPodCapabilities     []string            `name:"additional_pod_capabilities" default:""`
+	DroppedPodCapabilities        []string            `name:"dropped_pod_capabilities" default:""`
 	ClusterLabels                 map[string]string   `name:"cluster_labels" default:"application:spilo"`
 	InheritedLabels               []string            `name:"inherited_labels" default:""`
 	InheritedAnnotations          []string            `name:"inherited_annotations" default:""`
@@ -65,6 +68,13 @@ type Resources struct {
 	MaxInstances                      int32  `name:"max_instances" default:"-1"`
 	MinInstances                      int32  `name:"min_instances" default:"-1"`
 	IgnoreInstanceLimitsAnnotationKey string `name:"ignore_instance_limits_annotation_key"`
+}
+
+
+// Seccompprofile defines the seccompProfile spec of SecurityContext resources
+type SeccompProfile struct {
+	LocalhostProfile    string `name:"localhost_profile"`
+	Type                string `name:"type"`
 }
 
 type InfrastructureRole struct {

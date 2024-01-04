@@ -78,12 +78,25 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   This must be set to run the container without root. By default the container
   runs with root. This option only works for Spilo versions >= 1.6-p3.
 
+* **spiloRunAsNonRoot**
+  determines whether the pod’s container should run as a non-root user. If set 
+  to true, the image is validating at runtime to make sure that it does not run 
+  as UID 0 (root) and won’t start the container if it does.
+
 * **spiloFSGroup**
   the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This will override the **spilo_fsgroup**
   operator parameter. This is required to run Spilo as a non-root process, but
   requires a custom Spilo image. Note the FSGroup of a Pod cannot be changed
   without recreating a new Pod. Optional.
+
+* **spiloSeccompProfile**
+  Seccomp (Secure Computing) is a feature in the Linux kernel that allows a 
+  userspace program to create syscall filters. In the context of containers, 
+  these syscall filters are collated into seccomp profiles that can be used to 
+  restrict which syscalls and arguments are permitted. Applying seccomp profiles 
+  to containers reduces the chance that a Linux kernel vulnerability will be 
+  exploited.
 
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
@@ -118,7 +131,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   a map of usernames to user flags for the users that should be created in the
   cluster by the operator. User flags are a list, allowed elements are
   `SUPERUSER`, `REPLICATION`, `INHERIT`, `LOGIN`, `NOLOGIN`, `CREATEROLE`,
-  `CREATEDB`, `BYPASSRLS`. A login user is created by default unless NOLOGIN is
+  `CREATEDB`, `BYPASSURL`. A login user is created by default unless NOLOGIN is
   specified, in which case the operator creates a role. One can specify empty
   flags by providing a JSON empty array '*[]*'. If the config option
   `enable_cross_namespace_secret` is enabled you can specify the namespace in
@@ -486,6 +499,10 @@ defined in the sidecar dictionary:
 
 * **resources**
   [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container)
+  for each sidecar container. Optional.
+
+* **securityContext**
+  [A security context defining privilege and access control settings](https://kubernetes.io/docs/tasks/configure-pod-container/security-context)
   for each sidecar container. Optional.
 
 ### Requests

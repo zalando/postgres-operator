@@ -466,8 +466,17 @@ spec:
                 type: integer
               spiloRunAsGroup:
                 type: integer
+              spiloRunAsNonRoot:
+                type: boolean
               spiloFSGroup:
                 type: integer
+              spiloSeccompProfile:
+                type: object
+                properties:
+                  localhostProfile:
+                    type: string
+                  type:
+                    type: string
               standby:
                 type: object
                 properties:

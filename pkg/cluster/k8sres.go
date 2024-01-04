@@ -446,15 +446,26 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (loca
 	return
 }
 
-func generateCapabilities(capabilities []string) *v1.Capabilities {
-	additionalCapabilities := make([]v1.Capability, 0, len(capabilities))
+func generateCapabilities(capabilities []string) []v1.Capability {
+	capabilities_ := make([]v1.Capability, 0, len(capabilities))
 	for _, capability := range capabilities {
-		additionalCapabilities = append(additionalCapabilities, v1.Capability(strings.ToUpper(capability)))
+		capabilities_ = append(capabilities_, v1.Capability(strings.ToUpper(capability)))
 	}
-	if len(additionalCapabilities) > 0 {
-		return &v1.Capabilities{
-			Add: additionalCapabilities,
-		}
+	return capabilities_
+}
+
+func generatePodCapabilities(additionalCapabilities []string, droppedCapabilities []string) *v1.Capabilities {
+	additionalCapabilities_ := generateCapabilities(additionalCapabilities)
+	droppedCapabilities_ := generateCapabilities(droppedCapabilities)
+	capabilities := v1.Capabilities{}
+	if len(additionalCapabilities_) > 0 {
+		capabilities.Add = additionalCapabilities_
+	}
+	if len(droppedCapabilities_) > 0 {
+		capabilities.Drop = droppedCapabilities_
+	}
+	if len(additionalCapabilities_) > 0 || len(droppedCapabilities_) > 0 {
+		return &capabilities
 	}
 	return nil
 }
@@ -639,7 +650,7 @@ func generateContainer(
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
 	privilegeEscalationMode *bool,
-	additionalPodCapabilities *v1.Capabilities,
+	podCapabilities *v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{
 		Name:            name,
@@ -666,7 +677,7 @@ func generateContainer(
 			AllowPrivilegeEscalation: privilegeEscalationMode,
 			Privileged:               &privilegedMode,
 			ReadOnlyRootFilesystem:   util.False(),
-			Capabilities:             additionalPodCapabilities,
+			Capabilities:             podCapabilities,
 		},
 	}
 }
@@ -688,7 +699,6 @@ func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar,
 			if err != nil {
 				return nil, err
 			}
-
 			sc := getSidecarContainer(sidecar, startIndex+index, resources)
 			result = append(result, *sc)
 		}
@@ -766,7 +776,9 @@ func (c *Cluster) generatePodTemplate(
 	tolerationsSpec *[]v1.Toleration,
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
+	spiloRunAsNonRoot *bool,
 	spiloFSGroup *int64,
+	spiloSeccompProfile *acidv1.SeccompProfile,
 	nodeAffinity *v1.Affinity,
 	schedulerName *string,
 	terminateGracePeriod int64,
@@ -795,8 +807,21 @@ func (c *Cluster) generatePodTemplate(
 		securityContext.RunAsGroup = spiloRunAsGroup
 	}
 
+	if spiloRunAsNonRoot != nil {
+		securityContext.RunAsNonRoot = spiloRunAsNonRoot
+	}
+
 	if spiloFSGroup != nil {
 		securityContext.FSGroup = spiloFSGroup
+	}
+	
+	c.logger.Debug("Set spiloSeccompProfile")
+	if spiloSeccompProfile != nil {
+		securityContext.SeccompProfile = &v1.SeccompProfile{}
+		securityContext.SeccompProfile.Type = spiloSeccompProfile.Type
+		if spiloSeccompProfile.LocalhostProfile != "" {
+			securityContext.SeccompProfile.LocalhostProfile = &spiloSeccompProfile.LocalhostProfile
+		}
 	}
 
 	podSpec := v1.PodSpec{
@@ -1181,6 +1206,7 @@ func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.Resour
 		Resources:       *resources,
 		Env:             sidecar.Env,
 		Ports:           sidecar.Ports,
+		SecurityContext: sidecar.SecurityContext,
 	}
 }
 
@@ -1302,9 +1328,29 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveRunAsGroup = spec.SpiloRunAsGroup
 	}
 
+	effectiveRunAsNonRoot := c.OpConfig.Resources.SpiloRunAsNonRoot
+	if spec.SpiloRunAsNonRoot != nil {
+		effectiveRunAsNonRoot = spec.SpiloRunAsNonRoot
+	}
+
 	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
 	if spec.SpiloFSGroup != nil {
 		effectiveFSGroup = spec.SpiloFSGroup
+	}
+
+	c.logger.Debug("Set effectiveSeccompProfile")
+	var effectiveSeccompProfile *acidv1.SeccompProfile
+	if c.OpConfig.Resources.SpiloSeccompProfile != nil {
+		effectiveSeccompProfile = &acidv1.SeccompProfile {}
+		if c.OpConfig.Resources.SpiloSeccompProfile.LocalhostProfile != "" {
+			effectiveSeccompProfile.LocalhostProfile = c.OpConfig.Resources.SpiloSeccompProfile.LocalhostProfile
+		}
+		if c.OpConfig.Resources.SpiloSeccompProfile.Type != "" {
+			effectiveSeccompProfile.Type = v1.SeccompProfileType(c.OpConfig.Resources.SpiloSeccompProfile.Type)
+		}
+	}	
+	if spec.SpiloSeccompProfile != nil {
+		effectiveSeccompProfile = spec.SpiloSeccompProfile
 	}
 
 	volumeMounts := generateVolumeMounts(spec.Volume)
@@ -1341,7 +1387,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
-		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
+		generatePodCapabilities(c.OpConfig.AdditionalPodCapabilities, c.OpConfig.DroppedPodCapabilities),
 	)
 
 	// Patroni responds 200 to probe only if it either owns the leader lock or postgres is running and DCS is accessible
@@ -1422,7 +1468,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		&tolerationSpec,
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
+		effectiveRunAsNonRoot,
 		effectiveFSGroup,
+		effectiveSeccompProfile,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
 		spec.SchedulerName,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
@@ -2251,6 +2299,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		nil,
 		nil,
 		nil,
+		nil,
+		nil,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		nil,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
@@ -2412,6 +2462,8 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
 	}
 
+	c.logger.Debugf("Generated logical backup env vars")
+	c.logger.Debugf("%v", envVars)
 	return envVars
 }
 

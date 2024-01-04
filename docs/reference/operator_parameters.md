@@ -453,11 +453,24 @@ configuration they are grouped under the `kubernetes` key.
   This must be set to run the container without root. By default the container
   runs with root. This option only works for Spilo versions >= 1.6-p3.
 
+* **spilo_runasnonroot**
+  determines whether the spilo container should run as a non-root user. If set 
+  to true, the image is validating at runtime to make sure that it does not run 
+  as UID 0 (root) and won’t start the container if it does.
+
 * **spilo_fsgroup**
   the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This is required to run Spilo as a
   non-root process, but requires a custom Spilo image. Note the FSGroup of a Pod
   cannot be changed without recreating a new Pod.
+
+* **spiloSeccompProfile**
+  Seccomp (Secure Computing) is a feature in the Linux kernel that allows a 
+  userspace program to create syscall filters. In the context of containers, 
+  these syscall filters are collated into seccomp profiles that can be used to 
+  restrict which syscalls and arguments are permitted. Applying seccomp profiles 
+  to containers reduces the chance that a Linux kernel vulnerability will be 
+  exploited.
 
 * **spilo_privileged**
   whether the Spilo container should run in privileged mode. Privileged mode is
@@ -474,6 +487,10 @@ configuration they are grouped under the `kubernetes` key.
   SecurityContext (e.g. SYS_NICE etc.). Please, make sure first that the
   PodSecruityPolicy allows the capabilities listed here. Otherwise, the
   container will not start. The default is empty.
+
+* **dropped_pod_capabilities**
+  list of capabilities to be dropped from the postgres container's
+  SecurityContext (e.g. ALL, SYS_NICE etc.).
 
 * **master_pod_move_timeout**
   The period of time to wait for the success of migration of master pods from

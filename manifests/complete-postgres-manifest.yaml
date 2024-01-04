@@ -93,7 +93,11 @@ spec:
   enableShmVolume: true
 #  spiloRunAsUser: 101
 #  spiloRunAsGroup: 103
+#  spiloRunAsNonRoot: true
 #  spiloFSGroup: 103
+#  spiloSeccompProfile:
+#    type: Localhost
+#    localhostProfile: profiles/audit.json
 #  podAnnotations:
 #    annotation.key: value
 #  serviceAnnotations:
@@ -187,6 +191,12 @@ spec:
 #     env:
 #       - name: "USEFUL_VAR"
 #         value: "perhaps-true"
+#     securityContext:
+#       allowPrivilegeEscalation: false
+#       capabilities:
+#        drop:
+#         - ALL
+#       runAsNonRoot: true
 
 # Custom TLS certificate. Disabled unless tls.secretName has a value.
   tls:

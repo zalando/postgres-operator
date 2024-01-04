@@ -39,9 +39,11 @@ type PostgresSpec struct {
 	// deprecated field storing cluster name without teamId prefix
 	ClusterName string `json:"-"`
 
-	SpiloRunAsUser  *int64 `json:"spiloRunAsUser,omitempty"`
-	SpiloRunAsGroup *int64 `json:"spiloRunAsGroup,omitempty"`
-	SpiloFSGroup    *int64 `json:"spiloFSGroup,omitempty"`
+	SpiloRunAsUser       *int64            `json:"spiloRunAsUser,omitempty"`
+	SpiloRunAsGroup      *int64            `json:"spiloRunAsGroup,omitempty"`
+	SpiloRunAsNonRoot    *bool             `json:"spiloRunAsNonRoot,omitempty"`
+	SpiloFSGroup         *int64            `json:"spiloFSGroup,omitempty"`
+	SpiloSeccompProfile  *SeccompProfile   `json:"spiloSeccompProfile,omitempty"`
 
 	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
 	// in that case the var evaluates to nil and the value is taken from the operator config
@@ -209,11 +211,12 @@ type CloneDescription struct {
 
 // Sidecar defines a container to be run in the same pod as the Postgres container.
 type Sidecar struct {
-	*Resources  `json:"resources,omitempty"`
-	Name        string             `json:"name,omitempty"`
-	DockerImage string             `json:"image,omitempty"`
-	Ports       []v1.ContainerPort `json:"ports,omitempty"`
-	Env         []v1.EnvVar        `json:"env,omitempty"`
+	*Resources      `json:"resources,omitempty"`
+	Name            string             `json:"name,omitempty"`
+	DockerImage     string             `json:"image,omitempty"`
+	Ports           []v1.ContainerPort `json:"ports,omitempty"`
+	Env             []v1.EnvVar        `json:"env,omitempty"`
+	SecurityContext *v1.SecurityContext `json:"securityContext,omitempty"`
 }
 
 // UserFlags defines flags (such as superuser, nologin) that could be assigned to individual users

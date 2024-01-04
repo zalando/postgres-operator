@@ -178,6 +178,10 @@ spec:
                     type: array
                     items:
                       type: string
+                  dropped_pod_capabilities:
+                    type: array
+                    items:
+                      type: string
                   cluster_domain:
                     type: string
                     default: "cluster.local"
@@ -337,8 +341,17 @@ spec:
                     type: integer
                   spilo_runasgroup:
                     type: integer
+                  spilo_runasnonroot:
+                    type: boolean
                   spilo_fsgroup:
                     type: integer
+                  spilo_seccompprofile:
+                    type: object
+                    properties:
+                      localhostProfile:
+                        type: string
+                      type:
+                        type: string
                   spilo_privileged:
                     type: boolean
                     default: false

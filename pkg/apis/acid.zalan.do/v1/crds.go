@@ -728,8 +728,22 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"spiloRunAsGroup": {
 						Type: "integer",
 					},
+					"spiloRunAsNonRoot": {
+						Type: "boolean",
+					},
 					"spiloFSGroup": {
 						Type: "integer",
+					},
+					"spiloSeccompProfile": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"localhostProfile": {
+								Type: "string",
+							},
+							"type": {
+								Type: "string",
+							},
+						},
 					},
 					"standby": {
 						Type: "object",
@@ -1249,6 +1263,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
+							"dropped_pod_capabilities": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
 							"cluster_domain": {
 								Type: "string",
 							},
@@ -1474,8 +1496,22 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"spilo_runasgroup": {
 								Type: "integer",
 							},
+							"spilo_runasnonroot": {
+								Type: "boolean",
+							},
 							"spilo_fsgroup": {
 								Type: "integer",
+							},
+							"spilo_seccompprofile": {
+								Type: "object",
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"localhost_profile": {
+										Type:    "string",
+									},
+									"type": {
+										Type:    "string",
+									},
+								},
 							},
 							"spilo_privileged": {
 								Type: "boolean",
