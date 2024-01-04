@@ -359,6 +359,14 @@ CPU and memory requests for the Postgres container.
   memory requests for the Postgres container. Optional, overrides the
   `default_memory_request` operator configuration parameter.
 
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
+
 ### Limits
 
 CPU and memory limits for the Postgres container.
@@ -370,6 +378,14 @@ CPU and memory limits for the Postgres container.
 * **memory**
   memory limits for the Postgres container. Optional, overrides the
   `default_memory_limits` operator configuration parameter.
+
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
 
 ## Parameters defining how to clone the cluster from another one
 
@@ -500,6 +516,14 @@ CPU and memory requests for the sidecar container.
   memory requests for the sidecar container. Optional, overrides the
   `default_memory_request` operator configuration parameter. Optional.
 
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
+
 ### Limits
 
 CPU and memory limits for the sidecar container.
@@ -511,6 +535,14 @@ CPU and memory limits for the sidecar container.
 * **memory**
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
+
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
 
 ## Connection pooler
 

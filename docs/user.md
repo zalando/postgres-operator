@@ -690,6 +690,27 @@ manifest the operator will raise the limits to the configured minimum values.
 If no resources are defined in the manifest they will be obtained from the
 configured [default requests](reference/operator_parameters.md#kubernetes-resource-requests).
 
+### HugePages support
+
+The operator supports [HugePages](https://www.postgresql.org/docs/15/kernel-resources.html#LINUX-HUGEPAGES).
+To enable HugePages, set the matching resource requests and/or limits in the manifest:
+
+```yaml
+spec:
+  resources:
+    requests:
+      hugepages-2Mi: 250Mi
+      hugepages-1Gi: 1Gi
+    limits:
+      hugepages-2Mi: 500Mi
+      hugepages-1Gi: 2Gi
+```
+
+There are no minimums or maximums and the default is 0 for both HugePage sizes,
+but Kubernetes will not spin up the pod if the requested HugePages cannot be allocated.
+For more information on HugePages in Kubernetes, see also
+[https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/](https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/)
+
 ## Use taints, tolerations and node affinity for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application pods,

@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"time"
-
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -3079,6 +3078,131 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			expectedResources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "1Gi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "2Gi"},
+			},
+		},
+		{
+			subTest: "test HugePages are not set on container when not requested in manifest",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{},
+						ResourceLimits:   acidv1.ResourceDescription{},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:    "100m",
+					Memory: "100Mi",
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:    "1",
+					Memory: "500Mi",
+				},
+			},
+		},
+		{
+			subTest: "test HugePages are passed through to the postgres container",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{
+							HugePages2Mi: "128Mi",
+							HugePages1Gi: "1Gi",
+						},
+						ResourceLimits: acidv1.ResourceDescription{
+							HugePages2Mi: "256Mi",
+							HugePages1Gi: "2Gi",
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:          "100m",
+					Memory:       "100Mi",
+					HugePages2Mi: "128Mi",
+					HugePages1Gi: "1Gi",
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:          "1",
+					Memory:       "500Mi",
+					HugePages2Mi: "256Mi",
+					HugePages1Gi: "2Gi",
+				},
+			},
+		},
+		{
+			subTest: "test HugePages are passed through on sidecars",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Sidecars: []acidv1.Sidecar{
+						{
+							Name:        "test-sidecar",
+							DockerImage: "test-image",
+							Resources: &acidv1.Resources{
+								ResourceRequests: acidv1.ResourceDescription{
+									HugePages2Mi: "128Mi",
+									HugePages1Gi: "1Gi",
+								},
+								ResourceLimits: acidv1.ResourceDescription{
+									HugePages2Mi: "256Mi",
+									HugePages1Gi: "2Gi",
+								},
+							},
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:          "100m",
+					Memory:       "100Mi",
+					HugePages2Mi: "128Mi",
+					HugePages1Gi: "1Gi",
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:          "1",
+					Memory:       "500Mi",
+					HugePages2Mi: "256Mi",
+					HugePages1Gi: "2Gi",
+				},
 			},
 		},
 	}
