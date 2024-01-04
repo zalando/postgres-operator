@@ -84,6 +84,13 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	// add or remove standby_cluster section from Patroni config depending on changes in standby section
+	if reflect.DeepEqual(oldSpec.Spec.StandbyCluster, newSpec.Spec.StandbyCluster) {
+		if err := c.syncStandbyClusterConfiguration(); err != nil {
+			return fmt.Errorf("could not sync StandbyCluster configuration: %v", err)
+		}
+	}
+
 	c.logger.Debug("syncing pod disruption budgets")
 	if err = c.syncPodDisruptionBudget(false); err != nil {
 		err = fmt.Errorf("could not sync pod disruption budget: %v", err)
@@ -708,6 +715,46 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	configPatched = true
 
 	return configPatched, requiresMasterRestart, nil
+}
+
+// syncStandbyClusterConfiguration checks whether standby cluster
+// parameters have changed and if necessary sets it via the Patroni API
+func (c *Cluster) syncStandbyClusterConfiguration() error {
+	var (
+		err  error
+		pods []v1.Pod
+	)
+
+	standbyOptionsToSet := make(map[string]interface{})
+	if c.Spec.StandbyCluster != nil {
+		c.logger.Infof("turning %q into a standby cluster", c.Name)
+		standbyOptionsToSet["create_replica_methods"] = []string{"bootstrap_standby_with_wale", "basebackup_fast_xlog"}
+		standbyOptionsToSet["restore_command"] = "envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""
+
+	} else {
+		c.logger.Infof("promoting standby cluster and detach from source")
+		standbyOptionsToSet = nil
+	}
+
+	if pods, err = c.listPods(); err != nil {
+		return err
+	}
+	if len(pods) == 0 {
+		return fmt.Errorf("could not call Patroni API: cluster has no pods")
+	}
+	// try all pods until the first one that is successful, as it doesn't matter which pod
+	// carries the request to change configuration through
+	for _, pod := range pods {
+		podName := util.NameFromMeta(pod.ObjectMeta)
+		c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
+			podName, standbyOptionsToSet)
+		if err = c.patroni.SetStandbyClusterParameters(&pod, standbyOptionsToSet); err == nil {
+			return nil
+		}
+		c.logger.Warningf("could not patch postgres parameters within pod %s: %v", podName, err)
+	}
+	return fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
+		len(pods))
 }
 
 func (c *Cluster) syncSecrets() error {
