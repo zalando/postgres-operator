@@ -233,6 +233,7 @@ type OperatorLogicalBackupConfiguration struct {
 	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
+	CronjobEnvironmentSecret     string `json:"logical_backup_cronjob_environment_secret,omitempty"`
 	CPURequest                   string `json:"logical_backup_cpu_request,omitempty"`
 	MemoryRequest                string `json:"logical_backup_memory_request,omitempty"`
 	CPULimit                     string `json:"logical_backup_cpu_limit,omitempty"`

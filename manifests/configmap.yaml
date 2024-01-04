@@ -94,6 +94,7 @@ data:
   logical_backup_s3_sse: "AES256"
   # logical_backup_s3_retention_time: ""
   logical_backup_schedule: "30 00 * * *"
+  # logical_backup_cronjob_environment_secret: ""
   major_version_upgrade_mode: "manual"
   # major_version_upgrade_team_allow_list: ""
   master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"

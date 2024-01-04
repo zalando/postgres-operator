@@ -35,6 +35,7 @@ type Interface interface {
 	GetClusterMembers(master *v1.Pod) ([]ClusterMember, error)
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
+	SetStandbyClusterParameters(server *v1.Pod, options map[string]interface{}) error
 	GetMemberData(server *v1.Pod) (MemberData, error)
 	Restart(server *v1.Pod) error
 	GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, error)
@@ -163,6 +164,11 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 		return err
 	}
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
+}
+
+// SetStandbyClusterParameters sets StandbyCluster options via Patroni patch API call.
+func (p *Patroni) SetStandbyClusterParameters(server *v1.Pod, parameters map[string]interface{}) error {
+	return p.SetConfig(server, map[string]interface{}{"standby_cluster": parameters})
 }
 
 // SetConfig sets Patroni options via Patroni patch API call.

@@ -80,7 +80,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 					PamRoleName: "zalandos",
 				},
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
@@ -102,24 +102,17 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 				FailsafeMode:          util.True(),
 			},
-			opConfig: &config.Config{
-				Auth: config.Auth{
-					PamRoleName: "zalandos",
-				},
-			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
+			opConfig: &config.Config{},
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally",
 			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
-				Auth: config.Auth{
-					PamRoleName: "zalandos",
-				},
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
@@ -128,12 +121,9 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				FailsafeMode: util.False(),
 			},
 			opConfig: &config.Config{
-				Auth: config.Auth{
-					PamRoleName: "zalandos",
-				},
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":false}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
@@ -142,12 +132,9 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				FailsafeMode: util.True(),
 			},
 			opConfig: &config.Config{
-				Auth: config.Auth{
-					PamRoleName: "zalandos",
-				},
 				EnablePatroniFailsafeMode: util.False(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -157,8 +144,8 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if tt.result != result {
-			t.Errorf("%s %s: Spilo Config is %v, expected %v for role %#v and param %#v",
-				t.Name(), tt.subtest, result, tt.result, tt.opConfig.Auth.PamRoleName, tt.pgParam)
+			t.Errorf("%s %s: Spilo Config is %v, expected %v and param %#v",
+				t.Name(), tt.subtest, result, tt.result, tt.pgParam)
 		}
 	}
 }
@@ -205,6 +192,7 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 const (
 	testPodEnvironmentConfigMapName      = "pod_env_cm"
 	testPodEnvironmentSecretName         = "pod_env_sc"
+	testCronjobEnvironmentSecretName     = "pod_env_sc"
 	testPodEnvironmentObjectNotExists    = "idonotexist"
 	testPodEnvironmentSecretNameAPIError = "pod_env_sc_apierror"
 	testResourceCheckInterval            = 3
@@ -455,6 +443,96 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s %s: expected no error but got error: `%v`",
 					t.Name(), tt.subTest, err)
+			}
+		}
+	}
+
+}
+
+// Test if the keys of an existing secret are properly referenced
+func TestCronjobEnvironmentSecretVariables(t *testing.T) {
+	testName := "TestCronjobEnvironmentSecretVariables"
+	tests := []struct {
+		subTest  string
+		opConfig config.Config
+		envVars  []v1.EnvVar
+		err      error
+	}{
+		{
+			subTest: "No CronjobEnvironmentSecret configured",
+			envVars: []v1.EnvVar{},
+		},
+		{
+			subTest: "Secret referenced by CronjobEnvironmentSecret does not exist",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCronjobEnvironmentSecret: "idonotexist",
+				},
+			},
+			err: fmt.Errorf("could not read Secret CronjobEnvironmentSecretName: secret.core \"idonotexist\" not found"),
+		},
+		{
+			subTest: "Cronjob environment vars reference all keys from secret configured by CronjobEnvironmentSecret",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCronjobEnvironmentSecret: testCronjobEnvironmentSecretName,
+				},
+			},
+			envVars: []v1.EnvVar{
+				{
+					Name: "clone_aws_access_key_id",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "clone_aws_access_key_id",
+						},
+					},
+				},
+				{
+					Name: "custom_variable",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "custom_variable",
+						},
+					},
+				},
+				{
+					Name: "standby_google_application_credentials",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "standby_google_application_credentials",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		vars, err := c.getCronjobEnvironmentSecretVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
+		if !reflect.DeepEqual(vars, tt.envVars) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				testName, tt.subTest, tt.envVars, vars)
+		}
+		if tt.err != nil {
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s %s: expected error `%v` but got `%v`",
+					testName, tt.subTest, tt.err, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s %s: expected no error but got error: `%v`",
+					testName, tt.subTest, err)
 			}
 		}
 	}
@@ -3009,7 +3087,9 @@ func TestGenerateResourceRequirements(t *testing.T) {
 
 func TestGenerateLogicalBackupJob(t *testing.T) {
 	clusterName := "acid-test-cluster"
+	teamId := "test"
 	configResources := config.Resources{
+		ClusterNameLabel:     "cluster-name",
 		DefaultCPURequest:    "100m",
 		DefaultCPULimit:      "1",
 		DefaultMemoryRequest: "100Mi",
@@ -3017,12 +3097,14 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 	}
 
 	tests := []struct {
-		subTest           string
-		config            config.Config
-		specSchedule      string
-		expectedSchedule  string
-		expectedJobName   string
-		expectedResources acidv1.Resources
+		subTest            string
+		config             config.Config
+		specSchedule       string
+		expectedSchedule   string
+		expectedJobName    string
+		expectedResources  acidv1.Resources
+		expectedAnnotation map[string]string
+		expectedLabel      map[string]string
 	}{
 		{
 			subTest: "test generation of logical backup pod resources when not configured",
@@ -3042,6 +3124,8 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
 		},
 		{
 			subTest: "test generation of logical backup pod resources when configured",
@@ -3065,6 +3149,8 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "50Mi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "300m", Memory: "300Mi"},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
 		},
 		{
 			subTest: "test generation of logical backup pod resources when partly configured",
@@ -3086,6 +3172,8 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: "50m", Memory: "100Mi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "250m", Memory: "500Mi"},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
 		},
 		{
 			subTest: "test generation of logical backup pod resources with SetMemoryRequestToLimit enabled",
@@ -3107,6 +3195,52 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "200Mi"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "200Mi"},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of pod annotations when cluster InheritedLabel is set",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:     "cluster-name",
+					InheritedLabels:      []string{"labelKey"},
+					DefaultCPURequest:    "100m",
+					DefaultCPULimit:      "1",
+					DefaultMemoryRequest: "100Mi",
+					DefaultMemoryLimit:   "500Mi",
+				},
+			},
+			specSchedule:     "",
+			expectedJobName:  "acid-test-cluster",
+			expectedSchedule: "",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+			expectedLabel:      map[string]string{"labelKey": "labelValue", "cluster-name": clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of pod annotations when cluster InheritedAnnotations is set",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:     "cluster-name",
+					InheritedAnnotations: []string{"annotationKey"},
+					DefaultCPURequest:    "100m",
+					DefaultCPULimit:      "1",
+					DefaultMemoryRequest: "100Mi",
+					DefaultMemoryLimit:   "500Mi",
+				},
+			},
+			specSchedule:     "",
+			expectedJobName:  "acid-test-cluster",
+			expectedSchedule: "",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: map[string]string{"annotationKey": "annotationValue"},
 		},
 	}
 
@@ -3115,18 +3249,33 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 			Config{
 				OpConfig: tt.config,
 			}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
-
 		cluster.ObjectMeta.Name = clusterName
+		cluster.Spec.TeamID = teamId
+		if cluster.ObjectMeta.Labels == nil {
+			cluster.ObjectMeta.Labels = make(map[string]string)
+		}
+		if cluster.ObjectMeta.Annotations == nil {
+			cluster.ObjectMeta.Annotations = make(map[string]string)
+		}
+		cluster.ObjectMeta.Labels["labelKey"] = "labelValue"
+		cluster.ObjectMeta.Annotations["annotationKey"] = "annotationValue"
 		cluster.Spec.LogicalBackupSchedule = tt.specSchedule
 		cronJob, err := cluster.generateLogicalBackupJob()
 		assert.NoError(t, err)
-
 		if cronJob.Spec.Schedule != tt.expectedSchedule {
 			t.Errorf("%s - %s: expected schedule %s, got %s", t.Name(), tt.subTest, tt.expectedSchedule, cronJob.Spec.Schedule)
 		}
 
 		if cronJob.Name != tt.expectedJobName {
 			t.Errorf("%s - %s: expected job name %s, got %s", t.Name(), tt.subTest, tt.expectedJobName, cronJob.Name)
+		}
+
+		if !reflect.DeepEqual(cronJob.Labels, tt.expectedLabel) {
+			t.Errorf("%s - %s: expected labels %s, got %s", t.Name(), tt.subTest, tt.expectedLabel, cronJob.Labels)
+		}
+
+		if !reflect.DeepEqual(cronJob.Annotations, tt.expectedAnnotation) {
+			t.Errorf("%s - %s: expected annotations %s, got %s", t.Name(), tt.subTest, tt.expectedAnnotation, cronJob.Annotations)
 		}
 
 		containers := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers
