@@ -238,6 +238,7 @@ type Config struct {
 	SetMemoryRequestToLimit                  bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                   bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 	EnableCrossNamespaceSecret               bool              `name:"enable_cross_namespace_secret" default:"false"`
+	EnableFinalizers                         *bool             `name:"enable_finalizers" default:"false"`
 	EnablePgVersionEnvVar                    bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat                 bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`

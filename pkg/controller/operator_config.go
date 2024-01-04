@@ -91,6 +91,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
 	result.EnableCrossNamespaceSecret = fromCRD.Kubernetes.EnableCrossNamespaceSecret
+	result.EnableFinalizers = util.CoalesceBool(fromCRD.Kubernetes.EnableFinalizers, util.False())
 
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
 	if fromCRD.Kubernetes.InfrastructureRolesDefs != nil {
