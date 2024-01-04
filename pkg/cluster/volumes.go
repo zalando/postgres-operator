@@ -128,7 +128,7 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 
 			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, modifyType, modifySize, modifyIops, modifyThroughput)
 			if err != nil {
-				errors = append(errors, fmt.Sprintf("modify failed, showing current EBS values: volume-id=%s size=%d iops=%d throughput=%d", volume.VolumeID, volume.Size, volume.Iops, volume.Throughput))
+				errors = append(errors, fmt.Sprintf("modify failed: %v, showing current EBS values: volume-id=%s size=%d iops=%d throughput=%d", err, volume.VolumeID, volume.Size, volume.Iops, volume.Throughput))
 			}
 		}
 	}

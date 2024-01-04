@@ -676,6 +676,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
+				PodServiceAccountName: "postgres-pod",
 				ConnectionPooler: config.ConnectionPooler{
 					MaxDBConnections:                     k8sutil.Int32ToPointer(60),
 					ConnectionPoolerDefaultCPURequest:    "100m",
@@ -724,6 +725,15 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 			expected: nil,
 			cluster:  cluster,
 			check:    noCheck,
+		},
+		{
+			subTest: "pooler uses pod service account",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    testServiceAccount,
 		},
 		{
 			subTest: "no default resources",
@@ -872,6 +882,17 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 	}
 }
 
+func testServiceAccount(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
+	poolerServiceAccount := podSpec.Spec.ServiceAccountName
+
+	if poolerServiceAccount != cluster.OpConfig.PodServiceAccountName {
+		return fmt.Errorf("Pooler service account does not match, got %+v, expected %+v",
+			poolerServiceAccount, cluster.OpConfig.PodServiceAccountName)
+	}
+
+	return nil
+}
+
 func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
 	if cpuReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest {
@@ -1000,6 +1021,7 @@ func TestPoolerTLS(t *testing.T) {
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
+				PodServiceAccountName: "postgres-pod",
 			},
 		}, client, pg, logger, eventRecorder)
 
@@ -1027,6 +1049,8 @@ func TestPoolerTLS(t *testing.T) {
 
 	fsGroup := int64(103)
 	assert.Equal(t, &fsGroup, deploy.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
+
+	assert.Equal(t, "postgres-pod", deploy.Spec.Template.Spec.ServiceAccountName, "need to add a service account name")
 
 	volume := v1.Volume{
 		Name: "my-secret",

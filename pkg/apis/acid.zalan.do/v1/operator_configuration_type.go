@@ -101,6 +101,7 @@ type KubernetesMetaConfiguration struct {
 	PodAntiAffinityPreferredDuringScheduling bool                `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
 	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
+	PersistentVolumeClaimRetentionPolicy     map[string]string   `json:"persistent_volume_claim_retention_policy,omitempty"`
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
 }
@@ -233,6 +234,7 @@ type OperatorLogicalBackupConfiguration struct {
 	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
+	CronjobEnvironmentSecret     string `json:"logical_backup_cronjob_environment_secret,omitempty"`
 	CPURequest                   string `json:"logical_backup_cpu_request,omitempty"`
 	MemoryRequest                string `json:"logical_backup_memory_request,omitempty"`
 	CPULimit                     string `json:"logical_backup_cpu_limit,omitempty"`

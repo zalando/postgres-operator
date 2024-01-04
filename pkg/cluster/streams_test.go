@@ -65,9 +65,11 @@ var (
 							PayloadColumn: k8sutil.StringToPointer("b_payload"),
 						},
 						"data.foobar": acidv1.StreamTable{
-							EventType: "stream-type-b",
+							EventType:         "stream-type-b",
+							RecoveryEventType: "stream-type-b-dlq",
 						},
 					},
+					EnableRecovery: util.True(),
 					Filter: map[string]*string{
 						"data.bar": k8sutil.StringToPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
 					},
@@ -106,6 +108,14 @@ var (
 						PayloadColumn: k8sutil.StringToPointer("b_payload"),
 						Type:          constants.EventStreamFlowPgGenericType,
 					},
+					EventStreamRecovery: zalandov1.EventStreamRecovery{
+						Type: constants.EventStreamRecoveryDLQType,
+						Sink: &zalandov1.EventStreamSink{
+							EventType:    fmt.Sprintf("%s-%s", "stream-type-a", constants.EventStreamRecoverySuffix),
+							MaxBatchSize: k8sutil.UInt32ToPointer(uint32(100)),
+							Type:         constants.EventStreamSinkNakadiType,
+						},
+					},
 					EventStreamSink: zalandov1.EventStreamSink{
 						EventType:    "stream-type-a",
 						MaxBatchSize: k8sutil.UInt32ToPointer(uint32(100)),
@@ -135,6 +145,14 @@ var (
 				zalandov1.EventStream{
 					EventStreamFlow: zalandov1.EventStreamFlow{
 						Type: constants.EventStreamFlowPgGenericType,
+					},
+					EventStreamRecovery: zalandov1.EventStreamRecovery{
+						Type: constants.EventStreamRecoveryDLQType,
+						Sink: &zalandov1.EventStreamSink{
+							EventType:    "stream-type-b-dlq",
+							MaxBatchSize: k8sutil.UInt32ToPointer(uint32(100)),
+							Type:         constants.EventStreamSinkNakadiType,
+						},
 					},
 					EventStreamSink: zalandov1.EventStreamSink{
 						EventType:    "stream-type-b",
@@ -251,7 +269,8 @@ func TestSameStreams(t *testing.T) {
 	testName := "TestSameStreams"
 
 	stream1 := zalandov1.EventStream{
-		EventStreamFlow: zalandov1.EventStreamFlow{},
+		EventStreamFlow:     zalandov1.EventStreamFlow{},
+		EventStreamRecovery: zalandov1.EventStreamRecovery{},
 		EventStreamSink: zalandov1.EventStreamSink{
 			EventType: "stream-type-a",
 		},
@@ -263,7 +282,8 @@ func TestSameStreams(t *testing.T) {
 	}
 
 	stream2 := zalandov1.EventStream{
-		EventStreamFlow: zalandov1.EventStreamFlow{},
+		EventStreamFlow:     zalandov1.EventStreamFlow{},
+		EventStreamRecovery: zalandov1.EventStreamRecovery{},
 		EventStreamSink: zalandov1.EventStreamSink{
 			EventType: "stream-type-b",
 		},

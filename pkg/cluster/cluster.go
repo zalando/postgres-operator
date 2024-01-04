@@ -409,6 +409,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		reasons = append(reasons, "new statefulset's pod management policy do not match")
 	}
 
+	if !reflect.DeepEqual(c.Statefulset.Spec.PersistentVolumeClaimRetentionPolicy, statefulSet.Spec.PersistentVolumeClaimRetentionPolicy) {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's persistent volume claim retention policy do not match")
+	}
+
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
 	needsRollUpdate, reasons = c.compareContainers("containers", c.Statefulset.Spec.Template.Spec.Containers, statefulSet.Spec.Template.Spec.Containers, needsRollUpdate, reasons)
 
@@ -474,23 +480,24 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's volumeClaimTemplates contains different number of volumes to the old one")
-	}
-	for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
-		name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
-		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
-		if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
-			continue
-		}
-		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one", name))
-		}
-		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
+	} else {
+		for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
 			name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q does not match the current one", name))
+			// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
+			if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
+				continue
+			}
+			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one", name))
+			}
+			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
+				name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q does not match the current one", name))
+			}
 		}
 	}
 
@@ -872,6 +879,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			}
 		}
 	}()
+
+	// add or remove standby_cluster section from Patroni config depending on changes in standby section
+	if reflect.DeepEqual(oldSpec.Spec.StandbyCluster, newSpec.Spec.StandbyCluster) {
+		if err := c.syncStandbyClusterConfiguration(); err != nil {
+			return fmt.Errorf("could not set StandbyCluster configuration options: %v", err)
+		}
+	}
 
 	// pod disruption budget
 	if oldSpec.Spec.NumberOfInstances != newSpec.Spec.NumberOfInstances {

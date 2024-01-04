@@ -580,7 +580,9 @@ For all LOGIN roles the operator will create K8s secrets in the namespace
 specified in `secretNamespace`, if `enable_cross_namespace_secret` is set to
 `true` in the config. Otherwise, they are created in the same namespace like
 the Postgres cluster. Unlike roles specified with `namespace.username` under
-`users`, the namespace will not be part of the role name here.
+`users`, the namespace will not be part of the role name here. Keep in mind
+that the underscores in a role name are replaced with dashes in the K8s
+secret name.
 
 ```yaml
 spec:
@@ -938,33 +940,25 @@ established between standby replica(s).
 One big advantage of standby clusters is that they can be promoted to a proper
 database cluster. This means it will stop replicating changes from the source,
 and start accept writes itself. This mechanism makes it possible to move
-databases from one place to another with minimal downtime. Currently, the
-operator does not support promoting a standby cluster. It has to be done
-manually using `patronictl edit-config` inside the postgres container of the
-standby leader pod. Remove the following lines from the YAML structure and the
-leader promotion happens immediately. Before doing so, make sure that the
-standby is not behind the source database.
+databases from one place to another with minimal downtime.
 
-```yaml
-standby_cluster:
-  create_replica_methods:
-    - bootstrap_standby_with_wale
-    - basebackup_fast_xlog
-  restore_command: envdir "/home/postgres/etc/wal-e.d/env-standby" /scripts/restore_command.sh
-     "%f" "%p"
-```
+Before promoting a standby cluster, make sure that the standby is not behind
+the source database. You should ideally stop writes to your source cluster and
+then create a dummy database object that you check for being replicated in the
+target to verify all data has been copied.
 
-Finally, remove the `standby` section from the postgres cluster manifest.
+To promote, remove the `standby` section from the postgres cluster manifest.
+A rolling update will be triggered removing the `STANDBY_*` environment
+variables from the pods, followed by a Patroni config update that promotes the
+cluster.
 
-### Turn a normal cluster into a standby
+### Adding standby section after promotion
 
-There is no way to transform a non-standby cluster to a standby cluster through
-the operator. Adding the `standby` section to the manifest of a running
-Postgres cluster will have no effect. But, as explained in the previous
-paragraph it can be done manually through `patronictl edit-config`. This time,
-by adding the `standby_cluster` section to the Patroni configuration. However,
-the transformed standby cluster will not be doing any streaming. It will be in
-standby mode and allow read-only transactions only.
+Turning a running cluster into a standby is not easily possible and should be
+avoided. The best way is to remove the cluster and resubmit the manifest
+after a short wait of a few minutes. Adding the `standby` section would turn
+the database cluster in read-only mode on next operator SYNC cycle but it
+does not sync automatically with the source cluster again.
 
 ## Sidecar Support
 

@@ -64,9 +64,8 @@ type patroniDCS struct {
 }
 
 type pgBootstrap struct {
-	Initdb []interface{}     `json:"initdb"`
-	Users  map[string]pgUser `json:"users"`
-	DCS    patroniDCS        `json:"dcs,omitempty"`
+	Initdb []interface{} `json:"initdb"`
+	DCS    patroniDCS    `json:"dcs,omitempty"`
 }
 
 type spiloConfiguration struct {
@@ -428,13 +427,6 @@ PatroniInitDBParams:
 	// relevant section in the manifest.
 	if len(patroni.PgHba) > 0 {
 		config.PgLocalConfiguration[patroniPGHBAConfParameterName] = patroni.PgHba
-	}
-
-	config.Bootstrap.Users = map[string]pgUser{
-		opConfig.PamRoleName: {
-			Password: "",
-			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
-		},
 	}
 
 	res, err := json.Marshal(config)
@@ -1145,6 +1137,37 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	return secretPodEnvVarsList, nil
 }
 
+// Return list of variables the cronjob received from the configured Secret
+func (c *Cluster) getCronjobEnvironmentSecretVariables() ([]v1.EnvVar, error) {
+	secretCronjobEnvVarsList := make([]v1.EnvVar, 0)
+
+	if c.OpConfig.LogicalBackupCronjobEnvironmentSecret == "" {
+		return secretCronjobEnvVarsList, nil
+	}
+
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
+		context.TODO(),
+		c.OpConfig.LogicalBackupCronjobEnvironmentSecret,
+		metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not read Secret CronjobEnvironmentSecretName: %v", err)
+	}
+
+	for k := range secret.Data {
+		secretCronjobEnvVarsList = append(secretCronjobEnvVarsList,
+			v1.EnvVar{Name: k, ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.OpConfig.LogicalBackupCronjobEnvironmentSecret,
+					},
+					Key: k,
+				},
+			}})
+	}
+
+	return secretCronjobEnvVarsList, nil
+}
+
 func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.ResourceRequirements) *v1.Container {
 	name := sidecar.Name
 	if name == "" {
@@ -1440,6 +1463,19 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
+	var persistentVolumeClaimRetentionPolicy appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy
+	if c.OpConfig.PersistentVolumeClaimRetentionPolicy["when_deleted"] == "delete" {
+		persistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.DeletePersistentVolumeClaimRetentionPolicyType
+	} else {
+		persistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	}
+
+	if c.OpConfig.PersistentVolumeClaimRetentionPolicy["when_scaled"] == "delete" {
+		persistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.DeletePersistentVolumeClaimRetentionPolicyType
+	} else {
+		persistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	}
+
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
@@ -1448,13 +1484,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas:             &numberOfInstances,
-			Selector:             c.labelsSelector(),
-			ServiceName:          c.serviceName(Master),
-			Template:             *podTemplate,
-			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
-			UpdateStrategy:       updateStrategy,
-			PodManagementPolicy:  podManagementPolicy,
+			Replicas:                             &numberOfInstances,
+			Selector:                             c.labelsSelector(),
+			ServiceName:                          c.serviceName(Master),
+			Template:                             *podTemplate,
+			VolumeClaimTemplates:                 []v1.PersistentVolumeClaim{*volumeClaimTemplate},
+			UpdateStrategy:                       updateStrategy,
+			PodManagementPolicy:                  podManagementPolicy,
+			PersistentVolumeClaimRetentionPolicy: &persistentVolumeClaimRetentionPolicy,
 		},
 	}
 
@@ -2173,7 +2210,13 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
 	}
 
+	secretEnvVarsList, err := c.getCronjobEnvironmentSecretVariables()
+	if err != nil {
+		return nil, err
+	}
+
 	envVars := c.generateLogicalBackupPodEnvVars()
+	envVars = append(envVars, secretEnvVarsList...)
 	logicalBackupContainer := generateContainer(
 		logicalBackupContainerName,
 		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
@@ -2185,10 +2228,11 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		nil,
 	)
 
-	labels := map[string]string{
-		c.OpConfig.ClusterNameLabel: c.Name,
-		"application":               "spilo-logical-backup",
+	logicalBackupJobLabel := map[string]string{
+		"application": "spilo-logical-backup",
 	}
+
+	labels := labels.Merge(c.labelsSet(true), logicalBackupJobLabel)
 
 	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil)
 	podAffinity := podAffinity(
@@ -2205,7 +2249,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 	if podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
 		labels,
-		annotations,
+		c.annotationsSet(annotations),
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},

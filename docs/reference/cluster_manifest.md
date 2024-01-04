@@ -252,8 +252,8 @@ information, see [user docs](../user.md#prepared-databases-with-roles-and-defaul
   map of schemas that the operator will create. Optional - if no schema is
   listed, the operator will create a schema called `data`. Under each schema
   key, it can be defined if `defaultRoles` (NOLOGIN) and `defaultUsers` (LOGIN)
-  roles shall be created that have schema-exclusive privileges. Both flags are
-  set to `false` by default.
+  roles shall be created that have schema-exclusive privileges.
+  By default, `defaultRoles` is `true` and `defaultUsers` is false.
 
 * **secretNamespace**
   for each default LOGIN role the operator will create a secret. You can

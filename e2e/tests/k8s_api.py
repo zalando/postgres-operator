@@ -202,6 +202,9 @@ class K8s:
         return len(self.api.policy_v1.list_namespaced_pod_disruption_budget(
             namespace, label_selector=labels).items)
 
+    def count_pvcs_with_label(self, labels, namespace='default'):
+        return len(self.api.core_v1.list_namespaced_persistent_volume_claim(namespace, label_selector=labels).items)
+
     def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: x.status.phase == 'Running', pods)))
@@ -505,6 +508,9 @@ class K8sBase:
     def count_pdbs_with_label(self, labels, namespace='default'):
         return len(self.api.policy_v1.list_namespaced_pod_disruption_budget(
             namespace, label_selector=labels).items)
+
+    def count_pvcs_with_label(self, labels, namespace='default'):
+        return len(self.api.core_v1.list_namespaced_persistent_volume_claim(namespace, label_selector=labels).items)
 
     def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
