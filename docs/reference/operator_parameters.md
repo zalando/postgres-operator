@@ -323,6 +323,11 @@ configuration they are grouped under the `kubernetes` key.
   replaced by the cluster name. Only the `{cluster}` placeholders is allowed in
   the template.
 
+* **pdb_master_label_selector**
+  By default the PDB will match the master role hence preventing nodes to be
+  drained if the node_readiness_label is not used. This option if set to `false`
+  will not add the `spilo-role=master` selector to the PDB.
+
 * **enable_pod_disruption_budget**
   PDB is enabled by default to protect the cluster from voluntarily disruptions
   and hence unwanted DB downtime. However, on some cloud providers it could be
@@ -431,7 +436,7 @@ configuration they are grouped under the `kubernetes` key.
   environment if they not if conflict with the environment variables generated
   by the operator. The WAL location (bucket path) can be overridden, though.
   The default is empty.
-  
+
 * **pod_environment_secret**
   similar to pod_environment_configmap but referencing a secret with custom
   environment variables. Because the secret is not allowed to exist in a
@@ -577,7 +582,7 @@ effect, and the parameters are grouped under the `timeouts` key in the
 CRD-based configuration.
 
 * **PatroniAPICheckInterval**
-  the interval between consecutive attempts waiting for the return of 
+  the interval between consecutive attempts waiting for the return of
   Patroni Api. The default is `1s`.
 
 * **PatroniAPICheckTimeout**
@@ -651,7 +656,7 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   balancers. Allowed values are `Cluster` (default) and `Local`.
 
 * **master_dns_name_format**
-  defines the DNS name string template for the master load balancer cluster. 
+  defines the DNS name string template for the master load balancer cluster.
   The default is `{cluster}.{namespace}.{hostedzone}`, where `{cluster}` is
   replaced by the cluster name, `{namespace}` is replaced with the namespace
   and `{hostedzone}` is replaced with the hosted zone (the value of the
@@ -816,7 +821,7 @@ grouped under the `logical_backup` key.
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
 
 * **logical_backup_s3_retention_time**
-  Specify a retention time for logical backups stored in S3. Backups older than the specified retention 
+  Specify a retention time for logical backups stored in S3. Backups older than the specified retention
   time will be deleted after a new backup was uploaded. If empty, all backups will be kept. Example values are
   "3 days", "2 weeks", or "1 month". The default is empty.
 

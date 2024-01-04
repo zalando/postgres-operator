@@ -1394,6 +1394,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pdb_name_format": {
 								Type: "string",
 							},
+							"pdb_master_label_selector": {
+								Type: "boolean",
+							},
 							"persistent_volume_claim_retention_policy": {
 								Type: "object",
 								Properties: map[string]apiextv1.JSONSchemaProps{

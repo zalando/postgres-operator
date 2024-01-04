@@ -2150,10 +2150,17 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
+	pdbMasterLabelSelector := c.OpConfig.PDBMasterLabelSelector
 
 	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
 	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
 		minAvailable = intstr.FromInt(0)
+	}
+
+	// define label selector and add the master role selector if enabled
+	labels := c.labelsSet(false)
+	if pdbMasterLabelSelector == nil || *c.OpConfig.PDBMasterLabelSelector {
+		labels[c.OpConfig.PodRoleLabel] = string(Master)
 	}
 
 	return &policyv1.PodDisruptionBudget{
@@ -2166,7 +2173,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: c.roleLabelsSet(false, Master),
+				MatchLabels: labels,
 			},
 		},
 	}
