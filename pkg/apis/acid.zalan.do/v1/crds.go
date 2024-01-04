@@ -1423,7 +1423,7 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 										},
 									},
 								},
-              },
+							},
 							"pod_antiaffinity_preferred_during_scheduling": {
 								Type: "boolean",
 							},
