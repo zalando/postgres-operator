@@ -189,6 +189,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupS3RetentionTime = fromCRD.LogicalBackup.RetentionTime
 	result.LogicalBackupGoogleApplicationCredentials = fromCRD.LogicalBackup.GoogleApplicationCredentials
 	result.LogicalBackupJobPrefix = util.Coalesce(fromCRD.LogicalBackup.JobPrefix, "logical-backup-")
+	result.LogicalBackupCronjobEnvironmentSecret = fromCRD.LogicalBackup.CronjobEnvironmentSecret
 	result.LogicalBackupCPURequest = fromCRD.LogicalBackup.CPURequest
 	result.LogicalBackupMemoryRequest = fromCRD.LogicalBackup.MemoryRequest
 	result.LogicalBackupCPULimit = fromCRD.LogicalBackup.CPULimit

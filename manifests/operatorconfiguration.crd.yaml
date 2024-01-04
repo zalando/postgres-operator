@@ -537,6 +537,8 @@ spec:
                     type: string
                     pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
                     default: "30 00 * * *"
+                  logical_backup_cronjob_environment_secret:
+                    type: string
               debug:
                 type: object
                 properties:

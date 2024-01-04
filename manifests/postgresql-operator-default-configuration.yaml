@@ -175,6 +175,7 @@ configuration:
     logical_backup_s3_sse: "AES256"
     # logical_backup_s3_retention_time: ""
     logical_backup_schedule: "30 00 * * *"
+    # logical_backup_cronjob_environment_secret: ""
   debug:
     debug_logging: true
     enable_database_access: true
