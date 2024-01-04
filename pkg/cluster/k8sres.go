@@ -64,9 +64,8 @@ type patroniDCS struct {
 }
 
 type pgBootstrap struct {
-	Initdb []interface{}     `json:"initdb"`
-	Users  map[string]pgUser `json:"users"`
-	DCS    patroniDCS        `json:"dcs,omitempty"`
+	Initdb []interface{} `json:"initdb"`
+	DCS    patroniDCS    `json:"dcs,omitempty"`
 }
 
 type spiloConfiguration struct {
@@ -428,13 +427,6 @@ PatroniInitDBParams:
 	// relevant section in the manifest.
 	if len(patroni.PgHba) > 0 {
 		config.PgLocalConfiguration[patroniPGHBAConfParameterName] = patroni.PgHba
-	}
-
-	config.Bootstrap.Users = map[string]pgUser{
-		opConfig.PamRoleName: {
-			Password: "",
-			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
-		},
 	}
 
 	res, err := json.Marshal(config)
@@ -1143,6 +1135,37 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 
 	sort.Slice(secretPodEnvVarsList, func(i, j int) bool { return secretPodEnvVarsList[i].Name < secretPodEnvVarsList[j].Name })
 	return secretPodEnvVarsList, nil
+}
+
+// Return list of variables the cronjob received from the configured Secret
+func (c *Cluster) getCronjobEnvironmentSecretVariables() ([]v1.EnvVar, error) {
+	secretCronjobEnvVarsList := make([]v1.EnvVar, 0)
+
+	if c.OpConfig.LogicalBackupCronjobEnvironmentSecret == "" {
+		return secretCronjobEnvVarsList, nil
+	}
+
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
+		context.TODO(),
+		c.OpConfig.LogicalBackupCronjobEnvironmentSecret,
+		metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not read Secret CronjobEnvironmentSecretName: %v", err)
+	}
+
+	for k := range secret.Data {
+		secretCronjobEnvVarsList = append(secretCronjobEnvVarsList,
+			v1.EnvVar{Name: k, ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.OpConfig.LogicalBackupCronjobEnvironmentSecret,
+					},
+					Key: k,
+				},
+			}})
+	}
+
+	return secretCronjobEnvVarsList, nil
 }
 
 func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.ResourceRequirements) *v1.Container {
@@ -2180,7 +2203,13 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
 	}
 
+	secretEnvVarsList, err := c.getCronjobEnvironmentSecretVariables()
+	if err != nil {
+		return nil, err
+	}
+
 	envVars := c.generateLogicalBackupPodEnvVars()
+	envVars = append(envVars, secretEnvVarsList...)
 	logicalBackupContainer := generateContainer(
 		logicalBackupContainerName,
 		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,

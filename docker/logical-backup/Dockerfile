@@ -1,4 +1,4 @@
-FROM registry.opensource.zalan.do/library/ubuntu-18.04:latest
+FROM registry.opensource.zalan.do/library/ubuntu-22.04:latest
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -24,12 +24,12 @@ RUN apt-get update     \
     && curl --silent https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     && apt-get update \
     && apt-get install --no-install-recommends -y  \
+        postgresql-client-16  \
         postgresql-client-15  \
         postgresql-client-14  \
         postgresql-client-13  \
         postgresql-client-12  \
         postgresql-client-11  \
-        postgresql-client-10  \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

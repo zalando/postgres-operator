@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=registry.opensource.zalan.do/library/alpine-3.15:latest
+ARG BASE_IMAGE=registry.opensource.zalan.do/library/alpine-3:latest
 ARG VERSION=latest
 
 FROM ubuntu:20.04 as builder

@@ -825,6 +825,9 @@ grouped under the `logical_backup` key.
   [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Default: "30 00 \* \* \*"
 
+* **logical_backup_cronjob_environment_secret**
+  Reference to a Kubernetes secret, which keys will be added as environment variables to the cronjob. Default: ""
+
 ## Debugging the operator
 
 Options to aid debugging of the operator itself. Grouped under the `debug` key.
