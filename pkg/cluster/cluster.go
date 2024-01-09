@@ -262,9 +262,10 @@ func (c *Cluster) Create() (err error) {
 	}()
 
 	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+
 	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
 		c.logger.Info("Adding finalizer.")
-		if err = c.AddFinalizer(); err != nil {
+		if err = c.addFinalizer(); err != nil {
 			return fmt.Errorf("could not add Finalizer: %v", err)
 		}
 	}
@@ -771,9 +772,9 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	return true, ""
 }
 
-// AddFinalizer patches the postgresql CR to add our finalizer.
-func (c *Cluster) AddFinalizer() error {
-	if c.HasFinalizer() {
+// addFinalizer patches the postgresql CR to add our finalizer.
+func (c *Cluster) addFinalizer() error {
+	if c.hasFinalizer() {
 		c.logger.Debugf("Finalizer %s already exists.", finalizerName)
 		return nil
 	}
@@ -786,7 +787,7 @@ func (c *Cluster) AddFinalizer() error {
 		return fmt.Errorf("Unable to produce patch to add finalizer: %v", err)
 	}
 
-	updatedSpec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(
+	updatedSpec, err := c.KubeClient.Postgresqls(c.Namespace).Patch(
 		context.TODO(), c.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("Could not add finalizer: %v", err)
@@ -797,9 +798,9 @@ func (c *Cluster) AddFinalizer() error {
 	return nil
 }
 
-// RemoveFinalizer patches postgresql CR to remove finalizer.
-func (c *Cluster) RemoveFinalizer() error {
-	if !c.HasFinalizer() {
+// removeFinalizer patches postgresql CR to remove finalizer.
+func (c *Cluster) removeFinalizer() error {
+	if !c.hasFinalizer() {
 		c.logger.Debugf("No finalizer %s exists to remove.", finalizerName)
 		return nil
 	}
@@ -811,7 +812,7 @@ func (c *Cluster) RemoveFinalizer() error {
 		return fmt.Errorf("Unable to produce patch to remove finalizer: %v", err)
 	}
 
-	updatedSpec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(
+	updatedSpec, err := c.KubeClient.Postgresqls(c.Namespace).Patch(
 		context.TODO(), c.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("Could not remove finalizer: %v", err)
@@ -823,8 +824,8 @@ func (c *Cluster) RemoveFinalizer() error {
 	return nil
 }
 
-// HasFinalizer checks if our finalizer is currently set or not
-func (c *Cluster) HasFinalizer() bool {
+// hasFinalizer checks if our finalizer is currently set or not
+func (c *Cluster) hasFinalizer() bool {
 	for _, finalizer := range c.ObjectMeta.Finalizers {
 		if finalizer == finalizerName {
 			return true
@@ -1181,7 +1182,7 @@ func (c *Cluster) Delete() error {
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "Delete", "Some resources could be successfully deleted yet")
 		return fmt.Errorf("some error(s) occured when deleting resources, NOT removing finalizer yet")
 	}
-	if err := c.RemoveFinalizer(); err != nil {
+	if err := c.removeFinalizer(); err != nil {
 		return fmt.Errorf("Done cleaning up, but error when trying to remove our finalizer: %v", err)
 	}
 
