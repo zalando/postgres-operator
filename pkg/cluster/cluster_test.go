@@ -35,7 +35,10 @@ const (
 )
 
 var logger = logrus.New().WithField("test", "cluster")
-var eventRecorder = record.NewFakeRecorder(8)
+
+// eventRecorder needs buffer for TestCreate which emit events for
+// 1 cluster, primary endpoint, 2 services, the secrets, the statefulset and pods being ready
+var eventRecorder = record.NewFakeRecorder(7)
 
 var cl = New(
 	Config{

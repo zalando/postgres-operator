@@ -2741,7 +2741,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 	clusterNameLabel := "cluster-name"
 	sidecarName := "postgres-exporter"
 
-	// enforceMinResourceLimits will be called 2 twice emitting 4 events (2x cpu, 2x memory raise)
+	// enforceMinResourceLimits will be called 2 times emitting 4 events (2x cpu, 2x memory raise)
 	// enforceMaxResourceRequests will be called 4 times emitting 6 events (2x cpu, 4x memory cap)
 	// hence event bufferSize of 10 is required
 	newEventRecorder := record.NewFakeRecorder(10)
