@@ -213,6 +213,29 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 	return pg, nil
 }
 
+// SetFinalizer of Postgres cluster
+func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pgMetadata metav1.ObjectMeta, finalizers []string) (*apiacidv1.Postgresql, error) {
+	var pg *apiacidv1.Postgresql
+	pgMetadata.SetFinalizers(finalizers)
+
+	patch, err := json.Marshal(struct {
+		PgMetadata interface{} `json:"metadata"`
+	}{&pgMetadata})
+
+	if err != nil {
+		return pg, fmt.Errorf("could not marshal status: %v", err)
+	}
+
+	pg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
+		context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	if err != nil {
+		return pg, fmt.Errorf("could not set finalizer: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion.
+	return pg, nil
+}
+
 // SamePDB compares the PodDisruptionBudgets
 func SamePDB(cur, new *apipolicyv1.PodDisruptionBudget) (match bool, reason string) {
 	//TODO: improve comparison

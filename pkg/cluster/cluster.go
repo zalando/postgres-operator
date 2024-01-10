@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 
@@ -778,22 +777,14 @@ func (c *Cluster) addFinalizer() error {
 	}
 
 	c.logger.Infof("adding finalizer %s", finalizerName)
-	currentSpec := c.DeepCopy()
-	newSpec := c.DeepCopy()
-	newSpec.ObjectMeta.SetFinalizers(append(newSpec.ObjectMeta.Finalizers, finalizerName))
-	patchBytes, err := getPatchBytes(currentSpec, newSpec)
+	finalizers := append(c.ObjectMeta.Finalizers, finalizerName)
+	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), c.ObjectMeta, finalizers)
 	if err != nil {
-		return fmt.Errorf("unable to produce patch to add finalizer: %v", err)
-	}
-
-	updatedSpec, err := c.KubeClient.Postgresqls(c.Namespace).Patch(
-		context.TODO(), c.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err != nil {
-		return fmt.Errorf("could not add finalizer: %v", err)
+		return fmt.Errorf("error adding finalizer: %v", err)
 	}
 
 	// update the spec, maintaining the new resourceVersion
-	c.setSpec(updatedSpec)
+	c.setSpec(newSpec)
 	return nil
 }
 
@@ -804,22 +795,14 @@ func (c *Cluster) removeFinalizer() error {
 	}
 
 	c.logger.Infof("removing finalizer %s", finalizerName)
-	currentSpec := c.DeepCopy()
-	newSpec := c.DeepCopy()
-	newSpec.ObjectMeta.SetFinalizers(removeString(newSpec.ObjectMeta.Finalizers, finalizerName))
-	patchBytes, err := getPatchBytes(currentSpec, newSpec)
+	finalizers := util.RemoveString(c.ObjectMeta.Finalizers, finalizerName)
+	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), c.ObjectMeta, finalizers)
 	if err != nil {
-		return fmt.Errorf("unable to produce patch to remove finalizer: %v", err)
-	}
-
-	updatedSpec, err := c.KubeClient.Postgresqls(c.Namespace).Patch(
-		context.TODO(), c.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err != nil {
-		return fmt.Errorf("could not remove finalizer: %v", err)
+		return fmt.Errorf("error removing finalizer: %v", err)
 	}
 
 	// update the spec, maintaining the new resourceVersion.
-	c.setSpec(updatedSpec)
+	c.setSpec(newSpec)
 
 	return nil
 }
@@ -832,36 +815,6 @@ func (c *Cluster) hasFinalizer() bool {
 		}
 	}
 	return false
-}
-
-// Iterate through slice and remove certain string, then return cleaned slice
-func removeString(slice []string, s string) (result []string) {
-	for _, item := range slice {
-		if item == s {
-			continue
-		}
-		result = append(result, item)
-	}
-	return result
-}
-
-// getPatchBytes will produce a JSONpatch between the two parameters of type acidv1.Postgresql
-func getPatchBytes(oldSpec, newSpec *acidv1.Postgresql) ([]byte, error) {
-	oldData, err := json.Marshal(oldSpec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal oldSpec for postgresql %s/%s: %v", oldSpec.Namespace, oldSpec.Name, err)
-	}
-
-	newData, err := json.Marshal(newSpec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal newSpec for postgresql %s/%s: %v", newSpec.Namespace, newSpec.Name, err)
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to CreateMergePatch for postgresl %s/%s: %v", oldSpec.Namespace, oldSpec.Name, err)
-	}
-	return patchBytes, nil
 }
 
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
