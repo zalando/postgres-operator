@@ -264,9 +264,8 @@ func (c *Cluster) Create() (err error) {
 	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
 
 	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
-		c.logger.Info("Adding finalizer.")
 		if err = c.addFinalizer(); err != nil {
-			return fmt.Errorf("could not add Finalizer: %v", err)
+			return fmt.Errorf("could not add finalizer: %v", err)
 		}
 	}
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
@@ -772,50 +771,51 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	return true, ""
 }
 
-// addFinalizer patches the postgresql CR to add our finalizer.
+// addFinalizer patches the postgresql CR to add finalizer
 func (c *Cluster) addFinalizer() error {
 	if c.hasFinalizer() {
-		c.logger.Debugf("Finalizer %s already exists.", finalizerName)
 		return nil
 	}
 
+	c.logger.Infof("adding finalizer %s", finalizerName)
 	currentSpec := c.DeepCopy()
 	newSpec := c.DeepCopy()
 	newSpec.ObjectMeta.SetFinalizers(append(newSpec.ObjectMeta.Finalizers, finalizerName))
 	patchBytes, err := getPatchBytes(currentSpec, newSpec)
 	if err != nil {
-		return fmt.Errorf("Unable to produce patch to add finalizer: %v", err)
+		return fmt.Errorf("unable to produce patch to add finalizer: %v", err)
 	}
 
 	updatedSpec, err := c.KubeClient.Postgresqls(c.Namespace).Patch(
 		context.TODO(), c.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
-		return fmt.Errorf("Could not add finalizer: %v", err)
+		return fmt.Errorf("could not add finalizer: %v", err)
 	}
 
-	// update the spec, maintaining the new resourceVersion.
+	// update the spec, maintaining the new resourceVersion
 	c.setSpec(updatedSpec)
 	return nil
 }
 
-// removeFinalizer patches postgresql CR to remove finalizer.
+// removeFinalizer patches postgresql CR to remove finalizer
 func (c *Cluster) removeFinalizer() error {
 	if !c.hasFinalizer() {
-		c.logger.Debugf("No finalizer %s exists to remove.", finalizerName)
 		return nil
 	}
+
+	c.logger.Infof("removing finalizer %s", finalizerName)
 	currentSpec := c.DeepCopy()
 	newSpec := c.DeepCopy()
 	newSpec.ObjectMeta.SetFinalizers(removeString(newSpec.ObjectMeta.Finalizers, finalizerName))
 	patchBytes, err := getPatchBytes(currentSpec, newSpec)
 	if err != nil {
-		return fmt.Errorf("Unable to produce patch to remove finalizer: %v", err)
+		return fmt.Errorf("unable to produce patch to remove finalizer: %v", err)
 	}
 
 	updatedSpec, err := c.KubeClient.Postgresqls(c.Namespace).Patch(
 		context.TODO(), c.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
-		return fmt.Errorf("Could not remove finalizer: %v", err)
+		return fmt.Errorf("could not remove finalizer: %v", err)
 	}
 
 	// update the spec, maintaining the new resourceVersion.
@@ -824,7 +824,7 @@ func (c *Cluster) removeFinalizer() error {
 	return nil
 }
 
-// hasFinalizer checks if our finalizer is currently set or not
+// hasFinalizer checks if finalizer is currently set or not
 func (c *Cluster) hasFinalizer() bool {
 	for _, finalizer := range c.ObjectMeta.Finalizers {
 		if finalizer == finalizerName {
@@ -1113,7 +1113,7 @@ func (c *Cluster) Delete() error {
 
 	if err := c.deleteStreams(); err != nil {
 		c.logger.Warningf("could not delete event streams: %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete event streams: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete event streams: %v", err)
 	}
 	var anyErrors = false
 
@@ -1122,25 +1122,25 @@ func (c *Cluster) Delete() error {
 	if err := c.deleteLogicalBackupJob(); err != nil {
 		anyErrors = true
 		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not remove the logical backup k8s cron job; %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove the logical backup k8s cron job; %v", err)
 	}
 
 	if err := c.deleteStatefulSet(); err != nil {
 		anyErrors = true
 		c.logger.Warningf("could not delete statefulset: %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete statefulset: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete statefulset: %v", err)
 	}
 
 	if err := c.deleteSecrets(); err != nil {
 		anyErrors = true
 		c.logger.Warningf("could not delete secrets: %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete secrets: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete secrets: %v", err)
 	}
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
 		anyErrors = true
 		c.logger.Warningf("could not delete pod disruption budget: %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete pod disruption budget: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budget: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -1149,21 +1149,21 @@ func (c *Cluster) Delete() error {
 			if err := c.deleteEndpoint(role); err != nil {
 				anyErrors = true
 				c.logger.Warningf("could not delete %s endpoint: %v", role, err)
-				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete %s endpoint: %v", role, err)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s endpoint: %v", role, err)
 			}
 		}
 
 		if err := c.deleteService(role); err != nil {
 			anyErrors = true
 			c.logger.Warningf("could not delete %s service: %v", role, err)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete %s service: %v", role, err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s service: %v", role, err)
 		}
 	}
 
 	if err := c.deletePatroniClusterObjects(); err != nil {
 		anyErrors = true
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not remove leftover patroni objects; %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove leftover patroni objects; %v", err)
 	}
 
 	// Delete connection pooler objects anyway, even if it's not mentioned in the
@@ -1173,20 +1173,19 @@ func (c *Cluster) Delete() error {
 		if err := c.deleteConnectionPooler(role); err != nil {
 			anyErrors = true
 			c.logger.Warningf("could not remove connection pooler: %v", err)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not remove connection pooler: %v", err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove connection pooler: %v", err)
 		}
 	}
 
 	// If we are done deleting our various resources we remove the finalizer to let K8S finally delete the Postgres CR
 	if anyErrors {
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "Delete", "Some resources could be successfully deleted yet")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "Delete", "some resources could be successfully deleted yet")
 		return fmt.Errorf("some error(s) occured when deleting resources, NOT removing finalizer yet")
 	}
 	if err := c.removeFinalizer(); err != nil {
-		return fmt.Errorf("Done cleaning up, but error when trying to remove our finalizer: %v", err)
+		return fmt.Errorf("done cleaning up, but error when removing finalizer: %v", err)
 	}
 
-	c.logger.Info("Done cleaning up our resources, removed finalizer.")
 	return nil
 }
 

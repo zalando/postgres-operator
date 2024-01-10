@@ -248,7 +248,7 @@ func (c *Cluster) deleteStatefulSet() error {
 
 	err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Delete(context.TODO(), c.Statefulset.Name, c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("StatefulSet was already deleted")
+		c.logger.Debugf("statefulset %q has already been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	} else if err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func (c *Cluster) deleteService(role PostgresRole) error {
 
 	if err := c.KubeClient.Services(c.Services[role].Namespace).Delete(context.TODO(), c.Services[role].Name, c.deleteOptions); err != nil {
 		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("Service was already deleted")
+			c.logger.Debugf("%s service has already been deleted", role)
 		} else if err != nil {
 			return err
 		}
@@ -455,7 +455,7 @@ func (c *Cluster) deletePodDisruptionBudget() error {
 		PodDisruptionBudgets(c.PodDisruptionBudget.Namespace).
 		Delete(context.TODO(), c.PodDisruptionBudget.Name, c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("PodDisruptionBudget was already deleted")
+		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta))
 	} else if err != nil {
 		return fmt.Errorf("could not delete PodDisruptionBudget: %v", err)
 	}
@@ -490,13 +490,13 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 
 	if err := c.KubeClient.Endpoints(c.Endpoints[role].Namespace).Delete(context.TODO(), c.Endpoints[role].Name, c.deleteOptions); err != nil {
 		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("Endpoint was already deleted")
+			c.logger.Debugf("%s endpoint has already been deleted", role)
 		} else if err != nil {
 			return fmt.Errorf("could not delete endpoint: %v", err)
 		}
 	}
 
-	c.logger.Infof("endpoint %q has been deleted", util.NameFromMeta(c.Endpoints[role].ObjectMeta))
+	c.logger.Infof("%s endpoint %q has been deleted", role, util.NameFromMeta(c.Endpoints[role].ObjectMeta))
 	delete(c.Endpoints, role)
 
 	return nil
@@ -526,7 +526,7 @@ func (c *Cluster) deleteSecret(uid types.UID, secret v1.Secret) error {
 	c.logger.Debugf("deleting secret %q", secretName)
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("Secret was already deleted")
+		c.logger.Debugf("secret %q has already been deleted", secretName)
 	} else if err != nil {
 		return fmt.Errorf("could not delete secret %q: %v", secretName, err)
 	}
@@ -588,7 +588,7 @@ func (c *Cluster) deleteLogicalBackupJob() error {
 
 	err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(context.TODO(), c.getLogicalBackupJobName(), c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("LogicalBackup CronJob was already deleted")
+		c.logger.Debugf("logical backup cron job %q has already been deleted", c.getLogicalBackupJobName())
 	} else if err != nil {
 		return err
 	}
