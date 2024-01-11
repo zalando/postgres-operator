@@ -214,7 +214,7 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 }
 
 // SetFinalizer of Postgres cluster
-func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pgMetadata metav1.ObjectMeta, finalizers []string) (*apiacidv1.Postgresql, error) {
+func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pgMetadata *metav1.ObjectMeta, finalizers []string) (*apiacidv1.Postgresql, error) {
 	var pg *apiacidv1.Postgresql
 	pgMetadata.SetFinalizers(finalizers)
 
