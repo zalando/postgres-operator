@@ -3127,12 +3127,12 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
 						ResourceRequests: acidv1.ResourceDescription{
-							HugePages2Mi: "128Mi",
-							HugePages1Gi: "1Gi",
+							HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+							HugePages1Gi: k8sutil.StringToPointer("1Gi"),
 						},
 						ResourceLimits: acidv1.ResourceDescription{
-							HugePages2Mi: "256Mi",
-							HugePages1Gi: "2Gi",
+							HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+							HugePages1Gi: k8sutil.StringToPointer("2Gi"),
 						},
 					},
 					TeamID: "acid",
@@ -3145,14 +3145,14 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{
 					CPU:          "100m",
 					Memory:       "100Mi",
-					HugePages2Mi: "128Mi",
-					HugePages1Gi: "1Gi",
+					HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("1Gi"),
 				},
 				ResourceLimits: acidv1.ResourceDescription{
 					CPU:          "1",
 					Memory:       "500Mi",
-					HugePages2Mi: "256Mi",
-					HugePages1Gi: "2Gi",
+					HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("2Gi"),
 				},
 			},
 		},
@@ -3174,12 +3174,12 @@ func TestGenerateResourceRequirements(t *testing.T) {
 							DockerImage: "test-image",
 							Resources: &acidv1.Resources{
 								ResourceRequests: acidv1.ResourceDescription{
-									HugePages2Mi: "128Mi",
-									HugePages1Gi: "1Gi",
+									HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+									HugePages1Gi: k8sutil.StringToPointer("1Gi"),
 								},
 								ResourceLimits: acidv1.ResourceDescription{
-									HugePages2Mi: "256Mi",
-									HugePages1Gi: "2Gi",
+									HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+									HugePages1Gi: k8sutil.StringToPointer("2Gi"),
 								},
 							},
 						},
@@ -3194,14 +3194,14 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{
 					CPU:          "100m",
 					Memory:       "100Mi",
-					HugePages2Mi: "128Mi",
-					HugePages1Gi: "1Gi",
+					HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("1Gi"),
 				},
 				ResourceLimits: acidv1.ResourceDescription{
 					CPU:          "1",
 					Memory:       "500Mi",
-					HugePages2Mi: "256Mi",
-					HugePages1Gi: "2Gi",
+					HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("2Gi"),
 				},
 			},
 		},
