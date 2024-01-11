@@ -214,26 +214,37 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 }
 
 // SetFinalizer of Postgres cluster
-func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pgMetadata *metav1.ObjectMeta, finalizers []string) (*apiacidv1.Postgresql, error) {
-	var pg *apiacidv1.Postgresql
+func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg *apiacidv1.Postgresql, finalizers []string) (*apiacidv1.Postgresql, error) {
+	var (
+		updatedPg *apiacidv1.Postgresql
+		patch     []byte
+		err       error
+	)
+	pgMetadata := pg.ObjectMeta
 	pgMetadata.SetFinalizers(finalizers)
 
-	patch, err := json.Marshal(struct {
-		PgMetadata interface{} `json:"metadata"`
-	}{&pgMetadata})
+	if len(finalizers) > 0 {
+		patch, err = json.Marshal(struct {
+			PgMetadata interface{} `json:"metadata"`
+		}{&pgMetadata})
+		if err != nil {
+			return pg, fmt.Errorf("could not marshal ObjectMeta: %v", err)
+		}
 
-	if err != nil {
-		return pg, fmt.Errorf("could not marshal status: %v", err)
+		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
+			context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	} else {
+		// in case finalizers are empty and Update is needed to remove
+		pg.ObjectMeta = pgMetadata
+		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Update(
+			context.TODO(), pg, metav1.UpdateOptions{})
 	}
-
-	pg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
-		context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
-		return pg, fmt.Errorf("could not set finalizer: %v", err)
+		return updatedPg, fmt.Errorf("could not set finalizer: %v", err)
 	}
 
 	// update the spec, maintaining the new resourceVersion.
-	return pg, nil
+	return updatedPg, nil
 }
 
 // SamePDB compares the PodDisruptionBudgets
