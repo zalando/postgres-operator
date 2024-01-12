@@ -778,7 +778,7 @@ func (c *Cluster) addFinalizer() error {
 
 	c.logger.Infof("adding finalizer %s", finalizerName)
 	finalizers := append(c.ObjectMeta.Finalizers, finalizerName)
-	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), &c.Postgresql, finalizers)
+	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), c.DeepCopy(), finalizers)
 	if err != nil {
 		return fmt.Errorf("error adding finalizer: %v", err)
 	}
@@ -796,7 +796,7 @@ func (c *Cluster) removeFinalizer() error {
 
 	c.logger.Infof("removing finalizer %s", finalizerName)
 	finalizers := util.RemoveString(c.ObjectMeta.Finalizers, finalizerName)
-	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), &c.Postgresql, finalizers)
+	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), c.DeepCopy(), finalizers)
 	if err != nil {
 		return fmt.Errorf("error removing finalizer: %v", err)
 	}
