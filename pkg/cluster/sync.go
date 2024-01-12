@@ -89,7 +89,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	// add or remove standby_cluster section from Patroni config depending on changes in standby section
-	if reflect.DeepEqual(oldSpec.Spec.StandbyCluster, newSpec.Spec.StandbyCluster) {
+	if !reflect.DeepEqual(oldSpec.Spec.StandbyCluster, newSpec.Spec.StandbyCluster) {
 		if err := c.syncStandbyClusterConfiguration(); err != nil {
 			return fmt.Errorf("could not sync StandbyCluster configuration: %v", err)
 		}
