@@ -220,13 +220,12 @@ func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg
 		patch     []byte
 		err       error
 	)
-	pgMetadata := pg.ObjectMeta
-	pgMetadata.SetFinalizers(finalizers)
+	pg.ObjectMeta.SetFinalizers(finalizers)
 
 	if len(finalizers) > 0 {
 		patch, err = json.Marshal(struct {
 			PgMetadata interface{} `json:"metadata"`
-		}{&pgMetadata})
+		}{&pg.ObjectMeta})
 		if err != nil {
 			return pg, fmt.Errorf("could not marshal ObjectMeta: %v", err)
 		}
@@ -234,8 +233,7 @@ func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg
 		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
 			context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	} else {
-		// in case finalizers are empty and Update is needed to remove
-		pg.ObjectMeta = pgMetadata
+		// in case finalizers are empty and update is needed to remove
 		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Update(
 			context.TODO(), pg, metav1.UpdateOptions{})
 	}
@@ -243,7 +241,6 @@ func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg
 		return updatedPg, fmt.Errorf("could not set finalizer: %v", err)
 	}
 
-	// update the spec, maintaining the new resourceVersion.
 	return updatedPg, nil
 }
 

@@ -48,11 +48,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
-	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
-		if err = c.addFinalizer(); err != nil {
-			return fmt.Errorf("could not add finalizer: %v", err)
-		}
-	}
 	if err = c.syncFinalizer(); err != nil {
 		c.logger.Debugf("could not sync finalizers: %v", err)
 	}
@@ -155,13 +150,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 
 func (c *Cluster) syncFinalizer() error {
 	var err error
-
 	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
 		err = c.addFinalizer()
 	} else {
 		err = c.removeFinalizer()
 	}
-
 	if err != nil {
 		return fmt.Errorf("could not sync finalizer: %v", err)
 	}
