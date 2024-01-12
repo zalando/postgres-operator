@@ -267,14 +267,14 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 		}
 	}
 
-	if spec.HugePages2Mi != "" {
-		requests[v1.ResourceHugePagesPrefix+"2Mi"], err = resource.ParseQuantity(spec.HugePages2Mi)
+	if spec.HugePages2Mi != nil {
+		requests[v1.ResourceHugePagesPrefix+"2Mi"], err = resource.ParseQuantity(*spec.HugePages2Mi)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse hugepages-2Mi quantity: %v", err)
 		}
 	}
-	if spec.HugePages1Gi != "" {
-		requests[v1.ResourceHugePagesPrefix+"1Gi"], err = resource.ParseQuantity(spec.HugePages1Gi)
+	if spec.HugePages1Gi != nil {
+		requests[v1.ResourceHugePagesPrefix+"1Gi"], err = resource.ParseQuantity(*spec.HugePages1Gi)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse hugepages-1Gi quantity: %v", err)
 		}

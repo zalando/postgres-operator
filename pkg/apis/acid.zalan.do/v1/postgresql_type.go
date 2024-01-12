@@ -153,10 +153,10 @@ type PostgresqlParam struct {
 
 // ResourceDescription describes CPU and memory resources defined for a cluster.
 type ResourceDescription struct {
-	CPU          string `json:"cpu"`
-	Memory       string `json:"memory"`
-	HugePages2Mi string `json:"hugepages-2Mi"`
-	HugePages1Gi string `json:"hugepages-1Gi"`
+	CPU          string  `json:"cpu"`
+	Memory       string  `json:"memory"`
+	HugePages2Mi *string `json:"hugepages-2Mi"`
+	HugePages1Gi *string `json:"hugepages-1Gi"`
 }
 
 // Resources describes requests and limits for the cluster resouces.
