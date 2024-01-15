@@ -247,9 +247,10 @@ func (c *Cluster) Create() (err error) {
 	defer c.mu.Unlock()
 
 	var (
-		service *v1.Service
-		ep      *v1.Endpoints
-		ss      *appsv1.StatefulSet
+		pgCreateStatus *acidv1.Postgresql
+		service        *v1.Service
+		ep             *v1.Endpoints
+		ss             *appsv1.StatefulSet
 	)
 
 	defer func() {
@@ -260,7 +261,11 @@ func (c *Cluster) Create() (err error) {
 		}
 	}()
 
-	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+	pgCreateStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+	if err != nil {
+		return fmt.Errorf("could not set cluster status: %v", err)
+	}
+	c.setSpec(pgCreateStatus)
 
 	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
 		if err = c.addFinalizer(); err != nil {
