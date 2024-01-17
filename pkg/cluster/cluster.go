@@ -1065,15 +1065,23 @@ func syncResources(a, b *v1.ResourceRequirements) bool {
 // before the pods, it will be re-created by the current master pod and will remain, obstructing the
 // creation of the new cluster with the same name. Therefore, the endpoints should be deleted last.
 func (c *Cluster) Delete() error {
+	var anyErrors = false
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of cluster resources")
 
+	pgCreateStatus, err := c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusTerminating)
+	if err != nil {
+		anyErrors = true
+		c.logger.Warningf("could not set cluster status: %v", err)
+	}
+	c.setSpec(pgCreateStatus)
+
 	if err := c.deleteStreams(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not delete event streams: %v", err)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete event streams: %v", err)
 	}
-	var anyErrors = false
 
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created

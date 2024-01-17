@@ -285,14 +285,17 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			lg.Errorf("unknown cluster: %q", clusterName)
 			return
 		}
-		lg.Infoln("deletion of the cluster started")
 
 		teamName := strings.ToLower(cl.Spec.TeamID)
-
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Delete(); err != nil {
-			cl.Error = fmt.Sprintf("could not delete cluster: %v", err)
-			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Delete", "%v", cl.Error)
+
+		// when using finalizers the deletion already happened
+		if c.opConfig.EnableFinalizers == nil || !*c.opConfig.EnableFinalizers {
+			lg.Infoln("deletion of the cluster started")
+			if err := cl.Delete(); err != nil {
+				cl.Error = fmt.Sprintf("could not delete cluster: %v", err)
+				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Delete", "%v", cl.Error)
+			}
 		}
 
 		func() {
