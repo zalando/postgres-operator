@@ -10,7 +10,6 @@ const (
 	ClusterStatusAddFailed    = "CreateFailed"
 	ClusterStatusRunning      = "Running"
 	ClusterStatusInvalid      = "Invalid"
-	ClusterStatusTerminating  = "Terminating"
 )
 
 const (

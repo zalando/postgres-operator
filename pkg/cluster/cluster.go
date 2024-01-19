@@ -1070,13 +1070,6 @@ func (c *Cluster) Delete() error {
 	defer c.mu.Unlock()
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of cluster resources")
 
-	pgCreateStatus, err := c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusTerminating)
-	if err != nil {
-		anyErrors = true
-		c.logger.Warningf("could not set cluster status: %v", err)
-	}
-	c.setSpec(pgCreateStatus)
-
 	if err := c.deleteStreams(); err != nil {
 		anyErrors = true
 		c.logger.Warningf("could not delete event streams: %v", err)
