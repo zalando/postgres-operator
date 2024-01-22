@@ -1,11 +1,13 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +35,10 @@ const (
 )
 
 var logger = logrus.New().WithField("test", "cluster")
-var eventRecorder = record.NewFakeRecorder(1)
+
+// eventRecorder needs buffer for TestCreate which emit events for
+// 1 cluster, primary endpoint, 2 services, the secrets, the statefulset and pods being ready
+var eventRecorder = record.NewFakeRecorder(7)
 
 var cl = New(
 	Config{
@@ -78,6 +83,79 @@ var cl = New(
 	logger,
 	eventRecorder,
 )
+
+func TestCreate(t *testing.T) {
+	clientSet := fake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	clusterName := "cluster-with-finalizer"
+	clusterNamespace := "test"
+
+	client := k8sutil.KubernetesClient{
+		DeploymentsGetter:            clientSet.AppsV1(),
+		EndpointsGetter:              clientSet.CoreV1(),
+		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
+		PodDisruptionBudgetsGetter:   clientSet.PolicyV1(),
+		PodsGetter:                   clientSet.CoreV1(),
+		PostgresqlsGetter:            acidClientSet.AcidV1(),
+		ServicesGetter:               clientSet.CoreV1(),
+		SecretsGetter:                clientSet.CoreV1(),
+		StatefulSetsGetter:           clientSet.AppsV1(),
+	}
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: clusterNamespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-0", clusterName),
+			Namespace: clusterNamespace,
+			Labels: map[string]string{
+				"application":  "spilo",
+				"cluster-name": clusterName,
+				"spilo-role":   "master",
+			},
+		},
+	}
+
+	// manually create resources which must be found by further API calls and are not created by cluster.Create()
+	client.Postgresqls(clusterNamespace).Create(context.TODO(), &pg, metav1.CreateOptions{})
+	client.Pods(clusterNamespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:         map[string]string{"application": "spilo"},
+					ClusterNameLabel:      "cluster-name",
+					DefaultCPURequest:     "300m",
+					DefaultCPULimit:       "300m",
+					DefaultMemoryRequest:  "300Mi",
+					DefaultMemoryLimit:    "300Mi",
+					PodRoleLabel:          "spilo-role",
+					ResourceCheckInterval: time.Duration(3),
+					ResourceCheckTimeout:  time.Duration(10),
+				},
+				EnableFinalizers: util.True(),
+			},
+		}, client, pg, logger, eventRecorder)
+
+	err := cluster.Create()
+	assert.NoError(t, err)
+
+	if !cluster.hasFinalizer() {
+		t.Errorf("%s - expected finalizer not found on cluster", t.Name())
+	}
+}
 
 func TestStatefulSetAnnotations(t *testing.T) {
 	spec := acidv1.PostgresSpec{

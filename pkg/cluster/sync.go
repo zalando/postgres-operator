@@ -48,6 +48,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	if err = c.syncFinalizer(); err != nil {
+		c.logger.Debugf("could not sync finalizers: %v", err)
+	}
+
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
 		return err
@@ -142,6 +146,20 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	return err
+}
+
+func (c *Cluster) syncFinalizer() error {
+	var err error
+	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
+		err = c.addFinalizer()
+	} else {
+		err = c.removeFinalizer()
+	}
+	if err != nil {
+		return fmt.Errorf("could not sync finalizer: %v", err)
+	}
+
+	return nil
 }
 
 func (c *Cluster) syncServices() error {

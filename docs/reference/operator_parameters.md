@@ -328,6 +328,14 @@ configuration they are grouped under the `kubernetes` key.
   drained if the node_readiness_label is not used. This option if set to `false`
   will not add the `spilo-role=master` selector to the PDB.
 
+* **enable_finalizers**
+  By default, a deletion of the Postgresql resource will trigger a cleanup of
+  all child resources. However, if the database cluster is in a broken state
+  (e.g. failed initialization) and the operator cannot fully sync it, there can
+  be leftovers from a DELETE event. By enabling finalizers the Operator will
+  ensure all managed resources are deleted prior to the Postgresql resource.
+  The default is `false`.
+
 * **enable_pod_disruption_budget**
   PDB is enabled by default to protect the cluster from voluntarily disruptions
   and hence unwanted DB downtime. However, on some cloud providers it could be
