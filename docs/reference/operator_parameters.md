@@ -3,33 +3,46 @@
 There are two mutually-exclusive methods to set the Postgres Operator
 configuration.
 
-* ConfigMaps-based, the legacy one.  The configuration is supplied in a
-  key-value configmap, defined by the `CONFIG_MAP_NAME` environment variable.
-  Non-scalar values, i.e. lists or maps, are encoded in the value strings using
-  the comma-based syntax for lists and coma-separated `key:value` syntax for
-  maps. String values containing ':' should be enclosed in quotes. The
-  configuration is flat, parameter group names below are not reflected in the
-  configuration structure. There is an
-  [example](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
+* ConfigMaps-based, the legacy one
+* CRD-based configuration
 
-* CRD-based configuration. The configuration is stored in a custom YAML
-  manifest. The manifest is an instance of the custom resource definition (CRD)
-  called `OperatorConfiguration`. The operator registers this CRD during the
-  start and uses it for configuration if the [operator deployment manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
-  sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty
-  value. The variable should point to the `postgresql-operator-configuration`
-  object in the operator's namespace.
+Variable names are underscore-separated words.
 
-  The CRD-based configuration is a regular YAML document; non-scalar keys are
-  simply represented in the usual YAML way. There are no default values built-in
-  in the operator, each parameter that is not supplied in the configuration
-  receives an empty value. In order to create your own configuration just copy
-  the [default one](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
-  and change it.
+### ConfigMaps-based
+The configuration is supplied in a
+key-value configmap, defined by the `CONFIG_MAP_NAME` environment variable.
+Non-scalar values, i.e. lists or maps, are encoded in the value strings using
+the comma-based syntax for lists and coma-separated `key:value` syntax for
+maps. String values containing ':' should be enclosed in quotes. The
+configuration is flat, parameter group names below are not reflected in the
+configuration structure. There is an
+[example](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
 
-  To test the CRD-based configuration locally, use the following
+For the configmap configuration, the [default parameter values](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go#L14)
+mentioned here are likely to be overwritten in your local operator installation
+via your local version of the operator configmap. In the case you use the
+operator CRD, all the CRD defaults are provided in the
+[operator's default configuration manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
 
-  ```bash
+### CRD-based configuration
+The configuration is stored in a custom YAML
+manifest. The manifest is an instance of the custom resource definition (CRD)
+called `OperatorConfiguration`. The operator registers this CRD during the
+start and uses it for configuration if the [operator deployment manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
+sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty
+value. The variable should point to the `postgresql-operator-configuration`
+object in the operator's namespace.
+
+The CRD-based configuration is a regular YAML document; non-scalar keys are
+simply represented in the usual YAML way. There are no default values built-in
+in the operator, each parameter that is not supplied in the configuration
+receives an empty value. In order to create your own configuration just copy
+the [default one](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+and change it.
+
+To test the CRD-based configuration locally, use the following
+
+```bash
   kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
   kubectl create -f manifests/postgresql-operator-default-configuration.yaml
 
@@ -37,7 +50,7 @@ configuration.
   kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
 
   kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
-  ```
+```
 
 The CRD-based configuration is more powerful than the one based on ConfigMaps
 and should be used unless there is a compatibility requirement to use an already
@@ -57,15 +70,6 @@ controlled by the `resource_check_interval` and `resource_check_timeout`
 parameters, those parameters have no effect and are replaced by the
 `CRD_READY_WAIT_INTERVAL` and `CRD_READY_WAIT_TIMEOUT` environment variables.
 They will be deprecated and removed in the future.
-
-For the configmap configuration, the [default parameter values](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go#L14)
-mentioned here are likely to be overwritten in your local operator installation
-via your local version of the operator configmap. In the case you use the
-operator CRD, all the CRD defaults are provided in the
-[operator's default configuration manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
-
-Variable names are underscore-separated words.
-
 
 ## General
 
