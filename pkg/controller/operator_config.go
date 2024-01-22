@@ -128,6 +128,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodAntiAffinityTopologyKey = util.Coalesce(fromCRD.Kubernetes.PodAntiAffinityTopologyKey, "kubernetes.io/hostname")
 	result.PodAntiAffinityPreferredDuringScheduling = fromCRD.Kubernetes.PodAntiAffinityPreferredDuringScheduling
 	result.PodToleration = fromCRD.Kubernetes.PodToleration
+	result.LivenessProbe = fromCRD.Kubernetes.LivenessProbe
 
 	// Postgres Pod resources
 	result.DefaultCPURequest = util.Coalesce(fromCRD.PostgresPodResources.DefaultCPURequest, "100m")
