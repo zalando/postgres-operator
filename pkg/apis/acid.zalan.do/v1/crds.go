@@ -364,6 +364,132 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"livenessProbe": {
+						Description: "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+						Type:        "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"exec": {
+								Description: "One and only one of the following should be specified. Exec specifies the action to take.",
+								Type:        "object",
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"command": {
+										Description: "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.",
+										Type:        "array",
+										Items: &apiextv1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+								},
+							},
+							"failureThreshold": {
+								Description: "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
+								Type:        "integer",
+								Format:      "int32",
+							},
+							"httpGet": {
+								Description: "HTTPGet specifies the http request to perform.",
+								Type:        "object",
+								Required:    []string{"port"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"host": {
+										Description: "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead.",
+										Type:        "string",
+									},
+									"httpHeaders": {
+										Description: "Custom headers to set in the request. HTTP allows repeated headers.",
+										Type:        "array",
+										Items: &apiextv1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1.JSONSchemaProps{
+												Description: "HTTPHeader describes a custom header to be used in HTTP probes",
+												Type:        "object",
+												Required:    []string{"name", "value"},
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"name": {
+														Description: "The header field name",
+														Type:        "string",
+													},
+													"value": {
+														Description: "The header field value",
+														Type:        "string",
+													},
+												},
+											},
+										},
+									},
+									"path": {
+										Description: "Path to access on the HTTP server.",
+										Type:        "string",
+									},
+									"port": {
+										Description: "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+										AnyOf: []apiextv1.JSONSchemaProps{
+											{
+												Type: "integer",
+											},
+											{
+												Type: "string",
+											},
+										},
+										XIntOrString: true,
+									},
+									"scheme": {
+										Description: "Scheme to use for connecting to the host. Defaults to HTTP.",
+										Type:        "string",
+									},
+								},
+							},
+							"initialDelaySeconds": {
+								Description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+								Type:        "integer",
+								Format:      "int32",
+							},
+							"periodSeconds": {
+								Description: "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
+								Type:        "integer",
+								Format:      "int32",
+							},
+							"successThreshold": {
+								Description: "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.",
+								Type:        "integer",
+								Format:      "int32",
+							},
+							"tcpSocket": {
+								Description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook",
+								Type:        "object",
+								Required:    []string{"port"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"host": {
+										Description: "Optional: Host name to connect to, defaults to the pod IP.",
+										Type:        "string",
+									},
+									"port": {
+										Description:  "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+										XIntOrString: true,
+										AnyOf: []apiextv1.JSONSchemaProps{
+											{
+												Type: "integer",
+											},
+											{
+												Type: "string",
+											},
+										},
+									},
+								},
+							},
+							"terminationGracePeriodSeconds": {
+								Description: "Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
+								Type:        "integer",
+								Format:      "int64",
+							},
+							"timeoutSeconds": {
+								Description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+								Type:        "integer",
+								Format:      "int32",
+							},
+						},
+					},
 					"nodeAffinity": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
@@ -1380,6 +1506,132 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
 										Type: "string",
+									},
+								},
+							},
+							"liveness_probe": {
+								Description: "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+								Type:        "object",
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"exec": {
+										Description: "One and only one of the following should be specified. Exec specifies the action to take.",
+										Type:        "object",
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"command": {
+												Description: "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.",
+												Type:        "array",
+												Items: &apiextv1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1.JSONSchemaProps{
+														Type: "string",
+													},
+												},
+											},
+										},
+									},
+									"failureThreshold": {
+										Description: "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
+										Type:        "integer",
+										Format:      "int32",
+									},
+									"httpGet": {
+										Description: "HTTPGet specifies the http request to perform.",
+										Type:        "object",
+										Required:    []string{"port"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"host": {
+												Description: "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead.",
+												Type:        "string",
+											},
+											"httpHeaders": {
+												Description: "Custom headers to set in the request. HTTP allows repeated headers.",
+												Type:        "array",
+												Items: &apiextv1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1.JSONSchemaProps{
+														Description: "HTTPHeader describes a custom header to be used in HTTP probes",
+														Type:        "object",
+														Required:    []string{"name", "value"},
+														Properties: map[string]apiextv1.JSONSchemaProps{
+															"name": {
+																Description: "The header field name",
+																Type:        "string",
+															},
+															"value": {
+																Description: "The header field value",
+																Type:        "string",
+															},
+														},
+													},
+												},
+											},
+											"path": {
+												Description: "Path to access on the HTTP server.",
+												Type:        "string",
+											},
+											"port": {
+												Description: "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+												AnyOf: []apiextv1.JSONSchemaProps{
+													{
+														Type: "integer",
+													},
+													{
+														Type: "string",
+													},
+												},
+												XIntOrString: true,
+											},
+											"scheme": {
+												Description: "Scheme to use for connecting to the host. Defaults to HTTP.",
+												Type:        "string",
+											},
+										},
+									},
+									"initialDelaySeconds": {
+										Description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+										Type:        "integer",
+										Format:      "int32",
+									},
+									"periodSeconds": {
+										Description: "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
+										Type:        "integer",
+										Format:      "int32",
+									},
+									"successThreshold": {
+										Description: "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.",
+										Type:        "integer",
+										Format:      "int32",
+									},
+									"tcpSocket": {
+										Description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook",
+										Type:        "object",
+										Required:    []string{"port"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"host": {
+												Description: "Optional: Host name to connect to, defaults to the pod IP.",
+												Type:        "string",
+											},
+											"port": {
+												Description:  "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+												XIntOrString: true,
+												AnyOf: []apiextv1.JSONSchemaProps{
+													{
+														Type: "integer",
+													},
+													{
+														Type: "string",
+													},
+												},
+											},
+										},
+									},
+									"terminationGracePeriodSeconds": {
+										Description: "Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
+										Type:        "integer",
+										Format:      "int64",
+									},
+									"timeoutSeconds": {
+										Description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+										Type:        "integer",
+										Format:      "int32",
 									},
 								},
 							},
