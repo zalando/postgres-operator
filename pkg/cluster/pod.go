@@ -509,7 +509,7 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 				continue
 			}
 
-			if slices.Contains([]string{"running", "streaming"}, member.State) {
+			if slices.Contains([]string{"running", "streaming", "in archive recovery"}, member.State) {
 				candidates = append(candidates, member)
 			}
 		}
