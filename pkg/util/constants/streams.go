@@ -11,4 +11,7 @@ const (
 	EventStreamSourceAuthType    = "DatabaseAuthenticationSecret"
 	EventStreamFlowPgGenericType = "PostgresWalToGenericNakadiEvent"
 	EventStreamSinkNakadiType    = "Nakadi"
+	EventStreamRecoveryNoneType  = "None"
+	EventStreamRecoveryDLQType   = "DeadLetter"
+	EventStreamRecoverySuffix    = "dead-letter-queue"
 )

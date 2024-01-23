@@ -252,8 +252,8 @@ information, see [user docs](../user.md#prepared-databases-with-roles-and-defaul
   map of schemas that the operator will create. Optional - if no schema is
   listed, the operator will create a schema called `data`. Under each schema
   key, it can be defined if `defaultRoles` (NOLOGIN) and `defaultUsers` (LOGIN)
-  roles shall be created that have schema-exclusive privileges. Both flags are
-  set to `false` by default.
+  roles shall be created that have schema-exclusive privileges.
+  By default, `defaultRoles` is `true` and `defaultUsers` is false.
 
 * **secretNamespace**
   for each default LOGIN role the operator will create a secret. You can
@@ -363,6 +363,14 @@ CPU and memory requests for the Postgres container.
   memory requests for the Postgres container. Optional, overrides the
   `default_memory_request` operator configuration parameter.
 
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
+
 ### Limits
 
 CPU and memory limits for the Postgres container.
@@ -374,6 +382,14 @@ CPU and memory limits for the Postgres container.
 * **memory**
   memory limits for the Postgres container. Optional, overrides the
   `default_memory_limits` operator configuration parameter.
+
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
 
 ## Parameters defining how to clone the cluster from another one
 
@@ -504,6 +520,14 @@ CPU and memory requests for the sidecar container.
   memory requests for the sidecar container. Optional, overrides the
   `default_memory_request` operator configuration parameter. Optional.
 
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
+
 ### Limits
 
 CPU and memory limits for the sidecar container.
@@ -515,6 +539,14 @@ CPU and memory limits for the sidecar container.
 * **memory**
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
+
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
 
 ## Connection pooler
 

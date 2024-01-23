@@ -126,7 +126,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.10.0"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.10.1"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
 	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
@@ -140,6 +140,7 @@ type LogicalBackup struct {
 	LogicalBackupS3RetentionTime              string `name:"logical_backup_s3_retention_time" default:""`
 	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
+	LogicalBackupCronjobEnvironmentSecret     string `name:"logical_backup_cronjob_environment_secret" default:""`
 	LogicalBackupCPURequest                   string `name:"logical_backup_cpu_request"`
 	LogicalBackupMemoryRequest                string `name:"logical_backup_memory_request"`
 	LogicalBackupCPULimit                     string `name:"logical_backup_cpu_limit"`
@@ -219,6 +220,7 @@ type Config struct {
 	ReplicaDNSNameFormat                     StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{namespace}.{hostedzone}"`
 	ReplicaLegacyDNSNameFormat               StringTemplate    `name:"replica_legacy_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat                            StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	PDBMasterLabelSelector                   *bool             `name:"pdb_master_label_selector" default:"true"`
 	EnablePodDisruptionBudget                *bool             `name:"enable_pod_disruption_budget" default:"true"`
 	EnableInitContainers                     *bool             `name:"enable_init_containers" default:"true"`
 	EnableSidecars                           *bool             `name:"enable_sidecars" default:"true"`
@@ -236,6 +238,7 @@ type Config struct {
 	SetMemoryRequestToLimit                  bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                   bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 	EnableCrossNamespaceSecret               bool              `name:"enable_cross_namespace_secret" default:"false"`
+	EnableFinalizers                         *bool             `name:"enable_finalizers" default:"false"`
 	EnablePgVersionEnvVar                    bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat                 bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`
@@ -246,6 +249,7 @@ type Config struct {
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
+	PersistentVolumeClaimRetentionPolicy     map[string]string `name:"persistent_volume_claim_retention_policy" default:"when_deleted:retain,when_scaled:retain"`
 }
 
 // MustMarshal marshals the config or panics

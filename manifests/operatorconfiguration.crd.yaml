@@ -276,6 +276,19 @@ spec:
                   pdb_name_format:
                     type: string
                     default: "postgres-{cluster}-pdb"
+                  persistent_volume_claim_retention_policy:
+                    type: object
+                    properties:
+                      when_deleted:
+                        type: string
+                        enum:
+                          - "delete"
+                          - "retain"
+                      when_scaled:
+                        type: string
+                        enum:
+                          - "delete"
+                          - "retain"
                   pod_antiaffinity_preferred_during_scheduling:
                     type: boolean
                     default: false
@@ -487,7 +500,7 @@ spec:
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.0"
+                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
@@ -524,6 +537,8 @@ spec:
                     type: string
                     pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
                     default: "30 00 * * *"
+                  logical_backup_cronjob_environment_secret:
+                    type: string
               debug:
                 type: object
                 properties:

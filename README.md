@@ -57,8 +57,8 @@ production for over five years.
 
 | Release   | Postgres versions | K8s versions      | Golang  |
 | :-------- | :---------------: | :---------------: | :-----: |
-| v1.10.*   | 10 &rarr; 15      | 1.25+             | 1.19.8  |
-| v1.9.0    | 10 &rarr; 15      | 1.25+             | 1.18.9  |
+| v1.10.*   | 10 &rarr; 15      | 1.21+             | 1.19.8  |
+| v1.9.0    | 10 &rarr; 15      | 1.21+             | 1.18.9  |
 | v1.8.*    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
 | v1.7.1    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.16.9  |
 
@@ -70,7 +70,8 @@ For a quick first impression follow the instructions of this
 
 ## Supported setups of Postgres and Applications
 
-![Features](docs/diagrams/neutral_operator.png)
+![Features](docs/diagrams/neutral_operator_dark.png#gh-dark-mode-only)
+![Features](docs/diagrams/neutral_operator_light.png#gh-light-mode-only)
 
 ## Documentation
 

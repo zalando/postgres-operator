@@ -84,6 +84,9 @@ configuration:
     # node_readiness_label_merge: "OR"
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
+    persistent_volume_claim_retention_policy: 
+      when_deleted: "retain"
+      when_scaled: "retain"
     pod_antiaffinity_preferred_during_scheduling: false
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
     # pod_environment_configmap: "default/my-custom-config"
@@ -160,7 +163,7 @@ configuration:
     # logical_backup_cpu_request: ""
     # logical_backup_memory_limit: ""
     # logical_backup_memory_request: ""
-    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.0"
+    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
     # logical_backup_google_application_credentials: ""
     logical_backup_job_prefix: "logical-backup-"
     logical_backup_provider: "s3"
@@ -172,6 +175,7 @@ configuration:
     logical_backup_s3_sse: "AES256"
     # logical_backup_s3_retention_time: ""
     logical_backup_schedule: "30 00 * * *"
+    # logical_backup_cronjob_environment_secret: ""
   debug:
     debug_logging: true
     enable_database_access: true

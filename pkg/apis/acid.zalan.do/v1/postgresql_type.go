@@ -153,8 +153,10 @@ type PostgresqlParam struct {
 
 // ResourceDescription describes CPU and memory resources defined for a cluster.
 type ResourceDescription struct {
-	CPU    string `json:"cpu"`
-	Memory string `json:"memory"`
+	CPU          string  `json:"cpu"`
+	Memory       string  `json:"memory"`
+	HugePages2Mi *string `json:"hugepages-2Mi"`
+	HugePages1Gi *string `json:"hugepages-1Gi"`
 }
 
 // Resources describes requests and limits for the cluster resouces.
@@ -248,16 +250,18 @@ type ConnectionPooler struct {
 
 // Stream defines properties for creating FabricEventStream resources
 type Stream struct {
-	ApplicationId string                 `json:"applicationId"`
-	Database      string                 `json:"database"`
-	Tables        map[string]StreamTable `json:"tables"`
-	Filter        map[string]*string     `json:"filter,omitempty"`
-	BatchSize     *uint32                `json:"batchSize,omitempty"`
+	ApplicationId  string                 `json:"applicationId"`
+	Database       string                 `json:"database"`
+	Tables         map[string]StreamTable `json:"tables"`
+	Filter         map[string]*string     `json:"filter,omitempty"`
+	BatchSize      *uint32                `json:"batchSize,omitempty"`
+	EnableRecovery *bool                  `json:"enableRecovery,omitempty"`
 }
 
 // StreamTable defines properties of outbox tables for FabricEventStreams
 type StreamTable struct {
-	EventType     string  `json:"eventType"`
-	IdColumn      *string `json:"idColumn,omitempty"`
-	PayloadColumn *string `json:"payloadColumn,omitempty"`
+	EventType         string  `json:"eventType"`
+	RecoveryEventType string  `json:"recoveryEventType"`
+	IdColumn          *string `json:"idColumn,omitempty"`
+	PayloadColumn     *string `json:"payloadColumn,omitempty"`
 }

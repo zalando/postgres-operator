@@ -82,6 +82,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ClusterDomain = util.Coalesce(fromCRD.Kubernetes.ClusterDomain, "cluster.local")
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat
+	result.PDBMasterLabelSelector = util.CoalesceBool(fromCRD.Kubernetes.PDBMasterLabelSelector, util.True())
 	result.EnablePodDisruptionBudget = util.CoalesceBool(fromCRD.Kubernetes.EnablePodDisruptionBudget, util.True())
 	result.StorageResizeMode = util.Coalesce(fromCRD.Kubernetes.StorageResizeMode, "pvc")
 	result.EnableInitContainers = util.CoalesceBool(fromCRD.Kubernetes.EnableInitContainers, util.True())
@@ -90,6 +91,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
 	result.EnableCrossNamespaceSecret = fromCRD.Kubernetes.EnableCrossNamespaceSecret
+	result.EnableFinalizers = util.CoalesceBool(fromCRD.Kubernetes.EnableFinalizers, util.False())
 
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
 	if fromCRD.Kubernetes.InfrastructureRolesDefs != nil {
@@ -119,6 +121,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.NodeReadinessLabelMerge = fromCRD.Kubernetes.NodeReadinessLabelMerge
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
 	result.PodManagementPolicy = util.Coalesce(fromCRD.Kubernetes.PodManagementPolicy, "ordered_ready")
+	result.PersistentVolumeClaimRetentionPolicy = fromCRD.Kubernetes.PersistentVolumeClaimRetentionPolicy
 	result.EnableReadinessProbe = fromCRD.Kubernetes.EnableReadinessProbe
 	result.MasterPodMoveTimeout = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout), "10m")
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity
@@ -174,7 +177,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.10.0")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.10.1")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupAzureStorageAccountName = fromCRD.LogicalBackup.AzureStorageAccountName
 	result.LogicalBackupAzureStorageAccountKey = fromCRD.LogicalBackup.AzureStorageAccountKey
@@ -188,6 +191,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupS3RetentionTime = fromCRD.LogicalBackup.RetentionTime
 	result.LogicalBackupGoogleApplicationCredentials = fromCRD.LogicalBackup.GoogleApplicationCredentials
 	result.LogicalBackupJobPrefix = util.Coalesce(fromCRD.LogicalBackup.JobPrefix, "logical-backup-")
+	result.LogicalBackupCronjobEnvironmentSecret = fromCRD.LogicalBackup.CronjobEnvironmentSecret
 	result.LogicalBackupCPURequest = fromCRD.LogicalBackup.CPURequest
 	result.LogicalBackupMemoryRequest = fromCRD.LogicalBackup.MemoryRequest
 	result.LogicalBackupCPULimit = fromCRD.LogicalBackup.CPULimit

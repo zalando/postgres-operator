@@ -1,14 +1,14 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.10.0
+  tag: v1.10.1
   pullPolicy: "IfNotPresent"
 
-  # Optionally specify an array of imagePullSecrets.
-  # Secrets must be manually created in the namespace.
-  # ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
-  # imagePullSecrets:
-  # - name: myRegistryKeySecretName
+# Optionally specify an array of imagePullSecrets.
+# Secrets must be manually created in the namespace.
+# ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+# imagePullSecrets:
+# - name: myRegistryKeySecretName
 
 podAnnotations: {}
 podLabels: {}
@@ -123,6 +123,10 @@ configKubernetes:
 
   # allow user secrets in other namespaces than the Postgres cluster
   enable_cross_namespace_secret: false
+  # use finalizers to ensure all managed resources are deleted prior to the postgresql CR
+  # this avoids stale resources in case the operator misses a delete event or is not running
+  # during deletion
+  enable_finalizers: false
   # enables initContainers to run actions before Spilo is started
   enable_init_containers: true
   # toggles pod anti affinity on the Postgres pods
@@ -165,6 +169,10 @@ configKubernetes:
 
   # defines the template for PDB (Pod Disruption Budget) names
   pdb_name_format: "postgres-{cluster}-pdb"
+  # specify the PVC retention policy when scaling down and/or deleting
+  persistent_volume_claim_retention_policy:
+    when_deleted: "retain"
+    when_scaled: "retain"
   # switches pod anti affinity type to `preferredDuringSchedulingIgnoredDuringExecution`
   pod_antiaffinity_preferred_during_scheduling: false
   # override topology key for pod anti affinity
@@ -348,7 +356,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.0"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -372,6 +380,8 @@ configLogicalBackup:
   logical_backup_s3_retention_time: ""
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
+  # secret to be used as reference for env variables in cronjob
+  logical_backup_cronjob_environment_secret: ""
 
 # automate creation of human users with teams API service
 configTeamsApi:
