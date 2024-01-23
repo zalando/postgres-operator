@@ -6,7 +6,7 @@ postgresqls
         ol.breadcrumb
 
           li.breadcrumb-item
-            a(href='/#/list')
+            a(href='./#/list')
               | PostgreSQL clusters
 
     .sk-spinner-pulse(
@@ -20,7 +20,7 @@ postgresqls
       |
       | or
       |
-      a(href='/') start over
+      a(href='./') start over
       | .
 
     div(
@@ -68,6 +68,8 @@ postgresqls
                   | IOPS (-3000 baseline): 0.006$
                   br
                   | Throughput (-125 baseline): 0.0476$
+                  br
+                  | 1 ELB: 21.96$
             th(stlye='width: 120px')
 
         tbody
@@ -79,7 +81,7 @@ postgresqls
             td(style='white-space: pre')
               | { namespace }
             td
-              a(href='/#/status/{ cluster_path(this) }') { name }
+              a(href='./#/status/{ cluster_path(this) }') { name }
               btn.btn-danger(if='{status.PostgresClusterStatus == "CreateFailed"}') Create Failed
             td { nodes }
             td { cpu } / { cpu_limit }
@@ -87,7 +89,7 @@ postgresqls
             td { volume_size }
             td { iops }
             td { throughput }
-            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput) }$
+            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput, num_elb) }$
 
             td
 
@@ -99,7 +101,7 @@ postgresqls
               )
 
                 a.btn.btn-info(
-                  href='/#/status/{ cluster_path(this) }'
+                  href='./#/status/{ cluster_path(this) }'
                 )
                   i.fa.fa-check-circle.regular
                   | Status
@@ -112,21 +114,21 @@ postgresqls
                   | Pgview
 
                 a.btn.btn-info(
-                  href='/#/logs/{ cluster_path(this) }'
+                  href='./#/logs/{ cluster_path(this) }'
                 )
                   i.fa.fa-align-justify
                   | Logs
 
                 a.btn(
                   class='btn-{ opts.read_write ? "primary" : "info" }'
-                  href='/#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
+                  href='./#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
                 )
                   i.fa.fa-clone.regular
                   | Clone
 
                 a.btn(
                   class='btn-{ opts.read_write ? "warning" : "info" }'
-                  href='/#/edit/{ cluster_path(this) }'
+                  href='./#/edit/{ cluster_path(this) }'
                 )
                   | Edit
 
@@ -167,7 +169,9 @@ postgresqls
                   | IOPS (-3000 baseline): 0.006$
                   br
                   | Throughput (-125 baseline): 0.0476$
-            th(stlye='width: 120px')
+                  br
+                  | 1 ELB: 21.96$
+            th(style='width: 120px')
 
         tbody
           tr(
@@ -179,7 +183,7 @@ postgresqls
               | { namespace }
             td
               a(
-                href='/#/status/{ cluster_path(this) }'
+                href='./#/status/{ cluster_path(this) }'
               )
                 | { name }
             td { nodes }
@@ -188,7 +192,7 @@ postgresqls
             td { volume_size }
             td { iops }
             td { throughput }
-            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput) }$
+            td { calcCosts(nodes, cpu, memory, volume_size, iops, throughput, num_elb) }$
 
             td
 
@@ -199,7 +203,7 @@ postgresqls
               )
 
                 a.btn.btn-info(
-                  href='/#/status/{ cluster_path(this) }'
+                  href='./#/status/{ cluster_path(this) }'
                 )
                   i.fa.fa-check-circle.regular
                   | Status
@@ -213,21 +217,21 @@ postgresqls
                   | Pgview
 
                 a.btn.btn-info(
-                  href='/#/logs/{ cluster_path(this) }'
+                  href='./#/logs/{ cluster_path(this) }'
                 )
                   i.fa.fa-align-justify
                   | Logs
 
                 a.btn(
                   class='btn-{ opts.read_write ? "primary" : "info" }'
-                  href='/#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
+                  href='./#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
                 )
                   i.fa.fa-clone.regular
                   | Clone
 
                 a.btn(
                   class='btn-{ opts.read_write ? "warning" : "info" }'
-                  href='/#/edit/{ cluster_path(this) }'
+                  href='./#/edit/{ cluster_path(this) }'
                 )
                   | Edit
 
@@ -263,10 +267,11 @@ postgresqls
       + '/' + encodeURI(cluster.name)
     )
 
-    const calcCosts = this.calcCosts = (nodes, cpu, memory, disk, iops, throughput) => {
+    const calcCosts = this.calcCosts = (nodes, cpu, memory, disk, iops, throughput, num_elb) => {
       podcount = Math.max(nodes, opts.config.min_pods)
       corecost = toCores(cpu) * opts.config.cost_core * 30.5 * 24
       memorycost = toMemory(memory) * opts.config.cost_memory * 30.5 * 24
+      elbcost = num_elb * opts.config.cost_elb * 30.5 * 24
       diskcost = toDisk(disk) * opts.config.cost_ebs
       iopscost = 0
       if (iops !== undefined && iops > opts.config.free_iops) {
@@ -283,7 +288,7 @@ postgresqls
         throughputcost = (throughput - opts.config.free_throughput) * opts.config.cost_throughput
       }
 
-      costs = podcount * (Math.max(corecost, memorycost) + diskcost + iopscost + throughputcost)
+      costs = podcount * (Math.max(corecost, memorycost) + diskcost + iopscost + throughputcost) + elbcost
        return costs.toFixed(2)
     }
 
@@ -338,7 +343,7 @@ postgresqls
 
     this.on('mount', () =>
       jQuery
-      .get('/postgresqls')
+      .get('./postgresqls')
       .done(clusters => {
         this.my_clusters = []
         this.other_clusters = []

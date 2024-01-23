@@ -8,7 +8,7 @@ replicaCount: 1
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator-ui
-  tag: v1.8.2
+  tag: v1.10.1
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -41,12 +41,18 @@ resources:
 envs:
   # IMPORTANT: While operator chart and UI chart are independent, this is the interface between
   # UI and operator API. Insert the service name of the operator API here!
+  appUrl: "http://localhost:8081"
   operatorApiUrl: "http://postgres-operator:8080"
   operatorClusterNameLabel: "cluster-name"
   resourcesVisible: "False"
+  # Set to "*" to allow viewing/creation of clusters in all namespaces
   targetNamespace: "default"
   teams:
     - "acid"
+
+# Extra pod annotations
+podAnnotations:
+  {}
 
 # configure extra UI ENVs
 # Extra ENVs are writen in kubenertes format and added "as is" to the pod's env variables
@@ -77,6 +83,8 @@ extraEnvs:
   #       key: AWS_DEFAULT_REGION
   # - name: SPILO_S3_BACKUP_BUCKET
   #   value: <s3 bucket used by the operator>
+  # - name: "USE_AWS_INSTANCE_PROFILE"
+  #   value: "true"
 
 # configure UI service
 service:
@@ -85,6 +93,8 @@ service:
   # If the type of the service is NodePort a port can be specified using the nodePort field
   # If the nodePort field is not specified, or if it has no value, then a random port is used
   # nodePort: 32521
+  annotations:
+    {}
 
 # configure UI ingress. If needed: "enabled: true"
 ingress:
@@ -96,7 +106,7 @@ ingress:
   ingressClassName: ""
   hosts:
     - host: ui.example.org
-      paths: [""]
+      paths: ["/"]
   tls: []
   #  - secretName: ui-tls
   #    hosts:

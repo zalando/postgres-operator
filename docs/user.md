@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "14"
+    version: "15"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -45,11 +45,12 @@ Make sure, the `spec` section of the manifest contains at least a `teamId`, the
 The minimum volume size to run the `postgresql` resource on Elastic Block
 Storage (EBS) is `1Gi`.
 
-Note, that the name of the cluster must start with the `teamId` and `-`. At
-Zalando we use team IDs (nicknames) to lower the chance of duplicate cluster
-names and colliding entities. The team ID would also be used to query an API to
-get all members of a team and create [database roles](#teams-api-roles) for
-them. Besides, the maximum cluster name length is 53 characters.
+Note, that when `enable_team_id_clustername_prefix` is set to `true` the name
+of the cluster must start with the `teamId` and `-`. At Zalando we use team IDs
+(nicknames) to lower chances of duplicate cluster names and colliding entities.
+The team ID would also be used to query an API to get all members of a team
+and create [database roles](#teams-api-roles) for them. Besides, the maximum
+cluster name length is 53 characters.
 
 ## Watch pods being created
 
@@ -108,7 +109,7 @@ metadata:
 spec:
   [...]
   postgresql:
-    version: "14"
+    version: "15"
     parameters:
       password_encryption: scram-sha-256
 ```
@@ -151,7 +152,7 @@ specified explicitly.
 
 The operator automatically generates a password for each manifest role and
 places it in the secret named
-`{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do` in the
+`{username}.{clustername}.credentials.postgresql.acid.zalan.do` in the
 same namespace as the cluster. This way, the application running in the
 K8s cluster and connecting to Postgres can obtain the password right from the
 secret, without ever sharing it outside of the cluster.
@@ -181,7 +182,7 @@ be in the form of `namespace.username`.
 
 For such usernames, the secret is created in the given namespace and its name is
 of the following form,
-`{namespace}.{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do`
+`{namespace}.{username}.{clustername}.credentials.postgresql.acid.zalan.do`
 
 ### Infrastructure roles
 
@@ -222,7 +223,7 @@ the user name, password etc. The secret itself is referenced by the
 above list them separately.
 
 ```yaml
-apiVersion: v1
+apiVersion: "acid.zalan.do/v1"
 kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-configuration
@@ -516,7 +517,7 @@ Postgres Operator will create the following NOLOGIN roles:
 
 The `<dbname>_owner` role is the database owner and should be used when creating
 new database objects. All members of the `admin` role, e.g. teams API roles, can
-become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/12/sql-alterdefaultprivileges.html)
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/15/sql-alterdefaultprivileges.html)
 are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
@@ -579,7 +580,9 @@ For all LOGIN roles the operator will create K8s secrets in the namespace
 specified in `secretNamespace`, if `enable_cross_namespace_secret` is set to
 `true` in the config. Otherwise, they are created in the same namespace like
 the Postgres cluster. Unlike roles specified with `namespace.username` under
-`users`, the namespace will not be part of the role name here.
+`users`, the namespace will not be part of the role name here. Keep in mind
+that the underscores in a role name are replaced with dashes in the K8s
+secret name.
 
 ```yaml
 spec:
@@ -591,7 +594,7 @@ spec:
 
 ### Schema `search_path` for default roles
 
-The schema [`search_path`](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH)
+The schema [`search_path`](https://www.postgresql.org/docs/15/ddl-schemas.html#DDL-SCHEMAS-PATH)
 for each role will include the role name and the schemas, this role should have
 access to. So `foo_bar_writer` does not have to schema-qualify tables from
 schemas `foo_bar_writer, bar`, while `foo_writer` can look up `foo_writer` and
@@ -686,6 +689,27 @@ The minimum limits to properly run the `postgresql` resource are configured to
 manifest the operator will raise the limits to the configured minimum values.
 If no resources are defined in the manifest they will be obtained from the
 configured [default requests](reference/operator_parameters.md#kubernetes-resource-requests).
+
+### HugePages support
+
+The operator supports [HugePages](https://www.postgresql.org/docs/15/kernel-resources.html#LINUX-HUGEPAGES).
+To enable HugePages, set the matching resource requests and/or limits in the manifest:
+
+```yaml
+spec:
+  resources:
+    requests:
+      hugepages-2Mi: 250Mi
+      hugepages-1Gi: 1Gi
+    limits:
+      hugepages-2Mi: 500Mi
+      hugepages-1Gi: 2Gi
+```
+
+There are no minimums or maximums and the default is 0 for both HugePage sizes,
+but Kubernetes will not spin up the pod if the requested HugePages cannot be allocated.
+For more information on HugePages in Kubernetes, see also
+[https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/](https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/)
 
 ## Use taints, tolerations and node affinity for dedicated PostgreSQL nodes
 
@@ -811,7 +835,7 @@ spec:
 ### Clone directly
 
 Another way to get a fresh copy of your source DB cluster is via
-[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html). To
+[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html). To
 use this feature simply leave out the timestamp field from the clone section.
 The operator will connect to the service of the source cluster by name. If the
 cluster is called test, then the connection string will look like host=test
@@ -937,33 +961,25 @@ established between standby replica(s).
 One big advantage of standby clusters is that they can be promoted to a proper
 database cluster. This means it will stop replicating changes from the source,
 and start accept writes itself. This mechanism makes it possible to move
-databases from one place to another with minimal downtime. Currently, the
-operator does not support promoting a standby cluster. It has to be done
-manually using `patronictl edit-config` inside the postgres container of the
-standby leader pod. Remove the following lines from the YAML structure and the
-leader promotion happens immediately. Before doing so, make sure that the
-standby is not behind the source database.
+databases from one place to another with minimal downtime.
 
-```yaml
-standby_cluster:
-  create_replica_methods:
-    - bootstrap_standby_with_wale
-    - basebackup_fast_xlog
-  restore_command: envdir "/home/postgres/etc/wal-e.d/env-standby" /scripts/restore_command.sh
-     "%f" "%p"
-```
+Before promoting a standby cluster, make sure that the standby is not behind
+the source database. You should ideally stop writes to your source cluster and
+then create a dummy database object that you check for being replicated in the
+target to verify all data has been copied.
 
-Finally, remove the `standby` section from the postgres cluster manifest.
+To promote, remove the `standby` section from the postgres cluster manifest.
+A rolling update will be triggered removing the `STANDBY_*` environment
+variables from the pods, followed by a Patroni config update that promotes the
+cluster.
 
-### Turn a normal cluster into a standby
+### Adding standby section after promotion
 
-There is no way to transform a non-standby cluster to a standby cluster through
-the operator. Adding the `standby` section to the manifest of a running
-Postgres cluster will have no effect. But, as explained in the previous
-paragraph it can be done manually through `patronictl edit-config`. This time,
-by adding the `standby_cluster` section to the Patroni configuration. However,
-the transformed standby cluster will not be doing any streaming. It will be in
-standby mode and allow read-only transactions only.
+Turning a running cluster into a standby is not easily possible and should be
+avoided. The best way is to remove the cluster and resubmit the manifest
+after a short wait of a few minutes. Adding the `standby` section would turn
+the database cluster in read-only mode on next operator SYNC cycle but it
+does not sync automatically with the source cluster again.
 
 ## Sidecar Support
 
@@ -1004,6 +1020,42 @@ specified but globally disabled in the configuration. The `enable_sidecars`
 option must be set to `true`.
 
 If you want to add a sidecar to every cluster managed by the operator, you can specify it in the [operator configuration](administrator.md#sidecars-for-postgres-clusters) instead.
+
+### Accessing the PostgreSQL socket from sidecars
+
+If enabled by the `share_pgsocket_with_sidecars` option in the operator
+configuration the PostgreSQL socket is placed in a volume of type `emptyDir`
+named `postgresql-run`. To allow access to the socket from any sidecar
+container simply add a VolumeMount to this volume to your sidecar spec.
+
+```yaml
+  - name: "container-name"
+    image: "company/image:tag"
+    volumeMounts:
+    - mountPath: /var/run
+      name: postgresql-run
+```
+
+If you do not want to globally enable this feature and only use it for single
+Postgres clusters, specify an `EmptyDir` volume under `additionalVolumes` in
+the manifest:
+
+```yaml
+spec:
+  additionalVolumes:
+  - name: postgresql-run
+    mountPath: /var/run/postgresql
+    targetContainers:
+    - all
+    volumeSource:
+      emptyDir: {}
+  sidecars: 
+  - name: "container-name"
+    image: "company/image:tag"
+    volumeMounts:
+    - mountPath: /var/run
+      name: postgresql-run
+```
 
 ## InitContainers Support
 
@@ -1048,7 +1100,7 @@ When using AWS with gp3 volumes you should set the mode to `mixed` because it
 will also adjust the IOPS and throughput that can be defined in the manifest.
 Check the [AWS docs](https://aws.amazon.com/ebs/general-purpose/) to learn
 about default and maximum values. Keep in mind that AWS rate-limits updating
-volume specs to no more than once every 6 hours. 
+volume specs to no more than once every 6 hours.
 
 ```yaml
 spec:
@@ -1160,14 +1212,19 @@ don't know the value, use `103` which is the GID from the default Spilo image
 OpenShift allocates the users and groups dynamically (based on scc), and their
 range is different in every namespace. Due to this dynamic behaviour, it's not
 trivial to know at deploy time the uid/gid of the user in the cluster.
-Therefore, instead of using a global `spilo_fsgroup` setting, use the
-`spiloFSGroup` field per Postgres cluster.
+Therefore, instead of using a global `spilo_fsgroup` setting in operator
+configuration or use the `spiloFSGroup` field per Postgres cluster manifest.
+
+For testing purposes, you can generate a self-signed certificate with openssl:
+```sh
+openssl req -x509 -nodes -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=acid.zalan.do"
+```
 
 Upload the cert as a kubernetes secret:
 ```sh
 kubectl create secret tls pg-tls \
-  --key pg-tls.key \
-  --cert pg-tls.crt
+  --key tls.key \
+  --cert tls.crt
 ```
 
 When doing client auth, CA can come optionally from the same secret:
@@ -1194,8 +1251,7 @@ spec:
 
 Optionally, the CA can be provided by a different secret:
 ```sh
-kubectl create secret generic pg-tls-ca \
-  --from-file=ca.crt=ca.crt
+kubectl create secret generic pg-tls-ca --from-file=ca.crt=ca.crt
 ```
 
 Then configure the postgres resource with the TLS secret:
@@ -1218,3 +1274,16 @@ Alternatively, it is also possible to use
 
 Certificate rotation is handled in the Spilo image which checks every 5
 minutes if the certificates have changed and reloads postgres accordingly.
+
+### TLS certificates for connection pooler
+
+By default, the pgBouncer image generates its own TLS certificate like Spilo.
+When the `tls` section is specfied in the manifest it will be used for the
+connection pooler pod(s) as well. The security context options are hard coded
+to `runAsUser: 100` and `runAsGroup: 101`. The `fsGroup` will be the same
+like for Spilo.
+
+As of now, the operator does not sync the pooler deployment automatically
+which means that changes in the pod template are not caught. You need to
+toggle `enableConnectionPooler` to set environment variables, volumes, secret
+mounts and securityContext required for TLS support in the pooler pod.

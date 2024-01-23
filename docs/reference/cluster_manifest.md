@@ -53,8 +53,7 @@ Those parameters are grouped under the `metadata` top-level key.
 These parameters are grouped directly under  the `spec` key in the manifest.
 
 * **teamId**
-  name of the team the cluster belongs to. Changing it after the cluster
-  creation is not supported. Required field.
+  name of the team the cluster belongs to. Required field.
 
 * **numberOfInstances**
   total number of  instances for a given cluster. The operator parameters
@@ -119,7 +118,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   a map of usernames to user flags for the users that should be created in the
   cluster by the operator. User flags are a list, allowed elements are
   `SUPERUSER`, `REPLICATION`, `INHERIT`, `LOGIN`, `NOLOGIN`, `CREATEROLE`,
-  `CREATEDB`, `BYPASSURL`. A login user is created by default unless NOLOGIN is
+  `CREATEDB`, `BYPASSRLS`. A login user is created by default unless NOLOGIN is
   specified, in which case the operator creates a role. One can specify empty
   flags by providing a JSON empty array '*[]*'. If the config option
   `enable_cross_namespace_secret` is enabled you can specify the namespace in
@@ -173,6 +172,22 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   to the services created for the database cluster. Check the
   [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#load-balancers-and-allowed-ip-ranges)
   for more information regarding default values and overwrite rules.
+
+* **masterServiceAnnotations**
+  A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+  to the master service created for the database cluster. Check the
+  [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#load-balancers-and-allowed-ip-ranges)
+  for more information regarding default values and overwrite rules.
+  This field overrides `serviceAnnotations` with the same key for the master
+  service if not empty.
+
+* **replicaServiceAnnotations**
+  A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+  to the replica service created for the database cluster. Check the
+  [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#load-balancers-and-allowed-ip-ranges)
+  for more information regarding default values and overwrite rules.
+  This field overrides `serviceAnnotations` with the same key for the replica
+  service if not empty.
 
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default Docker
@@ -237,8 +252,8 @@ information, see [user docs](../user.md#prepared-databases-with-roles-and-defaul
   map of schemas that the operator will create. Optional - if no schema is
   listed, the operator will create a schema called `data`. Under each schema
   key, it can be defined if `defaultRoles` (NOLOGIN) and `defaultUsers` (LOGIN)
-  roles shall be created that have schema-exclusive privileges. Both flags are
-  set to `false` by default.
+  roles shall be created that have schema-exclusive privileges.
+  By default, `defaultRoles` is `true` and `defaultUsers` is false.
 
 * **secretNamespace**
   for each default LOGIN role the operator will create a secret. You can
@@ -269,7 +284,7 @@ documentation](https://patroni.readthedocs.io/en/latest/SETTINGS.html) for the
 explanation of `ttl` and `loop_wait` parameters.
 
 * **initdb**
-  a map of key-value pairs describing initdb parameters. For `data-checksum`,
+  a map of key-value pairs describing initdb parameters. For `data-checksums`,
   `debug`, `no-locale`, `noclean`, `nosync` and `sync-only` parameters use
   `true` as the value if you want to set them. Changes to this option do not
   affect the already initialized clusters. Optional.
@@ -317,6 +332,14 @@ explanation of `ttl` and `loop_wait` parameters.
 
 * **synchronous_node_count**
   Patroni `synchronous_node_count` parameter value. Note, this option is only available for Spilo images with Patroni 2.0+. The default is set to `1`. Optional.
+
+* **failsafe_mode**
+  Patroni `failsafe_mode` parameter value. If enabled, Patroni will cope
+  with DCS outages by avoiding leader demotion. See the Patroni documentation
+  [here](https://patroni.readthedocs.io/en/master/dcs_failsafe_mode.html) for more details.
+  This feature is included since Patroni 3.0.0. Hence, check the container
+  image in use if this feature is included in the used Patroni version. The
+  default is set to `false`. Optional. 
   
 ## Postgres container resources
 
@@ -336,6 +359,14 @@ CPU and memory requests for the Postgres container.
   memory requests for the Postgres container. Optional, overrides the
   `default_memory_request` operator configuration parameter.
 
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
+
 ### Limits
 
 CPU and memory limits for the Postgres container.
@@ -347,6 +378,14 @@ CPU and memory limits for the Postgres container.
 * **memory**
   memory limits for the Postgres container. Optional, overrides the
   `default_memory_limits` operator configuration parameter.
+
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
 
 ## Parameters defining how to clone the cluster from another one
 
@@ -477,6 +516,14 @@ CPU and memory requests for the sidecar container.
   memory requests for the sidecar container. Optional, overrides the
   `default_memory_request` operator configuration parameter. Optional.
 
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
+
 ### Limits
 
 CPU and memory limits for the sidecar container.
@@ -488,6 +535,14 @@ CPU and memory limits for the sidecar container.
 * **memory**
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
+
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
 
 ## Connection pooler
 
@@ -523,7 +578,9 @@ for both master and replica pooler services (if `enableReplicaConnectionPooler`
 
 ## Custom TLS certificates
 
-Those parameters are grouped under the `tls` top-level key.
+Those parameters are grouped under the `tls` top-level key. Note, you have to
+define `spiloFSGroup` in the Postgres cluster manifest or `spilo_fsgroup` in
+the global configuration before adding the `tls` section'.
 
 * **secretName**
   By setting the `secretName` value, the cluster will switch to load the given
@@ -556,7 +613,7 @@ Those parameters are grouped under the `tls` top-level key.
 ## Change data capture streams
 
 This sections enables change data capture (CDC) streams via Postgres' 
-[logical decoding](https://www.postgresql.org/docs/14/logicaldecoding.html)
+[logical decoding](https://www.postgresql.org/docs/15/logicaldecoding.html)
 feature and `pgoutput` plugin. While the Postgres operator takes responsibility
 for providing the setup to publish change events, it relies on external tools
 to consume them. At Zalando, we are using a workflow based on
@@ -588,7 +645,7 @@ can have the following properties:
   and `payloadColumn`). The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
   The application is responsible for putting events into a (JSON/B or VARCHAR)
   payload column of the outbox table in the structure of the specified target
-  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/14/logical-replication-publication.html)
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/15/logical-replication-publication.html)
   in Postgres for all tables specified for one `database` and `applicationId`.
   The CDC operator will consume from it shortly after transactions are
   committed to the outbox table. The `idColumn` will be used in telemetry for

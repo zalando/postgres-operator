@@ -42,12 +42,26 @@ var (
 					AdditionalMembers:        map[string][]string{"acid": []string{"batman"}},
 				},
 			},
+			{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "PostgresTeam",
+					APIVersion: "acid.zalan.do/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "teamD",
+				},
+				Spec: acidv1.PostgresTeamSpec{
+					AdditionalSuperuserTeams: map[string][]string{},
+					AdditionalTeams:          map[string][]string{"teamA": []string{"teamD"}, "teamC": []string{"teamD"}, "teamD": []string{"teamA", "teamB", "teamC"}},
+					AdditionalMembers:        map[string][]string{"acid": []string{"batman"}},
+				},
+			},
 		},
 	}
 	pgTeamMap = PostgresTeamMap{
 		"teamA": {
 			AdditionalSuperuserTeams: []string{"teamB", "team24x7"},
-			AdditionalTeams:          []string{"teamC"},
+			AdditionalTeams:          []string{"teamC", "teamD"},
 			AdditionalMembers:        []string{},
 		},
 		"teamB": {
@@ -57,7 +71,12 @@ var (
 		},
 		"teamC": {
 			AdditionalSuperuserTeams: []string{"team24x7"},
-			AdditionalTeams:          []string{"teamA", "teamB", "acid"},
+			AdditionalTeams:          []string{"teamA", "teamB", "teamD", "acid"},
+			AdditionalMembers:        []string{},
+		},
+		"teamD": {
+			AdditionalSuperuserTeams: []string{},
+			AdditionalTeams:          []string{"teamA", "teamB", "teamC"},
 			AdditionalMembers:        []string{},
 		},
 		"team24x7": {
@@ -119,14 +138,14 @@ func TestGetAdditionalTeams(t *testing.T) {
 			"Check that additional teams are returned",
 			"teamA",
 			false,
-			[]string{"teamC"},
+			[]string{"teamC", "teamD"},
 			"GetAdditionalTeams returns wrong list",
 		},
 		{
 			"Check that additional teams are returned incl. transitive teams",
 			"teamA",
 			true,
-			[]string{"teamC", "teamB", "acid"},
+			[]string{"teamC", "teamD", "teamB", "acid"},
 			"GetAdditionalTeams returns wrong list",
 		},
 		{

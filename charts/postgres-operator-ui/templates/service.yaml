@@ -6,6 +6,10 @@ metadata:
     helm.sh/chart: {{ template "postgres-operator-ui.chart" . }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   name: {{ template "postgres-operator-ui.fullname" . }}
   namespace: {{ .Release.Namespace }}
 spec:

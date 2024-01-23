@@ -39,8 +39,12 @@ func (r *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool
 	return pv.Spec.AWSElasticBlockStore != nil && pv.Annotations[constants.VolumeStorateProvisionerAnnotation] == constants.EBSProvisioner
 }
 
-// ExtractVolumeID extracts volumeID
+// ExtractVolumeID extracts volumeID from "aws://eu-central-1a/vol-075ddfc4a127d0bd4"
+// or return only the vol-075ddfc4a127d0bd4 when it doesn't have "aws://"
 func (r *EBSVolumeResizer) ExtractVolumeID(volumeID string) (string, error) {
+	if (strings.HasPrefix(volumeID, "vol-")) && !(strings.HasPrefix(volumeID, "aws://")) {
+		return volumeID, nil
+	}
 	idx := strings.LastIndex(volumeID, constants.EBSVolumeIDStart) + 1
 	if idx == 0 {
 		return "", fmt.Errorf("malformed EBS volume id %q", volumeID)

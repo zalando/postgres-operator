@@ -4,3 +4,5 @@ nodes:
 - role: control-plane
 - role: worker
 - role: worker
+featureGates:
+  StatefulSetAutoDeletePVC: true

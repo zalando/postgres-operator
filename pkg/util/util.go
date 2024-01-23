@@ -152,6 +152,17 @@ func IsEqualIgnoreOrder(a, b []string) bool {
 	return reflect.DeepEqual(a_copy, b_copy)
 }
 
+// Iterate through slice and remove certain string, then return cleaned slice
+func RemoveString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
 // SliceReplaceElement
 func StringSliceReplaceElement(s []string, a, b string) (result []string) {
 	tmp := make([]string, 0, len(s))
@@ -366,4 +377,22 @@ func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 	}
 
 	return request.Cmp(limit) == -1, nil
+}
+
+func MinResource(maxRequestStr, requestStr string) (resource.Quantity, error) {
+
+	isSmaller, err := IsSmallerQuantity(maxRequestStr, requestStr)
+	if isSmaller && err == nil {
+		maxRequest, err := resource.ParseQuantity(maxRequestStr)
+		if err != nil {
+			return maxRequest, err
+		}
+		return maxRequest, nil
+	}
+
+	request, err := resource.ParseQuantity(requestStr)
+	if err != nil {
+		return request, err
+	}
+	return request, nil
 }

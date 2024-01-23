@@ -29,16 +29,15 @@ default: tools
 
 clean:
 	rm -rf manifests
+	rm -rf tls
 
 copy: clean
 	mkdir manifests
-	cp ../manifests -r .
+	cp -r ../manifests .
+	mkdir tls
 
-docker: scm-source.json
+docker:
 	docker build -t "$(IMAGE):$(TAG)" .
-
-scm-source.json: ../.git
-	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
 push: docker
 	docker push "$(IMAGE):$(TAG)"
@@ -47,7 +46,7 @@ tools:
 	# install pinned version of 'kind'
 	# go install must run outside of a dir with a (module-based) Go project !
 	# otherwise go install updates project's dependencies and/or behaves differently
-	cd "/tmp" && GO111MODULE=on go install sigs.k8s.io/kind@v0.11.1
+	cd "/tmp" && GO111MODULE=on go install sigs.k8s.io/kind@v0.14.0
 
 e2etest: tools copy clean
 	./run.sh main

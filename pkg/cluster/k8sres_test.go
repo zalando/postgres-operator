@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"time"
-
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -21,7 +20,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,26 +63,27 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
-	testName := "TestGenerateSpiloConfig"
 	tests := []struct {
 		subtest  string
 		pgParam  *acidv1.PostgresqlParam
 		patroni  *acidv1.Patroni
-		role     string
-		opConfig config.Config
+		opConfig *config.Config
 		result   string
 	}{
 		{
-			subtest:  "Patroni default configuration",
-			pgParam:  &acidv1.PostgresqlParam{PgVersion: "9.6"},
-			patroni:  &acidv1.Patroni{},
-			role:     "zalandos",
-			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/9.6/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+			subtest: "Patroni default configuration",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			patroni: &acidv1.Patroni{},
+			opConfig: &config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "11"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
 			patroni: &acidv1.Patroni{
 				InitDB: map[string]string{
 					"encoding":       "UTF8",
@@ -99,27 +99,57 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				SynchronousModeStrict: true,
 				SynchronousNodeCount:  1,
 				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
+				FailsafeMode:          util.True(),
 			},
-			role:     "zalandos",
-			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
+			opConfig: &config.Config{},
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
+		},
+		{
+			subtest: "Patroni failsafe_mode configured globally",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			patroni: &acidv1.Patroni{},
+			opConfig: &config.Config{
+				EnablePatroniFailsafeMode: util.True(),
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
+		},
+		{
+			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			patroni: &acidv1.Patroni{
+				FailsafeMode: util.False(),
+			},
+			opConfig: &config.Config{
+				EnablePatroniFailsafeMode: util.True(),
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
+		},
+		{
+			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			patroni: &acidv1.Patroni{
+				FailsafeMode: util.True(),
+			},
+			opConfig: &config.Config{
+				EnablePatroniFailsafeMode: util.False(),
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 	}
 	for _, tt := range tests {
-		cluster.OpConfig = tt.opConfig
-		result, err := generateSpiloJSONConfiguration(tt.pgParam, tt.patroni, tt.role, false, logger)
+		cluster.OpConfig = *tt.opConfig
+		result, err := generateSpiloJSONConfiguration(tt.pgParam, tt.patroni, tt.opConfig, logger)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if tt.result != result {
-			t.Errorf("%s %s: Spilo Config is %v, expected %v for role %#v and param %#v",
-				testName, tt.subtest, result, tt.result, tt.role, tt.pgParam)
+			t.Errorf("%s %s: Spilo Config is %v, expected %v and param %#v",
+				t.Name(), tt.subtest, result, tt.result, tt.pgParam)
 		}
 	}
 }
 
 func TestExtractPgVersionFromBinPath(t *testing.T) {
-	testName := "TestExtractPgVersionFromBinPath"
 	tests := []struct {
 		subTest  string
 		binPath  string
@@ -134,15 +164,15 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		},
 		{
 			subTest:  "test current bin path against hard coded template",
-			binPath:  "/usr/lib/postgresql/12/bin",
+			binPath:  "/usr/lib/postgresql/15/bin",
 			template: pgBinariesLocationTemplate,
-			expected: "12",
+			expected: "15",
 		},
 		{
 			subTest:  "test alternative bin path against a matching template",
-			binPath:  "/usr/pgsql-12/bin",
+			binPath:  "/usr/pgsql-15/bin",
 			template: "/usr/pgsql-%v/bin",
-			expected: "12",
+			expected: "15",
 		},
 	}
 
@@ -153,7 +183,7 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		}
 		if pgVersion != tt.expected {
 			t.Errorf("%s %s: Expected version %s, have %s instead",
-				testName, tt.subTest, tt.expected, pgVersion)
+				t.Name(), tt.subTest, tt.expected, pgVersion)
 		}
 	}
 }
@@ -161,6 +191,7 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 const (
 	testPodEnvironmentConfigMapName      = "pod_env_cm"
 	testPodEnvironmentSecretName         = "pod_env_sc"
+	testCronjobEnvironmentSecretName     = "pod_env_sc"
 	testPodEnvironmentObjectNotExists    = "idonotexist"
 	testPodEnvironmentSecretNameAPIError = "pod_env_sc_apierror"
 	testResourceCheckInterval            = 3
@@ -241,7 +272,6 @@ func newMockCluster(opConfig config.Config) *Cluster {
 }
 
 func TestPodEnvironmentConfigMapVariables(t *testing.T) {
-	testName := "TestPodEnvironmentConfigMapVariables"
 	tests := []struct {
 		subTest  string
 		opConfig config.Config
@@ -297,17 +327,17 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 		vars, err := c.getPodEnvironmentConfigMapVariables()
 		if !reflect.DeepEqual(vars, tt.envVars) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
-				testName, tt.subTest, tt.envVars, vars)
+				t.Name(), tt.subTest, tt.envVars, vars)
 		}
 		if tt.err != nil {
 			if err.Error() != tt.err.Error() {
 				t.Errorf("%s %s: expected error `%v` but got `%v`",
-					testName, tt.subTest, tt.err, err)
+					t.Name(), tt.subTest, tt.err, err)
 			}
 		} else {
 			if err != nil {
 				t.Errorf("%s %s: expected no error but got error: `%v`",
-					testName, tt.subTest, err)
+					t.Name(), tt.subTest, err)
 			}
 		}
 	}
@@ -316,7 +346,6 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 // Test if the keys of an existing secret are properly referenced
 func TestPodEnvironmentSecretVariables(t *testing.T) {
 	maxRetries := int(testResourceCheckTimeout / testResourceCheckInterval)
-	testName := "TestPodEnvironmentSecretVariables"
 	tests := []struct {
 		subTest  string
 		opConfig config.Config
@@ -399,6 +428,96 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 	for _, tt := range tests {
 		c := newMockCluster(tt.opConfig)
 		vars, err := c.getPodEnvironmentSecretVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
+		if !reflect.DeepEqual(vars, tt.envVars) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				t.Name(), tt.subTest, tt.envVars, vars)
+		}
+		if tt.err != nil {
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s %s: expected error `%v` but got `%v`",
+					t.Name(), tt.subTest, tt.err, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s %s: expected no error but got error: `%v`",
+					t.Name(), tt.subTest, err)
+			}
+		}
+	}
+
+}
+
+// Test if the keys of an existing secret are properly referenced
+func TestCronjobEnvironmentSecretVariables(t *testing.T) {
+	testName := "TestCronjobEnvironmentSecretVariables"
+	tests := []struct {
+		subTest  string
+		opConfig config.Config
+		envVars  []v1.EnvVar
+		err      error
+	}{
+		{
+			subTest: "No CronjobEnvironmentSecret configured",
+			envVars: []v1.EnvVar{},
+		},
+		{
+			subTest: "Secret referenced by CronjobEnvironmentSecret does not exist",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCronjobEnvironmentSecret: "idonotexist",
+				},
+			},
+			err: fmt.Errorf("could not read Secret CronjobEnvironmentSecretName: secret.core \"idonotexist\" not found"),
+		},
+		{
+			subTest: "Cronjob environment vars reference all keys from secret configured by CronjobEnvironmentSecret",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCronjobEnvironmentSecret: testCronjobEnvironmentSecretName,
+				},
+			},
+			envVars: []v1.EnvVar{
+				{
+					Name: "clone_aws_access_key_id",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "clone_aws_access_key_id",
+						},
+					},
+				},
+				{
+					Name: "custom_variable",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "custom_variable",
+						},
+					},
+				},
+				{
+					Name: "standby_google_application_credentials",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "standby_google_application_credentials",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		vars, err := c.getCronjobEnvironmentSecretVariables()
 		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 		if !reflect.DeepEqual(vars, tt.envVars) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
@@ -560,6 +679,23 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			envVarValue:    "s3.eu-central-1.amazonaws.com",
 		},
 	}
+	expectedCloneEnvSpecEnv := []ExpectedValue{
+		{
+			envIndex:       15,
+			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "test-cluster",
+		},
+		{
+			envIndex:       17,
+			envVarConstant: "CLONE_WALE_S3_PREFIX",
+			envVarValue:    "s3://another-bucket",
+		},
+		{
+			envIndex:       21,
+			envVarConstant: "CLONE_AWS_ENDPOINT",
+			envVarValue:    "s3.eu-central-1.amazonaws.com",
+		},
+	}
 	expectedCloneEnvConfigMap := []ExpectedValue{
 		{
 			envIndex:       16,
@@ -611,7 +747,6 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		},
 	}
 
-	testName := "TestGenerateSpiloPodEnvVars"
 	tests := []struct {
 		subTest            string
 		opConfig           config.Config
@@ -781,6 +916,36 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			expectedValues:     expectedCloneEnvSpec,
 		},
 		{
+			subTest: "will set CLONE_ parameters from manifest `env` section, followed by other options",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentConfigMap: spec.NamespacedName{
+						Name: testPodEnvironmentConfigMapName,
+					},
+				},
+				WALES3Bucket: "global-s3-bucket",
+			},
+			cloneDescription: &acidv1.CloneDescription{
+				ClusterName:  "test-cluster",
+				EndTimestamp: "somewhen",
+				UID:          dummyUUID,
+				S3WalPath:    "s3://another-bucket",
+				S3Endpoint:   "s3.eu-central-1.amazonaws.com",
+			},
+			standbyDescription: &acidv1.StandbyDescription{},
+			expectedValues:     expectedCloneEnvSpecEnv,
+			pgsql: acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					Env: []v1.EnvVar{
+						{
+							Name:  "CLONE_WAL_BUCKET_SCOPE_PREFIX",
+							Value: "test-cluster",
+						},
+					},
+				},
+			},
+		},
+		{
 			subTest: "will set CLONE_AWS_ENDPOINT parameter from pod environment config map",
 			opConfig: config.Config{
 				Resources: config.Resources{
@@ -836,29 +1001,33 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 	for _, tt := range tests {
 		c := newMockCluster(tt.opConfig)
-		c.Postgresql = tt.pgsql
-		actualEnvs := c.generateSpiloPodEnvVars(
-			types.UID(dummyUUID), exampleSpiloConfig, tt.cloneDescription, tt.standbyDescription)
+		pgsql := tt.pgsql
+		pgsql.Spec.Clone = tt.cloneDescription
+		pgsql.Spec.StandbyCluster = tt.standbyDescription
+		c.Postgresql = pgsql
+
+		actualEnvs, err := c.generateSpiloPodEnvVars(&pgsql.Spec, types.UID(dummyUUID), exampleSpiloConfig)
+		assert.NoError(t, err)
 
 		for _, ev := range tt.expectedValues {
 			env := actualEnvs[ev.envIndex]
 
 			if env.Name != ev.envVarConstant {
 				t.Errorf("%s %s: expected env name %s, have %s instead",
-					testName, tt.subTest, ev.envVarConstant, env.Name)
+					t.Name(), tt.subTest, ev.envVarConstant, env.Name)
 			}
 
 			if ev.envVarValueRef != nil {
 				if !reflect.DeepEqual(env.ValueFrom, ev.envVarValueRef) {
 					t.Errorf("%s %s: expected env value reference %#v, have %#v instead",
-						testName, tt.subTest, ev.envVarValueRef, env.ValueFrom)
+						t.Name(), tt.subTest, ev.envVarValueRef, env.ValueFrom)
 				}
 				continue
 			}
 
 			if env.Value != ev.envVarValue {
 				t.Errorf("%s %s: expected env value %s, have %s instead",
-					testName, tt.subTest, ev.envVarValue, env.Value)
+					t.Name(), tt.subTest, ev.envVarValue, env.Value)
 			}
 		}
 	}
@@ -939,7 +1108,6 @@ func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
 }
 
 func TestGetNumberOfInstances(t *testing.T) {
-	testName := "TestGetNumberOfInstances"
 	tests := []struct {
 		subTest         string
 		config          config.Config
@@ -1063,13 +1231,12 @@ func TestGetNumberOfInstances(t *testing.T) {
 
 		if numInstances != tt.provided {
 			t.Errorf("%s %s: Expected to get %d instances, have %d instead",
-				testName, tt.subTest, tt.provided, numInstances)
+				t.Name(), tt.subTest, tt.provided, numInstances)
 		}
 	}
 }
 
 func TestCloneEnv(t *testing.T) {
-	testName := "TestCloneEnv"
 	tests := []struct {
 		subTest   string
 		cloneOpts *acidv1.CloneDescription
@@ -1136,18 +1303,17 @@ func TestCloneEnv(t *testing.T) {
 
 		if env.Name != tt.env.Name {
 			t.Errorf("%s %s: Expected env name %s, have %s instead",
-				testName, tt.subTest, tt.env.Name, env.Name)
+				t.Name(), tt.subTest, tt.env.Name, env.Name)
 		}
 
 		if env.Value != tt.env.Value {
 			t.Errorf("%s %s: Expected env value %s, have %s instead",
-				testName, tt.subTest, tt.env.Value, env.Value)
+				t.Name(), tt.subTest, tt.env.Value, env.Value)
 		}
 	}
 }
 
 func TestAppendEnvVar(t *testing.T) {
-	testName := "TestAppendEnvVar"
 	tests := []struct {
 		subTest      string
 		envs         []v1.EnvVar
@@ -1203,7 +1369,7 @@ func TestAppendEnvVar(t *testing.T) {
 
 		if len(finalEnvs) != tt.expectedSize {
 			t.Errorf("%s %s: expected %d env variables, got %d",
-				testName, tt.subTest, tt.expectedSize, len(finalEnvs))
+				t.Name(), tt.subTest, tt.expectedSize, len(finalEnvs))
 		}
 
 		for _, env := range tt.envs {
@@ -1211,7 +1377,7 @@ func TestAppendEnvVar(t *testing.T) {
 				if env.Name == finalEnv.Name {
 					if env.Value != finalEnv.Value {
 						t.Errorf("%s %s: expected env value %s of variable %s, got %s instead",
-							testName, tt.subTest, env.Value, env.Name, finalEnv.Value)
+							t.Name(), tt.subTest, env.Value, env.Name, finalEnv.Value)
 					}
 				}
 			}
@@ -1220,7 +1386,6 @@ func TestAppendEnvVar(t *testing.T) {
 }
 
 func TestStandbyEnv(t *testing.T) {
-	testName := "TestStandbyEnv"
 	tests := []struct {
 		subTest     string
 		standbyOpts *acidv1.StandbyDescription
@@ -1303,17 +1468,17 @@ func TestStandbyEnv(t *testing.T) {
 
 		if env.Name != tt.env.Name {
 			t.Errorf("%s %s: Expected env name %s, have %s instead",
-				testName, tt.subTest, tt.env.Name, env.Name)
+				t.Name(), tt.subTest, tt.env.Name, env.Name)
 		}
 
 		if env.Value != tt.env.Value {
 			t.Errorf("%s %s: Expected env value %s, have %s instead",
-				testName, tt.subTest, tt.env.Value, env.Value)
+				t.Name(), tt.subTest, tt.env.Value, env.Value)
 		}
 
 		if len(envs) != tt.envLen {
 			t.Errorf("%s %s: Expected number of env variables %d, have %d instead",
-				testName, tt.subTest, tt.envLen, len(envs))
+				t.Name(), tt.subTest, tt.envLen, len(envs))
 		}
 	}
 }
@@ -1384,6 +1549,96 @@ func TestNodeAffinity(t *testing.T) {
 	assert.Equal(t, s.Spec.Template.Spec.Affinity.NodeAffinity, nodeAff, "cluster template has correct node affinity")
 }
 
+func TestPodAffinity(t *testing.T) {
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+
+	tests := []struct {
+		subTest   string
+		preferred bool
+		anti      bool
+	}{
+		{
+			subTest:   "generate affinity RequiredDuringSchedulingIgnoredDuringExecution",
+			preferred: false,
+			anti:      false,
+		},
+		{
+			subTest:   "generate affinity PreferredDuringSchedulingIgnoredDuringExecution",
+			preferred: true,
+			anti:      false,
+		},
+		{
+			subTest:   "generate anitAffinity RequiredDuringSchedulingIgnoredDuringExecution",
+			preferred: false,
+			anti:      true,
+		},
+		{
+			subTest:   "generate anitAffinity PreferredDuringSchedulingIgnoredDuringExecution",
+			preferred: true,
+			anti:      true,
+		},
+	}
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			NumberOfInstances: 1,
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		cluster := New(
+			Config{
+				OpConfig: config.Config{
+					EnablePodAntiAffinity:                    tt.anti,
+					PodManagementPolicy:                      "ordered_ready",
+					ProtectedRoles:                           []string{"admin"},
+					PodAntiAffinityPreferredDuringScheduling: tt.preferred,
+					Resources: config.Resources{
+						ClusterLabels:        map[string]string{"application": "spilo"},
+						ClusterNameLabel:     "cluster-name",
+						DefaultCPURequest:    "300m",
+						DefaultCPULimit:      "300m",
+						DefaultMemoryRequest: "300Mi",
+						DefaultMemoryLimit:   "300Mi",
+						PodRoleLabel:         "spilo-role",
+					},
+				},
+			}, k8sutil.KubernetesClient{}, pg, logger, eventRecorder)
+
+		cluster.Name = clusterName
+		cluster.Namespace = namespace
+
+		s, err := cluster.generateStatefulSet(&pg.Spec)
+		if err != nil {
+			assert.NoError(t, err)
+		}
+
+		if !tt.anti {
+			assert.Nil(t, s.Spec.Template.Spec.Affinity, "pod affinity should not be set")
+		} else {
+			if tt.preferred {
+				assert.NotNil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should use preferredDuringScheduling")
+				assert.Nil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should not use requiredDuringScheduling")
+			} else {
+				assert.Nil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should not use preferredDuringScheduling")
+				assert.NotNil(t, s.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "pod anti-affinity should use requiredDuringScheduling")
+			}
+		}
+	}
+}
+
 func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
@@ -1406,8 +1661,59 @@ func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role Postg
 	return nil
 }
 
-func TestTLS(t *testing.T) {
+func TestSharePgSocketWithSidecars(t *testing.T) {
+	tests := []struct {
+		subTest   string
+		podSpec   *v1.PodSpec
+		runVolPos int
+	}{
+		{
+			subTest: "empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{},
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{},
+					},
+				},
+			},
+			runVolPos: 0,
+		},
+		{
+			subTest: "non empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{},
+						},
+					},
+				},
+			},
+			runVolPos: 1,
+		},
+	}
+	for _, tt := range tests {
+		addVarRunVolume(tt.podSpec)
+		postgresContainer := getPostgresContainer(tt.podSpec)
 
+		volumeName := tt.podSpec.Volumes[tt.runVolPos].Name
+		volumeMountName := postgresContainer.VolumeMounts[tt.runVolPos].Name
+
+		if volumeName != constants.RunVolumeName {
+			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
+				t.Name(), tt.subTest, constants.RunVolumeName, volumeName)
+		}
+		if volumeMountName != constants.RunVolumeName {
+			t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
+				t.Name(), tt.subTest, constants.RunVolumeName, volumeMountName)
+		}
+	}
+}
+
+func TestTLS(t *testing.T) {
 	client, _ := newFakeK8sTestClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
@@ -1496,7 +1802,6 @@ func TestTLS(t *testing.T) {
 }
 
 func TestShmVolume(t *testing.T) {
-	testName := "TestShmVolume"
 	tests := []struct {
 		subTest string
 		podSpec *v1.PodSpec
@@ -1539,17 +1844,16 @@ func TestShmVolume(t *testing.T) {
 
 		if volumeName != constants.ShmVolumeName {
 			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
-				testName, tt.subTest, constants.ShmVolumeName, volumeName)
+				t.Name(), tt.subTest, constants.ShmVolumeName, volumeName)
 		}
 		if volumeMountName != constants.ShmVolumeName {
 			t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
-				testName, tt.subTest, constants.ShmVolumeName, volumeMountName)
+				t.Name(), tt.subTest, constants.ShmVolumeName, volumeMountName)
 		}
 	}
 }
 
 func TestSecretVolume(t *testing.T) {
-	testName := "TestSecretVolume"
 	tests := []struct {
 		subTest   string
 		podSpec   *v1.PodSpec
@@ -1599,7 +1903,7 @@ func TestSecretVolume(t *testing.T) {
 
 		if volumeName != additionalSecretMount {
 			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
-				testName, tt.subTest, additionalSecretMount, volumeName)
+				t.Name(), tt.subTest, additionalSecretMount, volumeName)
 		}
 
 		for i := range tt.podSpec.Containers {
@@ -1607,7 +1911,7 @@ func TestSecretVolume(t *testing.T) {
 
 			if volumeMountName != additionalSecretMount {
 				t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
-					testName, tt.subTest, additionalSecretMount, volumeMountName)
+					t.Name(), tt.subTest, additionalSecretMount, volumeMountName)
 			}
 		}
 
@@ -1622,8 +1926,6 @@ func TestSecretVolume(t *testing.T) {
 }
 
 func TestAdditionalVolume(t *testing.T) {
-	testName := "TestAdditionalVolume"
-
 	client, _ := newFakeK8sTestClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
@@ -1735,14 +2037,13 @@ func TestAdditionalVolume(t *testing.T) {
 
 			if !util.IsEqualIgnoreOrder(mounts, tt.expectedMounts) {
 				t.Errorf("%s %s: different volume mounts: got %v, epxected %v",
-					testName, tt.subTest, mounts, tt.expectedMounts)
+					t.Name(), tt.subTest, mounts, tt.expectedMounts)
 			}
 		}
 	}
 }
 
 func TestVolumeSelector(t *testing.T) {
-	testName := "TestVolumeSelector"
 	makeSpec := func(volume acidv1.Volume) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
 			TeamID:            "myapp",
@@ -1823,7 +2124,7 @@ func TestVolumeSelector(t *testing.T) {
 		pgSpec := makeSpec(tt.volume)
 		sts, err := cluster.generateStatefulSet(&pgSpec)
 		if err != nil {
-			t.Fatalf("%s %s: no statefulset created %v", testName, tt.subTest, err)
+			t.Fatalf("%s %s: no statefulset created %v", t.Name(), tt.subTest, err)
 		}
 
 		volIdx := len(sts.Spec.VolumeClaimTemplates)
@@ -1834,12 +2135,12 @@ func TestVolumeSelector(t *testing.T) {
 			}
 		}
 		if volIdx == len(sts.Spec.VolumeClaimTemplates) {
-			t.Errorf("%s %s: no datavolume found in sts", testName, tt.subTest)
+			t.Errorf("%s %s: no datavolume found in sts", t.Name(), tt.subTest)
 		}
 
 		selector := sts.Spec.VolumeClaimTemplates[volIdx].Spec.Selector
 		if !reflect.DeepEqual(selector, tt.wantSelector) {
-			t.Errorf("%s %s: expected: %#v but got: %#v", testName, tt.subTest, tt.wantSelector, selector)
+			t.Errorf("%s %s: expected: %#v but got: %#v", t.Name(), tt.subTest, tt.wantSelector, selector)
 		}
 	}
 }
@@ -1873,7 +2174,7 @@ func TestSidecars(t *testing.T) {
 
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
-			PgVersion: "12.1",
+			PgVersion: "15",
 			Parameters: map[string]string{
 				"max_connections": "100",
 			},
@@ -1915,8 +2216,10 @@ func TestSidecars(t *testing.T) {
 				},
 				Resources: config.Resources{
 					DefaultCPURequest:    "200m",
+					MaxCPURequest:        "300m",
 					DefaultCPULimit:      "500m",
 					DefaultMemoryRequest: "0.7Gi",
+					MaxMemoryRequest:     "1.0Gi",
 					DefaultMemoryLimit:   "1.3Gi",
 				},
 				SidecarImages: map[string]string{
@@ -2051,7 +2354,7 @@ func TestSidecars(t *testing.T) {
 func TestGeneratePodDisruptionBudget(t *testing.T) {
 	tests := []struct {
 		c   *Cluster
-		out policyv1beta1.PodDisruptionBudget
+		out policyv1.PodDisruptionBudget
 	}{
 		// With multiple instances.
 		{
@@ -2063,13 +2366,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
@@ -2087,13 +2390,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
@@ -2111,13 +2414,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
@@ -2135,16 +2438,40 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1beta1.PodDisruptionBudget{
+			policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-databass-budget",
 					Namespace: "myapp",
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
+					},
+				},
+			},
+		},
+		// With PDBMasterLabelSelector disabled.
+		{
+			New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", PDBMasterLabelSelector: util.False()}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+				logger,
+				eventRecorder),
+			policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "postgres-myapp-database-pdb",
+					Namespace: "myapp",
+					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
+				},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					MinAvailable: util.ToIntStr(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"cluster-name": "myapp-database"},
 					},
 				},
 			},
@@ -2202,8 +2529,10 @@ func TestGenerateService(t *testing.T) {
 				},
 				Resources: config.Resources{
 					DefaultCPURequest:    "200m",
+					MaxCPURequest:        "300m",
 					DefaultCPULimit:      "500m",
 					DefaultMemoryRequest: "0.7Gi",
+					MaxMemoryRequest:     "1.0Gi",
 					DefaultMemoryLimit:   "1.3Gi",
 				},
 				SidecarImages: map[string]string{
@@ -2251,7 +2580,6 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
-	testName := "TestCreateLoadBalancerLogic"
 	tests := []struct {
 		subtest  string
 		role     PostgresRole
@@ -2293,7 +2621,7 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 		result := cluster.shouldCreateLoadBalancerForService(tt.role, tt.spec)
 		if tt.result != result {
 			t.Errorf("%s %s: Load balancer is %t, expect %t for role %#v and spec %#v",
-				testName, tt.subtest, result, tt.result, tt.role, tt.spec)
+				t.Name(), tt.subtest, result, tt.result, tt.role, tt.spec)
 		}
 	}
 }
@@ -2303,6 +2631,7 @@ func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 
 	return k8sutil.KubernetesClient{
 		DeploymentsGetter: clientSet.AppsV1(),
+		PodsGetter:        clientSet.CoreV1(),
 		ServicesGetter:    clientSet.CoreV1(),
 	}, clientSet
 }
@@ -2340,7 +2669,6 @@ func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPo
 }
 
 func TestEnableLoadBalancers(t *testing.T) {
-	testName := "Test enabling LoadBalancers"
 	client, _ := newLBFakeClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
@@ -2466,7 +2794,7 @@ func TestEnableLoadBalancers(t *testing.T) {
 			cluster.syncService(role)
 			cluster.ConnectionPooler[role] = &ConnectionPoolerObjects{
 				Name:        cluster.connectionPoolerName(role),
-				ClusterName: cluster.ClusterName,
+				ClusterName: cluster.Name,
 				Namespace:   cluster.Namespace,
 				Role:        role,
 			}
@@ -2475,34 +2803,35 @@ func TestEnableLoadBalancers(t *testing.T) {
 			generatedServices = append(generatedServices, cluster.ConnectionPooler[role].Service.Spec)
 		}
 		if !reflect.DeepEqual(tt.expectedServices, generatedServices) {
-			t.Errorf("%s %s: expected %#v but got %#v", testName, tt.subTest, tt.expectedServices, generatedServices)
+			t.Errorf("%s %s: expected %#v but got %#v", t.Name(), tt.subTest, tt.expectedServices, generatedServices)
 		}
 	}
 }
 
 func TestGenerateResourceRequirements(t *testing.T) {
-	testName := "TestGenerateResourceRequirements"
 	client, _ := newFakeK8sTestClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
 	clusterNameLabel := "cluster-name"
-	roleLabel := "spilo-role"
 	sidecarName := "postgres-exporter"
 
-	// two test cases will call enforceMinResourceLimits which emits 2 events per call
-	// hence bufferSize of 4 is required
-	newEventRecorder := record.NewFakeRecorder(4)
+	// enforceMinResourceLimits will be called 2 times emitting 4 events (2x cpu, 2x memory raise)
+	// enforceMaxResourceRequests will be called 4 times emitting 6 events (2x cpu, 4x memory cap)
+	// hence event bufferSize of 10 is required
+	newEventRecorder := record.NewFakeRecorder(10)
 
 	configResources := config.Resources{
 		ClusterLabels:        map[string]string{"application": "spilo"},
 		ClusterNameLabel:     clusterNameLabel,
 		DefaultCPURequest:    "100m",
 		DefaultCPULimit:      "1",
+		MaxCPURequest:        "500m",
+		MinCPULimit:          "250m",
 		DefaultMemoryRequest: "100Mi",
 		DefaultMemoryLimit:   "500Mi",
-		MinCPULimit:          "250m",
+		MaxMemoryRequest:     "1Gi",
 		MinMemoryLimit:       "250Mi",
-		PodRoleLabel:         roleLabel,
+		PodRoleLabel:         "spilo-role",
 	}
 
 	tests := []struct {
@@ -2632,6 +2961,10 @@ func TestGenerateResourceRequirements(t *testing.T) {
 					Namespace: namespace,
 				},
 				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{Memory: "200Mi"},
+						ResourceLimits:   acidv1.ResourceDescription{Memory: "300Mi"},
+					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
 						Size: "1G",
@@ -2639,8 +2972,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "500Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "300Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "300Mi"},
 			},
 		},
 		{
@@ -2765,6 +3098,187 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
 			},
 		},
+		{
+			subTest: "test enforcing max cpu and memory requests",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "2Gi"},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: "2", Memory: "4Gi"},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "500m", Memory: "1Gi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "2", Memory: "4Gi"},
+			},
+		},
+		{
+			subTest: "test SetMemoryRequestToLimit flag but raise only until max memory request",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: true,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{Memory: "500Mi"},
+						ResourceLimits:   acidv1.ResourceDescription{Memory: "2Gi"},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "1Gi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "2Gi"},
+			},
+		},
+		{
+			subTest: "test HugePages are not set on container when not requested in manifest",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{},
+						ResourceLimits:   acidv1.ResourceDescription{},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:    "100m",
+					Memory: "100Mi",
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:    "1",
+					Memory: "500Mi",
+				},
+			},
+		},
+		{
+			subTest: "test HugePages are passed through to the postgres container",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{
+							HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+							HugePages1Gi: k8sutil.StringToPointer("1Gi"),
+						},
+						ResourceLimits: acidv1.ResourceDescription{
+							HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+							HugePages1Gi: k8sutil.StringToPointer("2Gi"),
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:          "100m",
+					Memory:       "100Mi",
+					HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("1Gi"),
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:          "1",
+					Memory:       "500Mi",
+					HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("2Gi"),
+				},
+			},
+		},
+		{
+			subTest: "test HugePages are passed through on sidecars",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Sidecars: []acidv1.Sidecar{
+						{
+							Name:        "test-sidecar",
+							DockerImage: "test-image",
+							Resources: &acidv1.Resources{
+								ResourceRequests: acidv1.ResourceDescription{
+									HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+									HugePages1Gi: k8sutil.StringToPointer("1Gi"),
+								},
+								ResourceLimits: acidv1.ResourceDescription{
+									HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+									HugePages1Gi: k8sutil.StringToPointer("2Gi"),
+								},
+							},
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:          "100m",
+					Memory:       "100Mi",
+					HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("1Gi"),
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:          "1",
+					Memory:       "500Mi",
+					HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("2Gi"),
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2788,14 +3302,214 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		}
 		assert.NoError(t, err)
 		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
-			t.Errorf("%s - %s: expected %#v but got %#v", testName, tt.subTest, tt.expectedResources, clusterResources)
+			t.Errorf("%s - %s: expected %#v but got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
+		}
+	}
+}
+
+func TestGenerateLogicalBackupJob(t *testing.T) {
+	clusterName := "acid-test-cluster"
+	teamId := "test"
+	configResources := config.Resources{
+		ClusterNameLabel:     "cluster-name",
+		DefaultCPURequest:    "100m",
+		DefaultCPULimit:      "1",
+		DefaultMemoryRequest: "100Mi",
+		DefaultMemoryLimit:   "500Mi",
+	}
+
+	tests := []struct {
+		subTest            string
+		config             config.Config
+		specSchedule       string
+		expectedSchedule   string
+		expectedJobName    string
+		expectedResources  acidv1.Resources
+		expectedAnnotation map[string]string
+		expectedLabel      map[string]string
+	}{
+		{
+			subTest: "test generation of logical backup pod resources when not configured",
+			config: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupJobPrefix: "logical-backup-",
+					LogicalBackupSchedule:  "30 00 * * *",
+				},
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			specSchedule:     "",
+			expectedSchedule: "30 00 * * *",
+			expectedJobName:  "logical-backup-acid-test-cluster",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of logical backup pod resources when configured",
+			config: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCPURequest:    "10m",
+					LogicalBackupCPULimit:      "300m",
+					LogicalBackupMemoryRequest: "50Mi",
+					LogicalBackupMemoryLimit:   "300Mi",
+					LogicalBackupJobPrefix:     "lb-",
+					LogicalBackupSchedule:      "30 00 * * *",
+				},
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			specSchedule:     "30 00 * * 7",
+			expectedSchedule: "30 00 * * 7",
+			expectedJobName:  "lb-acid-test-cluster",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "50Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "300m", Memory: "300Mi"},
+			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of logical backup pod resources when partly configured",
+			config: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCPURequest: "50m",
+					LogicalBackupCPULimit:   "250m",
+					LogicalBackupJobPrefix:  "",
+					LogicalBackupSchedule:   "30 00 * * *",
+				},
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			specSchedule:     "",
+			expectedSchedule: "30 00 * * *",
+			expectedJobName:  "acid-test-cluster",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "50m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "250m", Memory: "500Mi"},
+			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of logical backup pod resources with SetMemoryRequestToLimit enabled",
+			config: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupMemoryRequest: "80Mi",
+					LogicalBackupMemoryLimit:   "200Mi",
+					LogicalBackupJobPrefix:     "test-long-prefix-so-name-must-be-trimmed-",
+					LogicalBackupSchedule:      "30 00 * * *",
+				},
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: true,
+			},
+			specSchedule:     "",
+			expectedSchedule: "30 00 * * *",
+			expectedJobName:  "test-long-prefix-so-name-must-be-trimmed-acid-test-c",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "200Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "200Mi"},
+			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of pod annotations when cluster InheritedLabel is set",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:     "cluster-name",
+					InheritedLabels:      []string{"labelKey"},
+					DefaultCPURequest:    "100m",
+					DefaultCPULimit:      "1",
+					DefaultMemoryRequest: "100Mi",
+					DefaultMemoryLimit:   "500Mi",
+				},
+			},
+			specSchedule:     "",
+			expectedJobName:  "acid-test-cluster",
+			expectedSchedule: "",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+			expectedLabel:      map[string]string{"labelKey": "labelValue", "cluster-name": clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of pod annotations when cluster InheritedAnnotations is set",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:     "cluster-name",
+					InheritedAnnotations: []string{"annotationKey"},
+					DefaultCPURequest:    "100m",
+					DefaultCPULimit:      "1",
+					DefaultMemoryRequest: "100Mi",
+					DefaultMemoryLimit:   "500Mi",
+				},
+			},
+			specSchedule:     "",
+			expectedJobName:  "acid-test-cluster",
+			expectedSchedule: "",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: map[string]string{"annotationKey": "annotationValue"},
+		},
+	}
+
+	for _, tt := range tests {
+		var cluster = New(
+			Config{
+				OpConfig: tt.config,
+			}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
+		cluster.ObjectMeta.Name = clusterName
+		cluster.Spec.TeamID = teamId
+		if cluster.ObjectMeta.Labels == nil {
+			cluster.ObjectMeta.Labels = make(map[string]string)
+		}
+		if cluster.ObjectMeta.Annotations == nil {
+			cluster.ObjectMeta.Annotations = make(map[string]string)
+		}
+		cluster.ObjectMeta.Labels["labelKey"] = "labelValue"
+		cluster.ObjectMeta.Annotations["annotationKey"] = "annotationValue"
+		cluster.Spec.LogicalBackupSchedule = tt.specSchedule
+		cronJob, err := cluster.generateLogicalBackupJob()
+		assert.NoError(t, err)
+		if cronJob.Spec.Schedule != tt.expectedSchedule {
+			t.Errorf("%s - %s: expected schedule %s, got %s", t.Name(), tt.subTest, tt.expectedSchedule, cronJob.Spec.Schedule)
+		}
+
+		if cronJob.Name != tt.expectedJobName {
+			t.Errorf("%s - %s: expected job name %s, got %s", t.Name(), tt.subTest, tt.expectedJobName, cronJob.Name)
+		}
+
+		if !reflect.DeepEqual(cronJob.Labels, tt.expectedLabel) {
+			t.Errorf("%s - %s: expected labels %s, got %s", t.Name(), tt.subTest, tt.expectedLabel, cronJob.Labels)
+		}
+
+		if !reflect.DeepEqual(cronJob.Annotations, tt.expectedAnnotation) {
+			t.Errorf("%s - %s: expected annotations %s, got %s", t.Name(), tt.subTest, tt.expectedAnnotation, cronJob.Annotations)
+		}
+
+		containers := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers
+		clusterResources, err := parseResourceRequirements(containers[0].Resources)
+		assert.NoError(t, err)
+		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
+			t.Errorf("%s - %s: expected resources %#v, got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
 		}
 	}
 }
 
 func TestGenerateCapabilities(t *testing.T) {
-
-	testName := "TestGenerateCapabilities"
 	tests := []struct {
 		subTest      string
 		configured   []string
@@ -2835,7 +3549,7 @@ func TestGenerateCapabilities(t *testing.T) {
 		caps := generateCapabilities(tt.configured)
 		if !reflect.DeepEqual(caps, tt.capabilities) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
-				testName, tt.subTest, tt.capabilities, caps)
+				t.Name(), tt.subTest, tt.capabilities, caps)
 		}
 	}
 }

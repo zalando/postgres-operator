@@ -221,6 +221,10 @@ spec:
                 items:
                   type: string
                   pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
+              masterServiceAnnotations:
+                type: object
+                additionalProperties:
+                  type: string
               nodeAffinity:
                 type: object
                 properties:
@@ -318,6 +322,8 @@ spec:
               patroni:
                 type: object
                 properties:
+                  failsafe_mode:
+                    type: boolean
                   initdb:
                     type: object
                     additionalProperties:
@@ -363,13 +369,12 @@ spec:
                   version:
                     type: string
                     enum:
-                      - "9.5"
-                      - "9.6"
                       - "10"
                       - "11"
                       - "12"
                       - "13"
                       - "14"
+                      - "15"
                   parameters:
                     type: object
                     additionalProperties:
@@ -399,6 +404,10 @@ spec:
               replicaLoadBalancer:
                 type: boolean
                 description: deprecated
+              replicaServiceAnnotations:
+                type: object
+                additionalProperties:
+                  type: string
               resources:
                 type: object
                 properties:
@@ -430,6 +439,12 @@ spec:
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                         # Note: the value specified here must not be zero or be higher
                         # than the corresponding limit.
+                      hugepages-2Mi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-1Gi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                   requests:
                     type: object
                     properties:
@@ -437,6 +452,12 @@ spec:
                         type: string
                         pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                       memory:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-2Mi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-1Gi:
                         type: string
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
               schedulerName:
@@ -490,6 +511,8 @@ spec:
                       type: integer
                     database:
                       type: string
+                    enableRecovery:
+                      type: boolean
                     filter:
                       type: object
                       additionalProperties:
@@ -506,6 +529,8 @@ spec:
                           idColumn:
                             type: string
                           payloadColumn:
+                            type: string
+                          recoveryEventType:
                             type: string
               teamId:
                 type: string

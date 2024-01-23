@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Compose, Zalando SE
+Copyright 2024 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -123,7 +123,7 @@ func (c *FakePostgresqls) UpdateStatus(ctx context.Context, postgresql *acidzala
 // Delete takes name of the postgresql and deletes it. Returns an error if one occurs.
 func (c *FakePostgresqls) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(postgresqlsResource, c.ns, name), &acidzalandov1.Postgresql{})
+		Invokes(testing.NewDeleteActionWithOptions(postgresqlsResource, c.ns, name, opts), &acidzalandov1.Postgresql{})
 
 	return err
 }

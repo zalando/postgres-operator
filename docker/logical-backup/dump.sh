@@ -12,14 +12,18 @@ DUMP_SIZE_COEFF=5
 ERRORCOUNT=0
 
 TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+KUBERNETES_SERVICE_PORT=${KUBERNETES_SERVICE_PORT:-443}
 if [ "$KUBERNETES_SERVICE_HOST" != "${KUBERNETES_SERVICE_HOST#*[0-9].[0-9]}" ]; then
-  echo "IPv4"
-  K8S_API_URL=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/api/v1
+    echo "IPv4"
+    K8S_API_URL=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/api/v1
 elif [ "$KUBERNETES_SERVICE_HOST" != "${KUBERNETES_SERVICE_HOST#*:[0-9a-fA-F]}" ]; then
-  echo "IPv6"
-  K8S_API_URL=https://[$KUBERNETES_SERVICE_HOST]:$KUBERNETES_SERVICE_PORT/api/v1
+    echo "IPv6"
+    K8S_API_URL=https://[$KUBERNETES_SERVICE_HOST]:$KUBERNETES_SERVICE_PORT/api/v1
+elif [ -n "$KUBERNETES_SERVICE_HOST" ]; then
+    echo "Hostname"
+    K8S_API_URL=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/api/v1
 else
-  echo "Unrecognized IP format '$KUBERNETES_SERVICE_HOST'"
+  echo "KUBERNETES_SERVICE_HOST was not set"
 fi
 echo "API Endpoint: ${K8S_API_URL}"
 CERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -40,6 +44,12 @@ function compress {
     pigz
 }
 
+function az_upload {
+    PATH_TO_BACKUP=$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
+
+    az storage blob upload --file "$1" --account-name "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME" --account-key "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY" -c "$LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER" -n "$PATH_TO_BACKUP"
+}
+
 function aws_delete_objects {
     args=(
       "--bucket=$LOGICAL_BACKUP_S3_BUCKET"
@@ -53,42 +63,42 @@ function aws_delete_objects {
 export -f aws_delete_objects
 
 function aws_delete_outdated {
-      if [[ -z "$LOGICAL_BACKUP_S3_RETENTION_TIME" ]] ; then
-          echo "no retention time configured: skip cleanup of outdated backups"
-          return 0
-      fi
-
-      # define cutoff date for outdated backups (day precision)
-      cutoff_date=$(date -d "$LOGICAL_BACKUP_S3_RETENTION_TIME ago" +%F)
-
-      # mimic bucket setup from Spilo
-      prefix="spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"
-
-      args=(
-        "--no-paginate"
-        "--output=text"
-        "--prefix=$prefix"
-        "--bucket=$LOGICAL_BACKUP_S3_BUCKET"
-      )
-
-      [[ ! -z "$LOGICAL_BACKUP_S3_ENDPOINT" ]] && args+=("--endpoint-url=$LOGICAL_BACKUP_S3_ENDPOINT")
-      [[ ! -z "$LOGICAL_BACKUP_S3_REGION" ]] && args+=("--region=$LOGICAL_BACKUP_S3_REGION")
-
-      # list objects older than the cutoff date
-      aws s3api list-objects "${args[@]}" --query="Contents[?LastModified<='$cutoff_date'].[Key]" > /tmp/outdated-backups
-
-      # spare the last backup
-      sed -i '$d' /tmp/outdated-backups
-
-      count=$(wc -l < /tmp/outdated-backups)
-      if [[ $count == 0 ]] ; then
-        echo "no outdated backups to delete"
+    if [[ -z "$LOGICAL_BACKUP_S3_RETENTION_TIME" ]] ; then
+        echo "no retention time configured: skip cleanup of outdated backups"
         return 0
-      fi
-      echo "deleting $count outdated backups created before $cutoff_date"
+    fi
 
-      # deleted outdated files in batches with 100 at a time
-      tr '\n' '\0'  < /tmp/outdated-backups | xargs -0 -P1 -n100 bash -c 'aws_delete_objects "$@"' _
+    # define cutoff date for outdated backups (day precision)
+    cutoff_date=$(date -d "$LOGICAL_BACKUP_S3_RETENTION_TIME ago" +%F)
+
+    # mimic bucket setup from Spilo
+    prefix="spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"
+
+    args=(
+      "--no-paginate"
+      "--output=text"
+      "--prefix=$prefix"
+      "--bucket=$LOGICAL_BACKUP_S3_BUCKET"
+    )
+
+    [[ ! -z "$LOGICAL_BACKUP_S3_ENDPOINT" ]] && args+=("--endpoint-url=$LOGICAL_BACKUP_S3_ENDPOINT")
+    [[ ! -z "$LOGICAL_BACKUP_S3_REGION" ]] && args+=("--region=$LOGICAL_BACKUP_S3_REGION")
+
+    # list objects older than the cutoff date
+    aws s3api list-objects "${args[@]}" --query="Contents[?LastModified<='$cutoff_date'].[Key]" > /tmp/outdated-backups
+
+    # spare the last backup
+    sed -i '$d' /tmp/outdated-backups
+
+    count=$(wc -l < /tmp/outdated-backups)
+    if [[ $count == 0 ]] ; then
+      echo "no outdated backups to delete"
+      return 0
+    fi
+    echo "deleting $count outdated backups created before $cutoff_date"
+
+    # deleted outdated files in batches with 100 at a time
+    tr '\n' '\0'  < /tmp/outdated-backups | xargs -0 -P1 -n100 bash -c 'aws_delete_objects "$@"' _
 }
 
 function aws_upload {
@@ -120,7 +130,7 @@ function upload {
         "gcs")
             gcs_upload
             ;;
-        *)
+        "s3")
             aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
             aws_delete_outdated
             ;;
@@ -131,14 +141,14 @@ function get_pods {
     declare -r SELECTOR="$1"
 
     curl "${K8S_API_URL}/namespaces/${POD_NAMESPACE}/pods?$SELECTOR" \
-        --cacert $CERT \
-        -H "Authorization: Bearer ${TOKEN}" | jq .items[].status.podIP -r
+      --cacert $CERT \
+      -H "Authorization: Bearer ${TOKEN}" | jq .items[].status.podIP -r
 }
 
 function get_current_pod {
     curl "${K8S_API_URL}/namespaces/${POD_NAMESPACE}/pods?fieldSelector=metadata.name%3D${HOSTNAME}" \
-        --cacert $CERT \
-        -H "Authorization: Bearer ${TOKEN}"
+      --cacert $CERT \
+      -H "Authorization: Bearer ${TOKEN}"
 }
 
 declare -a search_strategy=(
@@ -174,8 +184,13 @@ for search in "${search_strategy[@]}"; do
 done
 
 set -x
-dump | compress | upload
-[[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
-set +x
+if [ "$LOGICAL_BACKUP_PROVIDER" == "az" ]; then
+    dump | compress > /tmp/azure-backup.sql.gz
+    az_upload /tmp/azure-backup.sql.gz
+else
+    dump | compress | upload
+    [[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
+    set +x
 
-exit $ERRORCOUNT
+    exit $ERRORCOUNT
+fi

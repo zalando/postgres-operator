@@ -3,32 +3,46 @@
 There are two mutually-exclusive methods to set the Postgres Operator
 configuration.
 
-* ConfigMaps-based, the legacy one.  The configuration is supplied in a
-  key-value configmap, defined by the `CONFIG_MAP_NAME` environment variable.
-  Non-scalar values, i.e. lists or maps, are encoded in the value strings using
-  the comma-based syntax for lists and coma-separated `key:value` syntax for
-  maps. String values containing ':' should be enclosed in quotes. The
-  configuration is flat, parameter group names below are not reflected in the
-  configuration structure. There is an
-  [example](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
+* ConfigMaps-based, the legacy one
+* CRD-based configuration
 
-* CRD-based configuration. The configuration is stored in a custom YAML
-  manifest. The manifest is an instance of the custom resource definition (CRD)
-  called `OperatorConfiguration`. The operator registers this CRD during the
-  start and uses it for configuration if the [operator deployment manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
-  sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty
-  value. The variable should point to the `postgresql-operator-configuration`
-  object in the operator's namespace.
+Variable names are underscore-separated words.
 
-  The CRD-based configuration is a regular YAML document; non-scalar keys are
-  simply represented in the usual YAML way. There are no default values built-in
-  in the operator, each parameter that is not supplied in the configuration
-  receives an empty value. In order to create your own configuration just copy
-  the [default one](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
-  and change it.
+### ConfigMaps-based
+The configuration is supplied in a
+key-value configmap, defined by the `CONFIG_MAP_NAME` environment variable.
+Non-scalar values, i.e. lists or maps, are encoded in the value strings using
+the comma-based syntax for lists and coma-separated `key:value` syntax for
+maps. String values containing ':' should be enclosed in quotes. The
+configuration is flat, parameter group names below are not reflected in the
+configuration structure. There is an
+[example](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
 
-  To test the CRD-based configuration locally, use the following
-  ```bash
+For the configmap configuration, the [default parameter values](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go#L14)
+mentioned here are likely to be overwritten in your local operator installation
+via your local version of the operator configmap. In the case you use the
+operator CRD, all the CRD defaults are provided in the
+[operator's default configuration manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+
+### CRD-based configuration
+The configuration is stored in a custom YAML
+manifest. The manifest is an instance of the custom resource definition (CRD)
+called `OperatorConfiguration`. The operator registers this CRD during the
+start and uses it for configuration if the [operator deployment manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
+sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty
+value. The variable should point to the `postgresql-operator-configuration`
+object in the operator's namespace.
+
+The CRD-based configuration is a regular YAML document; non-scalar keys are
+simply represented in the usual YAML way. There are no default values built-in
+in the operator, each parameter that is not supplied in the configuration
+receives an empty value. In order to create your own configuration just copy
+the [default one](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+and change it.
+
+To test the CRD-based configuration locally, use the following
+
+```bash
   kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
   kubectl create -f manifests/postgresql-operator-default-configuration.yaml
 
@@ -36,7 +50,7 @@ configuration.
   kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
 
   kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
-  ```
+```
 
 The CRD-based configuration is more powerful than the one based on ConfigMaps
 and should be used unless there is a compatibility requirement to use an already
@@ -56,15 +70,6 @@ controlled by the `resource_check_interval` and `resource_check_timeout`
 parameters, those parameters have no effect and are replaced by the
 `CRD_READY_WAIT_INTERVAL` and `CRD_READY_WAIT_TIMEOUT` environment variables.
 They will be deprecated and removed in the future.
-
-For the configmap configuration, the [default parameter values](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go#L14)
-mentioned here are likely to be overwritten in your local operator installation
-via your local version of the operator configmap. In the case you use the
-operator CRD, all the CRD defaults are provided in the
-[operator's default configuration manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
-
-Variable names are underscore-separated words.
-
 
 ## General
 
@@ -91,6 +96,11 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **enable_spilo_wal_path_compat**
   enables backwards compatible path between Spilo 12 and Spilo 13+ images. The default is `false`.
+
+* **enable_team_id_clustername_prefix**
+  To lower the risk of name clashes between clusters of different teams you
+  can turn on this flag and the operator will sync only clusters where the
+  name starts with the `teamId` (from `spec`) plus `-`. Default is `false`.
 
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
@@ -161,11 +171,12 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **set_memory_request_to_limit**
   Set `memory_request` to `memory_limit` for all Postgres clusters (the default
-  value is also increased). This prevents certain cases of memory overcommitment
-  at the cost of overprovisioning memory and potential scheduling problems for
-  containers with high memory limits due to the lack of memory on Kubernetes
-  cluster nodes. This affects all containers created by the operator (Postgres,
-  connection pooler, logical backup, scalyr sidecar, and other sidecars except 
+  value is also increased but configured `max_memory_request` can not be
+  bypassed). This prevents certain cases of memory overcommitment at the cost
+  of overprovisioning memory and potential scheduling problems for containers
+  with high memory limits due to the lack of memory on Kubernetes cluster
+  nodes. This affects all containers created by the operator (Postgres,
+  connection pooler, logical backup, scalyr sidecar, and other sidecars except
   **sidecars** defined in the operator configuration); to set resources for the
   operator's own container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L20).
   The default is `false`.
@@ -239,12 +250,12 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
-  when `major_version_upgrade_mode` is set to `"full"`. The default is `"9.6"`.
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"11"`.
 
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
   which violate the configured allowed `minimal_major_version` when
-  `major_version_upgrade_mode` is set to `"full"`. The default is `"14"`.
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"15"`.
 
 ## Kubernetes resources
 
@@ -316,6 +327,19 @@ configuration they are grouped under the `kubernetes` key.
   replaced by the cluster name. Only the `{cluster}` placeholders is allowed in
   the template.
 
+* **pdb_master_label_selector**
+  By default the PDB will match the master role hence preventing nodes to be
+  drained if the node_readiness_label is not used. This option if set to `false`
+  will not add the `spilo-role=master` selector to the PDB.
+
+* **enable_finalizers**
+  By default, a deletion of the Postgresql resource will trigger a cleanup of
+  all child resources. However, if the database cluster is in a broken state
+  (e.g. failed initialization) and the operator cannot fully sync it, there can
+  be leftovers from a DELETE event. By enabling finalizers the Operator will
+  ensure all managed resources are deleted prior to the Postgresql resource.
+  The default is `false`.
+
 * **enable_pod_disruption_budget**
   PDB is enabled by default to protect the cluster from voluntarily disruptions
   and hence unwanted DB downtime. However, on some cloud providers it could be
@@ -336,6 +360,12 @@ configuration they are grouped under the `kubernetes` key.
   global option to allow for creating sidecar containers in the cluster manifest
   to run alongside Spilo on the same pod. Globally defined sidecars are always
   enabled. Default is true.
+
+* **share_pgsocket_with_sidecars**
+  global option to create an emptyDir volume named `postgresql-run`. This is
+  mounted by all containers at `/var/run/postgresql` sharing the unix socket of
+  PostgreSQL (`pg_socket`) with the sidecars this way.
+  Default is `false`.
 
 * **secret_name_template**
   a template for the name of the database user secrets generated by the
@@ -418,7 +448,7 @@ configuration they are grouped under the `kubernetes` key.
   environment if they not if conflict with the environment variables generated
   by the operator. The WAL location (bucket path) can be overridden, though.
   The default is empty.
-  
+
 * **pod_environment_secret**
   similar to pod_environment_configmap but referencing a secret with custom
   environment variables. Because the secret is not allowed to exist in a
@@ -478,10 +508,24 @@ configuration they are grouped under the `kubernetes` key.
   override [topology key](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#built-in-node-labels)
   for pod anti affinity. The default is `kubernetes.io/hostname`.
 
+* **pod_antiaffinity_preferred_during_scheduling**
+  when scaling the number of pods beyond the available number of topology
+  keys the anti affinity has to be configured to preferred during scheduling.
+  The default is `false` which means the pod anti affinity will use
+  `requiredDuringSchedulingIgnoredDuringExecution`.
+
 * **pod_management_policy**
   specify the [pod management policy](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-management-policies)
   of stateful sets of PG clusters. The default is `ordered_ready`, the second
   possible value is `parallel`.
+
+* **enable_readiness_probe**
+  the operator can set a readiness probe on the statefulset for the database
+  pods with `InitialDelaySeconds: 6`, `PeriodSeconds: 10`, `TimeoutSeconds: 5`,
+  `SuccessThreshold: 1` and `FailureThreshold: 3`. When enabling readiness
+  probes it is recommended to switch the `pod_management_policy` to `parallel`
+  to avoid unneccesary waiting times in case of multiple instances failing.
+  The default is `false`.
 
 * **storage_resize_mode**
   defines how operator handles the difference between the requested volume size and
@@ -514,6 +558,12 @@ CRD-based configuration.
   memory limits for the Postgres containers, unless overridden by cluster-specific
   settings. The default is `500Mi`.
 
+* **max_cpu_request**
+  optional upper boundary for CPU request
+
+* **max_memory_request**
+  optional upper boundary for memory request
+
 * **min_cpu_limit**
   hard CPU minimum what we consider to be required to properly run Postgres
   clusters with Patroni on Kubernetes. The default is `250m`.
@@ -521,6 +571,19 @@ CRD-based configuration.
 * **min_memory_limit**
   hard memory minimum what we consider to be required to properly run Postgres
   clusters with Patroni on Kubernetes. The default is `250Mi`.
+
+## Patroni options
+
+Parameters configuring Patroni. In the CRD-based configuration they are grouped
+under the `patroni` key.
+
+* **enable_patroni_failsafe_mode**
+  If enabled, Patroni copes with DCS outages by avoiding leader demotion.
+  See the Patroni documentation [here](https://patroni.readthedocs.io/en/master/dcs_failsafe_mode.html) for more details.
+  This feature is included since Patroni 3.0.0. Hence, check the container image
+  in use if this feature is included in the used Patroni version. It can also be
+  enabled cluster-wise with the `failsafe_mode` flag under the `patroni` section
+  in the manifest. The default for the global config option is set to `false`.
 
 ## Operator timeouts
 
@@ -531,7 +594,7 @@ effect, and the parameters are grouped under the `timeouts` key in the
 CRD-based configuration.
 
 * **PatroniAPICheckInterval**
-  the interval between consecutive attempts waiting for the return of 
+  the interval between consecutive attempts waiting for the return of
   Patroni Api. The default is `1s`.
 
 * **PatroniAPICheckTimeout**
@@ -600,22 +663,47 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   the cluster. Can be overridden by individual cluster settings. The default
   is `false`.
 
-* **external_traffic_policy** defines external traffic policy for load
+* **external_traffic_policy**
+  defines external traffic policy for load
   balancers. Allowed values are `Cluster` (default) and `Local`.
 
-* **master_dns_name_format** defines the DNS name string template for the
-  master load balancer cluster.  The default is
-  `{cluster}.{team}.{hostedzone}`, where `{cluster}` is replaced by the cluster
-  name, `{team}` is replaced with the team name and `{hostedzone}` is replaced
-  with the hosted zone (the value of the `db_hosted_zone` parameter). No other
-  placeholders are allowed.
+* **master_dns_name_format**
+  defines the DNS name string template for the master load balancer cluster.
+  The default is `{cluster}.{namespace}.{hostedzone}`, where `{cluster}` is
+  replaced by the cluster name, `{namespace}` is replaced with the namespace
+  and `{hostedzone}` is replaced with the hosted zone (the value of the
+  `db_hosted_zone` parameter). The `{team}` placeholder can still be used,
+  although it is not recommened because the team of a cluster can change.
+  If the cluster name starts with the `teamId` it will also be part of the
+  DNS, aynway. No other placeholders are allowed!
 
-* **replica_dns_name_format** defines the DNS name string template for the
-  replica load balancer cluster.  The default is
-  `{cluster}-repl.{team}.{hostedzone}`, where `{cluster}` is replaced by the
-  cluster name, `{team}` is replaced with the team name and `{hostedzone}` is
-  replaced with the hosted zone (the value of the `db_hosted_zone` parameter).
-  No other placeholders are allowed.
+* **master_legacy_dns_name_format**
+  *deprecated* default master DNS template `{cluster}.{team}.{hostedzone}` as
+  of pre `v1.9.0`. If cluster name starts with `teamId` then a second DNS
+  entry will be created using the template defined here to provide backwards
+  compatibility. The `teamId` prefix will be extracted from the clustername
+  because it follows later in the DNS string. When using a customized
+  `master_dns_name_format` make sure to define the legacy DNS format when
+  switching to v1.9.0.
+
+* **replica_dns_name_format**
+  defines the DNS name string template for the replica load balancer cluster.
+  The default is `{cluster}-repl.{namespace}.{hostedzone}`, where `{cluster}`
+  is replaced by the cluster name, `{namespace}` is replaced with the
+  namespace and `{hostedzone}` is replaced with the hosted zone (the value of
+  the `db_hosted_zone` parameter). The `{team}` placeholder can still be used,
+  although it is not recommened because the team of a cluster can change.
+  If the cluster name starts with the `teamId` it will also be part of the
+  DNS, aynway. No other placeholders are allowed!
+
+* **replica_legacy_dns_name_format**
+  *deprecated* default master DNS template `{cluster}-repl.{team}.{hostedzone}`
+  as of pre `v1.9.0`. If cluster name starts with `teamId` then a second DNS
+  entry will be created using the template defined here to provide backwards
+  compatibility. The `teamId` prefix will be extracted from the clustername
+  because it follows later in the DNS string. When using a customized
+  `master_dns_name_format` make sure to define the legacy DNS format when
+  switching to v1.9.0.
 
 ## AWS or GCP interaction
 
@@ -691,12 +779,19 @@ These parameters configure a K8s cron job managed by the operator to produce
 Postgres logical backups. In the CRD-based configuration those parameters are
 grouped under the `logical_backup` key.
 
+* **logical_backup_cpu_limit**
+  **logical_backup_cpu_request**
+  **logical_backup_memory_limit**
+  **logical_backup_memory_request**
+  Resource configuration for pod template in logical backup cron job. If empty
+  default values from `postgres_pod_resources` will be used.
+
 * **logical_backup_docker_image**
   An image for pods of the logical backup job. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile)
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.8.2"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -705,8 +800,17 @@ grouped under the `logical_backup` key.
   The prefix to be prepended to the name of a k8s CronJob running the backups. Beware the prefix counts towards the name length restrictions imposed by k8s. Empty string is a legitimate value. Operator does not do the actual renaming: It simply creates the job with the new prefix. You will have to delete the old cron job manually. Default: "logical-backup-".
 
 * **logical_backup_provider**
-  Specifies the storage provider to which the backup should be uploaded (`s3` or `gcs`).
-  Default: "s3"
+  Specifies the storage provider to which the backup should be uploaded
+  (`s3`, `gcs` or `az`). Default: "s3"
+
+* **logical_backup_azure_storage_account_name**
+  Storage account name used to upload logical backups to when using Azure. Default: ""
+
+* **logical_backup_azure_storage_container**
+  Storage container used to upload logical backups to when using Azure. Default: ""
+
+* **logical_backup_azure_storage_account_key**
+  Storage account key used to authenticate with Azure when uploading logical backups. Default: ""
 
 * **logical_backup_s3_access_key_id**
   When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
@@ -729,7 +833,7 @@ grouped under the `logical_backup` key.
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
 
 * **logical_backup_s3_retention_time**
-  Specify a retention time for logical backups stored in S3. Backups older than the specified retention 
+  Specify a retention time for logical backups stored in S3. Backups older than the specified retention
   time will be deleted after a new backup was uploaded. If empty, all backups will be kept. Example values are
   "3 days", "2 weeks", or "1 month". The default is empty.
 
@@ -737,6 +841,9 @@ grouped under the `logical_backup` key.
   Backup schedule in the cron format. Please take the
   [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Default: "30 00 \* \* \*"
+
+* **logical_backup_cronjob_environment_secret**
+  Reference to a Kubernetes secret, which keys will be added as environment variables to the cronjob. Default: ""
 
 ## Debugging the operator
 
