@@ -39,6 +39,7 @@ data:
   # enable_admin_role_for_users: "true"
   # enable_crd_registration: "true"
   # enable_cross_namespace_secret: "false"
+  enable_finalizers: "false"
   # enable_database_access: "true"
   enable_ebs_gp3_migration: "false"
   # enable_ebs_gp3_migration_max_size: "1000"
