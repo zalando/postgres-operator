@@ -8,8 +8,8 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
+	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 
 	apiacidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	zalandoclient "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
@@ -18,7 +18,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/spec"
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	apipolicyv1 "k8s.io/api/policy/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -61,9 +61,9 @@ type KubernetesClient struct {
 	appsv1.StatefulSetsGetter
 	appsv1.DeploymentsGetter
 	rbacv1.RoleBindingsGetter
-	policyv1beta1.PodDisruptionBudgetsGetter
+	policyv1.PodDisruptionBudgetsGetter
 	apiextv1.CustomResourceDefinitionsGetter
-	clientbatchv1beta1.CronJobsGetter
+	clientbatchv1.CronJobsGetter
 	acidv1.OperatorConfigurationsGetter
 	acidv1.PostgresTeamsGetter
 	acidv1.PostgresqlsGetter
@@ -156,10 +156,10 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.NamespacesGetter = client.CoreV1()
 	kubeClient.StatefulSetsGetter = client.AppsV1()
 	kubeClient.DeploymentsGetter = client.AppsV1()
-	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
+	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1()
-	kubeClient.CronJobsGetter = client.BatchV1beta1()
+	kubeClient.CronJobsGetter = client.BatchV1()
 	kubeClient.EventsGetter = client.CoreV1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
@@ -213,8 +213,39 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 	return pg, nil
 }
 
+// SetFinalizer of Postgres cluster
+func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg *apiacidv1.Postgresql, finalizers []string) (*apiacidv1.Postgresql, error) {
+	var (
+		updatedPg *apiacidv1.Postgresql
+		patch     []byte
+		err       error
+	)
+	pg.ObjectMeta.SetFinalizers(finalizers)
+
+	if len(finalizers) > 0 {
+		patch, err = json.Marshal(struct {
+			PgMetadata interface{} `json:"metadata"`
+		}{&pg.ObjectMeta})
+		if err != nil {
+			return pg, fmt.Errorf("could not marshal ObjectMeta: %v", err)
+		}
+
+		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
+			context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	} else {
+		// in case finalizers are empty and update is needed to remove
+		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Update(
+			context.TODO(), pg, metav1.UpdateOptions{})
+	}
+	if err != nil {
+		return updatedPg, fmt.Errorf("could not set finalizer: %v", err)
+	}
+
+	return updatedPg, nil
+}
+
 // SamePDB compares the PodDisruptionBudgets
-func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason string) {
+func SamePDB(cur, new *apipolicyv1.PodDisruptionBudget) (match bool, reason string) {
 	//TODO: improve comparison
 	match = reflect.DeepEqual(new.Spec, cur.Spec)
 	if !match {
@@ -224,12 +255,22 @@ func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason stri
 	return
 }
 
-func getJobImage(cronJob *batchv1beta1.CronJob) string {
+func getJobImage(cronJob *batchv1.CronJob) string {
 	return cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 }
 
+func getPgVersion(cronJob *batchv1.CronJob) string {
+	envs := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env
+	for _, env := range envs {
+		if env.Name == "PG_VERSION" {
+			return env.Value
+		}
+	}
+	return ""
+}
+
 // SameLogicalBackupJob compares Specs of logical backup cron jobs
-func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
+func SameLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string) {
 
 	if cur.Spec.Schedule != new.Spec.Schedule {
 		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
@@ -241,6 +282,13 @@ func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason st
 	if newImage != curImage {
 		return false, fmt.Sprintf("new job's image %q does not match the current one %q",
 			newImage, curImage)
+	}
+
+	newPgVersion := getPgVersion(new)
+	curPgVersion := getPgVersion(cur)
+	if newPgVersion != curPgVersion {
+		return false, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q",
+			newPgVersion, curPgVersion)
 	}
 
 	return true, ""

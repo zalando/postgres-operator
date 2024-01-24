@@ -26,4 +26,5 @@ data:
 {{- include "flattenValuesForConfigMap" .Values.configLoggingRestApi | indent 2 }}
 {{- include "flattenValuesForConfigMap" .Values.configTeamsApi | indent 2 }}
 {{- include "flattenValuesForConfigMap" .Values.configConnectionPooler | indent 2 }}
+{{- include "flattenValuesForConfigMap" .Values.configPatroni | indent 2 }}
 {{- end }}

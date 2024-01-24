@@ -126,8 +126,11 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.8.2"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.10.1"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
+	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
+	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
+	LogicalBackupAzureStorageAccountKey       string `name:"logical_backup_azure_storage_account_key" default:""`
 	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
 	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
 	LogicalBackupS3Endpoint                   string `name:"logical_backup_s3_endpoint" default:""`
@@ -137,6 +140,11 @@ type LogicalBackup struct {
 	LogicalBackupS3RetentionTime              string `name:"logical_backup_s3_retention_time" default:""`
 	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
+	LogicalBackupCronjobEnvironmentSecret     string `name:"logical_backup_cronjob_environment_secret" default:""`
+	LogicalBackupCPURequest                   string `name:"logical_backup_cpu_request"`
+	LogicalBackupMemoryRequest                string `name:"logical_backup_memory_request"`
+	LogicalBackupCPULimit                     string `name:"logical_backup_cpu_limit"`
+	LogicalBackupMemoryLimit                  string `name:"logical_backup_memory_limit"`
 }
 
 // Operator options for connection pooler
@@ -165,74 +173,83 @@ type Config struct {
 	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
 	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-14:2.1-p6"`
+	DockerImage             string            `name:"docker_image" default:"ghcr.io/zalando/spilo-15:3.0-p1"`
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
-	PodServiceAccountDefinition            string            `name:"pod_service_account_definition" default:""`
-	PodServiceAccountRoleBindingDefinition string            `name:"pod_service_account_role_binding_definition" default:""`
-	MasterPodMoveTimeout                   time.Duration     `name:"master_pod_move_timeout" default:"20m"`
-	DbHostedZone                           string            `name:"db_hosted_zone" default:"db.example.com"`
-	AWSRegion                              string            `name:"aws_region" default:"eu-central-1"`
-	WALES3Bucket                           string            `name:"wal_s3_bucket"`
-	LogS3Bucket                            string            `name:"log_s3_bucket"`
-	KubeIAMRole                            string            `name:"kube_iam_role"`
-	WALGSBucket                            string            `name:"wal_gs_bucket"`
-	GCPCredentials                         string            `name:"gcp_credentials"`
-	WALAZStorageAccount                    string            `name:"wal_az_storage_account"`
-	AdditionalSecretMount                  string            `name:"additional_secret_mount"`
-	AdditionalSecretMountPath              string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
-	EnableEBSGp3Migration                  bool              `name:"enable_ebs_gp3_migration" default:"false"`
-	EnableEBSGp3MigrationMaxSize           int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
-	DebugLogging                           bool              `name:"debug_logging" default:"true"`
-	EnableDBAccess                         bool              `name:"enable_database_access" default:"true"`
-	EnableTeamsAPI                         bool              `name:"enable_teams_api" default:"true"`
-	EnableTeamSuperuser                    bool              `name:"enable_team_superuser" default:"false"`
-	TeamAdminRole                          string            `name:"team_admin_role" default:"admin"`
-	RoleDeletionSuffix                     string            `name:"role_deletion_suffix" default:"_deleted"`
-	EnableTeamMemberDeprecation            bool              `name:"enable_team_member_deprecation" default:"false"`
-	EnableAdminRoleForUsers                bool              `name:"enable_admin_role_for_users" default:"true"`
-	EnablePostgresTeamCRD                  bool              `name:"enable_postgres_team_crd" default:"false"`
-	EnablePostgresTeamCRDSuperusers        bool              `name:"enable_postgres_team_crd_superusers" default:"false"`
-	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
-	EnableMasterPoolerLoadBalancer         bool              `name:"enable_master_pooler_load_balancer" default:"false"`
-	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
-	EnableReplicaPoolerLoadBalancer        bool              `name:"enable_replica_pooler_load_balancer" default:"false"`
-	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
-	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
-	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
-	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
-	StorageResizeMode                      string            `name:"storage_resize_mode" default:"pvc"`
-	EnableLoadBalancer                     *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
-	ExternalTrafficPolicy                  string            `name:"external_traffic_policy" default:"Cluster"`
-	MasterDNSNameFormat                    StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{namespace}.{hostedzone}"`
-	ReplicaDNSNameFormat                   StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{namespace}.{hostedzone}"`
-	PDBNameFormat                          StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
-	EnablePodDisruptionBudget              *bool             `name:"enable_pod_disruption_budget" default:"true"`
-	EnableInitContainers                   *bool             `name:"enable_init_containers" default:"true"`
-	EnableSidecars                         *bool             `name:"enable_sidecars" default:"true"`
-	Workers                                uint32            `name:"workers" default:"8"`
-	APIPort                                int               `name:"api_port" default:"8080"`
-	RingLogLines                           int               `name:"ring_log_lines" default:"100"`
-	ClusterHistoryEntries                  int               `name:"cluster_history_entries" default:"1000"`
-	TeamAPIRoleConfiguration               map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
-	PodTerminateGracePeriod                time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
-	PodManagementPolicy                    string            `name:"pod_management_policy" default:"ordered_ready"`
-	ProtectedRoles                         []string          `name:"protected_role_names" default:"admin,cron_admin"`
-	PostgresSuperuserTeams                 []string          `name:"postgres_superuser_teams" default:""`
-	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
-	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
-	EnableCrossNamespaceSecret             bool              `name:"enable_cross_namespace_secret" default:"false"`
-	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
-	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
-	EnableTeamIdClusternamePrefix          bool              `name:"enable_team_id_clustername_prefix" default:"false"`
-	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"`
-	MajorVersionUpgradeTeamAllowList       []string          `name:"major_version_upgrade_team_allow_list" default:""`
-	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.6"`
-	TargetMajorVersion                     string            `name:"target_major_version" default:"14"`
-	PatroniAPICheckInterval                time.Duration     `name:"patroni_api_check_interval" default:"1s"`
-	PatroniAPICheckTimeout                 time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
+	PodServiceAccountDefinition              string            `name:"pod_service_account_definition" default:""`
+	PodServiceAccountRoleBindingDefinition   string            `name:"pod_service_account_role_binding_definition" default:""`
+	MasterPodMoveTimeout                     time.Duration     `name:"master_pod_move_timeout" default:"20m"`
+	DbHostedZone                             string            `name:"db_hosted_zone" default:"db.example.com"`
+	AWSRegion                                string            `name:"aws_region" default:"eu-central-1"`
+	WALES3Bucket                             string            `name:"wal_s3_bucket"`
+	LogS3Bucket                              string            `name:"log_s3_bucket"`
+	KubeIAMRole                              string            `name:"kube_iam_role"`
+	WALGSBucket                              string            `name:"wal_gs_bucket"`
+	GCPCredentials                           string            `name:"gcp_credentials"`
+	WALAZStorageAccount                      string            `name:"wal_az_storage_account"`
+	AdditionalSecretMount                    string            `name:"additional_secret_mount"`
+	AdditionalSecretMountPath                string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
+	EnableEBSGp3Migration                    bool              `name:"enable_ebs_gp3_migration" default:"false"`
+	EnableEBSGp3MigrationMaxSize             int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
+	DebugLogging                             bool              `name:"debug_logging" default:"true"`
+	EnableDBAccess                           bool              `name:"enable_database_access" default:"true"`
+	EnableTeamsAPI                           bool              `name:"enable_teams_api" default:"true"`
+	EnableTeamSuperuser                      bool              `name:"enable_team_superuser" default:"false"`
+	TeamAdminRole                            string            `name:"team_admin_role" default:"admin"`
+	RoleDeletionSuffix                       string            `name:"role_deletion_suffix" default:"_deleted"`
+	EnableTeamMemberDeprecation              bool              `name:"enable_team_member_deprecation" default:"false"`
+	EnableAdminRoleForUsers                  bool              `name:"enable_admin_role_for_users" default:"true"`
+	EnablePostgresTeamCRD                    bool              `name:"enable_postgres_team_crd" default:"false"`
+	EnablePostgresTeamCRDSuperusers          bool              `name:"enable_postgres_team_crd_superusers" default:"false"`
+	EnableMasterLoadBalancer                 bool              `name:"enable_master_load_balancer" default:"true"`
+	EnableMasterPoolerLoadBalancer           bool              `name:"enable_master_pooler_load_balancer" default:"false"`
+	EnableReplicaLoadBalancer                bool              `name:"enable_replica_load_balancer" default:"false"`
+	EnableReplicaPoolerLoadBalancer          bool              `name:"enable_replica_pooler_load_balancer" default:"false"`
+	CustomServiceAnnotations                 map[string]string `name:"custom_service_annotations"`
+	CustomPodAnnotations                     map[string]string `name:"custom_pod_annotations"`
+	EnablePodAntiAffinity                    bool              `name:"enable_pod_antiaffinity" default:"false"`
+	PodAntiAffinityPreferredDuringScheduling bool              `name:"pod_antiaffinity_preferred_during_scheduling" default:"false"`
+	PodAntiAffinityTopologyKey               string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
+	StorageResizeMode                        string            `name:"storage_resize_mode" default:"pvc"`
+	EnableLoadBalancer                       *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
+	ExternalTrafficPolicy                    string            `name:"external_traffic_policy" default:"Cluster"`
+	MasterDNSNameFormat                      StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{namespace}.{hostedzone}"`
+	MasterLegacyDNSNameFormat                StringTemplate    `name:"master_legacy_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
+	ReplicaDNSNameFormat                     StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{namespace}.{hostedzone}"`
+	ReplicaLegacyDNSNameFormat               StringTemplate    `name:"replica_legacy_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	PDBNameFormat                            StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	PDBMasterLabelSelector                   *bool             `name:"pdb_master_label_selector" default:"true"`
+	EnablePodDisruptionBudget                *bool             `name:"enable_pod_disruption_budget" default:"true"`
+	EnableInitContainers                     *bool             `name:"enable_init_containers" default:"true"`
+	EnableSidecars                           *bool             `name:"enable_sidecars" default:"true"`
+	SharePgSocketWithSidecars                *bool             `name:"share_pgsocket_with_sidecars" default:"false"`
+	Workers                                  uint32            `name:"workers" default:"8"`
+	APIPort                                  int               `name:"api_port" default:"8080"`
+	RingLogLines                             int               `name:"ring_log_lines" default:"100"`
+	ClusterHistoryEntries                    int               `name:"cluster_history_entries" default:"1000"`
+	TeamAPIRoleConfiguration                 map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
+	PodTerminateGracePeriod                  time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	PodManagementPolicy                      string            `name:"pod_management_policy" default:"ordered_ready"`
+	EnableReadinessProbe                     bool              `name:"enable_readiness_probe" default:"false"`
+	ProtectedRoles                           []string          `name:"protected_role_names" default:"admin,cron_admin"`
+	PostgresSuperuserTeams                   []string          `name:"postgres_superuser_teams" default:""`
+	SetMemoryRequestToLimit                  bool              `name:"set_memory_request_to_limit" default:"false"`
+	EnableLazySpiloUpgrade                   bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
+	EnableCrossNamespaceSecret               bool              `name:"enable_cross_namespace_secret" default:"false"`
+	EnableFinalizers                         *bool             `name:"enable_finalizers" default:"false"`
+	EnablePgVersionEnvVar                    bool              `name:"enable_pgversion_env_var" default:"true"`
+	EnableSpiloWalPathCompat                 bool              `name:"enable_spilo_wal_path_compat" default:"false"`
+	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`
+	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"off"`
+	MajorVersionUpgradeTeamAllowList         []string          `name:"major_version_upgrade_team_allow_list" default:""`
+	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"11"`
+	TargetMajorVersion                       string            `name:"target_major_version" default:"15"`
+	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
+	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
+	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
+	PersistentVolumeClaimRetentionPolicy     map[string]string `name:"persistent_volume_claim_retention_policy" default:"when_deleted:retain,when_scaled:retain"`
 }
 
 // MustMarshal marshals the config or panics

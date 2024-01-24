@@ -15,15 +15,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *Cluster) createStreams(appId string) error {
+func (c *Cluster) createStreams(appId string) (*zalandov1.FabricEventStream, error) {
 	c.setProcessName("creating streams")
 
 	fes := c.generateFabricEventStream(appId)
-	if _, err := c.KubeClient.FabricEventStreams(c.Namespace).Create(context.TODO(), fes, metav1.CreateOptions{}); err != nil {
-		return err
+	streamCRD, err := c.KubeClient.FabricEventStreams(c.Namespace).Create(context.TODO(), fes, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return streamCRD, nil
 }
 
 func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) error {
@@ -46,11 +47,17 @@ func (c *Cluster) deleteStreams() error {
 	}
 
 	errors := make([]string, 0)
-	for _, appId := range c.streamApplications {
-		fesName := fmt.Sprintf("%s-%s", c.Name, appId)
-		err = c.KubeClient.FabricEventStreams(c.Namespace).Delete(context.TODO(), fesName, metav1.DeleteOptions{})
+	listOptions := metav1.ListOptions{
+		LabelSelector: c.labelsSet(true).String(),
+	}
+	streams, err := c.KubeClient.FabricEventStreams(c.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return fmt.Errorf("could not list of FabricEventStreams: %v", err)
+	}
+	for _, stream := range streams.Items {
+		err = c.KubeClient.FabricEventStreams(stream.Namespace).Delete(context.TODO(), stream.Name, metav1.DeleteOptions{})
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("could not delete event stream %q: %v", fesName, err))
+			errors = append(errors, fmt.Sprintf("could not delete event stream %q: %v", stream.Name, err))
 		}
 	}
 
@@ -70,38 +77,6 @@ func gatherApplicationIds(streams []acidv1.Stream) []string {
 	}
 
 	return appIds
-}
-
-func (c *Cluster) syncPostgresConfig(requiredPatroniConfig acidv1.Patroni) error {
-	errorMsg := "no pods found to update config"
-
-	// if streams are defined wal_level must be switched to logical
-	requiredPgParameters := map[string]string{"wal_level": "logical"}
-
-	// apply config changes in pods
-	pods, err := c.listPods()
-	if err != nil {
-		errorMsg = fmt.Sprintf("could not list pods of the statefulset: %v", err)
-	}
-	for i, pod := range pods {
-		podName := util.NameFromMeta(pods[i].ObjectMeta)
-		effectivePatroniConfig, effectivePgParameters, err := c.patroni.GetConfig(&pod)
-		if err != nil {
-			errorMsg = fmt.Sprintf("could not get Postgres config from pod %s: %v", podName, err)
-			continue
-		}
-
-		_, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePatroniConfig, requiredPatroniConfig, effectivePgParameters, requiredPgParameters)
-		if err != nil {
-			errorMsg = fmt.Sprintf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
-			continue
-		}
-
-		// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used
-		return nil
-	}
-
-	return fmt.Errorf(errorMsg)
 }
 
 func (c *Cluster) syncPublication(publication, dbName string, tables map[string]acidv1.StreamTable) error {
@@ -170,11 +145,13 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
 			streamFlow := getEventStreamFlow(stream, table.PayloadColumn)
 			streamSink := getEventStreamSink(stream, table.EventType)
+			streamRecovery := getEventStreamRecovery(stream, table.RecoveryEventType, table.EventType)
 
 			eventStreams = append(eventStreams, zalandov1.EventStream{
-				EventStreamFlow:   streamFlow,
-				EventStreamSink:   streamSink,
-				EventStreamSource: streamSource})
+				EventStreamFlow:     streamFlow,
+				EventStreamRecovery: streamRecovery,
+				EventStreamSink:     streamSink,
+				EventStreamSource:   streamSource})
 		}
 	}
 
@@ -184,8 +161,10 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 			Kind:       constants.EventStreamCRDKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        fmt.Sprintf("%s-%s", c.Name, appId),
+			// max length for cluster name is 58 so we can only add 5 more characters / numbers
+			Name:        fmt.Sprintf("%s-%s", c.Name, strings.ToLower(util.RandomPassword(5))),
 			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
 			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 			// make cluster StatefulSet the owner (like with connection pooler objects)
 			OwnerReferences: c.ownerReferences(),
@@ -227,6 +206,28 @@ func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1.EventS
 	}
 }
 
+func getEventStreamRecovery(stream acidv1.Stream, recoveryEventType, eventType string) zalandov1.EventStreamRecovery {
+	if (stream.EnableRecovery != nil && !*stream.EnableRecovery) ||
+		(stream.EnableRecovery == nil && recoveryEventType == "") {
+		return zalandov1.EventStreamRecovery{
+			Type: constants.EventStreamRecoveryNoneType,
+		}
+	}
+
+	if stream.EnableRecovery != nil && *stream.EnableRecovery && recoveryEventType == "" {
+		recoveryEventType = fmt.Sprintf("%s-%s", eventType, constants.EventStreamRecoverySuffix)
+	}
+
+	return zalandov1.EventStreamRecovery{
+		Type: constants.EventStreamRecoveryDLQType,
+		Sink: &zalandov1.EventStreamSink{
+			Type:         constants.EventStreamSinkNakadiType,
+			EventType:    recoveryEventType,
+			MaxBatchSize: stream.BatchSize,
+		},
+	}
+}
+
 func getTableSchema(fullTableName string) (tableName, schemaName string) {
 	schemaName = "public"
 	tableName = fullTableName
@@ -264,7 +265,6 @@ func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1.Co
 }
 
 func (c *Cluster) syncStreams() error {
-
 	c.setProcessName("syncing streams")
 
 	_, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), constants.EventStreamCRDName, metav1.GetOptions{})
@@ -273,15 +273,11 @@ func (c *Cluster) syncStreams() error {
 		return nil
 	}
 
-	// fetch different application IDs from streams section
-	// there will be a separate event stream resource for each ID
-	appIds := gatherApplicationIds(c.Spec.Streams)
-	c.streamApplications = appIds
-
 	slots := make(map[string]map[string]string)
+	slotsToSync := make(map[string]map[string]string)
 	publications := make(map[string]map[string]acidv1.StreamTable)
-
 	requiredPatroniConfig := c.Spec.Patroni
+
 	if len(requiredPatroniConfig.Slots) > 0 {
 		slots = requiredPatroniConfig.Slots
 	}
@@ -308,21 +304,7 @@ func (c *Cluster) syncStreams() error {
 		}
 	}
 
-	// no slots = no streams defined
-	if len(slots) > 0 {
-		requiredPatroniConfig.Slots = slots
-	} else {
-		return nil
-	}
-
-	// add extra logical slots to Patroni config
-	c.logger.Debug("syncing Postgres config for logical decoding")
-	err = c.syncPostgresConfig(requiredPatroniConfig)
-	if err != nil {
-		return fmt.Errorf("failed to snyc Postgres config for event streaming: %v", err)
-	}
-
-	// next, create publications to each created slot
+	// create publications to each created slot
 	c.logger.Debug("syncing database publications")
 	for publication, tables := range publications {
 		// but first check for existing publications
@@ -330,9 +312,31 @@ func (c *Cluster) syncStreams() error {
 		err = c.syncPublication(publication, dbName, tables)
 		if err != nil {
 			c.logger.Warningf("could not sync publication %q in database %q: %v", publication, dbName, err)
+			continue
 		}
+		slotsToSync[publication] = slots[publication]
 	}
 
+	// no slots to sync = no streams defined or publications created
+	if len(slotsToSync) > 0 {
+		requiredPatroniConfig.Slots = slotsToSync
+	} else {
+		return nil
+	}
+
+	c.logger.Debug("syncing logical replication slots")
+	pods, err := c.listPods()
+	if err != nil {
+		return fmt.Errorf("could not get list of pods to sync logical replication slots via Patroni API: %v", err)
+	}
+
+	// sync logical replication slots in Patroni config
+	configPatched, _, _, err := c.syncPatroniConfig(pods, requiredPatroniConfig, nil)
+	if err != nil {
+		c.logger.Warningf("Patroni config updated? %v - errors during config sync: %v", configPatched, err)
+	}
+
+	// finally sync stream CRDs
 	err = c.createOrUpdateStreams()
 	if err != nil {
 		return err
@@ -342,31 +346,48 @@ func (c *Cluster) syncStreams() error {
 }
 
 func (c *Cluster) createOrUpdateStreams() error {
-	for _, appId := range c.streamApplications {
-		fesName := fmt.Sprintf("%s-%s", c.Name, appId)
-		effectiveStreams, err := c.KubeClient.FabricEventStreams(c.Namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
-		if err != nil {
-			if !k8sutil.ResourceNotFound(err) {
-				return fmt.Errorf("failed reading event stream %s: %v", fesName, err)
-			}
 
-			c.logger.Infof("event streams do not exist, create it")
-			err = c.createStreams(appId)
-			if err != nil {
-				return fmt.Errorf("failed creating event stream %s: %v", fesName, err)
-			}
-			c.logger.Infof("event stream %q has been successfully created", fesName)
-		} else {
-			desiredStreams := c.generateFabricEventStream(appId)
-			if match, reason := sameStreams(effectiveStreams.Spec.EventStreams, desiredStreams.Spec.EventStreams); !match {
-				c.logger.Debugf("updating event streams: %s", reason)
-				desiredStreams.ObjectMeta.ResourceVersion = effectiveStreams.ObjectMeta.ResourceVersion
-				err = c.updateStreams(desiredStreams)
-				if err != nil {
-					return fmt.Errorf("failed updating event stream %s: %v", fesName, err)
+	// fetch different application IDs from streams section
+	// there will be a separate event stream resource for each ID
+	appIds := gatherApplicationIds(c.Spec.Streams)
+
+	// list all existing stream CRDs
+	listOptions := metav1.ListOptions{
+		LabelSelector: c.labelsSet(true).String(),
+	}
+	streams, err := c.KubeClient.FabricEventStreams(c.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return fmt.Errorf("could not list of FabricEventStreams: %v", err)
+	}
+
+	for _, appId := range appIds {
+		streamExists := false
+
+		// update stream when it exists and EventStreams array differs
+		for _, stream := range streams.Items {
+			if appId == stream.Spec.ApplicationId {
+				streamExists = true
+				desiredStreams := c.generateFabricEventStream(appId)
+				if match, reason := sameStreams(stream.Spec.EventStreams, desiredStreams.Spec.EventStreams); !match {
+					c.logger.Debugf("updating event streams: %s", reason)
+					desiredStreams.ObjectMeta = stream.ObjectMeta
+					err = c.updateStreams(desiredStreams)
+					if err != nil {
+						return fmt.Errorf("failed updating event stream %s: %v", stream.Name, err)
+					}
+					c.logger.Infof("event stream %q has been successfully updated", stream.Name)
 				}
-				c.logger.Infof("event stream %q has been successfully updated", fesName)
+				continue
 			}
+		}
+
+		if !streamExists {
+			c.logger.Infof("event streams with applicationId %s do not exist, create it", appId)
+			streamCRD, err := c.createStreams(appId)
+			if err != nil {
+				return fmt.Errorf("failed creating event streams with applicationId %s: %v", appId, err)
+			}
+			c.logger.Infof("event streams %q have been successfully created", streamCRD.Name)
 		}
 	}
 
@@ -384,7 +405,8 @@ func sameStreams(curEventStreams, newEventStreams []zalandov1.EventStream) (matc
 		for _, curStream := range curEventStreams {
 			if reflect.DeepEqual(newStream.EventStreamSource, curStream.EventStreamSource) &&
 				reflect.DeepEqual(newStream.EventStreamFlow, curStream.EventStreamFlow) &&
-				reflect.DeepEqual(newStream.EventStreamSink, curStream.EventStreamSink) {
+				reflect.DeepEqual(newStream.EventStreamSink, curStream.EventStreamSink) &&
+				reflect.DeepEqual(newStream.EventStreamRecovery, curStream.EventStreamRecovery) {
 				match = true
 				break
 			}

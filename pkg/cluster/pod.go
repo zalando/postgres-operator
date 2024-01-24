@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -214,19 +216,16 @@ func (c *Cluster) movePodFromEndOfLifeNode(pod *v1.Pod) (*v1.Pod, error) {
 // MigrateMasterPod migrates master pod via failover to a replica
 func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	var (
-		masterCandidateName spec.NamespacedName
-		err                 error
-		eol                 bool
+		err error
+		eol bool
 	)
 
 	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(context.TODO(), podName.Name, metav1.GetOptions{})
-
 	if err != nil {
-		return fmt.Errorf("could not get pod: %v", err)
+		return fmt.Errorf("could not get master pod: %v", err)
 	}
 
 	c.logger.Infof("starting process to migrate master pod %q", podName)
-
 	if eol, err = c.podIsEndOfLife(oldMaster); err != nil {
 		return fmt.Errorf("could not get node %q: %v", oldMaster.Spec.NodeName, err)
 	}
@@ -250,19 +249,19 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		}
 		c.Statefulset = sset
 	}
-	// We may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case.
+	// we may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case
+	masterCandidateName := podName
+	masterCandidatePod := oldMaster
 	if *c.Statefulset.Spec.Replicas > 1 {
 		if masterCandidateName, err = c.getSwitchoverCandidate(oldMaster); err != nil {
 			return fmt.Errorf("could not find suitable replica pod as candidate for failover: %v", err)
 		}
+		masterCandidatePod, err = c.KubeClient.Pods(masterCandidateName.Namespace).Get(context.TODO(), masterCandidateName.Name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("could not get master candidate pod: %v", err)
+		}
 	} else {
 		c.logger.Warningf("migrating single pod cluster %q, this will cause downtime of the Postgres cluster until pod is back", c.clusterName())
-	}
-
-	masterCandidatePod, err := c.KubeClient.Pods(masterCandidateName.Namespace).Get(context.TODO(), masterCandidateName.Name, metav1.GetOptions{})
-
-	if err != nil {
-		return fmt.Errorf("could not get master candidate pod: %v", err)
 	}
 
 	// there are two cases for each postgres cluster that has its master pod on the node to migrate from:
@@ -472,10 +471,24 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 		func() (bool, error) {
 			var err error
 			members, err = c.patroni.GetClusterMembers(master)
-
 			if err != nil {
 				return false, err
 			}
+
+			// look for SyncStandby candidates (which also implies pod is in running state)
+			for _, member := range members {
+				if PostgresRole(member.Role) == SyncStandby {
+					syncCandidates = append(syncCandidates, member)
+				}
+			}
+
+			// if synchronous mode is enabled and no SyncStandy was found
+			// return false for retry - cannot failover with no sync candidate
+			if c.Spec.Patroni.SynchronousMode && len(syncCandidates) == 0 {
+				c.logger.Warnf("no sync standby found - retrying fetching cluster members")
+				return false, nil
+			}
+
 			return true, nil
 		},
 	)
@@ -483,28 +496,30 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 		return spec.NamespacedName{}, fmt.Errorf("failed to get Patroni cluster members: %s", err)
 	}
 
-	for _, member := range members {
-		if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && member.State == "running" {
-			candidates = append(candidates, member)
-			if PostgresRole(member.Role) == SyncStandby {
-				syncCandidates = append(syncCandidates, member)
-			}
-		}
-	}
-
 	// pick candidate with lowest lag
-	// if sync_standby replicas were found assume synchronous_mode is enabled and ignore other candidates list
 	if len(syncCandidates) > 0 {
 		sort.Slice(syncCandidates, func(i, j int) bool {
 			return syncCandidates[i].Lag < syncCandidates[j].Lag
 		})
 		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
-	}
-	if len(candidates) > 0 {
-		sort.Slice(candidates, func(i, j int) bool {
-			return candidates[i].Lag < candidates[j].Lag
-		})
-		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
+	} else {
+		// in asynchronous mode find running replicas
+		for _, member := range members {
+			if PostgresRole(member.Role) == Leader || PostgresRole(member.Role) == StandbyLeader {
+				continue
+			}
+
+			if slices.Contains([]string{"running", "streaming", "in archive recovery"}, member.State) {
+				candidates = append(candidates, member)
+			}
+		}
+
+		if len(candidates) > 0 {
+			sort.Slice(candidates, func(i, j int) bool {
+				return candidates[i].Lag < candidates[j].Lag
+			})
+			return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
+		}
 	}
 
 	return spec.NamespacedName{}, fmt.Errorf("no switchover candidate found")

@@ -10,9 +10,9 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 configuration:
-{{ toYaml .Values.configGeneral | indent 2 }}
+{{ tpl (toYaml .Values.configGeneral) . | indent 2 }}
   users:
-{{ toYaml .Values.configUsers | indent 4 }}
+{{ tpl (toYaml .Values.configUsers) . | indent 4 }}
   major_version_upgrade:
 {{ toYaml .Values.configMajorVersionUpgrade | indent 4 }}
   kubernetes:
@@ -21,7 +21,7 @@ configuration:
     {{- end }}
     pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
     oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}
-{{ toYaml .Values.configKubernetes | indent 4 }}
+{{ tpl (toYaml .Values.configKubernetes) . | indent 4 }}
   postgres_pod_resources:
 {{ toYaml .Values.configPostgresPodResources | indent 4 }}
   timeouts:
@@ -35,9 +35,11 @@ configuration:
   debug:
 {{ toYaml .Values.configDebug | indent 4 }}
   teams_api:
-{{ toYaml .Values.configTeamsApi | indent 4 }}
+{{ tpl (toYaml .Values.configTeamsApi) . | indent 4 }}
   logging_rest_api:
 {{ toYaml .Values.configLoggingRestApi | indent 4 }}
   connection_pooler:
 {{ toYaml .Values.configConnectionPooler | indent 4 }}
+  patroni:
+{{ toYaml .Values.configPatroni | indent 4 }}
 {{- end }}

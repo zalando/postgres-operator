@@ -29,7 +29,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,6 +44,7 @@ var (
 	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 	patroniObjectSuffixes = []string{"leader", "config", "sync", "failover"}
+	finalizerName         = "postgres-operator.acid.zalan.do"
 )
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
@@ -61,7 +62,7 @@ type kubeResources struct {
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
-	PodDisruptionBudget *policybeta1.PodDisruptionBudget
+	PodDisruptionBudget *policyv1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
 }
@@ -84,6 +85,7 @@ type Cluster struct {
 	userSyncStrategy spec.UserSyncer
 	deleteOptions    metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
+	replicationSlots map[string]interface{}
 
 	teamsAPIClient      teams.Interface
 	oauthTokenGetter    OAuthTokenGetter
@@ -91,7 +93,6 @@ type Cluster struct {
 	currentProcess      Process
 	processMu           sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu              sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-	streamApplications  []string
 	ConnectionPooler    map[PostgresRole]*ConnectionPoolerObjects
 	EBSVolumes          map[string]volumes.VolumeProperties
 	VolumeResizer       volumes.VolumeResizer
@@ -141,6 +142,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
 		currentMajorVersion: 0,
+		replicationSlots:    make(map[string]interface{}),
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
@@ -227,6 +229,10 @@ func (c *Cluster) initUsers() error {
 	}
 
 	if err := c.initHumanUsers(); err != nil {
+		// remember all cached users in c.pgUsers
+		for cachedUserName, cachedUser := range c.pgUsersCache {
+			c.pgUsers[cachedUserName] = cachedUser
+		}
 		return fmt.Errorf("could not init human users: %v", err)
 	}
 
@@ -236,15 +242,15 @@ func (c *Cluster) initUsers() error {
 }
 
 // Create creates the new kubernetes objects associated with the cluster.
-func (c *Cluster) Create() error {
+func (c *Cluster) Create() (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var (
-		err error
 
-		service *v1.Service
-		ep      *v1.Endpoints
-		ss      *appsv1.StatefulSet
+	var (
+		pgCreateStatus *acidv1.Postgresql
+		service        *v1.Service
+		ep             *v1.Endpoints
+		ss             *appsv1.StatefulSet
 	)
 
 	defer func() {
@@ -255,7 +261,17 @@ func (c *Cluster) Create() error {
 		}
 	}()
 
-	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+	pgCreateStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+	if err != nil {
+		return fmt.Errorf("could not set cluster status: %v", err)
+	}
+	c.setSpec(pgCreateStatus)
+
+	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
+		if err = c.addFinalizer(); err != nil {
+			return fmt.Errorf("could not add finalizer: %v", err)
+		}
+	}
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -365,7 +381,17 @@ func (c *Cluster) Create() error {
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
 
+	// remember slots to detect deletion from manifest
+	for slotName, desiredSlot := range c.Spec.Patroni.Slots {
+		c.replicationSlots[slotName] = desiredSlot
+	}
+
 	if len(c.Spec.Streams) > 0 {
+		// creating streams requires syncing the statefulset first
+		err = c.syncStatefulSet()
+		if err != nil {
+			return fmt.Errorf("could not sync statefulset: %v", err)
+		}
 		if err = c.syncStreams(); err != nil {
 			c.logger.Errorf("could not create streams: %v", err)
 		}
@@ -388,6 +414,17 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		match = false
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's annotations do not match: "+reason)
+	}
+	if c.Statefulset.Spec.PodManagementPolicy != statefulSet.Spec.PodManagementPolicy {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's pod management policy do not match")
+	}
+
+	if !reflect.DeepEqual(c.Statefulset.Spec.PersistentVolumeClaimRetentionPolicy, statefulSet.Spec.PersistentVolumeClaimRetentionPolicy) {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's persistent volume claim retention policy do not match")
 	}
 
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
@@ -455,23 +492,24 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's volumeClaimTemplates contains different number of volumes to the old one")
-	}
-	for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
-		name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
-		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
-		if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
-			continue
-		}
-		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one", name))
-		}
-		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
+	} else {
+		for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
 			name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q does not match the current one", name))
+			// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
+			if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
+				continue
+			}
+			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one", name))
+			}
+			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
+				name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q does not match the current one", name))
+			}
 		}
 	}
 
@@ -528,6 +566,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 	checks := []containerCheck{
 		newCheck("new statefulset %s's %s (index %d) name does not match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
+		newCheck("new statefulset %s's %s (index %d) readiness probe does not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.ReadinessProbe, b.ReadinessProbe) }),
 		newCheck("new statefulset %s's %s (index %d) ports do not match the current one",
 			func(a, b v1.Container) bool { return !comparePorts(a.Ports, b.Ports) }),
 		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
@@ -735,12 +775,60 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	return true, ""
 }
 
+// addFinalizer patches the postgresql CR to add finalizer
+func (c *Cluster) addFinalizer() error {
+	if c.hasFinalizer() {
+		return nil
+	}
+
+	c.logger.Infof("adding finalizer %s", finalizerName)
+	finalizers := append(c.ObjectMeta.Finalizers, finalizerName)
+	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), c.DeepCopy(), finalizers)
+	if err != nil {
+		return fmt.Errorf("error adding finalizer: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion
+	c.setSpec(newSpec)
+	return nil
+}
+
+// removeFinalizer patches postgresql CR to remove finalizer
+func (c *Cluster) removeFinalizer() error {
+	if !c.hasFinalizer() {
+		return nil
+	}
+
+	c.logger.Infof("removing finalizer %s", finalizerName)
+	finalizers := util.RemoveString(c.ObjectMeta.Finalizers, finalizerName)
+	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), c.DeepCopy(), finalizers)
+	if err != nil {
+		return fmt.Errorf("error removing finalizer: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion.
+	c.setSpec(newSpec)
+
+	return nil
+}
+
+// hasFinalizer checks if finalizer is currently set or not
+func (c *Cluster) hasFinalizer() bool {
+	for _, finalizer := range c.ObjectMeta.Finalizers {
+		if finalizer == finalizerName {
+			return true
+		}
+	}
+	return false
+}
+
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
 // (i.e. service) is treated as an error
 // logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
 // for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
+	userInitFailed := false
 	syncStatefulSet := false
 
 	c.mu.Lock()
@@ -778,38 +866,50 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// check if users need to be synced
-	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
-		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
-	sameRotatedUsers := reflect.DeepEqual(oldSpec.Spec.UsersWithSecretRotation, newSpec.Spec.UsersWithSecretRotation) &&
-		reflect.DeepEqual(oldSpec.Spec.UsersWithInPlaceSecretRotation, newSpec.Spec.UsersWithInPlaceSecretRotation)
+	// Users
+	func() {
+		// check if users need to be synced during update
+		sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
+			reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
+		sameRotatedUsers := reflect.DeepEqual(oldSpec.Spec.UsersWithSecretRotation, newSpec.Spec.UsersWithSecretRotation) &&
+			reflect.DeepEqual(oldSpec.Spec.UsersWithInPlaceSecretRotation, newSpec.Spec.UsersWithInPlaceSecretRotation)
 
-	// connection pooler needs one system user created, which is done in
-	// initUsers. Check if it needs to be called.
-	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
-		needReplicaConnectionPoolerWorker(&newSpec.Spec)
+		// connection pooler needs one system user created who is initialized in initUsers
+		// only when disabled in oldSpec and enabled in newSpec
+		needPoolerUser := c.needConnectionPoolerUser(&oldSpec.Spec, &newSpec.Spec)
 
-	if !sameUsers || !sameRotatedUsers || needConnectionPooler {
-		c.logger.Debugf("initialize users")
-		if err := c.initUsers(); err != nil {
-			c.logger.Errorf("could not init users: %v", err)
-			updateFailed = true
+		// streams new replication user created who is initialized in initUsers
+		// only when streams were not specified in oldSpec but in newSpec
+		needStreamUser := len(oldSpec.Spec.Streams) == 0 && len(newSpec.Spec.Streams) > 0
+
+		if !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser {
+			c.logger.Debugf("initialize users")
+			if err := c.initUsers(); err != nil {
+				c.logger.Errorf("could not init users - skipping sync of secrets and databases: %v", err)
+				userInitFailed = true
+				updateFailed = true
+				return
+			}
+
+			c.logger.Debugf("syncing secrets")
+			//TODO: mind the secrets of the deleted/new users
+			if err := c.syncSecrets(); err != nil {
+				c.logger.Errorf("could not sync secrets: %v", err)
+				updateFailed = true
+			}
 		}
-
-		c.logger.Debugf("syncing secrets")
-
-		//TODO: mind the secrets of the deleted/new users
-		if err := c.syncSecrets(); err != nil {
-			c.logger.Errorf("could not sync secrets: %v", err)
-			updateFailed = true
-		}
-	}
+	}()
 
 	// Volume
 	if c.OpConfig.StorageResizeMode != "off" {
 		c.syncVolumes()
 	} else {
 		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume sync.")
+	}
+
+	// streams configuration
+	if len(oldSpec.Spec.Streams) == 0 && len(newSpec.Spec.Streams) > 0 {
+		syncStatefulSet = true
 	}
 
 	// Statefulset
@@ -827,6 +927,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			updateFailed = true
 			return
 		}
+
 		if syncStatefulSet || !reflect.DeepEqual(oldSs, newSs) {
 			c.logger.Debugf("syncing statefulsets")
 			syncStatefulSet = false
@@ -837,6 +938,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			}
 		}
 	}()
+
+	// add or remove standby_cluster section from Patroni config depending on changes in standby section
+	if !reflect.DeepEqual(oldSpec.Spec.StandbyCluster, newSpec.Spec.StandbyCluster) {
+		if err := c.syncStandbyClusterConfiguration(); err != nil {
+			return fmt.Errorf("could not set StandbyCluster configuration options: %v", err)
+		}
+	}
 
 	// pod disruption budget
 	if oldSpec.Spec.NumberOfInstances != newSpec.Spec.NumberOfInstances {
@@ -885,7 +993,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}()
 
 	// Roles and Databases
-	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
+	if !userInitFailed && !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		c.logger.Debugf("syncing roles")
 		if err := c.syncRoles(); err != nil {
 			c.logger.Errorf("could not sync roles: %v", err)
@@ -913,13 +1021,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// need to process. In the future we may want to do this more careful and
 	// check which databases we need to process, but even repeating the whole
 	// installation process should be good enough.
-
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
 		updateFailed = true
 	}
 
-	if len(c.Spec.Streams) > 0 {
+	// streams
+	if len(newSpec.Spec.Streams) > 0 {
 		if err := c.syncStreams(); err != nil {
 			c.logger.Errorf("could not sync streams: %v", err)
 			updateFailed = true
@@ -956,48 +1064,65 @@ func syncResources(a, b *v1.ResourceRequirements) bool {
 // DCS, reuses the master's endpoint to store the leader related metadata. If we remove the endpoint
 // before the pods, it will be re-created by the current master pod and will remain, obstructing the
 // creation of the new cluster with the same name. Therefore, the endpoints should be deleted last.
-func (c *Cluster) Delete() {
+func (c *Cluster) Delete() error {
+	var anyErrors = false
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of new cluster resources")
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of cluster resources")
 
 	if err := c.deleteStreams(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not delete event streams: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete event streams: %v", err)
 	}
 
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created
 	if err := c.deleteLogicalBackupJob(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove the logical backup k8s cron job; %v", err)
 	}
 
 	if err := c.deleteStatefulSet(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not delete statefulset: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete statefulset: %v", err)
 	}
 
 	if err := c.deleteSecrets(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not delete secrets: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete secrets: %v", err)
 	}
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not delete pod disruption budget: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budget: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
 		if !c.patroniKubernetesUseConfigMaps() {
 			if err := c.deleteEndpoint(role); err != nil {
+				anyErrors = true
 				c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s endpoint: %v", role, err)
 			}
 		}
 
 		if err := c.deleteService(role); err != nil {
+			anyErrors = true
 			c.logger.Warningf("could not delete %s service: %v", role, err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s service: %v", role, err)
 		}
 	}
 
 	if err := c.deletePatroniClusterObjects(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove leftover patroni objects; %v", err)
 	}
 
 	// Delete connection pooler objects anyway, even if it's not mentioned in the
@@ -1005,13 +1130,25 @@ func (c *Cluster) Delete() {
 	// wrong
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		if err := c.deleteConnectionPooler(role); err != nil {
+			anyErrors = true
 			c.logger.Warningf("could not remove connection pooler: %v", err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove connection pooler: %v", err)
 		}
 	}
 
+	// If we are done deleting our various resources we remove the finalizer to let K8S finally delete the Postgres CR
+	if anyErrors {
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "Delete", "some resources could be successfully deleted yet")
+		return fmt.Errorf("some error(s) occured when deleting resources, NOT removing finalizer yet")
+	}
+	if err := c.removeFinalizer(); err != nil {
+		return fmt.Errorf("done cleaning up, but error when removing finalizer: %v", err)
+	}
+
+	return nil
 }
 
-//NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
+// NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
 func (c *Cluster) NeedsRepair() (bool, acidv1.PostgresStatus) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
@@ -1087,28 +1224,10 @@ func (c *Cluster) initSystemUsers() {
 		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 
-	// Connection pooler user is an exception, if requested it's going to be
-	// created by operator as a normal pgUser
+	// Connection pooler user is an exception
+	// if requested it's going to be created by operator
 	if needConnectionPooler(&c.Spec) {
-		connectionPoolerSpec := c.Spec.ConnectionPooler
-		if connectionPoolerSpec == nil {
-			connectionPoolerSpec = &acidv1.ConnectionPooler{}
-		}
-
-		// Using superuser as pooler user is not a good idea. First of all it's
-		// not going to be synced correctly with the current implementation,
-		// and second it's a bad practice.
-		username := c.OpConfig.ConnectionPooler.User
-
-		isSuperUser := connectionPoolerSpec.User == c.OpConfig.SuperUsername
-		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
-			connectionPoolerSpec.User, "connection pool role")
-
-		if !isSuperUser && !isProtectedUser {
-			username = util.Coalesce(
-				connectionPoolerSpec.User,
-				c.OpConfig.ConnectionPooler.User)
-		}
+		username := c.poolerUser(&c.Spec)
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{
@@ -1478,7 +1597,8 @@ func (c *Cluster) GetCurrentProcess() Process {
 // GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() *ClusterStatus {
 	status := &ClusterStatus{
-		Cluster:             c.Spec.ClusterName,
+		Cluster:             c.Name,
+		Namespace:           c.Namespace,
 		Team:                c.Spec.TeamID,
 		Status:              c.Status,
 		Spec:                c.Spec,

@@ -6,7 +6,6 @@ LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 ENV TERM xterm-256color
 
 COPY requirements.txt ./
-COPY scm-source.json ./
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
@@ -16,7 +15,7 @@ RUN apt-get update \
            curl \
            vim \
     && pip3 install --no-cache-dir -r requirements.txt \
-    && curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.22.0/bin/linux/amd64/kubectl \
+    && curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.24.3/bin/linux/amd64/kubectl \
     && chmod +x ./kubectl \
     && mv ./kubectl /usr/local/bin/kubectl \
     && apt-get clean \
