@@ -203,6 +203,9 @@ spec:
                   enable_cross_namespace_secret:
                     type: boolean
                     default: false
+                  enable_finalizers:
+                    type: boolean
+                    default: false
                   enable_init_containers:
                     type: boolean
                     default: true

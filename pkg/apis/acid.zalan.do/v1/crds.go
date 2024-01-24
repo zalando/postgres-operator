@@ -1305,6 +1305,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_cross_namespace_secret": {
 								Type: "boolean",
 							},
+							"enable_finalizers": {
+								Type: "boolean",
+							},
 							"enable_init_containers": {
 								Type: "boolean",
 							},
