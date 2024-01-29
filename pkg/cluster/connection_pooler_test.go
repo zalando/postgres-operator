@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -740,7 +739,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: errors.New(`could not generate resource requirements: could not fill resource requests: could not parse default CPU quantity: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'`),
+			expected: nil,
 			cluster:  clusterNoDefaultRes,
 			check:    noCheck,
 		},
@@ -777,7 +776,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 		for _, tt := range tests {
 			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(role)
 
-			if err != tt.expected && err.Error() != tt.expected.Error() {
+			if err != tt.expected {
 				t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
 					testName, tt.subTest, err, tt.expected)
 			}
@@ -973,8 +972,8 @@ func TestPoolerTLS(t *testing.T) {
 			TeamID: "myapp", NumberOfInstances: 1,
 			EnableConnectionPooler: util.True(),
 			Resources: &acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
 				Size: "1G",

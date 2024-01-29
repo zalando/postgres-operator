@@ -126,12 +126,12 @@ func (c *Cluster) podDisruptionBudgetName() string {
 func makeDefaultResources(config *config.Config) acidv1.Resources {
 
 	defaultRequests := acidv1.ResourceDescription{
-		CPU:    config.Resources.DefaultCPURequest,
-		Memory: config.Resources.DefaultMemoryRequest,
+		CPU:    &config.Resources.DefaultCPURequest,
+		Memory: &config.Resources.DefaultMemoryRequest,
 	}
 	defaultLimits := acidv1.ResourceDescription{
-		CPU:    config.Resources.DefaultCPULimit,
-		Memory: config.Resources.DefaultMemoryLimit,
+		CPU:    &config.Resources.DefaultCPULimit,
+		Memory: &config.Resources.DefaultMemoryLimit,
 	}
 
 	return acidv1.Resources{
@@ -143,12 +143,12 @@ func makeDefaultResources(config *config.Config) acidv1.Resources {
 func makeLogicalBackupResources(config *config.Config) acidv1.Resources {
 
 	logicalBackupResourceRequests := acidv1.ResourceDescription{
-		CPU:    config.LogicalBackup.LogicalBackupCPURequest,
-		Memory: config.LogicalBackup.LogicalBackupMemoryRequest,
+		CPU:    &config.LogicalBackup.LogicalBackupCPURequest,
+		Memory: &config.LogicalBackup.LogicalBackupMemoryRequest,
 	}
 	logicalBackupResourceLimits := acidv1.ResourceDescription{
-		CPU:    config.LogicalBackup.LogicalBackupCPULimit,
-		Memory: config.LogicalBackup.LogicalBackupMemoryLimit,
+		CPU:    &config.LogicalBackup.LogicalBackupCPULimit,
+		Memory: &config.LogicalBackup.LogicalBackupMemoryLimit,
 	}
 
 	return acidv1.Resources{
@@ -240,30 +240,52 @@ func setMemoryRequestToLimit(resources *v1.ResourceRequirements, containerName s
 	}
 }
 
+func matchLimitsWithRequestsIfSmaller(resources *v1.ResourceRequirements, containerName string, logger *logrus.Entry) {
+	requests := resources.Requests
+	limits := resources.Limits
+	requestCPU, cpuRequestsExists := requests[v1.ResourceCPU]
+	limitCPU, cpuLimitExists := limits[v1.ResourceCPU]
+	if cpuRequestsExists && cpuLimitExists && limitCPU.Cmp(requestCPU) == -1 {
+		logger.Warningf("CPU limit of %s for %q container is increased to match CPU requests of %s", limitCPU.String(), containerName, requestCPU.String())
+		resources.Limits[v1.ResourceCPU] = requestCPU
+	}
+
+	requestMemory, memoryRequestsExists := requests[v1.ResourceMemory]
+	limitMemory, memoryLimitExists := limits[v1.ResourceMemory]
+	if memoryRequestsExists && memoryLimitExists && limitMemory.Cmp(requestMemory) == -1 {
+		logger.Warningf("memory limit of %s for %q container is increased to match memory requests of %s", limitMemory.String(), containerName, requestMemory.String())
+		resources.Limits[v1.ResourceMemory] = requestMemory
+	}
+}
+
 func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceDescription) (v1.ResourceList, error) {
 	var err error
 	requests := v1.ResourceList{}
 
-	if spec.CPU != "" {
-		requests[v1.ResourceCPU], err = resource.ParseQuantity(spec.CPU)
+	if spec.CPU != nil && *spec.CPU != "" && *spec.CPU != "0" && *spec.CPU != "null" {
+		requests[v1.ResourceCPU], err = resource.ParseQuantity(*spec.CPU)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse CPU quantity: %v", err)
 		}
 	} else {
-		requests[v1.ResourceCPU], err = resource.ParseQuantity(defaults.CPU)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse default CPU quantity: %v", err)
+		if defaults.CPU != nil && *defaults.CPU != "" && *defaults.CPU != "0" && *defaults.CPU != "null" {
+			requests[v1.ResourceCPU], err = resource.ParseQuantity(*defaults.CPU)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse default CPU quantity: %v", err)
+			}
 		}
 	}
-	if spec.Memory != "" {
-		requests[v1.ResourceMemory], err = resource.ParseQuantity(spec.Memory)
+	if spec.Memory != nil && *spec.Memory != "" && *spec.Memory != "0" && *spec.Memory != "null" {
+		requests[v1.ResourceMemory], err = resource.ParseQuantity(*spec.Memory)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse memory quantity: %v", err)
 		}
 	} else {
-		requests[v1.ResourceMemory], err = resource.ParseQuantity(defaults.Memory)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse default memory quantity: %v", err)
+		if defaults.Memory != nil && *defaults.Memory != "" && *defaults.Memory != "0" && *defaults.Memory != "null" {
+			requests[v1.ResourceMemory], err = resource.ParseQuantity(*defaults.Memory)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse default memory quantity: %v", err)
+			}
 		}
 	}
 
@@ -306,6 +328,8 @@ func (c *Cluster) generateResourceRequirements(
 	if err != nil {
 		return nil, fmt.Errorf("could not fill resource limits: %v", err)
 	}
+
+	matchLimitsWithRequestsIfSmaller(&result, containerName, c.logger)
 
 	// enforce minimum cpu and memory limits for Postgres containers only
 	if containerName == constants.PostgresContainerName {
@@ -1208,12 +1232,12 @@ func getBucketScopeSuffix(uid string) string {
 func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) acidv1.Resources {
 	return acidv1.Resources{
 		ResourceRequests: acidv1.ResourceDescription{
-			CPU:    cpuRequest,
-			Memory: memoryRequest,
+			CPU:    &cpuRequest,
+			Memory: &memoryRequest,
 		},
 		ResourceLimits: acidv1.ResourceDescription{
-			CPU:    cpuLimit,
-			Memory: memoryLimit,
+			CPU:    &cpuLimit,
+			Memory: &memoryLimit,
 		},
 	}
 }

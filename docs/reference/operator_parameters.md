@@ -549,19 +549,21 @@ CRD-based configuration.
 
 * **default_cpu_request**
   CPU request value for the Postgres containers, unless overridden by
-  cluster-specific settings. The default is `100m`.
+  cluster-specific settings. Empty string or `0` disables the default.
+  The default is `100m`.
 
 * **default_memory_request**
   memory request value for the Postgres containers, unless overridden by
-  cluster-specific settings. The default is `100Mi`.
+  cluster-specific settings. Empty string or `0` disables the default.
+  The default is `100Mi`.
 
 * **default_cpu_limit**
   CPU limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `1`.
+  settings.  Empty string or `0` disables the default. The default is `1`.
 
 * **default_memory_limit**
   memory limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `500Mi`.
+  settings. Empty string or `0` disables the default. The default is `500Mi`.
 
 * **max_cpu_request**
   optional upper boundary for CPU request

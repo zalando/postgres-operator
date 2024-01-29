@@ -130,10 +130,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodToleration = fromCRD.Kubernetes.PodToleration
 
 	// Postgres Pod resources
-	result.DefaultCPURequest = util.Coalesce(fromCRD.PostgresPodResources.DefaultCPURequest, "100m")
-	result.DefaultMemoryRequest = util.Coalesce(fromCRD.PostgresPodResources.DefaultMemoryRequest, "100Mi")
-	result.DefaultCPULimit = util.Coalesce(fromCRD.PostgresPodResources.DefaultCPULimit, "1")
-	result.DefaultMemoryLimit = util.Coalesce(fromCRD.PostgresPodResources.DefaultMemoryLimit, "500Mi")
+	result.DefaultCPURequest = fromCRD.PostgresPodResources.DefaultCPURequest
+	result.DefaultMemoryRequest = fromCRD.PostgresPodResources.DefaultMemoryRequest
+	result.DefaultCPULimit = fromCRD.PostgresPodResources.DefaultCPULimit
+	result.DefaultMemoryLimit = fromCRD.PostgresPodResources.DefaultMemoryLimit
 	result.MinCPULimit = util.Coalesce(fromCRD.PostgresPodResources.MinCPULimit, "250m")
 	result.MinMemoryLimit = util.Coalesce(fromCRD.PostgresPodResources.MinMemoryLimit, "250Mi")
 	result.MaxCPURequest = fromCRD.PostgresPodResources.MaxCPURequest

@@ -161,8 +161,8 @@ func TestStatefulSetAnnotations(t *testing.T) {
 	spec := acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: &acidv1.Resources{
-			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 		},
 		Volume: acidv1.Volume{
 			Size: "1G",
@@ -184,8 +184,8 @@ func TestStatefulSetUpdateWithEnv(t *testing.T) {
 	oldSpec := &acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: &acidv1.Resources{
-			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 		},
 		Volume: acidv1.Volume{
 			Size: "1G",
