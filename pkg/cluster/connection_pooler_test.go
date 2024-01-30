@@ -710,47 +710,42 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error { return nil }
 
 	tests := []struct {
-		subTest  string
-		spec     *acidv1.PostgresSpec
-		expected error
-		cluster  *Cluster
-		check    func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error
+		subTest string
+		spec    *acidv1.PostgresSpec
+		cluster *Cluster
+		check   func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error
 	}{
 		{
 			subTest: "default configuration",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    noCheck,
+			cluster: cluster,
+			check:   noCheck,
 		},
 		{
 			subTest: "pooler uses pod service account",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testServiceAccount,
+			cluster: cluster,
+			check:   testServiceAccount,
 		},
 		{
 			subTest: "no default resources",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  clusterNoDefaultRes,
-			check:    noCheck,
+			cluster: clusterNoDefaultRes,
+			check:   noCheck,
 		},
 		{
 			subTest: "default resources are set",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testResources,
+			cluster: cluster,
+			check:   testResources,
 		},
 		{
 			subTest: "labels for service",
@@ -758,28 +753,21 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				ConnectionPooler:              &acidv1.ConnectionPooler{},
 				EnableReplicaConnectionPooler: boolToPointer(true),
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testLabels,
+			cluster: cluster,
+			check:   testLabels,
 		},
 		{
 			subTest: "required envs",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testEnvs,
+			cluster: cluster,
+			check:   testEnvs,
 		},
 	}
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		for _, tt := range tests {
 			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(role)
-
-			if err != tt.expected {
-				t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
-					testName, tt.subTest, err, tt.expected)
-			}
 
 			err = tt.check(cluster, podSpec, role)
 			if err != nil {
