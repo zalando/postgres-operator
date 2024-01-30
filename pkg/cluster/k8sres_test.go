@@ -2932,6 +2932,38 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			},
 		},
 		{
+			subTest: "defaults are not defined but minimum limit is",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: clusterNameLabel,
+					MinMemoryLimit:   "250Mi",
+					PodRoleLabel:     "spilo-role",
+				},
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("500Mi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("500Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("500Mi")},
+			},
+		},
+		{
 			subTest: "test SetMemoryRequestToLimit flag",
 			config: config.Config{
 				Resources:               configResources,
