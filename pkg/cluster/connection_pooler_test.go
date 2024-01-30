@@ -767,9 +767,9 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 	}
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		for _, tt := range tests {
-			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(role)
+			podSpec, _ := tt.cluster.generateConnectionPoolerPodTemplate(role)
 
-			err = tt.check(cluster, podSpec, role)
+			err := tt.check(cluster, podSpec, role)
 			if err != nil {
 				t.Errorf("%s [%s]: Pod spec is incorrect, %+v",
 					testName, tt.subTest, err)
