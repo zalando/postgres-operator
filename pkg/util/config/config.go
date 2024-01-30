@@ -48,10 +48,10 @@ type Resources struct {
 	DeleteAnnotationNameKey       string              `name:"delete_annotation_name_key"`
 	PodRoleLabel                  string              `name:"pod_role_label" default:"spilo-role"`
 	PodToleration                 map[string]string   `name:"toleration" default:""`
-	DefaultCPURequest             string              `name:"default_cpu_request" default:"100m"`
-	DefaultMemoryRequest          string              `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit               string              `name:"default_cpu_limit" default:"1"`
-	DefaultMemoryLimit            string              `name:"default_memory_limit" default:"500Mi"`
+	DefaultCPURequest             string              `name:"default_cpu_request"`
+	DefaultMemoryRequest          string              `name:"default_memory_request"`
+	DefaultCPULimit               string              `name:"default_cpu_limit"`
+	DefaultMemoryLimit            string              `name:"default_memory_limit"`
 	MinCPULimit                   string              `name:"min_cpu_limit" default:"250m"`
 	MinMemoryLimit                string              `name:"min_memory_limit" default:"250Mi"`
 	MaxCPURequest                 string              `name:"max_cpu_request"`
