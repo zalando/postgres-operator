@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -265,27 +266,28 @@ func matchLimitsWithRequestsIfSmaller(resources *v1.ResourceRequirements, contai
 func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceDescription) (v1.ResourceList, error) {
 	var err error
 	requests := v1.ResourceList{}
+	emptyResourceExamples := []string{"", "0", "null"}
 
-	if spec.CPU != nil && *spec.CPU != "" && *spec.CPU != "0" && *spec.CPU != "null" {
+	if spec.CPU != nil && slices.Contains(emptyResourceExamples, *spec.CPU) {
 		requests[v1.ResourceCPU], err = resource.ParseQuantity(*spec.CPU)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse CPU quantity: %v", err)
 		}
 	} else {
-		if defaults.CPU != nil && *defaults.CPU != "" && *defaults.CPU != "0" && *defaults.CPU != "null" {
+		if defaults.CPU != nil && slices.Contains(emptyResourceExamples, *defaults.CPU) {
 			requests[v1.ResourceCPU], err = resource.ParseQuantity(*defaults.CPU)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse default CPU quantity: %v", err)
 			}
 		}
 	}
-	if spec.Memory != nil && *spec.Memory != "" && *spec.Memory != "0" && *spec.Memory != "null" {
+	if spec.Memory != nil && slices.Contains(emptyResourceExamples, *spec.Memory) {
 		requests[v1.ResourceMemory], err = resource.ParseQuantity(*spec.Memory)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse memory quantity: %v", err)
 		}
 	} else {
-		if defaults.Memory != nil && *defaults.Memory != "" && *defaults.Memory != "0" && *defaults.Memory != "null" {
+		if defaults.Memory != nil && slices.Contains(emptyResourceExamples, *defaults.Memory) {
 			requests[v1.ResourceMemory], err = resource.ParseQuantity(*defaults.Memory)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse default memory quantity: %v", err)
