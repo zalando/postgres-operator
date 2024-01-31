@@ -1578,15 +1578,18 @@ class EndToEndTestCase(unittest.TestCase):
         today = date.today()
 
         # enable password rotation for owner of foo database
-        pg_patch_inplace_rotation_for_owner = {
+        pg_patch_rotation_single_users = {
             "spec": {
+                "usersIgnoringSecretRotation": [
+                    "bar_user"
+                ],
                 "usersWithInPlaceSecretRotation": [
                     "zalando"
                 ]
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_inplace_rotation_for_owner)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_rotation_single_users)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # check if next rotation date was set in secret
@@ -1674,6 +1677,13 @@ class EndToEndTestCase(unittest.TestCase):
         # test that rotation_user can connect to the database
         self.eventuallyEqual(lambda: len(self.query_database_with_user(leader.metadata.name, "postgres", "SELECT 1", "foo_user")), 1,
             "Could not connect to the database with rotation user {}".format(rotation_user), 10, 5)
+
+        # check if rotation has been ignored for prepared bar_user
+        bar_user_secret = k8s.get_secret("bar_user")
+        secret_username = str(base64.b64decode(bar_user_secret.data["username"]), 'utf-8')
+
+        self.assertEqual("bar_user", secret_username,
+                        "Unexpected username in secret of bar_user: expected {}, got {}".format("bar_user", secret_username))
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped 
