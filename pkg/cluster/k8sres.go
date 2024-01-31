@@ -268,26 +268,26 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 	requests := v1.ResourceList{}
 	emptyResourceExamples := []string{"", "0", "null"}
 
-	if spec.CPU != nil && slices.Contains(emptyResourceExamples, *spec.CPU) {
+	if spec.CPU != nil && !slices.Contains(emptyResourceExamples, *spec.CPU) {
 		requests[v1.ResourceCPU], err = resource.ParseQuantity(*spec.CPU)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse CPU quantity: %v", err)
 		}
 	} else {
-		if defaults.CPU != nil && slices.Contains(emptyResourceExamples, *defaults.CPU) {
+		if defaults.CPU != nil && !slices.Contains(emptyResourceExamples, *defaults.CPU) {
 			requests[v1.ResourceCPU], err = resource.ParseQuantity(*defaults.CPU)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse default CPU quantity: %v", err)
 			}
 		}
 	}
-	if spec.Memory != nil && slices.Contains(emptyResourceExamples, *spec.Memory) {
+	if spec.Memory != nil && !slices.Contains(emptyResourceExamples, *spec.Memory) {
 		requests[v1.ResourceMemory], err = resource.ParseQuantity(*spec.Memory)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse memory quantity: %v", err)
 		}
 	} else {
-		if defaults.Memory != nil && slices.Contains(emptyResourceExamples, *defaults.Memory) {
+		if defaults.Memory != nil && !slices.Contains(emptyResourceExamples, *defaults.Memory) {
 			requests[v1.ResourceMemory], err = resource.ParseQuantity(*defaults.Memory)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse default memory quantity: %v", err)
