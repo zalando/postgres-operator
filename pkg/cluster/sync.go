@@ -15,6 +15,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -689,7 +690,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 		effectiveValue := effectivePgParameters[desiredOption]
 		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
 			parametersToSet[desiredOption] = desiredValue
-			if util.SliceContains(requirePrimaryRestartWhenDecreased, desiredOption) {
+			if slices.Contains(requirePrimaryRestartWhenDecreased, desiredOption) {
 				effectiveValueNum, errConv := strconv.Atoi(effectiveValue)
 				desiredValueNum, errConv2 := strconv.Atoi(desiredValue)
 				if errConv != nil || errConv2 != nil {
@@ -705,7 +706,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 
 	// check if there exist only config updates that require a restart of the primary
-	if len(restartPrimary) > 0 && !util.SliceContains(restartPrimary, false) && len(configToSet) == 0 {
+	if len(restartPrimary) > 0 && !slices.Contains(restartPrimary, false) && len(configToSet) == 0 {
 		requiresMasterRestart = true
 	}
 
@@ -873,14 +874,17 @@ func (c *Cluster) updateSecret(
 	// if password rotation is enabled update password and username if rotation interval has been passed
 	// rotation can be enabled globally or via the manifest (excluding the Postgres superuser)
 	rotationEnabledInManifest := secretUsername != constants.SuperuserKeyName &&
-		(util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) ||
-			util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
+		(slices.Contains(c.Spec.UsersWithSecretRotation, secretUsername) ||
+			slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
 
 	// globally enabled rotation is only allowed for manifest and bootstrapped roles
 	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
-	rotationAllowed := !pwdUser.IsDbOwner && util.SliceContains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
+	rotationAllowed := !pwdUser.IsDbOwner && slices.Contains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
 
-	if (c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest {
+	// users can ignore any kind of rotation
+	isIgnoringRotation := slices.Contains(c.Spec.UsersIgnoringSecretRotation, secretUsername)
+
+	if ((c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest) && !isIgnoringRotation {
 		updateSecretMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
 		if err != nil {
 			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
@@ -961,7 +965,7 @@ func (c *Cluster) rotatePasswordInSecret(
 	// update password and next rotation date if configured interval has passed
 	if currentTime.After(nextRotationDate) {
 		// create rotation user if role is not listed for in-place password update
-		if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+		if !slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
 			rotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format(constants.RotationUserDateFormat))
 			secret.Data["username"] = []byte(rotationUsername)
 			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, rotationUsername)
