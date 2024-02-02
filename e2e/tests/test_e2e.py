@@ -1581,7 +1581,7 @@ class EndToEndTestCase(unittest.TestCase):
         pg_patch_rotation_single_users = {
             "spec": {
                 "usersIgnoringSecretRotation": [
-                    "bar_user"
+                    "test.db_user"
                 ],
                 "usersWithInPlaceSecretRotation": [
                     "zalando"
@@ -1678,12 +1678,12 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database_with_user(leader.metadata.name, "postgres", "SELECT 1", "foo_user")), 1,
             "Could not connect to the database with rotation user {}".format(rotation_user), 10, 5)
 
-        # check if rotation has been ignored for prepared bar_user
-        bar_user_secret = k8s.get_secret("bar_user")
-        secret_username = str(base64.b64decode(bar_user_secret.data["username"]), 'utf-8')
+        # check if rotation has been ignored for user from test_cross_namespace_secrets test
+        db_user_secret = k8s.get_secret(username="db_user", namepsace="test")
+        secret_username = str(base64.b64decode(db_user_secret.data["username"]), 'utf-8')
 
-        self.assertEqual("bar_user", secret_username,
-                        "Unexpected username in secret of bar_user: expected {}, got {}".format("bar_user", secret_username))
+        self.assertEqual("test.db_user", secret_username,
+                        "Unexpected username in secret of test.db_user: expected {}, got {}".format("test.db_user", secret_username))
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped 
