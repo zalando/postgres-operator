@@ -1679,7 +1679,7 @@ class EndToEndTestCase(unittest.TestCase):
             "Could not connect to the database with rotation user {}".format(rotation_user), 10, 5)
 
         # check if rotation has been ignored for user from test_cross_namespace_secrets test
-        db_user_secret = k8s.get_secret(username="db_user", namepsace="test")
+        db_user_secret = k8s.get_secret(username="db_user", namespace="test")
         secret_username = str(base64.b64decode(db_user_secret.data["username"]), 'utf-8')
 
         self.assertEqual("test.db_user", secret_username,
