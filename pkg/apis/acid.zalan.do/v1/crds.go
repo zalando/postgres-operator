@@ -895,6 +895,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"topologySpreadConstraints": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
+						},
+					},
 					"useLoadBalancer": {
 						Type:        "boolean",
 						Description: "deprecated",
