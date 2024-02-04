@@ -4057,6 +4057,12 @@ spec:
                       type: string
                   type: object
                 type: array
+              topologySpreadConstraints:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
               useLoadBalancer:
                 description: |-
                   deprecated load balancer settings maintained for backward compatibility
