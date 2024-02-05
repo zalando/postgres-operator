@@ -3,7 +3,7 @@ package cluster
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -201,7 +201,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 
 	// mocking a config after setConfig is called
 	configJson := `{"postgresql": {"parameters": {"log_min_duration_statement": 200, "max_connections": 50}}}, "ttl": 20}`
-	r := ioutil.NopCloser(bytes.NewReader([]byte(configJson)))
+	r := io.NopCloser(bytes.NewReader([]byte(configJson)))
 
 	response := http.Response{
 		StatusCode: 200,
@@ -531,7 +531,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	// mocking a config after getConfig is called
 	mockClient := mocks.NewMockHTTPClient(ctrl)
 	configJson := `{"ttl": 20}`
-	r := ioutil.NopCloser(bytes.NewReader([]byte(configJson)))
+	r := io.NopCloser(bytes.NewReader([]byte(configJson)))
 	response := http.Response{
 		StatusCode: 200,
 		Body:       r,
@@ -540,7 +540,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 
 	// mocking a config after setConfig is called
 	standbyJson := `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_wale","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}}`
-	r = ioutil.NopCloser(bytes.NewReader([]byte(standbyJson)))
+	r = io.NopCloser(bytes.NewReader([]byte(standbyJson)))
 	response = http.Response{
 		StatusCode: 200,
 		Body:       r,
@@ -582,7 +582,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	assert.NoError(t, err)
 
 	configJson = `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_wale","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}, "ttl": 20}`
-	r = ioutil.NopCloser(bytes.NewReader([]byte(configJson)))
+	r = io.NopCloser(bytes.NewReader([]byte(configJson)))
 	response = http.Response{
 		StatusCode: 200,
 		Body:       r,
