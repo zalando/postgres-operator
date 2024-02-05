@@ -25,8 +25,8 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/spf13/cobra"
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -77,7 +77,7 @@ func deleteByFile(file string) {
 		log.Fatal(err)
 	}
 
-	ymlFile, err := ioutil.ReadFile(file)
+	ymlFile, err := os.ReadFile(file)
 	if err != nil {
 		log.Fatal(err)
 	}

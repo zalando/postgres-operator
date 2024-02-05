@@ -39,6 +39,13 @@ Create a pod service account name.
 {{- end -}}
 
 {{/*
+Create a pod priority class name.
+*/}}
+{{- define "postgres-pod.priorityClassName" -}}
+{{ default (printf "%s-%v" (include "postgres-operator.fullname" .) "pod") .Values.podPriorityClassName.name }}
+{{- end -}}
+
+{{/*
 Create a controller ID.
 */}}
 {{- define "postgres-operator.controllerID" -}}
