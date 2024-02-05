@@ -3,7 +3,7 @@ package cluster
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -86,7 +86,7 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 
 	for _, tt := range tests {
 		// mocking cluster members
-		r := ioutil.NopCloser(bytes.NewReader([]byte(tt.clusterJson)))
+		r := io.NopCloser(bytes.NewReader([]byte(tt.clusterJson)))
 
 		response := http.Response{
 			StatusCode: 200,
