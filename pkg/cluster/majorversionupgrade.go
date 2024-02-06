@@ -17,6 +17,7 @@ var VersionMap = map[string]int{
 	"13": 130000,
 	"14": 140000,
 	"15": 150000,
+	"16": 160000,
 }
 
 // IsBiggerPostgresVersion Compare two Postgres version numbers
@@ -95,6 +96,12 @@ func (c *Cluster) majorVersionUpgrade() error {
 			masterPod = &pods[i]
 			c.currentMajorVersion = ps.ServerVersion
 		}
+	}
+
+	// Recheck version with newest data from Patroni
+	if c.currentMajorVersion >= desiredVersion {
+		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
+		return nil
 	}
 
 	numberOfPods := len(pods)
