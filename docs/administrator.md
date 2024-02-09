@@ -355,6 +355,23 @@ This would be the recommended option to enable rotation in secrets of database
 owners, but only if they are not used as application users for regular read
 and write operations.
 
+### Ignore rotation for certain users
+
+If you wish to globally enable password rotation but need certain users to
+opt out from it there are two ways. First, you can remove the user from the
+manifest's `users` section. The corresponding secret to this user will no
+longer be synced by the operator then.
+
+Secondly, if you want the operator to continue syncing the secret (e.g. to
+recreate if it got accidentally removed) but cannot allow it being rotated,
+add the user to the following list in your manifest:
+
+```
+spec:
+  usersIgnoringSecretRotation:
+  - bar_user
+```
+
 ### Turning off password rotation
 
 When password rotation is turned off again the operator will check if the

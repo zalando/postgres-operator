@@ -59,6 +59,7 @@ type PostgresSpec struct {
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
 	Users                          map[string]UserFlags `json:"users,omitempty"`
+	UsersIgnoringSecretRotation    []string             `json:"usersIgnoringSecretRotation,omitempty"`
 	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
 	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
 

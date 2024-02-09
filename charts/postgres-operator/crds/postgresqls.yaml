@@ -612,6 +612,11 @@ spec:
                     - SUPERUSER
                     - nosuperuser
                     - NOSUPERUSER
+              usersIgnoringSecretRotation:
+                type: array
+                nullable: true
+                items:
+                  type: string
               usersWithInPlaceSecretRotation:
                 type: array
                 nullable: true

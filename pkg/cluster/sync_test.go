@@ -10,6 +10,7 @@ import (
 
 	"context"
 
+	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -634,7 +635,8 @@ func TestUpdateSecret(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			Databases:                      map[string]string{dbname: dbowner},
-			Users:                          map[string]acidv1.UserFlags{"foo": {}, dbowner: {}},
+			Users:                          map[string]acidv1.UserFlags{"foo": {}, "bar": {}, dbowner: {}},
+			UsersIgnoringSecretRotation:    []string{"bar"},
 			UsersWithInPlaceSecretRotation: []string{dbowner},
 			Streams: []acidv1.Stream{
 				{
@@ -710,6 +712,9 @@ func TestUpdateSecret(t *testing.T) {
 		if secretPassword == rotatedPassword {
 			// passwords for system users should not have been rotated
 			if pgUser.Origin != spec.RoleOriginManifest {
+				continue
+			}
+			if slices.Contains(pg.Spec.UsersIgnoringSecretRotation, username) {
 				continue
 			}
 			t.Errorf("%s: password unchanged in updated secret for %s", testName, username)

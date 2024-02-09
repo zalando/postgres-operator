@@ -718,6 +718,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*out)[key] = outVal
 		}
 	}
+	if in.UsersIgnoringSecretRotation != nil {
+		in, out := &in.UsersIgnoringSecretRotation, &out.UsersIgnoringSecretRotation
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.UsersWithSecretRotation != nil {
 		in, out := &in.UsersWithSecretRotation, &out.UsersWithSecretRotation
 		*out = make([]string, len(*in))
