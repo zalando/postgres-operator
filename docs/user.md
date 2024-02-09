@@ -689,6 +689,9 @@ The minimum limits to properly run the `postgresql` resource are configured to
 manifest the operator will raise the limits to the configured minimum values.
 If no resources are defined in the manifest they will be obtained from the
 configured [default requests](reference/operator_parameters.md#kubernetes-resource-requests).
+If neither defaults nor minimum limits are configured the operator will not
+specify any resources and it's up to K8s (or your own) admission hooks to
+handle it.
 
 ### HugePages support
 
