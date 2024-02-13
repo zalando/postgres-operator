@@ -84,5 +84,5 @@ jobs:
           context: docker/logical-backup
           push: true
           build-args: BASE_IMAGE=ubuntu:22.04
-          tags: "${{ steps.image.outputs.BACKUP_IMAGE }}"
+          tags: "${{ steps.image_lb.outputs.BACKUP_IMAGE }}"
           platforms: linux/amd64,linux/arm64
