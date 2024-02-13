@@ -75,7 +75,7 @@ jobs:
           context: ui
           push: true
           build-args: BASE_IMAGE=alpine:3.15
-          tags: "${{ steps.image.outputs.UI_IMAGE }}"
+          tags: "${{ steps.image_ui.outputs.UI_IMAGE }}"
           platforms: linux/amd64,linux/arm64
 
       - name: Build and push multiarch logical-backup image to ghcr
