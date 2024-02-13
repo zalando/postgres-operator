@@ -549,19 +549,19 @@ CRD-based configuration.
 
 * **default_cpu_request**
   CPU request value for the Postgres containers, unless overridden by
-  cluster-specific settings. The default is `100m`.
+  cluster-specific settings. Empty string or `0` disables the default.
 
 * **default_memory_request**
   memory request value for the Postgres containers, unless overridden by
-  cluster-specific settings. The default is `100Mi`.
+  cluster-specific settings. Empty string or `0` disables the default.
 
 * **default_cpu_limit**
   CPU limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `1`.
+  settings.  Empty string or `0` disables the default.
 
 * **default_memory_limit**
   memory limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `500Mi`.
+  settings. Empty string or `0` disables the default.
 
 * **max_cpu_request**
   optional upper boundary for CPU request
@@ -571,11 +571,11 @@ CRD-based configuration.
 
 * **min_cpu_limit**
   hard CPU minimum what we consider to be required to properly run Postgres
-  clusters with Patroni on Kubernetes. The default is `250m`.
+  clusters with Patroni on Kubernetes.
 
 * **min_memory_limit**
   hard memory minimum what we consider to be required to properly run Postgres
-  clusters with Patroni on Kubernetes. The default is `250Mi`.
+  clusters with Patroni on Kubernetes.
 
 ## Patroni options
 
@@ -1026,5 +1026,4 @@ operator being able to provide some reasonable defaults.
   **connection_pooler_default_memory_reques**
   **connection_pooler_default_cpu_limit**
   **connection_pooler_default_memory_limit**
-  Default resource configuration for connection pooler deployment. The internal
-  default for memory request and limit is `100Mi`, for CPU it is `500m` and `1`.
+  Default resource configuration for connection pooler deployment.

@@ -26,6 +26,10 @@ var parseTimeTests = []struct {
 	{"expect error as minute is out of range", "23:69", metav1.Now(), errors.New(`parsing time "23:69": minute out of range`)},
 }
 
+func stringToPointer(str string) *string {
+	return &str
+}
+
 var parseWeekdayTests = []struct {
 	about string
 	in    string
@@ -301,8 +305,8 @@ var unmarshalCluster = []struct {
 					Slots:                map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 				},
 				Resources: &Resources{
-					ResourceRequests: ResourceDescription{CPU: "10m", Memory: "50Mi"},
-					ResourceLimits:   ResourceDescription{CPU: "300m", Memory: "3000Mi"},
+					ResourceRequests: ResourceDescription{CPU: stringToPointer("10m"), Memory: stringToPointer("50Mi")},
+					ResourceLimits:   ResourceDescription{CPU: stringToPointer("300m"), Memory: stringToPointer("3000Mi")},
 				},
 
 				TeamID:              "acid",

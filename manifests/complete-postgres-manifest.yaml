@@ -19,6 +19,8 @@ spec:
     - createdb
     foo_user: []
 #    flyway: []
+#  usersIgnoringSecretRotation:
+#  - bar_user
 #  usersWithSecretRotation:
 #  - foo_user
 #  usersWithInPlaceSecretRotation:

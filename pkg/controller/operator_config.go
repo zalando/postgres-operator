@@ -130,12 +130,12 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodToleration = fromCRD.Kubernetes.PodToleration
 
 	// Postgres Pod resources
-	result.DefaultCPURequest = util.Coalesce(fromCRD.PostgresPodResources.DefaultCPURequest, "100m")
-	result.DefaultMemoryRequest = util.Coalesce(fromCRD.PostgresPodResources.DefaultMemoryRequest, "100Mi")
-	result.DefaultCPULimit = util.Coalesce(fromCRD.PostgresPodResources.DefaultCPULimit, "1")
-	result.DefaultMemoryLimit = util.Coalesce(fromCRD.PostgresPodResources.DefaultMemoryLimit, "500Mi")
-	result.MinCPULimit = util.Coalesce(fromCRD.PostgresPodResources.MinCPULimit, "250m")
-	result.MinMemoryLimit = util.Coalesce(fromCRD.PostgresPodResources.MinMemoryLimit, "250Mi")
+	result.DefaultCPURequest = fromCRD.PostgresPodResources.DefaultCPURequest
+	result.DefaultMemoryRequest = fromCRD.PostgresPodResources.DefaultMemoryRequest
+	result.DefaultCPULimit = fromCRD.PostgresPodResources.DefaultCPULimit
+	result.DefaultMemoryLimit = fromCRD.PostgresPodResources.DefaultMemoryLimit
+	result.MinCPULimit = fromCRD.PostgresPodResources.MinCPULimit
+	result.MinMemoryLimit = fromCRD.PostgresPodResources.MinMemoryLimit
 	result.MaxCPURequest = fromCRD.PostgresPodResources.MaxCPURequest
 	result.MaxMemoryRequest = fromCRD.PostgresPodResources.MaxMemoryRequest
 
@@ -265,21 +265,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		fromCRD.ConnectionPooler.Mode,
 		constants.ConnectionPoolerDefaultMode)
 
-	result.ConnectionPooler.ConnectionPoolerDefaultCPURequest = util.Coalesce(
-		fromCRD.ConnectionPooler.DefaultCPURequest,
-		constants.ConnectionPoolerDefaultCpuRequest)
-
-	result.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest = util.Coalesce(
-		fromCRD.ConnectionPooler.DefaultMemoryRequest,
-		constants.ConnectionPoolerDefaultMemoryRequest)
-
-	result.ConnectionPooler.ConnectionPoolerDefaultCPULimit = util.Coalesce(
-		fromCRD.ConnectionPooler.DefaultCPULimit,
-		constants.ConnectionPoolerDefaultCpuLimit)
-
-	result.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit = util.Coalesce(
-		fromCRD.ConnectionPooler.DefaultMemoryLimit,
-		constants.ConnectionPoolerDefaultMemoryLimit)
+	result.ConnectionPooler.ConnectionPoolerDefaultCPURequest = fromCRD.ConnectionPooler.DefaultCPURequest
+	result.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest = fromCRD.ConnectionPooler.DefaultMemoryRequest
+	result.ConnectionPooler.ConnectionPoolerDefaultCPULimit = fromCRD.ConnectionPooler.DefaultCPULimit
+	result.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit = fromCRD.ConnectionPooler.DefaultMemoryLimit
 
 	result.ConnectionPooler.MaxDBConnections = util.CoalesceInt32(
 		fromCRD.ConnectionPooler.MaxDBConnections,
