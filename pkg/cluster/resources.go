@@ -243,7 +243,8 @@ func (c *Cluster) deleteStatefulSet() error {
 	c.setProcessName("deleting statefulset")
 	c.logger.Debugln("deleting statefulset")
 	if c.Statefulset == nil {
-		return fmt.Errorf("there is no statefulset in the cluster")
+		c.logger.Debug("there is no statefulset in the cluster")
+		return nil
 	}
 
 	err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Delete(context.TODO(), c.Statefulset.Name, c.deleteOptions)
@@ -447,7 +448,8 @@ func (c *Cluster) updatePodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) e
 func (c *Cluster) deletePodDisruptionBudget() error {
 	c.logger.Debug("deleting pod disruption budget")
 	if c.PodDisruptionBudget == nil {
-		return fmt.Errorf("there is no pod disruption budget in the cluster")
+		c.logger.Debug("there is no pod disruption budget in the cluster")
+		return nil
 	}
 
 	pdbName := util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta)
@@ -485,7 +487,8 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	c.setProcessName("deleting endpoint")
 	c.logger.Debugln("deleting endpoint")
 	if c.Endpoints[role] == nil {
-		return fmt.Errorf("there is no %s endpoint in the cluster", role)
+		c.logger.Debugf("there is no %s endpoint in the cluster", role)
+		return nil
 	}
 
 	if err := c.KubeClient.Endpoints(c.Endpoints[role].Namespace).Delete(context.TODO(), c.Endpoints[role].Name, c.deleteOptions); err != nil {
