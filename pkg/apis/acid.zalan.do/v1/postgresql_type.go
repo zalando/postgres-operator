@@ -59,6 +59,7 @@ type PostgresSpec struct {
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
 	Users                          map[string]UserFlags `json:"users,omitempty"`
+	UsersIgnoringSecretRotation    []string             `json:"usersIgnoringSecretRotation,omitempty"`
 	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
 	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
 
@@ -153,8 +154,10 @@ type PostgresqlParam struct {
 
 // ResourceDescription describes CPU and memory resources defined for a cluster.
 type ResourceDescription struct {
-	CPU    string `json:"cpu"`
-	Memory string `json:"memory"`
+	CPU          *string `json:"cpu,omitempty"`
+	Memory       *string `json:"memory,omitempty"`
+	HugePages2Mi *string `json:"hugepages-2Mi,omitempty"`
+	HugePages1Gi *string `json:"hugepages-1Gi,omitempty"`
 }
 
 // Resources describes requests and limits for the cluster resouces.
@@ -259,7 +262,7 @@ type Stream struct {
 // StreamTable defines properties of outbox tables for FabricEventStreams
 type StreamTable struct {
 	EventType         string  `json:"eventType"`
-	RecoveryEventType string  `json:"recoveryEventType"`
+	RecoveryEventType string  `json:"recoveryEventType,omitempty"`
 	IdColumn          *string `json:"idColumn,omitempty"`
 	PayloadColumn     *string `json:"payloadColumn,omitempty"`
 }

@@ -123,6 +123,10 @@ configKubernetes:
 
   # allow user secrets in other namespaces than the Postgres cluster
   enable_cross_namespace_secret: false
+  # use finalizers to ensure all managed resources are deleted prior to the postgresql CR
+  # this avoids stale resources in case the operator misses a delete event or is not running
+  # during deletion
+  enable_finalizers: false
   # enables initContainers to run actions before Spilo is started
   enable_init_containers: true
   # toggles pod anti affinity on the Postgres pods
@@ -166,7 +170,7 @@ configKubernetes:
   # defines the template for PDB (Pod Disruption Budget) names
   pdb_name_format: "postgres-{cluster}-pdb"
   # specify the PVC retention policy when scaling down and/or deleting
-  persistent_volume_claim_retention_policy: 
+  persistent_volume_claim_retention_policy:
     when_deleted: "retain"
     when_scaled: "retain"
   # switches pod anti affinity type to `preferredDuringSchedulingIgnoredDuringExecution`
@@ -376,6 +380,8 @@ configLogicalBackup:
   logical_backup_s3_retention_time: ""
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
+  # secret to be used as reference for env variables in cronjob
+  logical_backup_cronjob_environment_secret: ""
 
 # automate creation of human users with teams API service
 configTeamsApi:
@@ -420,7 +426,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-27"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-32"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode
@@ -462,7 +468,14 @@ podServiceAccount:
 priorityClassName: ""
 
 # priority class for database pods
-podPriorityClassName: ""
+podPriorityClassName:
+  # If create is false with no name set, no podPriorityClassName is specified.
+  # Hence, the pod priorityClass is the one with globalDefault set. 
+  # If there is no PriorityClass with globalDefault set, the priority of Pods with no priorityClassName is zero.
+  create: true
+  # If not set a name is generated using the fullname template and "-pod" suffix
+  name: ""
+  priority: 1000000
 
 resources:
   limits:

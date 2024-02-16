@@ -355,6 +355,23 @@ This would be the recommended option to enable rotation in secrets of database
 owners, but only if they are not used as application users for regular read
 and write operations.
 
+### Ignore rotation for certain users
+
+If you wish to globally enable password rotation but need certain users to
+opt out from it there are two ways. First, you can remove the user from the
+manifest's `users` section. The corresponding secret to this user will no
+longer be synced by the operator then.
+
+Secondly, if you want the operator to continue syncing the secret (e.g. to
+recreate if it got accidentally removed) but cannot allow it being rotated,
+add the user to the following list in your manifest:
+
+```
+spec:
+  usersIgnoringSecretRotation:
+  - bar_user
+```
+
 ### Turning off password rotation
 
 When password rotation is turned off again the operator will check if the
@@ -1347,6 +1364,8 @@ environment variables in the [deployment manifest](https://github.com/zalando/po
 You can also expose the operator API through a [service](https://github.com/zalando/postgres-operator/blob/master/manifests/api-service.yaml).
 Some displayed options can be disabled from UI using simple flags under the
 `OPERATOR_UI_CONFIG` field in the deployment.
+
+The viewing and creation of clusters within the UI is limited to the namespace specified by the `TARGET_NAMESPACE` option. To allow the creation and viewing of clusters in all namespaces, set `TARGET_NAMESPACE` to `*`.
 
 ### Deploy the UI on K8s
 

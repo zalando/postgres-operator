@@ -19,6 +19,8 @@ spec:
     - createdb
     foo_user: []
 #    flyway: []
+#  usersIgnoringSecretRotation:
+#  - bar_user
 #  usersWithSecretRotation:
 #  - foo_user
 #  usersWithInPlaceSecretRotation:
@@ -107,9 +109,13 @@ spec:
     requests:
       cpu: 10m
       memory: 100Mi
+#      hugepages-2Mi: 128Mi
+#      hugepages-1Gi: 1Gi
     limits:
       cpu: 500m
       memory: 500Mi
+#      hugepages-2Mi: 128Mi
+#      hugepages-1Gi: 1Gi
   patroni:
     failsafe_mode: false
     initdb:
