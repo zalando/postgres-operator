@@ -41,12 +41,17 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.setSpec(newSpec)
 
 	defer func() {
+		var pgUpdatedStatus *acidv1.Postgresql
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
+			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
 		} else if !c.Status.Running() {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
 		}
+		if err != nil {
+			c.logger.Warningf("could not set cluster status: %v", err)
+		}
+		c.setSpec(pgUpdatedStatus)
 	}()
 
 	if err = c.syncFinalizer(); err != nil {
