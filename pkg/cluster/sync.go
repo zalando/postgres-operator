@@ -51,7 +51,9 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		if err != nil {
 			c.logger.Warningf("could not set cluster status: %v", err)
 		}
-		c.setSpec(pgUpdatedStatus)
+		if pgUpdatedStatus != nil {
+			c.setSpec(pgUpdatedStatus)
+		}
 	}()
 
 	if err = c.syncFinalizer(); err != nil {

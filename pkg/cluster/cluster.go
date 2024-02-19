@@ -263,7 +263,9 @@ func (c *Cluster) Create() (err error) {
 		if err != nil {
 			c.logger.Warningf("could not set cluster status: %v", err)
 		}
-		c.setSpec(pgUpdatedStatus)
+		if pgUpdatedStatus != nil {
+			c.setSpec(pgUpdatedStatus)
+		}
 	}()
 
 	pgCreateStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
@@ -856,7 +858,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		if err != nil {
 			c.logger.Warningf("could not set cluster status: %v", err)
 		}
-		c.setSpec(pgUpdatedStatus)
+		if pgUpdatedStatus != nil {
+			c.setSpec(pgUpdatedStatus)
+		}
 	}()
 
 	logNiceDiff(c.logger, oldSpec, newSpec)
