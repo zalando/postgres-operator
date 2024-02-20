@@ -209,7 +209,6 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 		return pg, fmt.Errorf("could not update status: %v", err)
 	}
 
-	// update the spec, maintaining the new resourceVersion.
 	return pg, nil
 }
 
@@ -220,7 +219,7 @@ func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg
 		patch     []byte
 		err       error
 	)
-	pg.ObjectMeta.SetFinalizers(finalizers)
+	pg.ObjectMeta.Finalizers = finalizers
 
 	if len(finalizers) > 0 {
 		patch, err = json.Marshal(struct {
