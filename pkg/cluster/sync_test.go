@@ -624,6 +624,7 @@ func TestUpdateSecret(t *testing.T) {
 	namespace := "default"
 	dbname := "app"
 	dbowner := "appowner"
+	appUser := "foo"
 	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
 	retentionUsers := make([]string, 0)
 
@@ -635,7 +636,7 @@ func TestUpdateSecret(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			Databases:                      map[string]string{dbname: dbowner},
-			Users:                          map[string]acidv1.UserFlags{"foo": {}, "bar": {}, dbowner: {}},
+			Users:                          map[string]acidv1.UserFlags{appUser: {}, "bar": {}, dbowner: {}},
 			UsersIgnoringSecretRotation:    []string{"bar"},
 			UsersWithInPlaceSecretRotation: []string{dbowner},
 			Streams: []acidv1.Stream{
@@ -743,5 +744,33 @@ func TestUpdateSecret(t *testing.T) {
 				t.Errorf("%s: unexpected number of users to drop - expected only %s, found %d", testName, username, len(retentionUsers))
 			}
 		}
+	}
+
+	// switch rotation for foo to in-place
+	inPlaceRotationUsers := []string{dbowner, appUser}
+	cluster.Spec.UsersWithInPlaceSecretRotation = inPlaceRotationUsers
+	cluster.initUsers()
+	cluster.syncSecrets()
+	updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), cluster.credentialSecretName(appUser), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	// username in secret should be switched to original user
+	currentUsername := string(updatedSecret.Data["username"])
+	if currentUsername != appUser {
+		t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, appUser, currentUsername)
+	}
+
+	// switch rotation back to rotation user
+	inPlaceRotationUsers = []string{dbowner}
+	cluster.Spec.UsersWithInPlaceSecretRotation = inPlaceRotationUsers
+	cluster.initUsers()
+	cluster.syncSecrets()
+	updatedSecret, err = cluster.KubeClient.Secrets(namespace).Get(context.TODO(), cluster.credentialSecretName(appUser), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	// username in secret will only be switched after next rotation date is passed
+	currentUsername = string(updatedSecret.Data["username"])
+	if currentUsername != appUser {
+		t.Errorf("%s: updated secret does not contain expected username: expected %s, got %s", testName, appUser, currentUsername)
 	}
 }

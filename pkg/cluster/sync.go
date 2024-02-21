@@ -942,6 +942,8 @@ func (c *Cluster) rotatePasswordInSecret(
 		err                 error
 		nextRotationDate    time.Time
 		nextRotationDateStr string
+		expectedUsername    string
+		rotationModeChanged bool
 		updateSecretMsg     string
 	)
 
@@ -962,17 +964,32 @@ func (c *Cluster) rotatePasswordInSecret(
 		nextRotationDate = currentRotationDate
 	}
 
+	// set username and check if it differs from current value in secret
+	currentUsername := string(secret.Data["username"])
+	if !slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+		expectedUsername = fmt.Sprintf("%s%s", secretUsername, currentTime.Format(constants.RotationUserDateFormat))
+	} else {
+		expectedUsername = secretUsername
+	}
+
+	// when changing to in-place rotation update secret immediatly
+	// if currentUsername is longer we know it has a date suffix
+	// the other way around we can wait until the next rotation date
+	if len(currentUsername) > len(expectedUsername) {
+		rotationModeChanged = true
+		c.logger.Infof("updating secret %s after switching to in-place rotation mode for username: %s", secretName, string(secret.Data["username"]))
+	}
+
 	// update password and next rotation date if configured interval has passed
-	if currentTime.After(nextRotationDate) {
+	if currentTime.After(nextRotationDate) || rotationModeChanged {
 		// create rotation user if role is not listed for in-place password update
 		if !slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
-			rotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format(constants.RotationUserDateFormat))
-			secret.Data["username"] = []byte(rotationUsername)
-			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, rotationUsername)
+			secret.Data["username"] = []byte(expectedUsername)
+			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, expectedUsername)
 			// whenever there is a rotation, check if old rotation users can be deleted
 			*retentionUsers = append(*retentionUsers, secretUsername)
 		} else {
-			// when passwords of system users are rotated in place, pods have to be replaced
+			// when passwords of system users are rotated in-place, pods have to be replaced
 			if roleOrigin == spec.RoleOriginSystem {
 				pods, err := c.listPods()
 				if err != nil {
@@ -986,7 +1003,7 @@ func (c *Cluster) rotatePasswordInSecret(
 				}
 			}
 
-			// when password of connection pooler is rotated in place, pooler pods have to be replaced
+			// when password of connection pooler is rotated in-place, pooler pods have to be replaced
 			if roleOrigin == spec.RoleOriginConnectionPooler {
 				listOptions := metav1.ListOptions{
 					LabelSelector: c.poolerLabelsSet(true).String(),
@@ -1003,10 +1020,12 @@ func (c *Cluster) rotatePasswordInSecret(
 				}
 			}
 
-			// when password of stream user is rotated in place, it should trigger rolling update in FES deployment
+			// when password of stream user is rotated in-place, it should trigger rolling update in FES deployment
 			if roleOrigin == spec.RoleOriginStream {
 				c.logger.Warnf("password in secret of stream user %s changed", constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix)
 			}
+
+			secret.Data["username"] = []byte(secretUsername)
 		}
 		secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
 		secret.Data["nextRotation"] = []byte(nextRotationDateStr)
