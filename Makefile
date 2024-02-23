@@ -69,7 +69,7 @@ docker: ${DOCKERDIR}/${DOCKERFILE}
 	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERDIR}/${DOCKERFILE}" --build-arg VERSION="${VERSION}" .
 
 indocker-race:
-	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.19.8 bash -c "make linux"
+	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.21.7 bash -c "make linux"
 
 push:
 	docker push "$(IMAGE):$(TAG)$(CDP_TAG)"
@@ -78,7 +78,7 @@ mocks:
 	GO111MODULE=on go generate ./...
 
 tools:
-	GO111MODULE=on go get -d k8s.io/client-go@kubernetes-1.25.9
+	GO111MODULE=on go get -d k8s.io/client-go@kubernetes-1.28.7
 	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.6.0
 	GO111MODULE=on go mod tidy
 
