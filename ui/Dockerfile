@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=registry.opensource.zalan.do/library/alpine-3.15:latest
+ARG BASE_IMAGE=registry.opensource.zalan.do/library/alpine-3:latest
 ARG NODE_IMAGE=node:14.21.2-alpine
 
 FROM $NODE_IMAGE AS build
