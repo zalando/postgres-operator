@@ -362,7 +362,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	for {
-		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}) error { return nil }))
+		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}, bool) error { return nil }))
 		if err != nil {
 			if err == cache.ErrFIFOClosed {
 				return

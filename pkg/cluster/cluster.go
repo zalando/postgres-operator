@@ -1181,7 +1181,7 @@ func (c *Cluster) ReceivePodEvent(event PodEvent) {
 	}
 }
 
-func (c *Cluster) processPodEvent(obj interface{}) error {
+func (c *Cluster) processPodEvent(obj interface{}, isInInitialList bool) error {
 	event, ok := obj.(PodEvent)
 	if !ok {
 		return fmt.Errorf("could not cast to PodEvent")
