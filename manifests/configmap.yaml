@@ -157,7 +157,7 @@ data:
   spilo_privileged: "false"
   storage_resize_mode: "pvc"
   super_username: postgres
-  # target_major_version: "15"
+  # target_major_version: "16"
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local

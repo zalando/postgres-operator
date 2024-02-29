@@ -91,7 +91,7 @@ configMajorVersionUpgrade:
   # minimal Postgres major version that will not automatically be upgraded
   minimal_major_version: "11"
   # target Postgres major version when upgrading clusters automatically
-  target_major_version: "15"
+  target_major_version: "16"
 
 configKubernetes:
   # list of additional capabilities for postgres container

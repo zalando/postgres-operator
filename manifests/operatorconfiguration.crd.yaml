@@ -168,7 +168,7 @@ spec:
                     default: "11"
                   target_major_version:
                     type: string
-                    default: "15"
+                    default: "16"
               kubernetes:
                 type: object
                 properties:
