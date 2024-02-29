@@ -643,6 +643,9 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	if desiredPatroniConfig.SynchronousModeStrict != effectivePatroniConfig.SynchronousModeStrict {
 		configToSet["synchronous_mode_strict"] = desiredPatroniConfig.SynchronousModeStrict
 	}
+	if desiredPatroniConfig.SynchronousNodeCount != effectivePatroniConfig.SynchronousNodeCount {
+		configToSet["synchronous_node_count"] = desiredPatroniConfig.SynchronousNodeCount
+	}
 	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != effectivePatroniConfig.TTL {
 		configToSet["ttl"] = desiredPatroniConfig.TTL
 	}
