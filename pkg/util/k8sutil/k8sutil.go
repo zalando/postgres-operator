@@ -19,8 +19,9 @@ import (
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apipolicyv1 "k8s.io/api/policy/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	apiextv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -62,7 +63,7 @@ type KubernetesClient struct {
 	appsv1.DeploymentsGetter
 	rbacv1.RoleBindingsGetter
 	policyv1.PodDisruptionBudgetsGetter
-	apiextv1.CustomResourceDefinitionsGetter
+	apiextv1client.CustomResourceDefinitionsGetter
 	clientbatchv1.CronJobsGetter
 	acidv1.OperatorConfigurationsGetter
 	acidv1.PostgresTeamsGetter
@@ -72,6 +73,13 @@ type KubernetesClient struct {
 	RESTClient         rest.Interface
 	AcidV1ClientSet    *zalandoclient.Clientset
 	Zalandov1ClientSet *zalandoclient.Clientset
+}
+
+type mockCustomResourceDefinition struct {
+	apiextv1client.CustomResourceDefinitionInterface
+}
+
+type MockCustomResourceDefinitionsGetter struct {
 }
 
 type mockSecret struct {
@@ -293,6 +301,18 @@ func SameLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string)
 	return true, ""
 }
 
+func (c *mockCustomResourceDefinition) Get(ctx context.Context, name string, options metav1.GetOptions) (*apiextv1.CustomResourceDefinition, error) {
+	return &apiextv1.CustomResourceDefinition{}, nil
+}
+
+func (c *mockCustomResourceDefinition) Create(ctx context.Context, crd *apiextv1.CustomResourceDefinition, options metav1.CreateOptions) (*apiextv1.CustomResourceDefinition, error) {
+	return &apiextv1.CustomResourceDefinition{}, nil
+}
+
+func (mock *MockCustomResourceDefinitionsGetter) CustomResourceDefinitions() apiextv1client.CustomResourceDefinitionInterface {
+	return &mockCustomResourceDefinition{}
+}
+
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
 	oldFormatSecret := &v1.Secret{}
 	oldFormatSecret.Name = "testcluster"
@@ -497,6 +517,8 @@ func NewMockKubernetesClient() KubernetesClient {
 		ConfigMapsGetter:  &MockConfigMapsGetter{},
 		DeploymentsGetter: &MockDeploymentGetter{},
 		ServicesGetter:    &MockServiceGetter{},
+
+		CustomResourceDefinitionsGetter: &MockCustomResourceDefinitionsGetter{},
 	}
 }
 
