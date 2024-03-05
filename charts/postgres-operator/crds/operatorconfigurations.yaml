@@ -167,7 +167,7 @@ spec:
                       type: string
                   minimal_major_version:
                     type: string
-                    default: "11"
+                    default: "12"
                   target_major_version:
                     type: string
                     default: "16"

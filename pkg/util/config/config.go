@@ -244,7 +244,7 @@ type Config struct {
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`
 	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"off"`
 	MajorVersionUpgradeTeamAllowList         []string          `name:"major_version_upgrade_team_allow_list" default:""`
-	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"11"`
+	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"12"`
 	TargetMajorVersion                       string            `name:"target_major_version" default:"16"`
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
