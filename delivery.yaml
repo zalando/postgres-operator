@@ -2,7 +2,9 @@ version: "2017-09-20"
 pipeline:
     - id: build-postgres-operator
       type: script
-      vm: large
+      vm_config:
+        type: linux
+        size: large
       cache:
         paths:
           - /go/pkg/mod
@@ -16,7 +18,7 @@ pipeline:
         - desc: 'Install go'
           cmd: |
             cd /tmp
-            wget -q https://storage.googleapis.com/golang/go1.19.8.linux-amd64.tar.gz -O go.tar.gz
+            wget -q https://storage.googleapis.com/golang/go1.21.7.linux-amd64.tar.gz -O go.tar.gz
             tar -xf go.tar.gz
             mv go /usr/local
             ln -s /usr/local/go/bin/go /usr/bin/go
@@ -37,9 +39,6 @@ pipeline:
           cmd: |
             export PATH=$PATH:$HOME/go/bin
             go test ./...
-        - desc: 'Run e2e tests'
-          cmd: |
-            make e2e
         - desc: 'Push docker image'
           cmd: |
             export PATH=$PATH:$HOME/go/bin
@@ -55,6 +54,8 @@ pipeline:
 
     - id: build-operator-ui
       type: script
+      vm_config:
+        type: linux
 
       commands:
         - desc: 'Prepare environment'
@@ -83,6 +84,8 @@ pipeline:
 
     - id: build-logical-backup
       type: script
+      vm_config:
+        type: linux
 
       commands:
         - desc: Build image

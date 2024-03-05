@@ -1,13 +1,15 @@
-name: Publish multiarch postgres-operator image on ghcr.io
+name: Publish multiarch postgres-operator images on ghcr.io
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME_UI: ${{ github.repository }}-ui
 
 on:
   push:
     tags:
       - '*'
+
 jobs:
   publish:
     name: Build, test and push image
@@ -21,7 +23,7 @@ jobs:
 
       - uses: actions/setup-go@v2
         with:
-          go-version: "^1.19.8"
+          go-version: "^1.21.7"
 
       - name: Run unit tests
         run: make deps mocks test
@@ -29,8 +31,20 @@ jobs:
       - name: Define image name
         id: image
         run: |
-            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_REF/refs\/tags\//}"
-            echo "NAME=$IMAGE" >> $GITHUB_OUTPUT
+            OPERATOR_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_REF/refs\/tags\//}"
+            echo "OPERATOR_IMAGE=$OPERATOR_IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Define UI image name
+        id: image_ui
+        run: |
+            UI_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_UI }}:${GITHUB_REF/refs\/tags\//}"
+            echo "UI_IMAGE=$UI_IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Define logical backup image name
+        id: image_lb
+        run: |
+            BACKUP_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/logical-backup:${GITHUB_REF_NAME}"
+            echo "BACKUP_IMAGE=$BACKUP_IMAGE" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -45,12 +59,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multiarch image to ghcr
+      - name: Build and push multiarch operator image to ghcr
         uses: docker/build-push-action@v3
         with:
           context: .
           file: docker/Dockerfile
           push: true
           build-args: BASE_IMAGE=alpine:3.15
-          tags: "${{ steps.image.outputs.NAME }}"
+          tags: "${{ steps.image.outputs.OPERATOR_IMAGE }}"
+          platforms: linux/amd64,linux/arm64
+
+      - name: Build and push multiarch ui image to ghcr
+        uses: docker/build-push-action@v3
+        with:
+          context: ui
+          push: true
+          build-args: BASE_IMAGE=alpine:3.15
+          tags: "${{ steps.image_ui.outputs.UI_IMAGE }}"
+          platforms: linux/amd64,linux/arm64
+
+      - name: Build and push multiarch logical-backup image to ghcr
+        uses: docker/build-push-action@v3
+        with:
+          context: docker/logical-backup
+          push: true
+          build-args: BASE_IMAGE=ubuntu:22.04
+          tags: "${{ steps.image_lb.outputs.BACKUP_IMAGE }}"
           platforms: linux/amd64,linux/arm64

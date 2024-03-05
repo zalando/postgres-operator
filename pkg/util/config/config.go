@@ -48,12 +48,12 @@ type Resources struct {
 	DeleteAnnotationNameKey       string              `name:"delete_annotation_name_key"`
 	PodRoleLabel                  string              `name:"pod_role_label" default:"spilo-role"`
 	PodToleration                 map[string]string   `name:"toleration" default:""`
-	DefaultCPURequest             string              `name:"default_cpu_request" default:"100m"`
-	DefaultMemoryRequest          string              `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit               string              `name:"default_cpu_limit" default:"1"`
-	DefaultMemoryLimit            string              `name:"default_memory_limit" default:"500Mi"`
-	MinCPULimit                   string              `name:"min_cpu_limit" default:"250m"`
-	MinMemoryLimit                string              `name:"min_memory_limit" default:"250Mi"`
+	DefaultCPURequest             string              `name:"default_cpu_request"`
+	DefaultMemoryRequest          string              `name:"default_memory_request"`
+	DefaultCPULimit               string              `name:"default_cpu_limit"`
+	DefaultMemoryLimit            string              `name:"default_memory_limit"`
+	MinCPULimit                   string              `name:"min_cpu_limit"`
+	MinMemoryLimit                string              `name:"min_memory_limit"`
 	MaxCPURequest                 string              `name:"max_cpu_request"`
 	MaxMemoryRequest              string              `name:"max_memory_request"`
 	PodEnvironmentConfigMap       spec.NamespacedName `name:"pod_environment_configmap"`
@@ -140,6 +140,7 @@ type LogicalBackup struct {
 	LogicalBackupS3RetentionTime              string `name:"logical_backup_s3_retention_time" default:""`
 	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
+	LogicalBackupCronjobEnvironmentSecret     string `name:"logical_backup_cronjob_environment_secret" default:""`
 	LogicalBackupCPURequest                   string `name:"logical_backup_cpu_request"`
 	LogicalBackupMemoryRequest                string `name:"logical_backup_memory_request"`
 	LogicalBackupCPULimit                     string `name:"logical_backup_cpu_limit"`
@@ -154,10 +155,10 @@ type ConnectionPooler struct {
 	Image                                string `name:"connection_pooler_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
 	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
 	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
-	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request" default:"500m"`
-	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request" default:"100Mi"`
-	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit" default:"1"`
-	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit" default:"100Mi"`
+	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request"`
+	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request"`
+	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit"`
+	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit"`
 }
 
 // Config describes operator config
@@ -219,6 +220,7 @@ type Config struct {
 	ReplicaDNSNameFormat                     StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{namespace}.{hostedzone}"`
 	ReplicaLegacyDNSNameFormat               StringTemplate    `name:"replica_legacy_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat                            StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	PDBMasterLabelSelector                   *bool             `name:"pdb_master_label_selector" default:"true"`
 	EnablePodDisruptionBudget                *bool             `name:"enable_pod_disruption_budget" default:"true"`
 	EnableInitContainers                     *bool             `name:"enable_init_containers" default:"true"`
 	EnableSidecars                           *bool             `name:"enable_sidecars" default:"true"`
@@ -236,6 +238,7 @@ type Config struct {
 	SetMemoryRequestToLimit                  bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                   bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 	EnableCrossNamespaceSecret               bool              `name:"enable_cross_namespace_secret" default:"false"`
+	EnableFinalizers                         *bool             `name:"enable_finalizers" default:"false"`
 	EnablePgVersionEnvVar                    bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat                 bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`

@@ -1,4 +1,5 @@
-FROM registry.opensource.zalan.do/library/ubuntu-18.04:latest
+ARG BASE_IMAGE=registry.opensource.zalan.do/library/ubuntu-22.04:latest
+FROM ${BASE_IMAGE}
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -30,7 +31,6 @@ RUN apt-get update     \
         postgresql-client-13  \
         postgresql-client-12  \
         postgresql-client-11  \
-        postgresql-client-10  \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

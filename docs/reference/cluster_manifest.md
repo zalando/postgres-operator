@@ -142,6 +142,14 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   database, like a flyway user running a migration on Pod start. See more
   details in the [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#password-replacement-without-extra-users).
 
+* **usersIgnoringSecretRotation**
+  if you have secret rotation enabled globally you can define a list of
+  of users that should opt out from it, for example if you store credentials
+  outside of K8s, too, and corresponding deployments cannot dynamically
+  reference secrets. Note, you can also opt out from the rotation by removing
+  users from the manifest's `users` section. The operator will not drop them
+  from the database. Optional.
+
 * **databases**
   a map of database names to database owners for the databases that should be
   created by the operator. The owner users should already exist on the cluster
@@ -359,6 +367,14 @@ CPU and memory requests for the Postgres container.
   memory requests for the Postgres container. Optional, overrides the
   `default_memory_request` operator configuration parameter.
 
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
+
 ### Limits
 
 CPU and memory limits for the Postgres container.
@@ -370,6 +386,14 @@ CPU and memory limits for the Postgres container.
 * **memory**
   memory limits for the Postgres container. Optional, overrides the
   `default_memory_limits` operator configuration parameter.
+
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
 
 ## Parameters defining how to clone the cluster from another one
 
@@ -500,6 +524,14 @@ CPU and memory requests for the sidecar container.
   memory requests for the sidecar container. Optional, overrides the
   `default_memory_request` operator configuration parameter. Optional.
 
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
+
 ### Limits
 
 CPU and memory limits for the sidecar container.
@@ -511,6 +543,14 @@ CPU and memory limits for the sidecar container.
 * **memory**
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
+
+* **hugepages-2Mi**
+  hugepages-2Mi requests for the sidecar container.
+  Optional, defaults to not set.
+
+* **hugepages-1Gi**
+  1Gi hugepages requests for the sidecar container.
+  Optional, defaults to not set.
 
 ## Connection pooler
 
