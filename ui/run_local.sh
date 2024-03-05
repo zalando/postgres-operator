@@ -31,6 +31,7 @@ default_operator_ui_config='{
   "limit_iops": 16000,
   "limit_throughput": 1000,
   "postgresql_versions": [
+    "16",
     "15",
     "14",
     "13",
