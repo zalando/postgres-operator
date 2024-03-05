@@ -96,6 +96,12 @@ func (c *Cluster) majorVersionUpgrade() error {
 		}
 	}
 
+	// Recheck version with newest data from Patroni
+	if c.currentMajorVersion >= desiredVersion {
+		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
+		return nil
+	}
+
 	numberOfPods := len(pods)
 	if allRunning && masterPod != nil {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
