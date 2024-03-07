@@ -29,7 +29,7 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 16, starting from 12+
+* Supports PostgreSQL 16, starting from 11+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html) /
