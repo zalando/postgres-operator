@@ -339,10 +339,11 @@ configuration they are grouped under the `kubernetes` key.
   cannot fully sync it, there can be leftovers. By enabling finalizers the
   operator will ensure all managed resources are deleted prior to the
   Postgresql resource. There is a trade-off though: The deletion is only
-  performed at the next cluster SYNC cycle when finding a `deletionTimestamp`
-  in the metadata and not immediately after issueing a delete command. The
-  final removal of the custom resource will add a DELETE event to the worker
-  queue but the child resources are already gone at this point.
+  performed after the next two SYNC cycles with the first one updating the
+  internal spec and the latter reacting on the `deletionTimestamp` while
+  processing the SYNC event. The final removal of the custom resource will
+  add a DELETE event to the worker queue but the child resources are already
+  gone at this point.
   The default is `false`.
 
 * **enable_pod_disruption_budget**
