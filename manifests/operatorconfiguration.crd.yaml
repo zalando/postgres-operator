@@ -319,6 +319,10 @@ spec:
                   pod_service_account_name:
                     type: string
                     default: "postgres-pod"
+                  pod_service_account_annotations:
+                    type: object
+                    additionalProperties:
+                      type: string
                   pod_service_account_role_binding_definition:
                     type: string
                     default: ""

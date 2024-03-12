@@ -68,6 +68,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// kubernetes config
 	result.CustomPodAnnotations = fromCRD.Kubernetes.CustomPodAnnotations
 	result.PodServiceAccountName = util.Coalesce(fromCRD.Kubernetes.PodServiceAccountName, "postgres-pod")
+	result.PodServiceAccountAnnotations = util.CoalesceStrMap(fromCRD.Kubernetes.PodServiceAccountAnnotations, map[string]string{})
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
 	result.PodEnvironmentConfigMap = fromCRD.Kubernetes.PodEnvironmentConfigMap

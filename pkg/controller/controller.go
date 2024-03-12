@@ -245,6 +245,7 @@ func (c *Controller) initPodServiceAccount() {
 			c.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
 		}
 		c.PodServiceAccount.Namespace = ""
+		c.PodServiceAccount.Annotations = c.opConfig.PodServiceAccountAnnotations
 	}
 
 	// actual service accounts are deployed at the time of Postgres/Spilo cluster creation

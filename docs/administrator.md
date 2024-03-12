@@ -1033,11 +1033,9 @@ The configuration parameters that we will be using are:
 
 * `wal_gs_bucket`
 
-1. Create a custom Kubernetes service account to be used by Patroni running on
-the postgres cluster pods, this service account should include an annotation
-with the email address of the Google IAM service account used to communicate
-with the GCS bucket, e.g.
+1. If you want to use a custom Kubernetes service account for Patroni running on the postgres cluster pods, follow these steps:
 
+    a. Create the service account and include an annotation with the email address of the Google IAM service account used to communicate with the GCS bucket:
 ```yml
 apiVersion: v1
 kind: ServiceAccount
@@ -1048,20 +1046,31 @@ metadata:
     iam.gke.io/gcp-service-account: <GCP_SERVICE_ACCOUNT_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com
 ```
 
-2. Specify the new custom service account in your [operator paramaters](./reference/operator_parameters.md)
-
-If using manual deployment or kustomize, this is done by setting
-`pod_service_account_name` in your configuration file specified in the
-[postgres-operator deployment](../manifests/postgres-operator.yaml#L37)
-
-If deploying the operator [using Helm](./quickstart.md#helm-chart), this can
-be specified in the chart's values file, e.g.:
-
+  b. Specify this custom service account in your [operator parameters](./reference/operator_parameters.md).
+    - If using manual deployment or kustomize, set `pod_service_account_name` in your configuration file as indicated in the [postgres-operator deployment](../manifests/postgres-operator.yaml#L37).
+    - If deploying the operator [using Helm](./quickstart.md#helm-chart), update the chart's values file:
 ```yml
 ...
 podServiceAccount:
   name: postgres-pod-custom
 ```
+
+2. If you prefer the operator to automatically create the service account with the correct annotation:
+
+    a. Specify the required annotation under `podServiceAccount` in your configuration:
+      - If using manual deployment or kustomize, specify the `pod_service_account_annotations` directly in your configuration file.
+      - If deploying the operator [using Helm](./quickstart.md#helm-chart), update the chart's values file:
+
+```yml
+...
+podServiceAccount:
+  name: postgres-pod
+  annotations:
+    iam.gke.io/gcp-service-account: <GCP_SERVICE_ACCOUNT_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com
+```
+
+  With this configuration, the operator will create a new service account named `postgres-pod` with the specified GCP service account annotation.
+
 
 3. Setup your operator configuration values. Ensure that the operator's configuration
 is set up like the following:

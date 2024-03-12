@@ -55,7 +55,8 @@ type MajorVersionUpgradeConfiguration struct {
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
 type KubernetesMetaConfiguration struct {
-	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
+	PodServiceAccountName        string            `json:"pod_service_account_name,omitempty"`
+	PodServiceAccountAnnotations map[string]string `json:"pod_service_account_annotations,omitempty"`
 	// TODO: change it to the proper json
 	PodServiceAccountDefinition            string                       `json:"pod_service_account_definition,omitempty"`
 	PodServiceAccountRoleBindingDefinition string                       `json:"pod_service_account_role_binding_definition,omitempty"`
