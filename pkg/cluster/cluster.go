@@ -254,14 +254,18 @@ func (c *Cluster) Create() (err error) {
 	)
 
 	defer func() {
-		var pgUpdatedStatus *acidv1.Postgresql
+		var (
+			pgUpdatedStatus *acidv1.Postgresql
+			errStatus       error
+		)
 		if err == nil {
-			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
+			c.logger.Warningf("cluster created failed: %v", err)
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
 		}
-		if err != nil {
-			c.logger.Warningf("could not set cluster status: %v", err)
+		if errStatus != nil {
+			c.logger.Warningf("could not set cluster status: %v", errStatus)
 		}
 		if pgUpdatedStatus != nil {
 			c.setSpec(pgUpdatedStatus)

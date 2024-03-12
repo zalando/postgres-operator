@@ -339,7 +339,6 @@ func (c *Controller) processEvent(event ClusterEvent) {
 				lg.Error(cl.Error)
 				return
 			}
-			lg.Infof("cluster has been deleted")
 		} else {
 			if err = cl.Sync(event.NewSpec); err != nil {
 				cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
