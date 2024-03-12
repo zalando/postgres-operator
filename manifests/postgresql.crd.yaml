@@ -338,6 +338,8 @@ spec:
                       type: string
                   retry_timeout:
                     type: integer
+                  master_start_timeout:
+                    type: integer
                   slots:
                     type: object
                     additionalProperties:

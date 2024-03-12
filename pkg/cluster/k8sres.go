@@ -56,6 +56,7 @@ type patroniDCS struct {
 	TTL                      uint32                       `json:"ttl,omitempty"`
 	LoopWait                 uint32                       `json:"loop_wait,omitempty"`
 	RetryTimeout             uint32                       `json:"retry_timeout,omitempty"`
+	MasterStartTimeout       uint32                       `json:"master_start_timeout,omitempty"`
 	MaximumLagOnFailover     float32                      `json:"maximum_lag_on_failover,omitempty"`
 	SynchronousMode          bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict    bool                         `json:"synchronous_mode_strict,omitempty"`
@@ -426,6 +427,9 @@ PatroniInitDBParams:
 	}
 	if patroni.RetryTimeout != 0 {
 		config.Bootstrap.DCS.RetryTimeout = patroni.RetryTimeout
+	}
+	if patroni.MasterStartTimeout != 0 {
+		config.Bootstrap.DCS.MasterStartTimeout = patroni.MasterStartTimeout
 	}
 	if patroni.TTL != 0 {
 		config.Bootstrap.DCS.TTL = patroni.TTL

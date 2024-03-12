@@ -347,7 +347,11 @@ explanation of `ttl` and `loop_wait` parameters.
   [here](https://patroni.readthedocs.io/en/master/dcs_failsafe_mode.html) for more details.
   This feature is included since Patroni 3.0.0. Hence, check the container
   image in use if this feature is included in the used Patroni version. The
-  default is set to `false`. Optional. 
+  default is set to `false`. Optional.
+
+* **master_start_timeout**
+  Patroni `master_start_timeout` parameter value. The default is set by the 
+  Spilo Docker image. Optional.
   
 ## Postgres container resources
 

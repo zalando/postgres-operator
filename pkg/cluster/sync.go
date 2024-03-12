@@ -640,6 +640,9 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	if desiredPatroniConfig.RetryTimeout > 0 && desiredPatroniConfig.RetryTimeout != effectivePatroniConfig.RetryTimeout {
 		configToSet["retry_timeout"] = desiredPatroniConfig.RetryTimeout
 	}
+	if desiredPatroniConfig.MasterStartTimeout > 0 && desiredPatroniConfig.MasterStartTimeout != effectivePatroniConfig.MasterStartTimeout {
+		configToSet["master_start_timeout"] = desiredPatroniConfig.MasterStartTimeout
+	}
 	if desiredPatroniConfig.SynchronousMode != effectivePatroniConfig.SynchronousMode {
 		configToSet["synchronous_mode"] = desiredPatroniConfig.SynchronousMode
 	}
