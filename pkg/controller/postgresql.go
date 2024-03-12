@@ -331,6 +331,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
 		// has this cluster been marked as deleted already, then we shall start cleaning up
+		lg.Infof("cluster DeletionTimestamp is %s", cl.ObjectMeta.DeletionTimestamp)
 		if !cl.ObjectMeta.DeletionTimestamp.IsZero() {
 			lg.Infof("cluster has a DeletionTimestamp of %s, starting deletion now.", cl.ObjectMeta.DeletionTimestamp.Format(time.RFC3339))
 			if err = cl.Delete(); err != nil {
