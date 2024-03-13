@@ -1217,7 +1217,7 @@ aws_or_gcp:
 
 If cluster members have to be (re)initialized restoring physical backups
 happens automatically either from the backup location or by running
-[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html)
+[pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html)
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.

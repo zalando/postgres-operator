@@ -35,8 +35,7 @@ default_operator_ui_config='{
     "15",
     "14",
     "13",
-    "12",
-    "11"
+    "12"
   ],
   "static_network_whitelist": {
     "localhost": ["172.0.0.1/32"]
