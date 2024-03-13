@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/aws/aws-sdk-go v1.42.18
 	github.com/golang/mock v1.6.0
-	github.com/lib/pq v1.10.4
+	github.com/lib/pq v1.10.9
 	github.com/motomux/pretty v0.0.0-20161209205251-b2aad2c9a95d
 	github.com/pkg/errors v0.9.1
 	github.com/r3labs/diff v1.1.0
