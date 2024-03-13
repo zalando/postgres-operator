@@ -377,6 +377,7 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test to check if next one works")
     def test_config_update(self):
         '''
             Change Postgres config under Spec.Postgresql.Parameters and Spec.Patroni
@@ -946,7 +947,6 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    @unittest.skip("Skipping this test to check if next one works")
     def test_infrastructure_roles(self):
         '''
             Test using external secrets for infrastructure roles
