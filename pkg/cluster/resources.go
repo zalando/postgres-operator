@@ -261,8 +261,12 @@ func (c *Cluster) deleteStatefulSet() error {
 		return fmt.Errorf("could not delete pods: %v", err)
 	}
 
-	if err := c.deletePersistentVolumeClaims(); err != nil {
-		return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
+	if c.OpConfig.EnablePersistentVolumeClaimDeletion != nil && *c.OpConfig.EnablePersistentVolumeClaimDeletion {
+		if err := c.deletePersistentVolumeClaims(); err != nil {
+			return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
+		}
+	} else {
+		c.logger.Info("not deleting PersistentVolumeClaims because disabled in configuration")
 	}
 
 	return nil

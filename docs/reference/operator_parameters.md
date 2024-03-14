@@ -346,6 +346,26 @@ configuration they are grouped under the `kubernetes` key.
   gone at this point.
   The default is `false`.
 
+* **persistent_volume_claim_retention_policy**
+  The operator tries to protect volumes as much as possible. If somebody
+  accidentally deletes the statefulset or scales in the `numberOfInstances` the
+  Persistent Volume Claims and thus Persistent Volumes will be retained.
+  However, this can have some consequences when you scale out again at a much
+  later point, for example after the cluster's Postgres major version has been
+  upgraded, because the old volume runs the old Postgres version with stale data.
+  Even if the version has not changed the replication lag could be massive. In
+  this case a reinitialization of the re-added member would make sense. You can
+  also modify the [retention policy of PVCs](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention) in the operator configuration.
+  The behavior can when changed for two scenarios: `when_deleted` - default is
+  `"retain"` - or `when_scaled` - default is also `"retain"`. The other possible
+  option is `delete`.
+
+* **enable_persistent_volume_claim_deletion**
+  By default, the operator deletes PersistentVolumeClaims when removing the
+  Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
+  on the statefulset is set to `retain`. To keep PVCs set this option to `false`.
+  The default is `true`.
+
 * **enable_pod_disruption_budget**
   PDB is enabled by default to protect the cluster from voluntarily disruptions
   and hence unwanted DB downtime. However, on some cloud providers it could be
