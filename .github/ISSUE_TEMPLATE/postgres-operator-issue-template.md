@@ -9,7 +9,7 @@ assignees: ''
 
 Please, answer some short questions which should help us to understand your problem / question better?
 
-- **Which image of the operator are you using?** e.g. registry.opensource.zalan.do/acid/postgres-operator:v1.10.1
+- **Which image of the operator are you using?** e.g. registry.opensource.zalan.do/acid/postgres-operator:v1.11.0
 - **Where do you run it - cloud or metal? Kubernetes or OpenShift?** [AWS K8s | GCP ... | Bare Metal K8s]
 - **Are you running Postgres Operator in production?** [yes | no]
 - **Type of issue?** [Bug report, question, feature request, etc.]

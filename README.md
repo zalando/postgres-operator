@@ -45,6 +45,7 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 [pg_partman](https://github.com/pgpartman/pg_partman),
 [pg_stat_kcache](https://github.com/powa-team/pg_stat_kcache),
 [pgq](https://github.com/pgq/pgq),
+[pgvector](https://github.com/pgvector/pgvector),
 [plpgsql_check](https://github.com/okbob/plpgsql_check),
 [postgis](https://postgis.net/),
 [set_user](https://github.com/pgaudit/set_user) and
@@ -88,9 +89,3 @@ There is a browser-friendly version of this documentation at
 * [Configuration options](docs/reference/operator_parameters.md)
 * [Postgres manifest reference](docs/reference/cluster_manifest.md)
 * [Command-line options and environment variables](docs/reference/command_line_and_environment.md)
-
-## Community
-
-There are two places to get in touch with the community:
-1. The [GitHub issue tracker](https://github.com/zalando/postgres-operator/issues)
-2. The **#postgres-operator** [slack channel](https://postgres-slack.herokuapp.com)
