@@ -356,7 +356,7 @@ configuration they are grouped under the `kubernetes` key.
   Even if the version has not changed the replication lag could be massive. In
   this case a reinitialization of the re-added member would make sense. You can
   also modify the [retention policy of PVCs](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention) in the operator configuration.
-  The behavior can when changed for two scenarios: `when_deleted` - default is
+  The behavior can be changed for two scenarios: `when_deleted` - default is
   `"retain"` - or `when_scaled` - default is also `"retain"`. The other possible
   option is `delete`.
 
