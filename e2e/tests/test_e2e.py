@@ -2048,7 +2048,8 @@ class EndToEndTestCase(unittest.TestCase):
         patch_delete_annotations = {
             "data": {
                 "delete_annotation_date_key": "delete-date",
-                "delete_annotation_name_key": "delete-clustername"
+                "delete_annotation_name_key": "delete-clustername",
+                "enable_persistent_volume_claim_deletion": "false"
             }
         }
         k8s.update_config(patch_delete_annotations)
@@ -2109,6 +2110,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.count_deployments_with_label(cluster_label), 0, "Deployments not deleted")
             self.eventuallyEqual(lambda: k8s.count_pdbs_with_label(cluster_label), 0, "Pod disruption budget not deleted")
             self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 0, "Secrets not deleted")
+            self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 3, "PVCs were deleted although disabled in config")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
