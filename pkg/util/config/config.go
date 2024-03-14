@@ -249,7 +249,7 @@ type Config struct {
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
-	EnablePersistentVolumeClaimDeletion      *bool             `name:"enable_persistent_volume_claim_retention_deletion" default:"true"`
+	EnablePersistentVolumeClaimDeletion      *bool             `name:"enable_persistent_volume_claim_deletion" default:"true"`
 	PersistentVolumeClaimRetentionPolicy     map[string]string `name:"persistent_volume_claim_retention_policy" default:"when_deleted:retain,when_scaled:retain"`
 }
 
