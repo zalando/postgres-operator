@@ -87,7 +87,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 	for i, pod := range pods {
 		ps, _ := c.patroni.GetMemberData(&pod)
 
-		if !slices.Contains([]string{"running", "streaming", "in archive recovery"}, ps.State) {
+		if ps.State != "running" { {
 			allRunning = false
 			c.logger.Infof("identified non running pod, potentially skipping major version upgrade")
 		}
