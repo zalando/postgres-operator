@@ -68,7 +68,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "ghcr.io/zalando/spilo-15:3.0-p1"
+                default: "ghcr.io/zalando/spilo-16:3.2-p2"
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -167,10 +167,10 @@ spec:
                       type: string
                   minimal_major_version:
                     type: string
-                    default: "11"
+                    default: "12"
                   target_major_version:
                     type: string
-                    default: "15"
+                    default: "16"
               kubernetes:
                 type: object
                 properties:
@@ -205,7 +205,13 @@ spec:
                   enable_cross_namespace_secret:
                     type: boolean
                     default: false
+                  enable_finalizers:
+                    type: boolean
+                    default: false
                   enable_init_containers:
+                    type: boolean
+                    default: true
+                  enable_persistent_volume_claim_deletion:
                     type: boolean
                     default: true
                   enable_pod_antiaffinity:
@@ -278,6 +284,19 @@ spec:
                   pdb_name_format:
                     type: string
                     default: "postgres-{cluster}-pdb"
+                  persistent_volume_claim_retention_policy:
+                    type: object
+                    properties:
+                      when_deleted:
+                        type: string
+                        enum:
+                          - "delete"
+                          - "retain"
+                      when_scaled:
+                        type: string
+                        enum:
+                          - "delete"
+                          - "retain"
                   pod_antiaffinity_preferred_during_scheduling:
                     type: boolean
                     default: false
@@ -349,19 +368,15 @@ spec:
                   default_cpu_limit:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "1"
                   default_cpu_request:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "100m"
                   default_memory_limit:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "500Mi"
                   default_memory_request:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "100Mi"
                   max_cpu_request:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
@@ -371,11 +386,9 @@ spec:
                   min_cpu_limit:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "250m"
                   min_memory_limit:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "250Mi"
               timeouts:
                 type: object
                 properties:
@@ -489,7 +502,7 @@ spec:
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
+                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
@@ -526,6 +539,8 @@ spec:
                     type: string
                     pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
                     default: "30 00 * * *"
+                  logical_backup_cronjob_environment_secret:
+                    type: string
               debug:
                 type: object
                 properties:
@@ -637,7 +652,7 @@ spec:
                     default: "pooler"
                   connection_pooler_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-27"
+                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-32"
                   connection_pooler_max_db_connections:
                     type: integer
                     default: 60
@@ -654,19 +669,15 @@ spec:
                   connection_pooler_default_cpu_limit:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "1"
                   connection_pooler_default_cpu_request:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "500m"
                   connection_pooler_default_memory_limit:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "100Mi"
                   connection_pooler_default_memory_request:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "100Mi"
               patroni:
                 type: object
                 properties:

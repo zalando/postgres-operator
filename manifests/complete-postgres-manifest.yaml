@@ -10,7 +10,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: ghcr.io/zalando/spilo-15:3.0-p1
+  dockerImage: ghcr.io/zalando/spilo-16:3.2-p2
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -19,6 +19,8 @@ spec:
     - createdb
     foo_user: []
 #    flyway: []
+#  usersIgnoringSecretRotation:
+#  - bar_user
 #  usersWithSecretRotation:
 #  - foo_user
 #  usersWithInPlaceSecretRotation:
@@ -46,7 +48,7 @@ spec:
           defaultRoles: true
           defaultUsers: false
   postgresql:
-    version: "15"
+    version: "16"
     parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
@@ -107,9 +109,13 @@ spec:
     requests:
       cpu: 10m
       memory: 100Mi
+#      hugepages-2Mi: 128Mi
+#      hugepages-1Gi: 1Gi
     limits:
       cpu: 500m
       memory: 500Mi
+#      hugepages-2Mi: 128Mi
+#      hugepages-1Gi: 1Gi
   patroni:
     failsafe_mode: false
     initdb:

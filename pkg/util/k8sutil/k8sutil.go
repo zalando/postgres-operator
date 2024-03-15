@@ -209,8 +209,38 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 		return pg, fmt.Errorf("could not update status: %v", err)
 	}
 
-	// update the spec, maintaining the new resourceVersion.
 	return pg, nil
+}
+
+// SetFinalizer of Postgres cluster
+func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg *apiacidv1.Postgresql, finalizers []string) (*apiacidv1.Postgresql, error) {
+	var (
+		updatedPg *apiacidv1.Postgresql
+		patch     []byte
+		err       error
+	)
+	pg.ObjectMeta.Finalizers = finalizers
+
+	if len(finalizers) > 0 {
+		patch, err = json.Marshal(struct {
+			PgMetadata interface{} `json:"metadata"`
+		}{&pg.ObjectMeta})
+		if err != nil {
+			return pg, fmt.Errorf("could not marshal ObjectMeta: %v", err)
+		}
+
+		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
+			context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	} else {
+		// in case finalizers are empty and update is needed to remove
+		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Update(
+			context.TODO(), pg, metav1.UpdateOptions{})
+	}
+	if err != nil {
+		return updatedPg, fmt.Errorf("could not set finalizer: %v", err)
+	}
+
+	return updatedPg, nil
 }
 
 // SamePDB compares the PodDisruptionBudgets

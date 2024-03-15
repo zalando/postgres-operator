@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -13,6 +14,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func (c *Cluster) createStreams(appId string) (*zalandov1.FabricEventStream, error) {
@@ -29,8 +31,12 @@ func (c *Cluster) createStreams(appId string) (*zalandov1.FabricEventStream, err
 
 func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) error {
 	c.setProcessName("updating event streams")
-
-	if _, err := c.KubeClient.FabricEventStreams(newEventStreams.Namespace).Update(context.TODO(), newEventStreams, metav1.UpdateOptions{}); err != nil {
+	patch, err := json.Marshal(newEventStreams)
+	if err != nil {
+		return fmt.Errorf("could not marshal new event stream CRD %q: %v", newEventStreams.Name, err)
+	}
+	if _, err := c.KubeClient.FabricEventStreams(newEventStreams.Namespace).Patch(
+		context.TODO(), newEventStreams.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
 		return err
 	}
 
@@ -145,11 +151,13 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
 			streamFlow := getEventStreamFlow(stream, table.PayloadColumn)
 			streamSink := getEventStreamSink(stream, table.EventType)
+			streamRecovery := getEventStreamRecovery(stream, table.RecoveryEventType, table.EventType)
 
 			eventStreams = append(eventStreams, zalandov1.EventStream{
-				EventStreamFlow:   streamFlow,
-				EventStreamSink:   streamSink,
-				EventStreamSource: streamSource})
+				EventStreamFlow:     streamFlow,
+				EventStreamRecovery: streamRecovery,
+				EventStreamSink:     streamSink,
+				EventStreamSource:   streamSource})
 		}
 	}
 
@@ -201,6 +209,28 @@ func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1.EventS
 		Type:         constants.EventStreamSinkNakadiType,
 		EventType:    eventType,
 		MaxBatchSize: stream.BatchSize,
+	}
+}
+
+func getEventStreamRecovery(stream acidv1.Stream, recoveryEventType, eventType string) zalandov1.EventStreamRecovery {
+	if (stream.EnableRecovery != nil && !*stream.EnableRecovery) ||
+		(stream.EnableRecovery == nil && recoveryEventType == "") {
+		return zalandov1.EventStreamRecovery{
+			Type: constants.EventStreamRecoveryNoneType,
+		}
+	}
+
+	if stream.EnableRecovery != nil && *stream.EnableRecovery && recoveryEventType == "" {
+		recoveryEventType = fmt.Sprintf("%s-%s", eventType, constants.EventStreamRecoverySuffix)
+	}
+
+	return zalandov1.EventStreamRecovery{
+		Type: constants.EventStreamRecoveryDLQType,
+		Sink: &zalandov1.EventStreamSink{
+			Type:         constants.EventStreamSinkNakadiType,
+			EventType:    recoveryEventType,
+			MaxBatchSize: stream.BatchSize,
+		},
 	}
 }
 
@@ -381,7 +411,8 @@ func sameStreams(curEventStreams, newEventStreams []zalandov1.EventStream) (matc
 		for _, curStream := range curEventStreams {
 			if reflect.DeepEqual(newStream.EventStreamSource, curStream.EventStreamSource) &&
 				reflect.DeepEqual(newStream.EventStreamFlow, curStream.EventStreamFlow) &&
-				reflect.DeepEqual(newStream.EventStreamSink, curStream.EventStreamSink) {
+				reflect.DeepEqual(newStream.EventStreamSink, curStream.EventStreamSink) &&
+				reflect.DeepEqual(newStream.EventStreamRecovery, curStream.EventStreamRecovery) {
 				match = true
 				break
 			}

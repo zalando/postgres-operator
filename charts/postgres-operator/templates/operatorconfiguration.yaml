@@ -16,8 +16,8 @@ configuration:
   major_version_upgrade:
 {{ toYaml .Values.configMajorVersionUpgrade | indent 4 }}
   kubernetes:
-    {{- if .Values.podPriorityClassName }}
-    pod_priority_class_name: {{ .Values.podPriorityClassName }}
+    {{- if .Values.podPriorityClassName.name }}
+    pod_priority_class_name: {{ .Values.podPriorityClassName.name }}
     {{- end }}
     pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
     oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}

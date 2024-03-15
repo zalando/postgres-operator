@@ -66,6 +66,17 @@ var substractTest = []struct {
 	{[]string{"a"}, []string{""}, []string{"a"}, false},
 }
 
+var removeStringTest = []struct {
+	slice  []string
+	item   string
+	result []string
+}{
+	{[]string{"a", "b", "c"}, "b", []string{"a", "c"}},
+	{[]string{"a"}, "b", []string{"a"}},
+	{[]string{"a"}, "a", []string{}},
+	{[]string{}, "a", []string{}},
+}
+
 var sliceContaintsTest = []struct {
 	slice []string
 	item  string
@@ -196,6 +207,15 @@ func TestFindNamedStringSubmatch(t *testing.T) {
 		actualRes := FindNamedStringSubmatch(tt.inRegex, tt.inStr)
 		if !reflect.DeepEqual(actualRes, tt.out) {
 			t.Errorf("FindNamedStringSubmatch expected: %#v, got: %#v", tt.out, actualRes)
+		}
+	}
+}
+
+func TestRemoveString(t *testing.T) {
+	for _, tt := range removeStringTest {
+		res := RemoveString(tt.slice, tt.item)
+		if !IsEqualIgnoreOrder(res, tt.result) {
+			t.Errorf("RemoveString expected: %#v, got: %#v", tt.result, res)
 		}
 	}
 }

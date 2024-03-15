@@ -369,12 +369,12 @@ spec:
                   version:
                     type: string
                     enum:
-                      - "10"
                       - "11"
                       - "12"
                       - "13"
                       - "14"
                       - "15"
+                      - "16"
                   parameters:
                     type: object
                     additionalProperties:
@@ -439,6 +439,12 @@ spec:
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                         # Note: the value specified here must not be zero or be higher
                         # than the corresponding limit.
+                      hugepages-2Mi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-1Gi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                   requests:
                     type: object
                     properties:
@@ -446,6 +452,12 @@ spec:
                         type: string
                         pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                       memory:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-2Mi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-1Gi:
                         type: string
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
               schedulerName:
@@ -499,6 +511,8 @@ spec:
                       type: integer
                     database:
                       type: string
+                    enableRecovery:
+                      type: boolean
                     filter:
                       type: object
                       additionalProperties:
@@ -515,6 +529,8 @@ spec:
                           idColumn:
                             type: string
                           payloadColumn:
+                            type: string
+                          recoveryEventType:
                             type: string
               teamId:
                 type: string
@@ -594,6 +610,11 @@ spec:
                     - SUPERUSER
                     - nosuperuser
                     - NOSUPERUSER
+              usersIgnoringSecretRotation:
+                type: array
+                nullable: true
+                items:
+                  type: string
               usersWithInPlaceSecretRotation:
                 type: array
                 nullable: true

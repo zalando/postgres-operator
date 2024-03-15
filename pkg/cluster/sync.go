@@ -15,6 +15,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -40,13 +41,27 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.setSpec(newSpec)
 
 	defer func() {
+		var (
+			pgUpdatedStatus *acidv1.Postgresql
+			errStatus       error
+		)
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
 		} else if !c.Status.Running() {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+		}
+		if errStatus != nil {
+			c.logger.Warningf("could not set cluster status: %v", errStatus)
+		}
+		if pgUpdatedStatus != nil {
+			c.setSpec(pgUpdatedStatus)
 		}
 	}()
+
+	if err = c.syncFinalizer(); err != nil {
+		c.logger.Debugf("could not sync finalizers: %v", err)
+	}
 
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
@@ -81,6 +96,13 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
 			return err
+		}
+	}
+
+	// add or remove standby_cluster section from Patroni config depending on changes in standby section
+	if !reflect.DeepEqual(oldSpec.Spec.StandbyCluster, newSpec.Spec.StandbyCluster) {
+		if err := c.syncStandbyClusterConfiguration(); err != nil {
+			return fmt.Errorf("could not sync StandbyCluster configuration: %v", err)
 		}
 	}
 
@@ -135,6 +157,20 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	return err
+}
+
+func (c *Cluster) syncFinalizer() error {
+	var err error
+	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
+		err = c.addFinalizer()
+	} else {
+		err = c.removeFinalizer()
+	}
+	if err != nil {
+		return fmt.Errorf("could not sync finalizer: %v", err)
+	}
+
+	return nil
 }
 
 func (c *Cluster) syncServices() error {
@@ -610,6 +646,9 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	if desiredPatroniConfig.SynchronousModeStrict != effectivePatroniConfig.SynchronousModeStrict {
 		configToSet["synchronous_mode_strict"] = desiredPatroniConfig.SynchronousModeStrict
 	}
+	if desiredPatroniConfig.SynchronousNodeCount != effectivePatroniConfig.SynchronousNodeCount {
+		configToSet["synchronous_node_count"] = desiredPatroniConfig.SynchronousNodeCount
+	}
 	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != effectivePatroniConfig.TTL {
 		configToSet["ttl"] = desiredPatroniConfig.TTL
 	}
@@ -664,7 +703,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 		effectiveValue := effectivePgParameters[desiredOption]
 		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
 			parametersToSet[desiredOption] = desiredValue
-			if util.SliceContains(requirePrimaryRestartWhenDecreased, desiredOption) {
+			if slices.Contains(requirePrimaryRestartWhenDecreased, desiredOption) {
 				effectiveValueNum, errConv := strconv.Atoi(effectiveValue)
 				desiredValueNum, errConv2 := strconv.Atoi(desiredValue)
 				if errConv != nil || errConv2 != nil {
@@ -680,7 +719,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 
 	// check if there exist only config updates that require a restart of the primary
-	if len(restartPrimary) > 0 && !util.SliceContains(restartPrimary, false) && len(configToSet) == 0 {
+	if len(restartPrimary) > 0 && !slices.Contains(restartPrimary, false) && len(configToSet) == 0 {
 		requiresMasterRestart = true
 	}
 
@@ -708,6 +747,46 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	configPatched = true
 
 	return configPatched, requiresMasterRestart, nil
+}
+
+// syncStandbyClusterConfiguration checks whether standby cluster
+// parameters have changed and if necessary sets it via the Patroni API
+func (c *Cluster) syncStandbyClusterConfiguration() error {
+	var (
+		err  error
+		pods []v1.Pod
+	)
+
+	standbyOptionsToSet := make(map[string]interface{})
+	if c.Spec.StandbyCluster != nil {
+		c.logger.Infof("turning %q into a standby cluster", c.Name)
+		standbyOptionsToSet["create_replica_methods"] = []string{"bootstrap_standby_with_wale", "basebackup_fast_xlog"}
+		standbyOptionsToSet["restore_command"] = "envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""
+
+	} else {
+		c.logger.Infof("promoting standby cluster and detach from source")
+		standbyOptionsToSet = nil
+	}
+
+	if pods, err = c.listPods(); err != nil {
+		return err
+	}
+	if len(pods) == 0 {
+		return fmt.Errorf("could not call Patroni API: cluster has no pods")
+	}
+	// try all pods until the first one that is successful, as it doesn't matter which pod
+	// carries the request to change configuration through
+	for _, pod := range pods {
+		podName := util.NameFromMeta(pod.ObjectMeta)
+		c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
+			podName, standbyOptionsToSet)
+		if err = c.patroni.SetStandbyClusterParameters(&pod, standbyOptionsToSet); err == nil {
+			return nil
+		}
+		c.logger.Warningf("could not patch postgres parameters within pod %s: %v", podName, err)
+	}
+	return fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
+		len(pods))
 }
 
 func (c *Cluster) syncSecrets() error {
@@ -808,14 +887,17 @@ func (c *Cluster) updateSecret(
 	// if password rotation is enabled update password and username if rotation interval has been passed
 	// rotation can be enabled globally or via the manifest (excluding the Postgres superuser)
 	rotationEnabledInManifest := secretUsername != constants.SuperuserKeyName &&
-		(util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) ||
-			util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
+		(slices.Contains(c.Spec.UsersWithSecretRotation, secretUsername) ||
+			slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
 
 	// globally enabled rotation is only allowed for manifest and bootstrapped roles
 	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
-	rotationAllowed := !pwdUser.IsDbOwner && util.SliceContains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
+	rotationAllowed := !pwdUser.IsDbOwner && slices.Contains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
 
-	if (c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest {
+	// users can ignore any kind of rotation
+	isIgnoringRotation := slices.Contains(c.Spec.UsersIgnoringSecretRotation, secretUsername)
+
+	if ((c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest) && !isIgnoringRotation {
 		updateSecretMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
 		if err != nil {
 			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
@@ -873,6 +955,8 @@ func (c *Cluster) rotatePasswordInSecret(
 		err                 error
 		nextRotationDate    time.Time
 		nextRotationDateStr string
+		expectedUsername    string
+		rotationModeChanged bool
 		updateSecretMsg     string
 	)
 
@@ -893,17 +977,32 @@ func (c *Cluster) rotatePasswordInSecret(
 		nextRotationDate = currentRotationDate
 	}
 
+	// set username and check if it differs from current value in secret
+	currentUsername := string(secret.Data["username"])
+	if !slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+		expectedUsername = fmt.Sprintf("%s%s", secretUsername, currentTime.Format(constants.RotationUserDateFormat))
+	} else {
+		expectedUsername = secretUsername
+	}
+
+	// when changing to in-place rotation update secret immediatly
+	// if currentUsername is longer we know it has a date suffix
+	// the other way around we can wait until the next rotation date
+	if len(currentUsername) > len(expectedUsername) {
+		rotationModeChanged = true
+		c.logger.Infof("updating secret %s after switching to in-place rotation mode for username: %s", secretName, string(secret.Data["username"]))
+	}
+
 	// update password and next rotation date if configured interval has passed
-	if currentTime.After(nextRotationDate) {
+	if currentTime.After(nextRotationDate) || rotationModeChanged {
 		// create rotation user if role is not listed for in-place password update
-		if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
-			rotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format(constants.RotationUserDateFormat))
-			secret.Data["username"] = []byte(rotationUsername)
-			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, rotationUsername)
+		if !slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+			secret.Data["username"] = []byte(expectedUsername)
+			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, expectedUsername)
 			// whenever there is a rotation, check if old rotation users can be deleted
 			*retentionUsers = append(*retentionUsers, secretUsername)
 		} else {
-			// when passwords of system users are rotated in place, pods have to be replaced
+			// when passwords of system users are rotated in-place, pods have to be replaced
 			if roleOrigin == spec.RoleOriginSystem {
 				pods, err := c.listPods()
 				if err != nil {
@@ -917,7 +1016,7 @@ func (c *Cluster) rotatePasswordInSecret(
 				}
 			}
 
-			// when password of connection pooler is rotated in place, pooler pods have to be replaced
+			// when password of connection pooler is rotated in-place, pooler pods have to be replaced
 			if roleOrigin == spec.RoleOriginConnectionPooler {
 				listOptions := metav1.ListOptions{
 					LabelSelector: c.poolerLabelsSet(true).String(),
@@ -934,10 +1033,12 @@ func (c *Cluster) rotatePasswordInSecret(
 				}
 			}
 
-			// when password of stream user is rotated in place, it should trigger rolling update in FES deployment
+			// when password of stream user is rotated in-place, it should trigger rolling update in FES deployment
 			if roleOrigin == spec.RoleOriginStream {
 				c.logger.Warnf("password in secret of stream user %s changed", constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix)
 			}
+
+			secret.Data["username"] = []byte(secretUsername)
 		}
 		secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
 		secret.Data["nextRotation"] = []byte(nextRotationDateStr)

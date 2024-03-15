@@ -44,6 +44,7 @@ var (
 	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 	patroniObjectSuffixes = []string{"leader", "config", "sync", "failover"}
+	finalizerName         = "postgres-operator.acid.zalan.do"
 )
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
@@ -246,20 +247,42 @@ func (c *Cluster) Create() (err error) {
 	defer c.mu.Unlock()
 
 	var (
-		service *v1.Service
-		ep      *v1.Endpoints
-		ss      *appsv1.StatefulSet
+		pgCreateStatus *acidv1.Postgresql
+		service        *v1.Service
+		ep             *v1.Endpoints
+		ss             *appsv1.StatefulSet
 	)
 
 	defer func() {
+		var (
+			pgUpdatedStatus *acidv1.Postgresql
+			errStatus       error
+		)
 		if err == nil {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
+			c.logger.Warningf("cluster created failed: %v", err)
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
+		}
+		if errStatus != nil {
+			c.logger.Warningf("could not set cluster status: %v", errStatus)
+		}
+		if pgUpdatedStatus != nil {
+			c.setSpec(pgUpdatedStatus)
 		}
 	}()
 
-	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+	pgCreateStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+	if err != nil {
+		return fmt.Errorf("could not set cluster status: %v", err)
+	}
+	c.setSpec(pgCreateStatus)
+
+	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
+		if err = c.addFinalizer(); err != nil {
+			return fmt.Errorf("could not add finalizer: %v", err)
+		}
+	}
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -409,6 +432,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		reasons = append(reasons, "new statefulset's pod management policy do not match")
 	}
 
+	if !reflect.DeepEqual(c.Statefulset.Spec.PersistentVolumeClaimRetentionPolicy, statefulSet.Spec.PersistentVolumeClaimRetentionPolicy) {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's persistent volume claim retention policy do not match")
+	}
+
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
 	needsRollUpdate, reasons = c.compareContainers("containers", c.Statefulset.Spec.Template.Spec.Containers, statefulSet.Spec.Template.Spec.Containers, needsRollUpdate, reasons)
 
@@ -474,23 +503,24 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's volumeClaimTemplates contains different number of volumes to the old one")
-	}
-	for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
-		name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
-		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
-		if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
-			continue
-		}
-		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one", name))
-		}
-		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
+	} else {
+		for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
 			name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q does not match the current one", name))
+			// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
+			if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
+				continue
+			}
+			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one", name))
+			}
+			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
+				name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q does not match the current one", name))
+			}
 		}
 	}
 
@@ -756,6 +786,54 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	return true, ""
 }
 
+// addFinalizer patches the postgresql CR to add finalizer
+func (c *Cluster) addFinalizer() error {
+	if c.hasFinalizer() {
+		return nil
+	}
+
+	c.logger.Infof("adding finalizer %s", finalizerName)
+	finalizers := append(c.ObjectMeta.Finalizers, finalizerName)
+	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), c.DeepCopy(), finalizers)
+	if err != nil {
+		return fmt.Errorf("error adding finalizer: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion
+	c.setSpec(newSpec)
+
+	return nil
+}
+
+// removeFinalizer patches postgresql CR to remove finalizer
+func (c *Cluster) removeFinalizer() error {
+	if !c.hasFinalizer() {
+		return nil
+	}
+
+	c.logger.Infof("removing finalizer %s", finalizerName)
+	finalizers := util.RemoveString(c.ObjectMeta.Finalizers, finalizerName)
+	newSpec, err := c.KubeClient.SetFinalizer(c.clusterName(), c.DeepCopy(), finalizers)
+	if err != nil {
+		return fmt.Errorf("error removing finalizer: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion.
+	c.setSpec(newSpec)
+
+	return nil
+}
+
+// hasFinalizer checks if finalizer is currently set or not
+func (c *Cluster) hasFinalizer() bool {
+	for _, finalizer := range c.ObjectMeta.Finalizers {
+		if finalizer == finalizerName {
+			return true
+		}
+	}
+	return false
+}
+
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
 // (i.e. service) is treated as an error
 // logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
@@ -772,10 +850,20 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.setSpec(newSpec)
 
 	defer func() {
+		var (
+			pgUpdatedStatus *acidv1.Postgresql
+			err             error
+		)
 		if updateFailed {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdateFailed)
+			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdateFailed)
 		} else {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+		}
+		if err != nil {
+			c.logger.Warningf("could not set cluster status: %v", err)
+		}
+		if pgUpdatedStatus != nil {
+			c.setSpec(pgUpdatedStatus)
 		}
 	}()
 
@@ -872,6 +960,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			}
 		}
 	}()
+
+	// add or remove standby_cluster section from Patroni config depending on changes in standby section
+	if !reflect.DeepEqual(oldSpec.Spec.StandbyCluster, newSpec.Spec.StandbyCluster) {
+		if err := c.syncStandbyClusterConfiguration(); err != nil {
+			return fmt.Errorf("could not set StandbyCluster configuration options: %v", err)
+		}
+	}
 
 	// pod disruption budget
 	if oldSpec.Spec.NumberOfInstances != newSpec.Spec.NumberOfInstances {
@@ -991,48 +1086,65 @@ func syncResources(a, b *v1.ResourceRequirements) bool {
 // DCS, reuses the master's endpoint to store the leader related metadata. If we remove the endpoint
 // before the pods, it will be re-created by the current master pod and will remain, obstructing the
 // creation of the new cluster with the same name. Therefore, the endpoints should be deleted last.
-func (c *Cluster) Delete() {
+func (c *Cluster) Delete() error {
+	var anyErrors = false
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of new cluster resources")
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of cluster resources")
 
 	if err := c.deleteStreams(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not delete event streams: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete event streams: %v", err)
 	}
 
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created
 	if err := c.deleteLogicalBackupJob(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove the logical backup k8s cron job; %v", err)
 	}
 
 	if err := c.deleteStatefulSet(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not delete statefulset: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete statefulset: %v", err)
 	}
 
 	if err := c.deleteSecrets(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not delete secrets: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete secrets: %v", err)
 	}
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not delete pod disruption budget: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budget: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
 		if !c.patroniKubernetesUseConfigMaps() {
 			if err := c.deleteEndpoint(role); err != nil {
+				anyErrors = true
 				c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s endpoint: %v", role, err)
 			}
 		}
 
 		if err := c.deleteService(role); err != nil {
+			anyErrors = true
 			c.logger.Warningf("could not delete %s service: %v", role, err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s service: %v", role, err)
 		}
 	}
 
 	if err := c.deletePatroniClusterObjects(); err != nil {
+		anyErrors = true
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove leftover patroni objects; %v", err)
 	}
 
 	// Delete connection pooler objects anyway, even if it's not mentioned in the
@@ -1040,10 +1152,22 @@ func (c *Cluster) Delete() {
 	// wrong
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		if err := c.deleteConnectionPooler(role); err != nil {
+			anyErrors = true
 			c.logger.Warningf("could not remove connection pooler: %v", err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove connection pooler: %v", err)
 		}
 	}
 
+	// If we are done deleting our various resources we remove the finalizer to let K8S finally delete the Postgres CR
+	if anyErrors {
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "Delete", "some resources could be successfully deleted yet")
+		return fmt.Errorf("some error(s) occured when deleting resources, NOT removing finalizer yet")
+	}
+	if err := c.removeFinalizer(); err != nil {
+		return fmt.Errorf("done cleaning up, but error when removing finalizer: %v", err)
+	}
+
+	return nil
 }
 
 // NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
@@ -1061,7 +1185,7 @@ func (c *Cluster) ReceivePodEvent(event PodEvent) {
 	}
 }
 
-func (c *Cluster) processPodEvent(obj interface{}) error {
+func (c *Cluster) processPodEvent(obj interface{}, isInInitialList bool) error {
 	event, ok := obj.(PodEvent)
 	if !ok {
 		return fmt.Errorf("could not cast to PodEvent")

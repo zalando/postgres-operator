@@ -49,8 +49,8 @@ type PostgresUsersConfiguration struct {
 type MajorVersionUpgradeConfiguration struct {
 	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
 	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
-	MinimalMajorVersion              string   `json:"minimal_major_version" default:"11"`
-	TargetMajorVersion               string   `json:"target_major_version" default:"15"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"12"`
+	TargetMajorVersion               string   `json:"target_major_version" default:"16"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
@@ -68,6 +68,7 @@ type KubernetesMetaConfiguration struct {
 	AdditionalPodCapabilities              []string                     `json:"additional_pod_capabilities,omitempty"`
 	WatchedNamespace                       string                       `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate        `json:"pdb_name_format,omitempty"`
+	PDBMasterLabelSelector                 *bool                        `json:"pdb_master_label_selector,omitempty"`
 	EnablePodDisruptionBudget              *bool                        `json:"enable_pod_disruption_budget,omitempty"`
 	StorageResizeMode                      string                       `json:"storage_resize_mode,omitempty"`
 	EnableInitContainers                   *bool                        `json:"enable_init_containers,omitempty"`
@@ -100,8 +101,11 @@ type KubernetesMetaConfiguration struct {
 	PodAntiAffinityPreferredDuringScheduling bool                `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
 	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
+	PersistentVolumeClaimRetentionPolicy     map[string]string   `json:"persistent_volume_claim_retention_policy,omitempty"`
+	EnablePersistentVolumeClaimDeletion      *bool               `json:"enable_persistent_volume_claim_deletion,omitempty"`
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
+	EnableFinalizers                         *bool               `json:"enable_finalizers,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -232,6 +236,7 @@ type OperatorLogicalBackupConfiguration struct {
 	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
+	CronjobEnvironmentSecret     string `json:"logical_backup_cronjob_environment_secret,omitempty"`
 	CPURequest                   string `json:"logical_backup_cpu_request,omitempty"`
 	MemoryRequest                string `json:"logical_backup_memory_request,omitempty"`
 	CPULimit                     string `json:"logical_backup_cpu_limit,omitempty"`
