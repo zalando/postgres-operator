@@ -6,7 +6,6 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
-	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -87,7 +86,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 	for i, pod := range pods {
 		ps, _ := c.patroni.GetMemberData(&pod)
 
-		if ps.State != "running" { {
+		if ps.State != "running" {
 			allRunning = false
 			c.logger.Infof("identified non running pod, potentially skipping major version upgrade")
 		}
