@@ -99,28 +99,28 @@ func TestGetClusterMembers(t *testing.T) {
 		}, {
 			Name:     "acid-test-cluster-1",
 			Role:     "sync_standby",
-			State:    "running",
+			State:    "streaming",
 			Timeline: 1,
 			Lag:      0,
 		}, {
 			Name:     "acid-test-cluster-2",
 			Role:     "replica",
-			State:    "running",
+			State:    "streaming",
 			Timeline: 1,
 			Lag:      math.MaxUint64,
 		}, {
 			Name:     "acid-test-cluster-3",
 			Role:     "replica",
-			State:    "running",
+			State:    "in archive recovery",
 			Timeline: 1,
 			Lag:      3000000000,
 		}}
 
 	json := `{"members": [
 		{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1},
-		{"name": "acid-test-cluster-1", "role": "sync_standby", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 0},
-		{"name": "acid-test-cluster-2", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": "unknown"},
-		{"name": "acid-test-cluster-3", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 3000000000}
+		{"name": "acid-test-cluster-1", "role": "sync_standby", "state": "streaming", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 0},
+		{"name": "acid-test-cluster-2", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": "unknown"},
+		{"name": "acid-test-cluster-3", "role": "replica", "state": "in archive recovery", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 3000000000}
 		]}`
 	r := io.NopCloser(bytes.NewReader([]byte(json)))
 
