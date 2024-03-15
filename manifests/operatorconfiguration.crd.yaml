@@ -209,6 +209,9 @@ spec:
                   enable_init_containers:
                     type: boolean
                     default: true
+                  enable_secrets_deletion:
+                    type: boolean
+                    default: true
                   enable_persistent_volume_claim_deletion:
                     type: boolean
                     default: true

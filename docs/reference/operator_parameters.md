@@ -360,6 +360,10 @@ configuration they are grouped under the `kubernetes` key.
   `"retain"` - or `when_scaled` - default is also `"retain"`. The other possible
   option is `delete`.
 
+* **enable_secrets_deletion**
+  By default, the operator deletes secrets when removing the Postgres cluster
+  manifest. To keep secrets, set this option to `false`. The default is `true`.
+
 * **enable_persistent_volume_claim_deletion**
   By default, the operator deletes PersistentVolumeClaims when removing the
   Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
