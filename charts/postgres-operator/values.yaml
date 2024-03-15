@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.10.1
+  tag: v1.11.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -358,7 +358,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 

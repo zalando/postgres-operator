@@ -1,6 +1,6 @@
 module github.com/zalando/postgres-operator
 
-go 1.19
+go 1.21
 
 require (
 	github.com/aws/aws-sdk-go v1.42.18
