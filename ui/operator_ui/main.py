@@ -321,7 +321,7 @@ DEFAULT_UI_CONFIG = {
     'users_visible': True,
     'databases_visible': True,
     'resources_visible': RESOURCES_VISIBLE,
-    'postgresql_versions': ['11', '12', '13', '14', '15'],
+    'postgresql_versions': ['12', '13', '14', '15', '16'],
     'dns_format_string': '{0}.{1}',
     'pgui_link': '',
     'static_network_whitelist': {},

@@ -821,12 +821,12 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 func makeDefaultConnectionPoolerResources(config *config.Config) acidv1.Resources {
 
 	defaultRequests := acidv1.ResourceDescription{
-		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPURequest,
-		Memory: config.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest,
+		CPU:    &config.ConnectionPooler.ConnectionPoolerDefaultCPURequest,
+		Memory: &config.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest,
 	}
 	defaultLimits := acidv1.ResourceDescription{
-		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPULimit,
-		Memory: config.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit,
+		CPU:    &config.ConnectionPooler.ConnectionPoolerDefaultCPULimit,
+		Memory: &config.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit,
 	}
 
 	return acidv1.Resources{

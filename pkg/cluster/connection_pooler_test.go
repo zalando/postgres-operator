@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -711,47 +710,42 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error { return nil }
 
 	tests := []struct {
-		subTest  string
-		spec     *acidv1.PostgresSpec
-		expected error
-		cluster  *Cluster
-		check    func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error
+		subTest string
+		spec    *acidv1.PostgresSpec
+		cluster *Cluster
+		check   func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error
 	}{
 		{
 			subTest: "default configuration",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    noCheck,
+			cluster: cluster,
+			check:   noCheck,
 		},
 		{
 			subTest: "pooler uses pod service account",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testServiceAccount,
+			cluster: cluster,
+			check:   testServiceAccount,
 		},
 		{
 			subTest: "no default resources",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: errors.New(`could not generate resource requirements: could not fill resource requests: could not parse default CPU quantity: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'`),
-			cluster:  clusterNoDefaultRes,
-			check:    noCheck,
+			cluster: clusterNoDefaultRes,
+			check:   noCheck,
 		},
 		{
 			subTest: "default resources are set",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testResources,
+			cluster: cluster,
+			check:   testResources,
 		},
 		{
 			subTest: "labels for service",
@@ -759,30 +753,23 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				ConnectionPooler:              &acidv1.ConnectionPooler{},
 				EnableReplicaConnectionPooler: boolToPointer(true),
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testLabels,
+			cluster: cluster,
+			check:   testLabels,
 		},
 		{
 			subTest: "required envs",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testEnvs,
+			cluster: cluster,
+			check:   testEnvs,
 		},
 	}
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		for _, tt := range tests {
-			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(role)
+			podSpec, _ := tt.cluster.generateConnectionPoolerPodTemplate(role)
 
-			if err != tt.expected && err.Error() != tt.expected.Error() {
-				t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
-					testName, tt.subTest, err, tt.expected)
-			}
-
-			err = tt.check(cluster, podSpec, role)
+			err := tt.check(cluster, podSpec, role)
 			if err != nil {
 				t.Errorf("%s [%s]: Pod spec is incorrect, %+v",
 					testName, tt.subTest, err)
@@ -973,8 +960,8 @@ func TestPoolerTLS(t *testing.T) {
 			TeamID: "myapp", NumberOfInstances: 1,
 			EnableConnectionPooler: util.True(),
 			Resources: &acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
 				Size: "1G",

@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -13,6 +14,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func (c *Cluster) createStreams(appId string) (*zalandov1.FabricEventStream, error) {
@@ -29,8 +31,12 @@ func (c *Cluster) createStreams(appId string) (*zalandov1.FabricEventStream, err
 
 func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) error {
 	c.setProcessName("updating event streams")
-
-	if _, err := c.KubeClient.FabricEventStreams(newEventStreams.Namespace).Update(context.TODO(), newEventStreams, metav1.UpdateOptions{}); err != nil {
+	patch, err := json.Marshal(newEventStreams)
+	if err != nil {
+		return fmt.Errorf("could not marshal new event stream CRD %q: %v", newEventStreams.Name, err)
+	}
+	if _, err := c.KubeClient.FabricEventStreams(newEventStreams.Namespace).Patch(
+		context.TODO(), newEventStreams.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
 		return err
 	}
 

@@ -339,7 +339,6 @@ func (c *Controller) processEvent(event ClusterEvent) {
 				lg.Error(cl.Error)
 				return
 			}
-			lg.Infof("cluster has been deleted")
 		} else {
 			if err = cl.Sync(event.NewSpec); err != nil {
 				cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
@@ -362,7 +361,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	for {
-		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}) error { return nil }))
+		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}, bool) error { return nil }))
 		if err != nil {
 			if err == cache.ErrFIFOClosed {
 				return

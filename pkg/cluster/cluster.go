@@ -254,10 +254,21 @@ func (c *Cluster) Create() (err error) {
 	)
 
 	defer func() {
+		var (
+			pgUpdatedStatus *acidv1.Postgresql
+			errStatus       error
+		)
 		if err == nil {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
+			c.logger.Warningf("cluster created failed: %v", err)
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
+		}
+		if errStatus != nil {
+			c.logger.Warningf("could not set cluster status: %v", errStatus)
+		}
+		if pgUpdatedStatus != nil {
+			c.setSpec(pgUpdatedStatus)
 		}
 	}()
 
@@ -795,6 +806,7 @@ func (c *Cluster) addFinalizer() error {
 
 	// update the spec, maintaining the new resourceVersion
 	c.setSpec(newSpec)
+
 	return nil
 }
 
@@ -843,10 +855,20 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.setSpec(newSpec)
 
 	defer func() {
+		var (
+			pgUpdatedStatus *acidv1.Postgresql
+			err             error
+		)
 		if updateFailed {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdateFailed)
+			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdateFailed)
 		} else {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+		}
+		if err != nil {
+			c.logger.Warningf("could not set cluster status: %v", err)
+		}
+		if pgUpdatedStatus != nil {
+			c.setSpec(pgUpdatedStatus)
 		}
 	}()
 
@@ -1168,7 +1190,7 @@ func (c *Cluster) ReceivePodEvent(event PodEvent) {
 	}
 }
 
-func (c *Cluster) processPodEvent(obj interface{}) error {
+func (c *Cluster) processPodEvent(obj interface{}, isInInitialList bool) error {
 	event, ok := obj.(PodEvent)
 	if !ok {
 		return fmt.Errorf("could not cast to PodEvent")

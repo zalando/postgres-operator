@@ -13,6 +13,7 @@ RUN bash docker/build_operator.sh
 
 FROM ${BASE_IMAGE}
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
+LABEL org.opencontainers.image.source="https://github.com/zalando/postgres-operator"
 
 # We need root certificates to deal with teams api over https
 RUN apk --no-cache add curl

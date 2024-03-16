@@ -17,4 +17,4 @@ spec:
   preparedDatabases:
     bar: {}
   postgresql:
-    version: "15"
+    version: "16"

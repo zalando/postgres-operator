@@ -48,12 +48,12 @@ type Resources struct {
 	DeleteAnnotationNameKey       string              `name:"delete_annotation_name_key"`
 	PodRoleLabel                  string              `name:"pod_role_label" default:"spilo-role"`
 	PodToleration                 map[string]string   `name:"toleration" default:""`
-	DefaultCPURequest             string              `name:"default_cpu_request" default:"100m"`
-	DefaultMemoryRequest          string              `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit               string              `name:"default_cpu_limit" default:"1"`
-	DefaultMemoryLimit            string              `name:"default_memory_limit" default:"500Mi"`
-	MinCPULimit                   string              `name:"min_cpu_limit" default:"250m"`
-	MinMemoryLimit                string              `name:"min_memory_limit" default:"250Mi"`
+	DefaultCPURequest             string              `name:"default_cpu_request"`
+	DefaultMemoryRequest          string              `name:"default_memory_request"`
+	DefaultCPULimit               string              `name:"default_cpu_limit"`
+	DefaultMemoryLimit            string              `name:"default_memory_limit"`
+	MinCPULimit                   string              `name:"min_cpu_limit"`
+	MinMemoryLimit                string              `name:"min_memory_limit"`
 	MaxCPURequest                 string              `name:"max_cpu_request"`
 	MaxMemoryRequest              string              `name:"max_memory_request"`
 	PodEnvironmentConfigMap       spec.NamespacedName `name:"pod_environment_configmap"`
@@ -126,7 +126,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.10.1"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.11.0"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
 	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
@@ -155,10 +155,10 @@ type ConnectionPooler struct {
 	Image                                string `name:"connection_pooler_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
 	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
 	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
-	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request" default:"500m"`
-	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request" default:"100Mi"`
-	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit" default:"1"`
-	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit" default:"100Mi"`
+	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request"`
+	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request"`
+	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit"`
+	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit"`
 }
 
 // Config describes operator config
@@ -173,7 +173,7 @@ type Config struct {
 	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
 	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"ghcr.io/zalando/spilo-15:3.0-p1"`
+	DockerImage             string            `name:"docker_image" default:"ghcr.io/zalando/spilo-16:3.2-p2"`
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
@@ -244,11 +244,12 @@ type Config struct {
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`
 	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"off"`
 	MajorVersionUpgradeTeamAllowList         []string          `name:"major_version_upgrade_team_allow_list" default:""`
-	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"11"`
-	TargetMajorVersion                       string            `name:"target_major_version" default:"15"`
+	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"12"`
+	TargetMajorVersion                       string            `name:"target_major_version" default:"16"`
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
+	EnablePersistentVolumeClaimDeletion      *bool             `name:"enable_persistent_volume_claim_deletion" default:"true"`
 	PersistentVolumeClaimRetentionPolicy     map[string]string `name:"persistent_volume_claim_retention_policy" default:"when_deleted:retain,when_scaled:retain"`
 }
 

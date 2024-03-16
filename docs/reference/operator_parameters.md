@@ -250,12 +250,12 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
-  when `major_version_upgrade_mode` is set to `"full"`. The default is `"11"`.
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"12"`.
 
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
   which violate the configured allowed `minimal_major_version` when
-  `major_version_upgrade_mode` is set to `"full"`. The default is `"15"`.
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"16"`.
 
 ## Kubernetes resources
 
@@ -339,11 +339,32 @@ configuration they are grouped under the `kubernetes` key.
   cannot fully sync it, there can be leftovers. By enabling finalizers the
   operator will ensure all managed resources are deleted prior to the
   Postgresql resource. There is a trade-off though: The deletion is only
-  performed at the next cluster SYNC cycle when finding a `deletionTimestamp`
-  in the metadata and not immediately after issueing a delete command. The
-  final removal of the custom resource will add a DELETE event to the worker
-  queue but the child resources are already gone at this point.
+  performed after the next two SYNC cycles with the first one updating the
+  internal spec and the latter reacting on the `deletionTimestamp` while
+  processing the SYNC event. The final removal of the custom resource will
+  add a DELETE event to the worker queue but the child resources are already
+  gone at this point.
   The default is `false`.
+
+* **persistent_volume_claim_retention_policy**
+  The operator tries to protect volumes as much as possible. If somebody
+  accidentally deletes the statefulset or scales in the `numberOfInstances` the
+  Persistent Volume Claims and thus Persistent Volumes will be retained.
+  However, this can have some consequences when you scale out again at a much
+  later point, for example after the cluster's Postgres major version has been
+  upgraded, because the old volume runs the old Postgres version with stale data.
+  Even if the version has not changed the replication lag could be massive. In
+  this case a reinitialization of the re-added member would make sense. You can
+  also modify the [retention policy of PVCs](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention) in the operator configuration.
+  The behavior can be changed for two scenarios: `when_deleted` - default is
+  `"retain"` - or `when_scaled` - default is also `"retain"`. The other possible
+  option is `delete`.
+
+* **enable_persistent_volume_claim_deletion**
+  By default, the operator deletes PersistentVolumeClaims when removing the
+  Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
+  on the statefulset is set to `retain`. To keep PVCs set this option to `false`.
+  The default is `true`.
 
 * **enable_pod_disruption_budget**
   PDB is enabled by default to protect the cluster from voluntarily disruptions
@@ -549,19 +570,19 @@ CRD-based configuration.
 
 * **default_cpu_request**
   CPU request value for the Postgres containers, unless overridden by
-  cluster-specific settings. The default is `100m`.
+  cluster-specific settings. Empty string or `0` disables the default.
 
 * **default_memory_request**
   memory request value for the Postgres containers, unless overridden by
-  cluster-specific settings. The default is `100Mi`.
+  cluster-specific settings. Empty string or `0` disables the default.
 
 * **default_cpu_limit**
   CPU limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `1`.
+  settings.  Empty string or `0` disables the default.
 
 * **default_memory_limit**
   memory limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `500Mi`.
+  settings. Empty string or `0` disables the default.
 
 * **max_cpu_request**
   optional upper boundary for CPU request
@@ -571,11 +592,11 @@ CRD-based configuration.
 
 * **min_cpu_limit**
   hard CPU minimum what we consider to be required to properly run Postgres
-  clusters with Patroni on Kubernetes. The default is `250m`.
+  clusters with Patroni on Kubernetes.
 
 * **min_memory_limit**
   hard memory minimum what we consider to be required to properly run Postgres
-  clusters with Patroni on Kubernetes. The default is `250Mi`.
+  clusters with Patroni on Kubernetes.
 
 ## Patroni options
 
@@ -796,7 +817,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -1026,5 +1047,4 @@ operator being able to provide some reasonable defaults.
   **connection_pooler_default_memory_reques**
   **connection_pooler_default_cpu_limit**
   **connection_pooler_default_memory_limit**
-  Default resource configuration for connection pooler deployment. The internal
-  default for memory request and limit is `100Mi`, for CPU it is `500m` and `1`.
+  Default resource configuration for connection pooler deployment.

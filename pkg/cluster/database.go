@@ -205,7 +205,11 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 	}
 	defer func() {
 		if err2 := rows.Close(); err2 != nil {
-			err = fmt.Errorf("error when closing query cursor: %v", err2)
+			if err != nil {
+				err = fmt.Errorf("error when closing query cursor: %v, previous error: %v", err2, err)
+			} else {
+				err = fmt.Errorf("error when closing query cursor: %v", err2)
+			}
 		}
 	}()
 
@@ -252,7 +256,11 @@ func findUsersFromRotation(rotatedUsers []string, db *sql.DB) (map[string]string
 	}
 	defer func() {
 		if err2 := rows.Close(); err2 != nil {
-			err = fmt.Errorf("error when closing query cursor: %v", err2)
+			if err != nil {
+				err = fmt.Errorf("error when closing query cursor: %v, previous error: %v", err2, err)
+			} else {
+				err = fmt.Errorf("error when closing query cursor: %v", err2)
+			}
 		}
 	}()
 

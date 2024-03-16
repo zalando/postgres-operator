@@ -294,6 +294,21 @@ func TestSameStreams(t *testing.T) {
 		},
 	}
 
+	stream3 := zalandov1.EventStream{
+		EventStreamFlow: zalandov1.EventStreamFlow{},
+		EventStreamRecovery: zalandov1.EventStreamRecovery{
+			Type: constants.EventStreamRecoveryNoneType,
+		},
+		EventStreamSink: zalandov1.EventStreamSink{
+			EventType: "stream-type-b",
+		},
+		EventStreamSource: zalandov1.EventStreamSource{
+			EventStreamTable: zalandov1.EventStreamTable{
+				Name: "bar",
+			},
+		},
+	}
+
 	tests := []struct {
 		subTest  string
 		streamsA []zalandov1.EventStream
@@ -335,6 +350,13 @@ func TestSameStreams(t *testing.T) {
 			streamsB: fes.Spec.EventStreams,
 			match:    false,
 			reason:   "number of defined streams is different",
+		},
+		{
+			subTest:  "event stream recovery specs differ",
+			streamsA: []zalandov1.EventStream{stream2},
+			streamsB: []zalandov1.EventStream{stream3},
+			match:    false,
+			reason:   "event stream specs differ",
 		},
 	}
 
@@ -409,6 +431,28 @@ func TestUpdateFabricEventStream(t *testing.T) {
 
 	result := cluster.generateFabricEventStream(appId)
 	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
-		t.Errorf("Malformed FabricEventStream, expected %#v, got %#v", streams.Items[0], result)
+		t.Errorf("Malformed FabricEventStream after updating manifest, expected %#v, got %#v", streams.Items[0], result)
+	}
+
+	// disable recovery
+	for _, stream := range pg.Spec.Streams {
+		if stream.ApplicationId == appId {
+			stream.EnableRecovery = util.False()
+		}
+	}
+	patchData, err = specPatch(pg.Spec)
+	assert.NoError(t, err)
+
+	pgPatched, err = cluster.KubeClient.Postgresqls(namespace).Patch(
+		context.TODO(), cluster.Name, types.MergePatchType, patchData, metav1.PatchOptions{}, "spec")
+	assert.NoError(t, err)
+
+	cluster.Postgresql.Spec = pgPatched.Spec
+	err = cluster.createOrUpdateStreams()
+	assert.NoError(t, err)
+
+	result = cluster.generateFabricEventStream(appId)
+	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
+		t.Errorf("Malformed FabricEventStream after disabling event recovery, expected %#v, got %#v", streams.Items[0], result)
 	}
 }

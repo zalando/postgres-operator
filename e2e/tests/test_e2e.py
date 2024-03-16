@@ -12,8 +12,8 @@ from kubernetes import client
 from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-15-e2e:0.1"
-SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-15-e2e:0.2"
+SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-16-e2e:0.1"
+SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-16-e2e:0.2"
 
 
 def to_selector(labels):
@@ -1578,15 +1578,18 @@ class EndToEndTestCase(unittest.TestCase):
         today = date.today()
 
         # enable password rotation for owner of foo database
-        pg_patch_inplace_rotation_for_owner = {
+        pg_patch_rotation_single_users = {
             "spec": {
+                "usersIgnoringSecretRotation": [
+                    "test.db_user"
+                ],
                 "usersWithInPlaceSecretRotation": [
                     "zalando"
                 ]
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_inplace_rotation_for_owner)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_rotation_single_users)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # check if next rotation date was set in secret
@@ -1674,6 +1677,13 @@ class EndToEndTestCase(unittest.TestCase):
         # test that rotation_user can connect to the database
         self.eventuallyEqual(lambda: len(self.query_database_with_user(leader.metadata.name, "postgres", "SELECT 1", "foo_user")), 1,
             "Could not connect to the database with rotation user {}".format(rotation_user), 10, 5)
+
+        # check if rotation has been ignored for user from test_cross_namespace_secrets test
+        db_user_secret = k8s.get_secret(username="test.db_user", namespace="test")
+        secret_username = str(base64.b64decode(db_user_secret.data["username"]), 'utf-8')
+
+        self.assertEqual("test.db_user", secret_username,
+                        "Unexpected username in secret of test.db_user: expected {}, got {}".format("test.db_user", secret_username))
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped 
@@ -2038,7 +2048,8 @@ class EndToEndTestCase(unittest.TestCase):
         patch_delete_annotations = {
             "data": {
                 "delete_annotation_date_key": "delete-date",
-                "delete_annotation_name_key": "delete-clustername"
+                "delete_annotation_name_key": "delete-clustername",
+                "enable_persistent_volume_claim_deletion": "false"
             }
         }
         k8s.update_config(patch_delete_annotations)
@@ -2099,6 +2110,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.count_deployments_with_label(cluster_label), 0, "Deployments not deleted")
             self.eventuallyEqual(lambda: k8s.count_pdbs_with_label(cluster_label), 0, "Pod disruption budget not deleted")
             self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 0, "Secrets not deleted")
+            self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 3, "PVCs were deleted although disabled in config")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))

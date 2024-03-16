@@ -11,12 +11,12 @@ import (
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"10": 100000,
 	"11": 110000,
 	"12": 120000,
 	"13": 130000,
 	"14": 140000,
 	"15": 150000,
+	"16": 160000,
 }
 
 // IsBiggerPostgresVersion Compare two Postgres version numbers
@@ -35,7 +35,7 @@ func (c *Cluster) GetDesiredMajorVersionAsInt() int {
 func (c *Cluster) GetDesiredMajorVersion() string {
 
 	if c.Config.OpConfig.MajorVersionUpgradeMode == "full" {
-		// e.g. current is 10, minimal is 11 allowing 11 to 15 clusters, everything below is upgraded
+		// e.g. current is 12, minimal is 12 allowing 12 to 16 clusters, everything below is upgraded
 		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.MinimalMajorVersion) {
 			c.logger.Infof("overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
 			return c.Config.OpConfig.TargetMajorVersion
@@ -95,6 +95,12 @@ func (c *Cluster) majorVersionUpgrade() error {
 			masterPod = &pods[i]
 			c.currentMajorVersion = ps.ServerVersion
 		}
+	}
+
+	// Recheck version with newest data from Patroni
+	if c.currentMajorVersion >= desiredVersion {
+		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
+		return nil
 	}
 
 	numberOfPods := len(pods)

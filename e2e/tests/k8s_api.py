@@ -314,7 +314,7 @@ class K8s:
 
     def get_patroni_running_members(self, pod="acid-minimal-cluster-0"):
         result = self.get_patroni_state(pod)
-        return list(filter(lambda x: "State" in x and x["State"] == "running", result))
+        return list(filter(lambda x: "State" in x and x["State"] in ["running", "streaming"], result))
 
     def get_deployment_replica_count(self, name="acid-minimal-cluster-pooler", namespace="default"):
         try:
@@ -583,7 +583,7 @@ class K8sBase:
 
     def get_patroni_running_members(self, pod):
         result = self.get_patroni_state(pod)
-        return list(filter(lambda x: x["State"] == "running", result))
+        return list(filter(lambda x: x["State"] in ["running", "streaming"], result))
 
     def get_statefulset_image(self, label_selector="application=spilo,cluster-name=acid-minimal-cluster", namespace='default'):
         ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=label_selector, limit=1)

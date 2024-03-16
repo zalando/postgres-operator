@@ -25,8 +25,8 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/spf13/cobra"
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -56,7 +56,7 @@ func create(fileName string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	ymlFile, err := ioutil.ReadFile(fileName)
+	ymlFile, err := os.ReadFile(fileName)
 	if err != nil {
 		log.Fatal(err)
 	}

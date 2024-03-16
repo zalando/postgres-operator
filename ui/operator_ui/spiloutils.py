@@ -308,7 +308,7 @@ def read_versions(
         if uid == 'wal' or defaulting(lambda: UUID(uid))
     ]
 
-BACKUP_VERSION_PREFIXES = ['', '9.6/', '10/', '11/', '12/', '13/', '14/', '15/']
+BACKUP_VERSION_PREFIXES = ['', '9.6/', '10/', '11/', '12/', '13/', '14/', '15/', '16/']
 
 def read_basebackups(
     pg_cluster,

@@ -3,13 +3,14 @@ package cluster
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
 
 	"context"
 
+	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -201,7 +202,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 
 	// mocking a config after setConfig is called
 	configJson := `{"postgresql": {"parameters": {"log_min_duration_statement": 200, "max_connections": 50}}}, "ttl": 20}`
-	r := ioutil.NopCloser(bytes.NewReader([]byte(configJson)))
+	r := io.NopCloser(bytes.NewReader([]byte(configJson)))
 
 	response := http.Response{
 		StatusCode: 200,
@@ -531,7 +532,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	// mocking a config after getConfig is called
 	mockClient := mocks.NewMockHTTPClient(ctrl)
 	configJson := `{"ttl": 20}`
-	r := ioutil.NopCloser(bytes.NewReader([]byte(configJson)))
+	r := io.NopCloser(bytes.NewReader([]byte(configJson)))
 	response := http.Response{
 		StatusCode: 200,
 		Body:       r,
@@ -540,7 +541,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 
 	// mocking a config after setConfig is called
 	standbyJson := `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_wale","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}}`
-	r = ioutil.NopCloser(bytes.NewReader([]byte(standbyJson)))
+	r = io.NopCloser(bytes.NewReader([]byte(standbyJson)))
 	response = http.Response{
 		StatusCode: 200,
 		Body:       r,
@@ -582,7 +583,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	assert.NoError(t, err)
 
 	configJson = `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_wale","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}, "ttl": 20}`
-	r = ioutil.NopCloser(bytes.NewReader([]byte(configJson)))
+	r = io.NopCloser(bytes.NewReader([]byte(configJson)))
 	response = http.Response{
 		StatusCode: 200,
 		Body:       r,
@@ -623,6 +624,7 @@ func TestUpdateSecret(t *testing.T) {
 	namespace := "default"
 	dbname := "app"
 	dbowner := "appowner"
+	appUser := "foo"
 	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
 	retentionUsers := make([]string, 0)
 
@@ -634,7 +636,8 @@ func TestUpdateSecret(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			Databases:                      map[string]string{dbname: dbowner},
-			Users:                          map[string]acidv1.UserFlags{"foo": {}, dbowner: {}},
+			Users:                          map[string]acidv1.UserFlags{appUser: {}, "bar": {}, dbowner: {}},
+			UsersIgnoringSecretRotation:    []string{"bar"},
 			UsersWithInPlaceSecretRotation: []string{dbowner},
 			Streams: []acidv1.Stream{
 				{
@@ -712,6 +715,9 @@ func TestUpdateSecret(t *testing.T) {
 			if pgUser.Origin != spec.RoleOriginManifest {
 				continue
 			}
+			if slices.Contains(pg.Spec.UsersIgnoringSecretRotation, username) {
+				continue
+			}
 			t.Errorf("%s: password unchanged in updated secret for %s", testName, username)
 		}
 
@@ -738,5 +744,33 @@ func TestUpdateSecret(t *testing.T) {
 				t.Errorf("%s: unexpected number of users to drop - expected only %s, found %d", testName, username, len(retentionUsers))
 			}
 		}
+	}
+
+	// switch rotation for foo to in-place
+	inPlaceRotationUsers := []string{dbowner, appUser}
+	cluster.Spec.UsersWithInPlaceSecretRotation = inPlaceRotationUsers
+	cluster.initUsers()
+	cluster.syncSecrets()
+	updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), cluster.credentialSecretName(appUser), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	// username in secret should be switched to original user
+	currentUsername := string(updatedSecret.Data["username"])
+	if currentUsername != appUser {
+		t.Errorf("%s: updated secret does not contain correct username: expected %s, got %s", testName, appUser, currentUsername)
+	}
+
+	// switch rotation back to rotation user
+	inPlaceRotationUsers = []string{dbowner}
+	cluster.Spec.UsersWithInPlaceSecretRotation = inPlaceRotationUsers
+	cluster.initUsers()
+	cluster.syncSecrets()
+	updatedSecret, err = cluster.KubeClient.Secrets(namespace).Get(context.TODO(), cluster.credentialSecretName(appUser), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	// username in secret will only be switched after next rotation date is passed
+	currentUsername = string(updatedSecret.Data["username"])
+	if currentUsername != appUser {
+		t.Errorf("%s: updated secret does not contain expected username: expected %s, got %s", testName, appUser, currentUsername)
 	}
 }
