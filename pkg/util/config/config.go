@@ -152,7 +152,7 @@ type ConnectionPooler struct {
 	NumberOfInstances                    *int32 `name:"connection_pooler_number_of_instances" default:"2"`
 	Schema                               string `name:"connection_pooler_schema" default:"pooler"`
 	User                                 string `name:"connection_pooler_user" default:"pooler"`
-	Image                                string `name:"connection_pooler_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
+	Image                                string `name:"connection_pooler_image" default:"container-registry.zalando.net/acid/pgbouncer"`
 	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
 	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
 	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request"`
