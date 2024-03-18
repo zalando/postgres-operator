@@ -14,6 +14,7 @@ data:
   pod_priority_class_name: {{ include "postgres-pod.priorityClassName" . }}
 {{- end }}
   pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
+  pod_service_account_create: {{ .Values.serviceAccount.create }}
 {{- include "flattenValuesForConfigMap" .Values.configGeneral | indent 2 }}
 {{- include "flattenValuesForConfigMap" .Values.configUsers | indent 2 }}
 {{- include "flattenValuesForConfigMap" .Values.configMajorVersionUpgrade | indent 2 }}
