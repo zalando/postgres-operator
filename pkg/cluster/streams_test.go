@@ -455,4 +455,21 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
 		t.Errorf("Malformed FabricEventStream after disabling event recovery, expected %#v, got %#v", streams.Items[0], result)
 	}
+
+	mockClient := k8sutil.NewMockKubernetesClient()
+	cluster.KubeClient.CustomResourceDefinitionsGetter = mockClient.CustomResourceDefinitionsGetter
+
+	// remove streams from manifest
+	pgPatched.Spec.Streams = nil
+	pgUpdated, err := cluster.KubeClient.Postgresqls(namespace).Update(
+		context.TODO(), pgPatched, metav1.UpdateOptions{})
+	assert.NoError(t, err)
+
+	cluster.Postgresql.Spec = pgUpdated.Spec
+	cluster.syncStreams()
+
+	streamList, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
+	if len(streamList.Items) > 0 || err != nil {
+		t.Errorf("stream resource has not been removed or unexpected error %v", err)
+	}
 }

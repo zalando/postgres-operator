@@ -327,7 +327,8 @@ func (c *Cluster) syncStreams() error {
 	if len(slotsToSync) > 0 {
 		requiredPatroniConfig.Slots = slotsToSync
 	} else {
-		return nil
+		// try to delete existing stream resources
+		return c.deleteStreams()
 	}
 
 	c.logger.Debug("syncing logical replication slots")
