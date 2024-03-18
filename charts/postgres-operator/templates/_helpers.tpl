@@ -70,8 +70,8 @@ Flatten nested config options when ConfigMap is used as ConfigTarget
         {{- $list := list }}
         {{- range $subKey, $subValue := $value }}
             {{- $list = append $list (printf "%s:%s" $subKey $subValue) }}
-{{ $key }}: {{ join "," $list | quote }}
         {{- end }}
+{{ $key }}: {{ join "," $list | quote }}
     {{- else }}
 {{ $key }}: {{ $value | quote }}
     {{- end }}
