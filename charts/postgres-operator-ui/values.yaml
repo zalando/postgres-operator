@@ -8,7 +8,7 @@ replicaCount: 1
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator-ui
-  tag: v1.10.1
+  tag: v1.11.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -45,6 +45,7 @@ envs:
   operatorApiUrl: "http://postgres-operator:8080"
   operatorClusterNameLabel: "cluster-name"
   resourcesVisible: "False"
+  # Set to "*" to allow viewing/creation of clusters in all namespaces
   targetNamespace: "default"
   teams:
     - "acid"

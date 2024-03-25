@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "15"
+    version: "16"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -109,7 +109,7 @@ metadata:
 spec:
   [...]
   postgresql:
-    version: "15"
+    version: "16"
     parameters:
       password_encryption: scram-sha-256
 ```
@@ -517,7 +517,7 @@ Postgres Operator will create the following NOLOGIN roles:
 
 The `<dbname>_owner` role is the database owner and should be used when creating
 new database objects. All members of the `admin` role, e.g. teams API roles, can
-become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/15/sql-alterdefaultprivileges.html)
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/16/sql-alterdefaultprivileges.html)
 are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
@@ -594,7 +594,7 @@ spec:
 
 ### Schema `search_path` for default roles
 
-The schema [`search_path`](https://www.postgresql.org/docs/15/ddl-schemas.html#DDL-SCHEMAS-PATH)
+The schema [`search_path`](https://www.postgresql.org/docs/16/ddl-schemas.html#DDL-SCHEMAS-PATH)
 for each role will include the role name and the schemas, this role should have
 access to. So `foo_bar_writer` does not have to schema-qualify tables from
 schemas `foo_bar_writer, bar`, while `foo_writer` can look up `foo_writer` and
@@ -689,6 +689,30 @@ The minimum limits to properly run the `postgresql` resource are configured to
 manifest the operator will raise the limits to the configured minimum values.
 If no resources are defined in the manifest they will be obtained from the
 configured [default requests](reference/operator_parameters.md#kubernetes-resource-requests).
+If neither defaults nor minimum limits are configured the operator will not
+specify any resources and it's up to K8s (or your own) admission hooks to
+handle it.
+
+### HugePages support
+
+The operator supports [HugePages](https://www.postgresql.org/docs/16/kernel-resources.html#LINUX-HUGEPAGES).
+To enable HugePages, set the matching resource requests and/or limits in the manifest:
+
+```yaml
+spec:
+  resources:
+    requests:
+      hugepages-2Mi: 250Mi
+      hugepages-1Gi: 1Gi
+    limits:
+      hugepages-2Mi: 500Mi
+      hugepages-1Gi: 2Gi
+```
+
+There are no minimums or maximums and the default is 0 for both HugePage sizes,
+but Kubernetes will not spin up the pod if the requested HugePages cannot be allocated.
+For more information on HugePages in Kubernetes, see also
+[https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/](https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/)
 
 ## Use taints, tolerations and node affinity for dedicated PostgreSQL nodes
 
@@ -734,7 +758,7 @@ If you need to define a `nodeAffinity` for all your Postgres clusters use the
 ## In-place major version upgrade
 
 Starting with Spilo 13, operator supports in-place major version upgrade to a
-higher major version (e.g. from PG 10 to PG 13). To trigger the upgrade,
+higher major version (e.g. from PG 11 to PG 13). To trigger the upgrade,
 simply increase the version in the manifest. It is your responsibility to test
 your applications against the new version before the upgrade; downgrading is
 not supported. The easiest way to do so is to try the upgrade on the cloned
@@ -814,7 +838,7 @@ spec:
 ### Clone directly
 
 Another way to get a fresh copy of your source DB cluster is via
-[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html). To
+[pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html). To
 use this feature simply leave out the timestamp field from the clone section.
 The operator will connect to the service of the source cluster by name. If the
 cluster is called test, then the connection string will look like host=test
@@ -940,33 +964,25 @@ established between standby replica(s).
 One big advantage of standby clusters is that they can be promoted to a proper
 database cluster. This means it will stop replicating changes from the source,
 and start accept writes itself. This mechanism makes it possible to move
-databases from one place to another with minimal downtime. Currently, the
-operator does not support promoting a standby cluster. It has to be done
-manually using `patronictl edit-config` inside the postgres container of the
-standby leader pod. Remove the following lines from the YAML structure and the
-leader promotion happens immediately. Before doing so, make sure that the
-standby is not behind the source database.
+databases from one place to another with minimal downtime.
 
-```yaml
-standby_cluster:
-  create_replica_methods:
-    - bootstrap_standby_with_wale
-    - basebackup_fast_xlog
-  restore_command: envdir "/home/postgres/etc/wal-e.d/env-standby" /scripts/restore_command.sh
-     "%f" "%p"
-```
+Before promoting a standby cluster, make sure that the standby is not behind
+the source database. You should ideally stop writes to your source cluster and
+then create a dummy database object that you check for being replicated in the
+target to verify all data has been copied.
 
-Finally, remove the `standby` section from the postgres cluster manifest.
+To promote, remove the `standby` section from the postgres cluster manifest.
+A rolling update will be triggered removing the `STANDBY_*` environment
+variables from the pods, followed by a Patroni config update that promotes the
+cluster.
 
-### Turn a normal cluster into a standby
+### Adding standby section after promotion
 
-There is no way to transform a non-standby cluster to a standby cluster through
-the operator. Adding the `standby` section to the manifest of a running
-Postgres cluster will have no effect. But, as explained in the previous
-paragraph it can be done manually through `patronictl edit-config`. This time,
-by adding the `standby_cluster` section to the Patroni configuration. However,
-the transformed standby cluster will not be doing any streaming. It will be in
-standby mode and allow read-only transactions only.
+Turning a running cluster into a standby is not easily possible and should be
+avoided. The best way is to remove the cluster and resubmit the manifest
+after a short wait of a few minutes. Adding the `standby` section would turn
+the database cluster in read-only mode on next operator SYNC cycle but it
+does not sync automatically with the source cluster again.
 
 ## Sidecar Support
 

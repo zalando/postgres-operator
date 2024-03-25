@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"time"
-
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -73,18 +72,18 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 	}{
 		{
 			subtest: "Patroni default configuration",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				Auth: config.Auth{
 					PamRoleName: "zalandos",
 				},
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{
 				InitDB: map[string]string{
 					"encoding":       "UTF8",
@@ -102,52 +101,39 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 				FailsafeMode:          util.True(),
 			},
-			opConfig: &config.Config{
-				Auth: config.Auth{
-					PamRoleName: "zalandos",
-				},
-			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
+			opConfig: &config.Config{},
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
-				Auth: config.Auth{
-					PamRoleName: "zalandos",
-				},
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.False(),
 			},
 			opConfig: &config.Config{
-				Auth: config.Auth{
-					PamRoleName: "zalandos",
-				},
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":false}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.True(),
 			},
 			opConfig: &config.Config{
-				Auth: config.Auth{
-					PamRoleName: "zalandos",
-				},
 				EnablePatroniFailsafeMode: util.False(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -157,8 +143,8 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if tt.result != result {
-			t.Errorf("%s %s: Spilo Config is %v, expected %v for role %#v and param %#v",
-				t.Name(), tt.subtest, result, tt.result, tt.opConfig.Auth.PamRoleName, tt.pgParam)
+			t.Errorf("%s %s: Spilo Config is %v, expected %v and param %#v",
+				t.Name(), tt.subtest, result, tt.result, tt.pgParam)
 		}
 	}
 }
@@ -178,15 +164,15 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		},
 		{
 			subTest:  "test current bin path against hard coded template",
-			binPath:  "/usr/lib/postgresql/15/bin",
+			binPath:  "/usr/lib/postgresql/16/bin",
 			template: pgBinariesLocationTemplate,
-			expected: "15",
+			expected: "16",
 		},
 		{
 			subTest:  "test alternative bin path against a matching template",
-			binPath:  "/usr/pgsql-15/bin",
+			binPath:  "/usr/pgsql-16/bin",
 			template: "/usr/pgsql-%v/bin",
-			expected: "15",
+			expected: "16",
 		},
 	}
 
@@ -205,6 +191,7 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 const (
 	testPodEnvironmentConfigMapName      = "pod_env_cm"
 	testPodEnvironmentSecretName         = "pod_env_sc"
+	testCronjobEnvironmentSecretName     = "pod_env_sc"
 	testPodEnvironmentObjectNotExists    = "idonotexist"
 	testPodEnvironmentSecretNameAPIError = "pod_env_sc_apierror"
 	testResourceCheckInterval            = 3
@@ -455,6 +442,96 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s %s: expected no error but got error: `%v`",
 					t.Name(), tt.subTest, err)
+			}
+		}
+	}
+
+}
+
+// Test if the keys of an existing secret are properly referenced
+func TestCronjobEnvironmentSecretVariables(t *testing.T) {
+	testName := "TestCronjobEnvironmentSecretVariables"
+	tests := []struct {
+		subTest  string
+		opConfig config.Config
+		envVars  []v1.EnvVar
+		err      error
+	}{
+		{
+			subTest: "No CronjobEnvironmentSecret configured",
+			envVars: []v1.EnvVar{},
+		},
+		{
+			subTest: "Secret referenced by CronjobEnvironmentSecret does not exist",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCronjobEnvironmentSecret: "idonotexist",
+				},
+			},
+			err: fmt.Errorf("could not read Secret CronjobEnvironmentSecretName: secret.core \"idonotexist\" not found"),
+		},
+		{
+			subTest: "Cronjob environment vars reference all keys from secret configured by CronjobEnvironmentSecret",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupCronjobEnvironmentSecret: testCronjobEnvironmentSecretName,
+				},
+			},
+			envVars: []v1.EnvVar{
+				{
+					Name: "clone_aws_access_key_id",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "clone_aws_access_key_id",
+						},
+					},
+				},
+				{
+					Name: "custom_variable",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "custom_variable",
+						},
+					},
+				},
+				{
+					Name: "standby_google_application_credentials",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "standby_google_application_credentials",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		vars, err := c.getCronjobEnvironmentSecretVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
+		if !reflect.DeepEqual(vars, tt.envVars) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				testName, tt.subTest, tt.envVars, vars)
+		}
+		if tt.err != nil {
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s %s: expected error `%v` but got `%v`",
+					testName, tt.subTest, tt.err, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s %s: expected no error but got error: `%v`",
+					testName, tt.subTest, err)
 			}
 		}
 	}
@@ -1344,8 +1421,8 @@ func TestNodeAffinity(t *testing.T) {
 		return acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
 			Resources: &acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
 				Size: "1G",
@@ -1437,8 +1514,8 @@ func TestPodAffinity(t *testing.T) {
 		Spec: acidv1.PostgresSpec{
 			NumberOfInstances: 1,
 			Resources: &acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
 				Size: "1G",
@@ -1581,8 +1658,8 @@ func TestTLS(t *testing.T) {
 		Spec: acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
 			Resources: &acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
 				Size: "1G",
@@ -1822,8 +1899,8 @@ func TestAdditionalVolume(t *testing.T) {
 		Spec: acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
 			Resources: &acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
 				Size: "1G",
@@ -1898,8 +1975,8 @@ func TestVolumeSelector(t *testing.T) {
 			TeamID:            "myapp",
 			NumberOfInstances: 0,
 			Resources: &acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: volume,
 		}
@@ -2023,15 +2100,15 @@ func TestSidecars(t *testing.T) {
 
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
-			PgVersion: "15",
+			PgVersion: "16",
 			Parameters: map[string]string{
 				"max_connections": "100",
 			},
 		},
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: &acidv1.Resources{
-			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 		},
 		Volume: acidv1.Volume{
 			Size: "1G",
@@ -2043,8 +2120,8 @@ func TestSidecars(t *testing.T) {
 			acidv1.Sidecar{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
-					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
-					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
+					ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("210m"), Memory: k8sutil.StringToPointer("0.8Gi")},
+					ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("510m"), Memory: k8sutil.StringToPointer("1.4Gi")},
 				},
 			},
 			acidv1.Sidecar{
@@ -2301,6 +2378,30 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				},
 			},
 		},
+		// With PDBMasterLabelSelector disabled.
+		{
+			New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", PDBMasterLabelSelector: util.False()}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+				logger,
+				eventRecorder),
+			policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "postgres-myapp-database-pdb",
+					Namespace: "myapp",
+					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
+				},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					MinAvailable: util.ToIntStr(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"cluster-name": "myapp-database"},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2318,8 +2419,8 @@ func TestGenerateService(t *testing.T) {
 	spec = acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: &acidv1.Resources{
-			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 		},
 		Volume: acidv1.Volume{
 			Size: "1G",
@@ -2331,8 +2432,8 @@ func TestGenerateService(t *testing.T) {
 			acidv1.Sidecar{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
-					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
-					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
+					ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("210m"), Memory: k8sutil.StringToPointer("0.8Gi")},
+					ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("510m"), Memory: k8sutil.StringToPointer("1.4Gi")},
 				},
 			},
 			acidv1.Sidecar{
@@ -2545,8 +2646,8 @@ func TestEnableLoadBalancers(t *testing.T) {
 					EnableReplicaPoolerLoadBalancer: util.False(),
 					NumberOfInstances:               1,
 					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-						ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
@@ -2592,8 +2693,8 @@ func TestEnableLoadBalancers(t *testing.T) {
 					EnableReplicaPoolerLoadBalancer: util.True(),
 					NumberOfInstances:               1,
 					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-						ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
@@ -2640,7 +2741,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 	clusterNameLabel := "cluster-name"
 	sidecarName := "postgres-exporter"
 
-	// enforceMinResourceLimits will be called 2 twice emitting 4 events (2x cpu, 2x memory raise)
+	// enforceMinResourceLimits will be called 2 times emitting 4 events (2x cpu, 2x memory raise)
 	// enforceMaxResourceRequests will be called 4 times emitting 6 events (2x cpu, 4x memory cap)
 	// hence event bufferSize of 10 is required
 	newEventRecorder := record.NewFakeRecorder(10)
@@ -2685,8 +2786,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
 		},
 		{
@@ -2714,8 +2815,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
 		},
 		{
@@ -2732,7 +2833,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{CPU: "50m", Memory: "50Mi"},
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("50m"), Memory: k8sutil.StringToPointer("50Mi")},
 					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
@@ -2741,8 +2842,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "50m", Memory: "50Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("50m"), Memory: k8sutil.StringToPointer("50Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
 		},
 		{
@@ -2759,8 +2860,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{Memory: "100Mi"},
-						ResourceLimits:   acidv1.ResourceDescription{Memory: "1Gi"},
+						ResourceRequests: acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("100Mi")},
+						ResourceLimits:   acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("1Gi")},
 					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
@@ -2769,8 +2870,97 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "1Gi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("1Gi")},
+			},
+		},
+		{
+			subTest: "test generation of resources when default is not defined",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     clusterNameLabel,
+					DefaultCPURequest:    "100m",
+					DefaultMemoryRequest: "100Mi",
+					PodRoleLabel:         "spilo-role",
+				},
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+			},
+		},
+		{
+			subTest: "test matchLimitsWithRequestsIfSmaller",
+			config: config.Config{
+				Resources:               configResources,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("750Mi")},
+						ResourceLimits:   acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("300Mi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("750Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("750Mi")},
+			},
+		},
+		{
+			subTest: "defaults are not defined but minimum limit is",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: clusterNameLabel,
+					MinMemoryLimit:   "250Mi",
+					PodRoleLabel:     "spilo-role",
+				},
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("500Mi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("500Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("500Mi")},
 			},
 		},
 		{
@@ -2787,8 +2977,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{Memory: "200Mi"},
-						ResourceLimits:   acidv1.ResourceDescription{Memory: "300Mi"},
+						ResourceRequests: acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("200Mi")},
+						ResourceLimits:   acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("300Mi")},
 					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
@@ -2797,8 +2987,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "300Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "300Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("300Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("300Mi")},
 			},
 		},
 		{
@@ -2818,8 +3008,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 						acidv1.Sidecar{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
-								ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "10Mi"},
-								ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+								ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("10Mi")},
+								ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 							},
 						},
 					},
@@ -2830,8 +3020,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "100Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 			},
 		},
 		{
@@ -2848,8 +3038,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "250Mi"},
-						ResourceLimits:   acidv1.ResourceDescription{CPU: "400m", Memory: "800Mi"},
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("250Mi")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("400m"), Memory: k8sutil.StringToPointer("800Mi")},
 					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
@@ -2858,8 +3048,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "250Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "400m", Memory: "800Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("250Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("400m"), Memory: k8sutil.StringToPointer("800Mi")},
 			},
 		},
 		{
@@ -2876,8 +3066,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
-						ResourceLimits:   acidv1.ResourceDescription{CPU: "200m", Memory: "200Mi"},
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("200m"), Memory: k8sutil.StringToPointer("200Mi")},
 					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
@@ -2886,8 +3076,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "250m", Memory: "250Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("250m"), Memory: k8sutil.StringToPointer("250Mi")},
 			},
 		},
 		{
@@ -2907,8 +3097,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 						acidv1.Sidecar{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
-								ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "10Mi"},
-								ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+								ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("10Mi")},
+								ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 							},
 						},
 					},
@@ -2919,8 +3109,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "10Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("10Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 			},
 		},
 		{
@@ -2937,8 +3127,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "2Gi"},
-						ResourceLimits:   acidv1.ResourceDescription{CPU: "2", Memory: "4Gi"},
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("2Gi")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("2"), Memory: k8sutil.StringToPointer("4Gi")},
 					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
@@ -2947,8 +3137,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "500m", Memory: "1Gi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "2", Memory: "4Gi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("500m"), Memory: k8sutil.StringToPointer("1Gi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("2"), Memory: k8sutil.StringToPointer("4Gi")},
 			},
 		},
 		{
@@ -2965,8 +3155,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
-						ResourceRequests: acidv1.ResourceDescription{Memory: "500Mi"},
-						ResourceLimits:   acidv1.ResourceDescription{Memory: "2Gi"},
+						ResourceRequests: acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("500Mi")},
+						ResourceLimits:   acidv1.ResourceDescription{Memory: k8sutil.StringToPointer("2Gi")},
 					},
 					TeamID: "acid",
 					Volume: acidv1.Volume{
@@ -2975,8 +3165,133 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "1Gi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "2Gi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("1Gi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("2Gi")},
+			},
+		},
+		{
+			subTest: "test HugePages are not set on container when not requested in manifest",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{},
+						ResourceLimits:   acidv1.ResourceDescription{},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:    k8sutil.StringToPointer("100m"),
+					Memory: k8sutil.StringToPointer("100Mi"),
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:    k8sutil.StringToPointer("1"),
+					Memory: k8sutil.StringToPointer("500Mi"),
+				},
+			},
+		},
+		{
+			subTest: "test HugePages are passed through to the postgres container",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{
+							HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+							HugePages1Gi: k8sutil.StringToPointer("1Gi"),
+						},
+						ResourceLimits: acidv1.ResourceDescription{
+							HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+							HugePages1Gi: k8sutil.StringToPointer("2Gi"),
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:          k8sutil.StringToPointer("100m"),
+					Memory:       k8sutil.StringToPointer("100Mi"),
+					HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("1Gi"),
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:          k8sutil.StringToPointer("1"),
+					Memory:       k8sutil.StringToPointer("500Mi"),
+					HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("2Gi"),
+				},
+			},
+		},
+		{
+			subTest: "test HugePages are passed through on sidecars",
+			config: config.Config{
+				Resources:           configResources,
+				PodManagementPolicy: "ordered_ready",
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Sidecars: []acidv1.Sidecar{
+						{
+							Name:        "test-sidecar",
+							DockerImage: "test-image",
+							Resources: &acidv1.Resources{
+								ResourceRequests: acidv1.ResourceDescription{
+									HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+									HugePages1Gi: k8sutil.StringToPointer("1Gi"),
+								},
+								ResourceLimits: acidv1.ResourceDescription{
+									HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+									HugePages1Gi: k8sutil.StringToPointer("2Gi"),
+								},
+							},
+						},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{
+					CPU:          k8sutil.StringToPointer("100m"),
+					Memory:       k8sutil.StringToPointer("100Mi"),
+					HugePages2Mi: k8sutil.StringToPointer("128Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("1Gi"),
+				},
+				ResourceLimits: acidv1.ResourceDescription{
+					CPU:          k8sutil.StringToPointer("1"),
+					Memory:       k8sutil.StringToPointer("500Mi"),
+					HugePages2Mi: k8sutil.StringToPointer("256Mi"),
+					HugePages1Gi: k8sutil.StringToPointer("2Gi"),
+				},
 			},
 		},
 	}
@@ -3009,7 +3324,9 @@ func TestGenerateResourceRequirements(t *testing.T) {
 
 func TestGenerateLogicalBackupJob(t *testing.T) {
 	clusterName := "acid-test-cluster"
+	teamId := "test"
 	configResources := config.Resources{
+		ClusterNameLabel:     "cluster-name",
 		DefaultCPURequest:    "100m",
 		DefaultCPULimit:      "1",
 		DefaultMemoryRequest: "100Mi",
@@ -3017,12 +3334,14 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 	}
 
 	tests := []struct {
-		subTest           string
-		config            config.Config
-		specSchedule      string
-		expectedSchedule  string
-		expectedJobName   string
-		expectedResources acidv1.Resources
+		subTest            string
+		config             config.Config
+		specSchedule       string
+		expectedSchedule   string
+		expectedJobName    string
+		expectedResources  acidv1.Resources
+		expectedAnnotation map[string]string
+		expectedLabel      map[string]string
 	}{
 		{
 			subTest: "test generation of logical backup pod resources when not configured",
@@ -3039,9 +3358,11 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 			expectedSchedule: "30 00 * * *",
 			expectedJobName:  "logical-backup-acid-test-cluster",
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "100Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "500Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
 		},
 		{
 			subTest: "test generation of logical backup pod resources when configured",
@@ -3062,9 +3383,11 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 			expectedSchedule: "30 00 * * 7",
 			expectedJobName:  "lb-acid-test-cluster",
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "10m", Memory: "50Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "300m", Memory: "300Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("50Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("300m"), Memory: k8sutil.StringToPointer("300Mi")},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
 		},
 		{
 			subTest: "test generation of logical backup pod resources when partly configured",
@@ -3083,9 +3406,11 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 			expectedSchedule: "30 00 * * *",
 			expectedJobName:  "acid-test-cluster",
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "50m", Memory: "100Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "250m", Memory: "500Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("50m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("250m"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
 		},
 		{
 			subTest: "test generation of logical backup pod resources with SetMemoryRequestToLimit enabled",
@@ -3104,9 +3429,55 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 			expectedSchedule: "30 00 * * *",
 			expectedJobName:  "test-long-prefix-so-name-must-be-trimmed-acid-test-c",
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "100m", Memory: "200Mi"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "200Mi"},
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("200Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("200Mi")},
 			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of pod annotations when cluster InheritedLabel is set",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:     "cluster-name",
+					InheritedLabels:      []string{"labelKey"},
+					DefaultCPURequest:    "100m",
+					DefaultCPULimit:      "1",
+					DefaultMemoryRequest: "100Mi",
+					DefaultMemoryLimit:   "500Mi",
+				},
+			},
+			specSchedule:     "",
+			expectedJobName:  "acid-test-cluster",
+			expectedSchedule: "",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
+			},
+			expectedLabel:      map[string]string{"labelKey": "labelValue", "cluster-name": clusterName, "team": teamId},
+			expectedAnnotation: nil,
+		},
+		{
+			subTest: "test generation of pod annotations when cluster InheritedAnnotations is set",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:     "cluster-name",
+					InheritedAnnotations: []string{"annotationKey"},
+					DefaultCPURequest:    "100m",
+					DefaultCPULimit:      "1",
+					DefaultMemoryRequest: "100Mi",
+					DefaultMemoryLimit:   "500Mi",
+				},
+			},
+			specSchedule:     "",
+			expectedJobName:  "acid-test-cluster",
+			expectedSchedule: "",
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
+			},
+			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedAnnotation: map[string]string{"annotationKey": "annotationValue"},
 		},
 	}
 
@@ -3115,18 +3486,33 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 			Config{
 				OpConfig: tt.config,
 			}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
-
 		cluster.ObjectMeta.Name = clusterName
+		cluster.Spec.TeamID = teamId
+		if cluster.ObjectMeta.Labels == nil {
+			cluster.ObjectMeta.Labels = make(map[string]string)
+		}
+		if cluster.ObjectMeta.Annotations == nil {
+			cluster.ObjectMeta.Annotations = make(map[string]string)
+		}
+		cluster.ObjectMeta.Labels["labelKey"] = "labelValue"
+		cluster.ObjectMeta.Annotations["annotationKey"] = "annotationValue"
 		cluster.Spec.LogicalBackupSchedule = tt.specSchedule
 		cronJob, err := cluster.generateLogicalBackupJob()
 		assert.NoError(t, err)
-
 		if cronJob.Spec.Schedule != tt.expectedSchedule {
 			t.Errorf("%s - %s: expected schedule %s, got %s", t.Name(), tt.subTest, tt.expectedSchedule, cronJob.Spec.Schedule)
 		}
 
 		if cronJob.Name != tt.expectedJobName {
 			t.Errorf("%s - %s: expected job name %s, got %s", t.Name(), tt.subTest, tt.expectedJobName, cronJob.Name)
+		}
+
+		if !reflect.DeepEqual(cronJob.Labels, tt.expectedLabel) {
+			t.Errorf("%s - %s: expected labels %s, got %s", t.Name(), tt.subTest, tt.expectedLabel, cronJob.Labels)
+		}
+
+		if !reflect.DeepEqual(cronJob.Annotations, tt.expectedAnnotation) {
+			t.Errorf("%s - %s: expected annotations %s, got %s", t.Name(), tt.subTest, tt.expectedAnnotation, cronJob.Annotations)
 		}
 
 		containers := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers

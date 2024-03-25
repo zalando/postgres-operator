@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=registry.opensource.zalan.do/library/alpine-3.15:latest
+ARG BASE_IMAGE=registry.opensource.zalan.do/library/alpine-3:latest
 ARG VERSION=latest
 
 FROM ubuntu:20.04 as builder
@@ -13,6 +13,7 @@ RUN bash docker/build_operator.sh
 
 FROM ${BASE_IMAGE}
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
+LABEL org.opencontainers.image.source="https://github.com/zalando/postgres-operator"
 
 # We need root certificates to deal with teams api over https
 RUN apk --no-cache add curl

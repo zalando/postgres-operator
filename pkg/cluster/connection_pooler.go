@@ -610,7 +610,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 			Delete(context.TODO(), deployment.Name, options)
 
 		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("connection pooler deployment was already deleted")
+			c.logger.Debugf("connection pooler deployment %s for role %s has already been deleted", deployment.Name, role)
 		} else if err != nil {
 			return fmt.Errorf("could not delete connection pooler deployment: %v", err)
 		}
@@ -629,7 +629,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 			Delete(context.TODO(), service.Name, options)
 
 		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("connection pooler service was already deleted")
+			c.logger.Debugf("connection pooler service %s for role %s has already been already deleted", service.Name, role)
 		} else if err != nil {
 			return fmt.Errorf("could not delete connection pooler service: %v", err)
 		}
@@ -821,12 +821,12 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 func makeDefaultConnectionPoolerResources(config *config.Config) acidv1.Resources {
 
 	defaultRequests := acidv1.ResourceDescription{
-		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPURequest,
-		Memory: config.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest,
+		CPU:    &config.ConnectionPooler.ConnectionPoolerDefaultCPURequest,
+		Memory: &config.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest,
 	}
 	defaultLimits := acidv1.ResourceDescription{
-		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPULimit,
-		Memory: config.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit,
+		CPU:    &config.ConnectionPooler.ConnectionPoolerDefaultCPULimit,
+		Memory: &config.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit,
 	}
 
 	return acidv1.Resources{

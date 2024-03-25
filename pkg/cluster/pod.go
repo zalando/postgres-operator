@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -503,7 +505,11 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 	} else {
 		// in asynchronous mode find running replicas
 		for _, member := range members {
-			if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && member.State == "running" {
+			if PostgresRole(member.Role) == Leader || PostgresRole(member.Role) == StandbyLeader {
+				continue
+			}
+
+			if slices.Contains([]string{"running", "streaming", "in archive recovery"}, member.State) {
 				candidates = append(candidates, member)
 			}
 		}
