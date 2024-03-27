@@ -129,6 +129,8 @@ configKubernetes:
   enable_finalizers: false
   # enables initContainers to run actions before Spilo is started
   enable_init_containers: true
+  # toggles if operator should delete secrets on cluster deletion
+  enable_secrets_deletion: true
   # toggles if operator should delete PVCs on cluster deletion
   enable_persistent_volume_claim_deletion: true
   # toggles pod anti affinity on the Postgres pods

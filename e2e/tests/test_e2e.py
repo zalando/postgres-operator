@@ -2049,6 +2049,7 @@ class EndToEndTestCase(unittest.TestCase):
             "data": {
                 "delete_annotation_date_key": "delete-date",
                 "delete_annotation_name_key": "delete-clustername",
+                "enable_secrets_deletion": "false",
                 "enable_persistent_volume_claim_deletion": "false"
             }
         }
@@ -2109,7 +2110,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.count_statefulsets_with_label(cluster_label), 0, "Statefulset not deleted")
             self.eventuallyEqual(lambda: k8s.count_deployments_with_label(cluster_label), 0, "Deployments not deleted")
             self.eventuallyEqual(lambda: k8s.count_pdbs_with_label(cluster_label), 0, "Pod disruption budget not deleted")
-            self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 0, "Secrets not deleted")
+            self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 7, "Secrets were deleted although disabled in config")
             self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 3, "PVCs were deleted although disabled in config")
 
         except timeout_decorator.TimeoutError:
