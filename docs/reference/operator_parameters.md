@@ -329,8 +329,8 @@ configuration they are grouped under the `kubernetes` key.
 
 * **pdb_master_label_selector**
   By default the PDB will match the master role hence preventing nodes to be
-  drained if the node_readiness_label is not used. This option if set to `false`
-  will not add the `spilo-role=master` selector to the PDB.
+  drained if the node_readiness_label is not used. If this option if set to
+  `false` the `spilo-role=master` selector will not be added to the PDB.
 
 * **enable_finalizers**
   By default, a deletion of the Postgresql resource will trigger an event

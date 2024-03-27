@@ -169,7 +169,9 @@ configKubernetes:
   # namespaced name of the secret containing the OAuth2 token to pass to the teams API
   # oauth_token_secret_name: postgresql-operator
 
-  # defines the template for PDB (Pod Disruption Budget) names
+  # toggle if `spilo-role=master` selector should be added to the PDB (Pod Disruption Budget)
+  pdb_master_label_selector: true
+  # defines the template for PDB names
   pdb_name_format: "postgres-{cluster}-pdb"
   # specify the PVC retention policy when scaling down and/or deleting
   persistent_volume_claim_retention_policy:
