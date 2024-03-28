@@ -85,6 +85,7 @@ configuration:
     #   status: ready
     # node_readiness_label_merge: "OR"
     oauth_token_secret_name: postgresql-operator
+    pdb_master_label_selector: true
     pdb_name_format: "postgres-{cluster}-pdb"
     persistent_volume_claim_retention_policy: 
       when_deleted: "retain"
