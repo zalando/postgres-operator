@@ -279,6 +279,9 @@ spec:
                   oauth_token_secret_name:
                     type: string
                     default: "postgresql-operator"
+                  pdb_master_label_selector:
+                    type: boolean
+                    default: true
                   pdb_name_format:
                     type: string
                     default: "postgres-{cluster}-pdb"

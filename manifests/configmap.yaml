@@ -119,6 +119,7 @@ data:
   patroni_api_check_timeout: "5s"
   # password_rotation_interval: "90"
   # password_rotation_user_retention: "180"
+  pdb_master_label_selector: "true"
   pdb_name_format: "postgres-{cluster}-pdb"
   persistent_volume_claim_retention_policy: "when_deleted:retain,when_scaled:retain"
   # pod_antiaffinity_preferred_during_scheduling: "false"
