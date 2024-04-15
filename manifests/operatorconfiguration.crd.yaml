@@ -526,6 +526,8 @@ spec:
                     type: string
                   logical_backup_s3_bucket:
                     type: string
+                  logical_backup_s3_bucket_prefix:
+                    type: string
                   logical_backup_s3_endpoint:
                     type: string
                   logical_backup_s3_region:

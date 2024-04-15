@@ -132,6 +132,7 @@ type LogicalBackup struct {
 	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
 	LogicalBackupAzureStorageAccountKey       string `name:"logical_backup_azure_storage_account_key" default:""`
 	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3BucketPrefix               string `name:"logical_backup_s3_bucket_prefix" default:"spilo/"`
 	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
 	LogicalBackupS3Endpoint                   string `name:"logical_backup_s3_endpoint" default:""`
 	LogicalBackupS3AccessKeyID                string `name:"logical_backup_s3_access_key_id" default:""`

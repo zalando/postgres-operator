@@ -228,6 +228,7 @@ type OperatorLogicalBackupConfiguration struct {
 	AzureStorageContainer        string `json:"logical_backup_azure_storage_container,omitempty"`
 	AzureStorageAccountKey       string `json:"logical_backup_azure_storage_account_key,omitempty"`
 	S3Bucket                     string `json:"logical_backup_s3_bucket,omitempty"`
+	S3BucketPrefix               string `json:"logical_backup_s3_bucket_prefix,omitempty"`
 	S3Region                     string `json:"logical_backup_s3_region,omitempty"`
 	S3Endpoint                   string `json:"logical_backup_s3_endpoint,omitempty"`
 	S3AccessKeyID                string `json:"logical_backup_s3_access_key_id,omitempty"`
