@@ -1509,17 +1509,19 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	var persistentVolumeClaimRetentionPolicy appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy
-	if c.OpConfig.PersistentVolumeClaimRetentionPolicy["when_deleted"] == "delete" {
-		persistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.DeletePersistentVolumeClaimRetentionPolicyType
-	} else {
-		persistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
-	}
+	var persistentVolumeClaimRetentionPolicy *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy = nil
+	if c.OpConfig.EnablePersistentVolumeClaimRetentionPolicy {
+		if c.OpConfig.PersistentVolumeClaimRetentionPolicy["when_deleted"] == "delete" {
+			persistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.DeletePersistentVolumeClaimRetentionPolicyType
+		} else {
+			persistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+		}
 
-	if c.OpConfig.PersistentVolumeClaimRetentionPolicy["when_scaled"] == "delete" {
-		persistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.DeletePersistentVolumeClaimRetentionPolicyType
-	} else {
-		persistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+		if c.OpConfig.PersistentVolumeClaimRetentionPolicy["when_scaled"] == "delete" {
+			persistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.DeletePersistentVolumeClaimRetentionPolicyType
+		} else {
+			persistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+		}
 	}
 
 	statefulSet := &appsv1.StatefulSet{
@@ -1537,7 +1539,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			VolumeClaimTemplates:                 []v1.PersistentVolumeClaim{*volumeClaimTemplate},
 			UpdateStrategy:                       updateStrategy,
 			PodManagementPolicy:                  podManagementPolicy,
-			PersistentVolumeClaimRetentionPolicy: &persistentVolumeClaimRetentionPolicy,
+			PersistentVolumeClaimRetentionPolicy: persistentVolumeClaimRetentionPolicy,
 		},
 	}
 
