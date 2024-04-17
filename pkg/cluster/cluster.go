@@ -28,6 +28,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/users"
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -784,6 +785,48 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	}
 
 	return true, ""
+}
+
+func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string) {
+
+	containersMatch := true
+	reasons := make([]string, 0)
+
+	if cur.Spec.Schedule != new.Spec.Schedule {
+		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
+			new.Spec.Schedule, cur.Spec.Schedule)
+	}
+
+	newImage := new.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+	curImage := cur.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+	if newImage != curImage {
+		return false, fmt.Sprintf("new job's image %q does not match the current one %q",
+			newImage, curImage)
+	}
+
+	newPgVersion := getPgVersion(new)
+	curPgVersion := getPgVersion(cur)
+	if newPgVersion != curPgVersion {
+		return false, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q",
+			newPgVersion, curPgVersion)
+	}
+
+	containersMatch, reasons = c.compareContainers("containers", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, containersMatch, reasons)
+	if !containersMatch {
+		return false, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(reasons, `', '`))
+	}
+
+	return true, ""
+}
+
+func getPgVersion(cronJob *batchv1.CronJob) string {
+	envs := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env
+	for _, env := range envs {
+		if env.Name == "PG_VERSION" {
+			return env.Value
+		}
+	}
+	return ""
 }
 
 // addFinalizer patches the postgresql CR to add finalizer

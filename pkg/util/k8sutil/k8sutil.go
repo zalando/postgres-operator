@@ -8,7 +8,6 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 
-	batchv1 "k8s.io/api/batch/v1"
 	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 
 	apiacidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -252,45 +251,6 @@ func SamePDB(cur, new *apipolicyv1.PodDisruptionBudget) (match bool, reason stri
 	}
 
 	return
-}
-
-func getJobImage(cronJob *batchv1.CronJob) string {
-	return cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
-}
-
-func getPgVersion(cronJob *batchv1.CronJob) string {
-	envs := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env
-	for _, env := range envs {
-		if env.Name == "PG_VERSION" {
-			return env.Value
-		}
-	}
-	return ""
-}
-
-// SameLogicalBackupJob compares Specs of logical backup cron jobs
-func SameLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string) {
-
-	if cur.Spec.Schedule != new.Spec.Schedule {
-		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
-			new.Spec.Schedule, cur.Spec.Schedule)
-	}
-
-	newImage := getJobImage(new)
-	curImage := getJobImage(cur)
-	if newImage != curImage {
-		return false, fmt.Sprintf("new job's image %q does not match the current one %q",
-			newImage, curImage)
-	}
-
-	newPgVersion := getPgVersion(new)
-	curPgVersion := getPgVersion(cur)
-	if newPgVersion != curPgVersion {
-		return false, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q",
-			newPgVersion, curPgVersion)
-	}
-
-	return true, ""
 }
 
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
