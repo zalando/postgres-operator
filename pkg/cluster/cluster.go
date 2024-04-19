@@ -439,8 +439,8 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		reasons = append(reasons, "new statefulset's persistent volume claim retention policy do not match")
 	}
 
-	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
-	needsRollUpdate, reasons = c.compareContainers("containers", c.Statefulset.Spec.Template.Spec.Containers, statefulSet.Spec.Template.Spec.Containers, needsRollUpdate, reasons)
+	needsRollUpdate, reasons = c.compareContainers("statefulset initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
+	needsRollUpdate, reasons = c.compareContainers("statefulset containers", c.Statefulset.Spec.Template.Spec.Containers, statefulSet.Spec.Template.Spec.Containers, needsRollUpdate, reasons)
 
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
@@ -572,30 +572,30 @@ func newCheck(msg string, cond containerCondition) containerCheck {
 
 func (c *Cluster) compareContainers(description string, setA, setB []v1.Container, needsRollUpdate bool, reasons []string) (bool, []string) {
 	if len(setA) != len(setB) {
-		return true, append(reasons, fmt.Sprintf("new statefulset %s's length does not match the current ones", description))
+		return true, append(reasons, fmt.Sprintf("new %s's length does not match the current ones", description))
 	}
 
 	checks := []containerCheck{
-		newCheck("new statefulset %s's %s (index %d) name does not match the current one",
+		newCheck("new %s's %s (index %d) name does not match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
-		newCheck("new statefulset %s's %s (index %d) readiness probe does not match the current one",
+		newCheck("new %s's %s (index %d) readiness probe does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.ReadinessProbe, b.ReadinessProbe) }),
-		newCheck("new statefulset %s's %s (index %d) ports do not match the current one",
+		newCheck("new %s's %s (index %d) ports do not match the current one",
 			func(a, b v1.Container) bool { return !comparePorts(a.Ports, b.Ports) }),
-		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
+		newCheck("new %s's %s (index %d) resources do not match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
-		newCheck("new statefulset %s's %s (index %d) environment does not match the current one",
+		newCheck("new %s's %s (index %d) environment does not match the current one",
 			func(a, b v1.Container) bool { return !compareEnv(a.Env, b.Env) }),
-		newCheck("new statefulset %s's %s (index %d) environment sources do not match the current one",
+		newCheck("new %s's %s (index %d) environment sources do not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
-		newCheck("new statefulset %s's %s (index %d) security context does not match the current one",
+		newCheck("new %s's %s (index %d) security context does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
-		newCheck("new statefulset %s's %s (index %d) volume mounts do not match the current one",
+		newCheck("new %s's %s (index %d) volume mounts do not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.VolumeMounts, b.VolumeMounts) }),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {
-		checks = append(checks, newCheck("new statefulset %s's %s (index %d) image does not match the current one",
+		checks = append(checks, newCheck("new %s's %s (index %d) image does not match the current one",
 			func(a, b v1.Container) bool { return a.Image != b.Image }))
 	}
 
@@ -789,7 +789,7 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 
 func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string) {
 
-	containersMatch := true
+	containersDiffer := false
 	reasons := make([]string, 0)
 
 	if cur.Spec.Schedule != new.Spec.Schedule {
@@ -811,8 +811,8 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool
 			newPgVersion, curPgVersion)
 	}
 
-	containersMatch, reasons = c.compareContainers("containers", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, containersMatch, reasons)
-	if !containersMatch {
+	containersDiffer, reasons = c.compareContainers("cronjob container", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, containersDiffer, reasons)
+	if containersDiffer {
 		return false, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(reasons, `', '`))
 	}
 
