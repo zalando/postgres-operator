@@ -789,9 +789,6 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 
 func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string) {
 
-	containersDiffer := false
-	reasons := make([]string, 0)
-
 	if cur.Spec.Schedule != new.Spec.Schedule {
 		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
 			new.Spec.Schedule, cur.Spec.Schedule)
@@ -811,8 +808,10 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool
 			newPgVersion, curPgVersion)
 	}
 
-	containersDiffer, reasons = c.compareContainers("cronjob container", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, containersDiffer, reasons)
-	if containersDiffer {
+	needsReplace := false
+	reasons := make([]string, 0)
+	needsReplace, reasons = c.compareContainers("cronjob container", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, needsReplace, reasons)
+	if needsReplace {
 		return false, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(reasons, `', '`))
 	}
 
