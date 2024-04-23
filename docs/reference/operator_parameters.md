@@ -815,7 +815,7 @@ grouped under the `logical_backup` key.
 * **logical_backup_docker_image**
   An image for pods of the logical backup job. The [example image](https://github.com/zalando/postgres-operator/blob/master/logical-backup/Dockerfile)
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
-  an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
+  an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
   pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
 
@@ -846,7 +846,7 @@ grouped under the `logical_backup` key.
   accessible by Postgres pods. Default: empty.
 
 * **logical_backup_s3_bucket_prefix**
-  S3 bucket prefix to use in configured bucket. Default: "spilo/"
+  S3 bucket prefix to use in configured bucket. Default: "spilo"
 
 * **logical_backup_s3_endpoint**
   When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.

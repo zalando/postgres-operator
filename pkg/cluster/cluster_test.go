@@ -1650,16 +1650,13 @@ func TestCompareServices(t *testing.T) {
 			if match && !tt.match {
 				t.Logf("match=%v current=%v, old=%v reason=%s", match, tt.current.Annotations, tt.new.Annotations, reason)
 				t.Errorf("%s - expected services to do not match: %q and %q", t.Name(), tt.current, tt.new)
-				return
 			}
 			if !match && tt.match {
 				t.Errorf("%s - expected services to be the same: %q and %q", t.Name(), tt.current, tt.new)
-				return
 			}
 			if !match && !tt.match {
 				if !strings.HasPrefix(reason, tt.reason) {
 					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
-					return
 				}
 			}
 		})
@@ -1724,8 +1721,8 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 		},
 		{
 			about:   "two cronjobs with different environment variables",
-			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "spilo/"}}),
-			new:     newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "logical-backup/"}}),
+			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "spilo"}}),
+			new:     newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "logical-backup"}}),
 			match:   false,
 			reason:  "logical backup container specs do not match: new cronjob container's logical-backup (index 0) environment does not match the current one",
 		},
@@ -1734,14 +1731,11 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.about, func(t *testing.T) {
 			match, reason := cl.compareLogicalBackupJob(tt.current, tt.new)
-			if !match && tt.match {
-				t.Errorf("%s - expected cronjobs to be the same: %q and %q", t.Name(), tt.current, tt.new)
-				return
-			}
-			if !match && !tt.match {
+			if match != tt.match {
+				t.Errorf("%s - unexpected match result %t when comparing cronjobs %q and %q", t.Name(), match, tt.current, tt.new)
+			} else {
 				if !strings.HasPrefix(reason, tt.reason) {
 					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
-					return
 				}
 			}
 		})
