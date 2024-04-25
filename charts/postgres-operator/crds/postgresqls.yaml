@@ -215,6 +215,8 @@ spec:
                 items:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+              logicalBackupRetention:
+                type: string
               logicalBackupSchedule:
                 type: string
                 pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'

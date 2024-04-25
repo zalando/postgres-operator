@@ -151,6 +151,7 @@ spec:
 
 # run periodic backups with k8s cron jobs
 #  enableLogicalBackup: true
+#  logicalBackupRetention: "3 months"
 #  logicalBackupSchedule: "30 00 * * *"
 
 #  maintenanceWindows:

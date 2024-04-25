@@ -2401,7 +2401,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 		{
 			Name:  "LOGICAL_BACKUP_S3_RETENTION_TIME",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3RetentionTime,
+			Value: c.getLogicalBackupRetentionTime(),
 		},
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_PREFIX",
@@ -2470,6 +2470,14 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 	}
 
 	return envVars
+}
+
+func (c *Cluster) getLogicalBackupRetentionTime() (retentionTime string) {
+	if c.Spec.LogicalBackupRetention != "" {
+		return c.Spec.LogicalBackupRetention
+	}
+
+	return c.OpConfig.LogicalBackup.LogicalBackupS3RetentionTime
 }
 
 // getLogicalBackupJobName returns the name; the job itself may not exists
