@@ -223,10 +223,17 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   Determines if the logical backup of this cluster should be taken and uploaded
   to S3. Default: false. Optional.
 
+* **logicalBackupRetention**
+  You can set a retention time for the logical backup cron job to remove old backup
+  files after a new backup has been uploaded. Example values are "3 days", "2 weeks", or
+  "1 month". It takes precedence over the global `logical_backup_s3_retention_time`
+  configuration. Currently only supported for AWS. Optional.
+
 * **logicalBackupSchedule**
   Schedule for the logical backup K8s cron job. Please take
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
-  into account. Optional. Default is: "30 00 \* \* \*"
+  into account. It takes precedence over the global `logical_backup_schedule`
+  configuration. Optional.
 
 * **additionalVolumes**
   List of additional volumes to mount in each container of the statefulset pod.

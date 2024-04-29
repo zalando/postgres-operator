@@ -2360,6 +2360,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
+	backupProvider := c.OpConfig.LogicalBackup.LogicalBackupProvider
+
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -2377,55 +2379,6 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 					FieldPath:  "metadata.namespace",
 				},
 			},
-		},
-		// Bucket env vars
-		{
-			Name:  "LOGICAL_BACKUP_PROVIDER",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupProvider,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_BUCKET",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_REGION",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Region,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_ENDPOINT",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_SSE",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_RETENTION_TIME",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3RetentionTime,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_BUCKET_PREFIX",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3BucketPrefix,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
-			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
-		},
-		{
-			Name:  "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountName,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageContainer,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey,
 		},
 		// Postgres env vars
 		{
@@ -2459,17 +2412,81 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 				},
 			},
 		},
+		// Bucket env vars
+		{
+			Name:  "LOGICAL_BACKUP_PROVIDER",
+			Value: backupProvider,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET_PREFIX",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3BucketPrefix,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
+			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
 	}
 
-	if c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "AWS_ACCESS_KEY_ID", Value: c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID})
-	}
+	switch backupProvider {
+	case "s3":
+		envVars = appendEnvVars(envVars, []v1.EnvVar{
+			{
+				Name:  "LOGICAL_BACKUP_S3_REGION",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupS3Region,
+			},
+			{
+				Name:  "LOGICAL_BACKUP_S3_ENDPOINT",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
+			},
+			{
+				Name:  "LOGICAL_BACKUP_S3_SSE",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE,
+			},
+			{
+				Name:  "LOGICAL_BACKUP_S3_RETENTION_TIME",
+				Value: c.getLogicalBackupRetentionTime(),
+			}}...)
 
-	if c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
+		if c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "AWS_ACCESS_KEY_ID", Value: c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID})
+		}
+
+		if c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
+		}
+
+	case "gcs":
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+
+	case "az":
+		envVars = appendEnvVars(envVars, []v1.EnvVar{
+			{
+				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountName,
+			},
+			{
+				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageContainer,
+			},
+			{
+				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey,
+			}}...)
 	}
 
 	return envVars
+}
+
+func (c *Cluster) getLogicalBackupRetentionTime() (retentionTime string) {
+	if c.Spec.LogicalBackupRetention != "" {
+		return c.Spec.LogicalBackupRetention
+	}
+
+	return c.OpConfig.LogicalBackup.LogicalBackupS3RetentionTime
 }
 
 // getLogicalBackupJobName returns the name; the job itself may not exists
