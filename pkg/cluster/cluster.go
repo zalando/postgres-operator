@@ -1154,10 +1154,14 @@ func (c *Cluster) Delete() error {
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete statefulset: %v", err)
 	}
 
-	if err := c.deleteSecrets(); err != nil {
-		anyErrors = true
-		c.logger.Warningf("could not delete secrets: %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete secrets: %v", err)
+	if c.OpConfig.EnableSecretsDeletion != nil && *c.OpConfig.EnableSecretsDeletion {
+		if err := c.deleteSecrets(); err != nil {
+			anyErrors = true
+			c.logger.Warningf("could not delete secrets: %v", err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete secrets: %v", err)
+		}
+	} else {
+		c.logger.Info("not deleting secrets because disabled in configuration")
 	}
 
 	if err := c.deletePodDisruptionBudget(); err != nil {

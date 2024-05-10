@@ -1323,6 +1323,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_init_containers": {
 								Type: "boolean",
 							},
+							"enable_secrets_deletion": {
+								Type: "boolean",
+							},
 							"enable_persistent_volume_claim_deletion": {
 								Type: "boolean",
 							},

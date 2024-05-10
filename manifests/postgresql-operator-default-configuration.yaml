@@ -59,6 +59,7 @@ configuration:
     # enable_cross_namespace_secret: "false"
     enable_finalizers: false
     enable_init_containers: true
+    enable_secrets_deletion: true
     enable_persistent_volume_claim_deletion: true
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
