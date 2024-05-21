@@ -1,6 +1,6 @@
 image:
-  registry: registry.opensource.zalan.do
-  repository: acid/postgres-operator
+  registry: ghcr.io
+  repository: zalando/postgres-operator
   tag: v1.11.0
   pullPolicy: "IfNotPresent"
 
