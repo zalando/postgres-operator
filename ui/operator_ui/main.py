@@ -16,7 +16,6 @@ from flask import (
     Flask,
     Response,
     abort,
-    redirect,
     render_template,
     request,
     send_from_directory,
@@ -366,7 +365,7 @@ def get_teams_for_user(user_name):
 def get_teams():
     return ok(
         get_teams_for_user(
-            request.header.get('X-Uid', ''),
+            request.headers.get('X-Uid', ''),
         )
     )
 
@@ -795,7 +794,6 @@ def get_versions(pg_cluster: str):
     )
 
 
-
 @app.route('/stored_clusters/<pg_cluster>/<uid>', methods=['GET'])
 def get_basebackups(pg_cluster: str, uid: str):
     return respond(
@@ -983,7 +981,7 @@ def init_cluster():
     help=f'Comma separated list of Kubernetes API server URLs (default: {DEFAULT_CLUSTERS})',  # noqa
     type=CommaSeparatedValues(),
 )
-def main(port, secret_key, debug, clusters: list):
+def main(port, debug, clusters: list):
     global TARGET_NAMESPACE
 
     basicConfig(stream=sys.stdout, level=(DEBUG if debug else INFO), format='%(asctime)s %(levelname)s: %(message)s',)
