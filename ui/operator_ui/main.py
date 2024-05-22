@@ -31,7 +31,6 @@ from os import getenv
 from re import X, compile
 from requests.exceptions import RequestException
 from signal import SIGTERM, signal
-from urllib.parse import urljoin
 
 from . import __version__
 from .cluster_discovery import DEFAULT_CLUSTERS, StaticClusterDiscoverer
