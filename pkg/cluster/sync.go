@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -92,7 +93,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	c.logger.Debug("syncing statefulsets")
-	if err = c.syncStatefulSet(); err != nil {
+	if err = c.syncStatefulSet(true); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
 			return err
@@ -200,15 +201,14 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		if match, reason := c.compareServices(svc, desiredSvc); !match {
-			c.logServiceChanges(role, svc, desiredSvc, false, reason)
-			updatedSvc, err := c.updateService(role, svc, desiredSvc)
-			if err != nil {
-				return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
-			}
-			c.Services[role] = updatedSvc
-			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
+		ignoredAnnotations := c.extractIgnoredAnnotations(svc.Annotations)
+		maps.Copy(desiredSvc.Annotations, ignoredAnnotations)
+		updatedSvc, err := c.updateService(role, svc, desiredSvc)
+		if err != nil {
+			return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
+		c.Services[role] = updatedSvc
+		c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		return nil
 	}
 	if !k8sutil.ResourceNotFound(err) {
@@ -275,7 +275,10 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
 		c.PodDisruptionBudget = pdb
 		newPDB := c.generatePodDisruptionBudget()
-		if match, reason := k8sutil.SamePDB(pdb, newPDB); !match {
+		ignoredAnnotations := c.extractIgnoredAnnotations(pdb.Annotations)
+		maps.Copy(newPDB.Annotations, ignoredAnnotations)
+		match, reason := c.ComparePodDisruptionBudget(pdb, newPDB)
+		if !match {
 			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
 			if err = c.updatePodDisruptionBudget(newPDB); err != nil {
 				return err
@@ -309,7 +312,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	return nil
 }
 
-func (c *Cluster) syncStatefulSet() error {
+func (c *Cluster) syncStatefulSet(force bool) error {
 	var (
 		restartWait         uint32
 		configPatched       bool
@@ -326,9 +329,13 @@ func (c *Cluster) syncStatefulSet() error {
 
 	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
 	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(context.TODO(), c.statefulSetName(), metav1.GetOptions{})
+	if err != nil && !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("error during reading of statefulset: %v", err)
+	}
+
 	if err != nil {
-		if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("error during reading of statefulset: %v", err)
+		if !force {
+			return nil
 		}
 		// statefulset does not exist, try to re-create it
 		c.Statefulset = nil
@@ -354,6 +361,16 @@ func (c *Cluster) syncStatefulSet() error {
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))
 
 	} else {
+		desiredSts, err := c.generateStatefulSet(&c.Spec)
+		if err != nil {
+			return fmt.Errorf("could not generate statefulset: %v", err)
+		}
+		ignoredAnnotations := c.extractIgnoredAnnotations(sset.Annotations)
+		maps.Copy(desiredSts.Annotations, ignoredAnnotations)
+		if reflect.DeepEqual(sset, desiredSts) && !force {
+			return nil
+		}
+		c.logger.Debugf("syncing statefulsets")
 		// check if there are still pods with a rolling update flag
 		for _, pod := range pods {
 			if c.getRollingUpdateFlagFromPod(&pod) {
@@ -374,12 +391,20 @@ func (c *Cluster) syncStatefulSet() error {
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 
-		desiredSts, err := c.generateStatefulSet(&c.Spec)
-		if err != nil {
-			return fmt.Errorf("could not generate statefulset: %v", err)
-		}
-
 		cmp := c.compareStatefulSetWith(desiredSts)
+		if !cmp.rollingUpdate {
+			for _, pod := range pods {
+				if changed, _ := c.compareAnnotations(pod.Annotations, desiredSts.Spec.Template.Annotations); changed {
+					ignoredAnnotations := c.extractIgnoredAnnotations(pod.Annotations)
+					maps.Copy(ignoredAnnotations, desiredSts.Spec.Template.Annotations)
+					pod.Annotations = ignoredAnnotations
+					c.logger.Debugf("updating annotations for pod %q", pod.Name)
+					if _, err := c.KubeClient.Pods(pod.Namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{}); err != nil {
+						return fmt.Errorf("could not update annotations for pod %q: %v", pod.Name, err)
+					}
+				}
+			}
+		}
 		if !cmp.match {
 			if cmp.rollingUpdate {
 				podsToRecreate = make([]v1.Pod, 0)
@@ -932,6 +957,14 @@ func (c *Cluster) updateSecret(
 			pwdUser.MemberOf = []string{secretUsername}
 		}
 		userMap[userKey] = pwdUser
+	}
+
+	ignoredAnnotations := c.extractIgnoredAnnotations(secret.Annotations)
+	maps.Copy(generatedSecret.Annotations, ignoredAnnotations)
+	if changed, reason := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations); changed {
+		c.logger.Infof("%q secret's annotations does not match the current one: %s", secretName, reason)
+		secret.Annotations = generatedSecret.Annotations
+		updateSecret = true
 	}
 
 	if updateSecret {

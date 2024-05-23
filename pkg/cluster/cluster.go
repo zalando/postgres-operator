@@ -30,6 +30,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	apipolicyv1 "k8s.io/api/policy/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -400,7 +401,7 @@ func (c *Cluster) Create() (err error) {
 
 	if len(c.Spec.Streams) > 0 {
 		// creating streams requires syncing the statefulset first
-		err = c.syncStatefulSet()
+		err = c.syncStatefulSet(true)
 		if err != nil {
 			return fmt.Errorf("could not sync statefulset: %v", err)
 		}
@@ -493,7 +494,6 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	if changed, reason := c.compareAnnotations(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations); changed {
 		match = false
 		needsReplace = true
-		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's pod template metadata annotations does not match "+reason)
 	}
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.SecurityContext, statefulSet.Spec.Template.Spec.SecurityContext) {
@@ -513,9 +513,9 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 				reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
 				continue
 			}
-			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
+			if changed, reason := c.compareAnnotations(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations); changed {
 				needsReplace = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one", name))
+				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one: ", name)+reason)
 			}
 			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
 				name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
@@ -764,6 +764,16 @@ func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) 
 
 }
 
+func (c *Cluster) extractIgnoredAnnotations(annoList map[string]string) map[string]string {
+	result := make(map[string]string)
+	for _, ignore := range c.OpConfig.IgnoredAnnotations {
+		if _, ok := annoList[ignore]; ok {
+			result[ignore] = annoList[ignore]
+		}
+	}
+	return result
+}
+
 func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	if old.Spec.Type != new.Spec.Type {
 		return false, fmt.Sprintf("new service's type %q does not match the current one %q",
@@ -815,6 +825,17 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool
 		return false, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(reasons, `', '`))
 	}
 
+	return true, ""
+}
+
+func (c *Cluster) ComparePodDisruptionBudget(cur, new *apipolicyv1.PodDisruptionBudget) (bool, string) {
+	//TODO: improve comparison
+	if match := reflect.DeepEqual(new.Spec, cur.Spec); !match {
+		return false, "new PDB spec does not match the current one"
+	}
+	if changed, reason := c.compareAnnotations(cur.Annotations, new.Annotations); changed {
+		return false, "new PDB's annotations does not match the current one:" + reason
+	}
 	return true, ""
 }
 
@@ -922,12 +943,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}
 
 	// Service
-	if !reflect.DeepEqual(c.generateService(Master, &oldSpec.Spec), c.generateService(Master, &newSpec.Spec)) ||
-		!reflect.DeepEqual(c.generateService(Replica, &oldSpec.Spec), c.generateService(Replica, &newSpec.Spec)) {
-		if err := c.syncServices(); err != nil {
-			c.logger.Errorf("could not sync services: %v", err)
-			updateFailed = true
-		}
+	if err := c.syncServices(); err != nil {
+		c.logger.Errorf("could not sync services: %v", err)
+		updateFailed = true
 	}
 
 	// Users
@@ -946,7 +964,10 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		// only when streams were not specified in oldSpec but in newSpec
 		needStreamUser := len(oldSpec.Spec.Streams) == 0 && len(newSpec.Spec.Streams) > 0
 
-		if !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser {
+		annotationsChanged, _ := c.compareAnnotations(oldSpec.Annotations, newSpec.Annotations)
+
+		initUsers := !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser
+		if initUsers {
 			c.logger.Debugf("initialize users")
 			if err := c.initUsers(); err != nil {
 				c.logger.Errorf("could not init users - skipping sync of secrets and databases: %v", err)
@@ -954,7 +975,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 				updateFailed = true
 				return
 			}
-
+		}
+		if initUsers || annotationsChanged {
 			c.logger.Debugf("syncing secrets")
 			//TODO: mind the secrets of the deleted/new users
 			if err := c.syncSecrets(); err != nil {
@@ -968,7 +990,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	if c.OpConfig.StorageResizeMode != "off" {
 		c.syncVolumes()
 	} else {
-		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume sync.")
+		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume size sync.")
 	}
 
 	// streams configuration
@@ -978,29 +1000,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// Statefulset
 	func() {
-		oldSs, err := c.generateStatefulSet(&oldSpec.Spec)
-		if err != nil {
-			c.logger.Errorf("could not generate old statefulset spec: %v", err)
+		if err := c.syncStatefulSet(syncStatefulSet); err != nil {
+			c.logger.Errorf("could not sync statefulsets: %v", err)
 			updateFailed = true
-			return
 		}
-
-		newSs, err := c.generateStatefulSet(&newSpec.Spec)
-		if err != nil {
-			c.logger.Errorf("could not generate new statefulset spec: %v", err)
-			updateFailed = true
-			return
-		}
-
-		if syncStatefulSet || !reflect.DeepEqual(oldSs, newSs) {
-			c.logger.Debugf("syncing statefulsets")
-			syncStatefulSet = false
-			// TODO: avoid generating the StatefulSet object twice by passing it to syncStatefulSet
-			if err := c.syncStatefulSet(); err != nil {
-				c.logger.Errorf("could not sync statefulsets: %v", err)
-				updateFailed = true
-			}
-		}
+		syncStatefulSet = false
 	}()
 
 	// add or remove standby_cluster section from Patroni config depending on changes in standby section
@@ -1011,12 +1015,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}
 
 	// pod disruption budget
-	if oldSpec.Spec.NumberOfInstances != newSpec.Spec.NumberOfInstances {
-		c.logger.Debug("syncing pod disruption budgets")
-		if err := c.syncPodDisruptionBudget(true); err != nil {
-			c.logger.Errorf("could not sync pod disruption budget: %v", err)
-			updateFailed = true
-		}
+	if err := c.syncPodDisruptionBudget(true); err != nil {
+		c.logger.Errorf("could not sync pod disruption budget: %v", err)
+		updateFailed = true
 	}
 
 	// logical backup job

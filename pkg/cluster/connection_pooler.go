@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -691,26 +692,6 @@ func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDe
 	return deployment, nil
 }
 
-// updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
-func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, deployment *appsv1.Deployment, annotations map[string]string) (*appsv1.Deployment, error) {
-	patchData, err := metaAnnotationsPatch(annotations)
-	if err != nil {
-		return nil, fmt.Errorf("could not form patch for the connection pooler deployment metadata: %v", err)
-	}
-	result, err := KubeClient.Deployments(deployment.Namespace).Patch(
-		context.TODO(),
-		deployment.Name,
-		types.MergePatchType,
-		[]byte(patchData),
-		metav1.PatchOptions{},
-		"")
-	if err != nil {
-		return nil, fmt.Errorf("could not patch connection pooler annotations %q: %v", patchData, err)
-	}
-	return result, nil
-
-}
-
 // Test if two connection pooler configuration needs to be synced. For simplicity
 // compare not the actual K8S objects, but the configuration itself and request
 // sync if there is any difference.
@@ -1022,6 +1003,25 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			syncReason = append(syncReason, specReason...)
 		}
 
+		newPodAnnotations := c.annotationsSet(c.generatePodAnnotations(&c.Spec))
+		if changed, reason := c.compareAnnotations(deployment.Spec.Template.Annotations, newPodAnnotations); changed {
+			specSync = true
+			syncReason = append(syncReason, []string{"new connection pooler's pod template annotations do not match the current one: " + reason}...)
+			deployment.Spec.Template.Annotations = newPodAnnotations
+		}
+		newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(nil)) // including the downscaling annotations
+		ignoredAnnotations := c.extractIgnoredAnnotations(deployment.Annotations)
+		maps.Copy(newAnnotations, ignoredAnnotations)
+		if changed, reason := c.compareAnnotations(deployment.Annotations, newAnnotations); changed {
+			deployment.Annotations = newAnnotations
+			c.logger.Infof("new connection pooler deployments's annotations does not match the current one:" + reason)
+			c.logger.Debug("updating connection pooler deployments's annotations")
+			deployment, err = c.KubeClient.Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("could not update connection pooler annotations %q: %v", deployment.Name, err)
+			}
+		}
+
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
 		syncReason = append(syncReason, defaultsReason...)
 
@@ -1040,15 +1040,6 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			}
 			c.ConnectionPooler[role].Deployment = deployment
 		}
-	}
-
-	newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(c.ConnectionPooler[role].Deployment.Annotations))
-	if newAnnotations != nil {
-		deployment, err = updateConnectionPoolerAnnotations(c.KubeClient, c.ConnectionPooler[role].Deployment, newAnnotations)
-		if err != nil {
-			return nil, err
-		}
-		c.ConnectionPooler[role].Deployment = deployment
 	}
 
 	// check if pooler pods must be replaced due to secret update
@@ -1076,22 +1067,27 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			if err != nil {
 				return nil, fmt.Errorf("could not delete pooler pod: %v", err)
 			}
+		} else if changed, _ := c.compareAnnotations(pod.Annotations, deployment.Spec.Template.Annotations); changed {
+			newAnnotations := c.extractIgnoredAnnotations(pod.Annotations)
+			maps.Copy(newAnnotations, deployment.Spec.Template.Annotations)
+			pod.Annotations = newAnnotations
+			c.logger.Debugf("updating annotations for connection pooler's pod %q", pod.Name)
+			_, err := c.KubeClient.Pods(pod.Namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("could not update annotations for pod %q: %v", pod.Name, err)
+			}
 		}
 	}
 
 	if service, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
 		c.ConnectionPooler[role].Service = service
 		desiredSvc := c.generateConnectionPoolerService(c.ConnectionPooler[role])
-		if match, reason := c.compareServices(service, desiredSvc); !match {
-			syncReason = append(syncReason, reason)
-			c.logServiceChanges(role, service, desiredSvc, false, reason)
-			newService, err = c.updateService(role, service, desiredSvc)
-			if err != nil {
-				return syncReason, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
-			}
-			c.ConnectionPooler[role].Service = newService
-			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
+		newService, err = c.updateService(role, service, desiredSvc)
+		if err != nil {
+			return syncReason, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
+		c.ConnectionPooler[role].Service = newService
+		c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		return NoSync, nil
 	}
 

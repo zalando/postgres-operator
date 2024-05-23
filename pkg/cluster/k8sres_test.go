@@ -3306,7 +3306,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		cluster.Namespace = namespace
 		_, err := cluster.createStatefulSet()
 		if k8sutil.ResourceAlreadyExists(err) {
-			err = cluster.syncStatefulSet()
+			err = cluster.syncStatefulSet(true)
 		}
 		assert.NoError(t, err)
 
