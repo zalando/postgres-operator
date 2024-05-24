@@ -41,15 +41,18 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.setSpec(newSpec)
 
 	defer func() {
-		var pgUpdatedStatus *acidv1.Postgresql
+		var (
+			pgUpdatedStatus *acidv1.Postgresql
+			errStatus       error
+		)
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
 		} else if !c.Status.Running() {
-			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
 		}
-		if err != nil {
-			c.logger.Warningf("could not set cluster status: %v", err)
+		if errStatus != nil {
+			c.logger.Warningf("could not set cluster status: %v", errStatus)
 		}
 		if pgUpdatedStatus != nil {
 			c.setSpec(pgUpdatedStatus)
@@ -642,6 +645,9 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 	if desiredPatroniConfig.SynchronousModeStrict != effectivePatroniConfig.SynchronousModeStrict {
 		configToSet["synchronous_mode_strict"] = desiredPatroniConfig.SynchronousModeStrict
+	}
+	if desiredPatroniConfig.SynchronousNodeCount != effectivePatroniConfig.SynchronousNodeCount {
+		configToSet["synchronous_node_count"] = desiredPatroniConfig.SynchronousNodeCount
 	}
 	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != effectivePatroniConfig.TTL {
 		configToSet["ttl"] = desiredPatroniConfig.TTL
@@ -1361,7 +1367,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 		if err != nil {
 			return fmt.Errorf("could not generate the desired logical backup job state: %v", err)
 		}
-		if match, reason := k8sutil.SameLogicalBackupJob(job, desiredJob); !match {
+		if match, reason := c.compareLogicalBackupJob(job, desiredJob); !match {
 			c.logger.Infof("logical job %s is not in the desired state and needs to be updated",
 				c.getLogicalBackupJobName(),
 			)

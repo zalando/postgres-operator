@@ -49,8 +49,8 @@ type PostgresUsersConfiguration struct {
 type MajorVersionUpgradeConfiguration struct {
 	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
 	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
-	MinimalMajorVersion              string   `json:"minimal_major_version" default:"11"`
-	TargetMajorVersion               string   `json:"target_major_version" default:"15"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"12"`
+	TargetMajorVersion               string   `json:"target_major_version" default:"16"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
@@ -102,6 +102,8 @@ type KubernetesMetaConfiguration struct {
 	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
 	PersistentVolumeClaimRetentionPolicy     map[string]string   `json:"persistent_volume_claim_retention_policy,omitempty"`
+	EnableSecretsDeletion                    *bool               `json:"enable_secrets_deletion,omitempty"`
+	EnablePersistentVolumeClaimDeletion      *bool               `json:"enable_persistent_volume_claim_deletion,omitempty"`
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
 	EnableFinalizers                         *bool               `json:"enable_finalizers,omitempty"`
@@ -227,6 +229,7 @@ type OperatorLogicalBackupConfiguration struct {
 	AzureStorageContainer        string `json:"logical_backup_azure_storage_container,omitempty"`
 	AzureStorageAccountKey       string `json:"logical_backup_azure_storage_account_key,omitempty"`
 	S3Bucket                     string `json:"logical_backup_s3_bucket,omitempty"`
+	S3BucketPrefix               string `json:"logical_backup_s3_bucket_prefix,omitempty"`
 	S3Region                     string `json:"logical_backup_s3_region,omitempty"`
 	S3Endpoint                   string `json:"logical_backup_s3_endpoint,omitempty"`
 	S3AccessKeyID                string `json:"logical_backup_s3_access_key_id,omitempty"`

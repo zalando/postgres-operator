@@ -215,6 +215,8 @@ spec:
                 items:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+              logicalBackupRetention:
+                type: string
               logicalBackupSchedule:
                 type: string
                 pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
@@ -371,12 +373,12 @@ spec:
                   version:
                     type: string
                     enum:
-                      - "10"
                       - "11"
                       - "12"
                       - "13"
                       - "14"
                       - "15"
+                      - "16"
                   parameters:
                     type: object
                     additionalProperties:

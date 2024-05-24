@@ -6,9 +6,9 @@ replicaCount: 1
 
 # configure ui image
 image:
-  registry: registry.opensource.zalan.do
-  repository: acid/postgres-operator-ui
-  tag: v1.10.1
+  registry: ghcr.io
+  repository: zalando/postgres-operator-ui
+  tag: v1.11.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.

@@ -250,12 +250,12 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
-  when `major_version_upgrade_mode` is set to `"full"`. The default is `"11"`.
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"12"`.
 
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
   which violate the configured allowed `minimal_major_version` when
-  `major_version_upgrade_mode` is set to `"full"`. The default is `"15"`.
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"16"`.
 
 ## Kubernetes resources
 
@@ -329,8 +329,8 @@ configuration they are grouped under the `kubernetes` key.
 
 * **pdb_master_label_selector**
   By default the PDB will match the master role hence preventing nodes to be
-  drained if the node_readiness_label is not used. This option if set to `false`
-  will not add the `spilo-role=master` selector to the PDB.
+  drained if the node_readiness_label is not used. If this option if set to
+  `false` the `spilo-role=master` selector will not be added to the PDB.
 
 * **enable_finalizers**
   By default, a deletion of the Postgresql resource will trigger an event
@@ -339,11 +339,36 @@ configuration they are grouped under the `kubernetes` key.
   cannot fully sync it, there can be leftovers. By enabling finalizers the
   operator will ensure all managed resources are deleted prior to the
   Postgresql resource. There is a trade-off though: The deletion is only
-  performed at the next cluster SYNC cycle when finding a `deletionTimestamp`
-  in the metadata and not immediately after issueing a delete command. The
-  final removal of the custom resource will add a DELETE event to the worker
-  queue but the child resources are already gone at this point.
+  performed after the next two SYNC cycles with the first one updating the
+  internal spec and the latter reacting on the `deletionTimestamp` while
+  processing the SYNC event. The final removal of the custom resource will
+  add a DELETE event to the worker queue but the child resources are already
+  gone at this point.
   The default is `false`.
+
+* **persistent_volume_claim_retention_policy**
+  The operator tries to protect volumes as much as possible. If somebody
+  accidentally deletes the statefulset or scales in the `numberOfInstances` the
+  Persistent Volume Claims and thus Persistent Volumes will be retained.
+  However, this can have some consequences when you scale out again at a much
+  later point, for example after the cluster's Postgres major version has been
+  upgraded, because the old volume runs the old Postgres version with stale data.
+  Even if the version has not changed the replication lag could be massive. In
+  this case a reinitialization of the re-added member would make sense. You can
+  also modify the [retention policy of PVCs](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention) in the operator configuration.
+  The behavior can be changed for two scenarios: `when_deleted` - default is
+  `"retain"` - or `when_scaled` - default is also `"retain"`. The other possible
+  option is `delete`.
+
+* **enable_secrets_deletion**
+  By default, the operator deletes secrets when removing the Postgres cluster
+  manifest. To keep secrets, set this option to `false`. The default is `true`.
+
+* **enable_persistent_volume_claim_deletion**
+  By default, the operator deletes PersistentVolumeClaims when removing the
+  Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
+  on the statefulset is set to `retain`. To keep PVCs set this option to `false`.
+  The default is `true`.
 
 * **enable_pod_disruption_budget**
   PDB is enabled by default to protect the cluster from voluntarily disruptions
@@ -792,11 +817,11 @@ grouped under the `logical_backup` key.
   default values from `postgres_pod_resources` will be used.
 
 * **logical_backup_docker_image**
-  An image for pods of the logical backup job. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile)
+  An image for pods of the logical backup job. The [example image](https://github.com/zalando/postgres-operator/blob/master/logical-backup/Dockerfile)
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
-  an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
+  an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.11.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -823,6 +848,9 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
+
+* **logical_backup_s3_bucket_prefix**
+  S3 bucket prefix to use in configured bucket. Default: "spilo"
 
 * **logical_backup_s3_endpoint**
   When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.

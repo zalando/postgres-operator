@@ -30,7 +30,6 @@ RUN apt-get update     \
         postgresql-client-14  \
         postgresql-client-13  \
         postgresql-client-12  \
-        postgresql-client-11  \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

@@ -72,18 +72,18 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 	}{
 		{
 			subtest: "Patroni default configuration",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				Auth: config.Auth{
 					PamRoleName: "zalandos",
 				},
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{
 				InitDB: map[string]string{
 					"encoding":       "UTF8",
@@ -102,38 +102,38 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				FailsafeMode:          util.True(),
 			},
 			opConfig: &config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.False(),
 			},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "15"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.True(),
 			},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.False(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/15/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -164,15 +164,15 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		},
 		{
 			subTest:  "test current bin path against hard coded template",
-			binPath:  "/usr/lib/postgresql/15/bin",
+			binPath:  "/usr/lib/postgresql/16/bin",
 			template: pgBinariesLocationTemplate,
-			expected: "15",
+			expected: "16",
 		},
 		{
 			subTest:  "test alternative bin path against a matching template",
-			binPath:  "/usr/pgsql-15/bin",
+			binPath:  "/usr/pgsql-16/bin",
 			template: "/usr/pgsql-%v/bin",
-			expected: "15",
+			expected: "16",
 		},
 	}
 
@@ -2100,7 +2100,7 @@ func TestSidecars(t *testing.T) {
 
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
-			PgVersion: "15",
+			PgVersion: "16",
 			Parameters: map[string]string{
 				"max_connections": "100",
 			},
@@ -3520,6 +3520,191 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 		assert.NoError(t, err)
 		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
 			t.Errorf("%s - %s: expected resources %#v, got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
+		}
+	}
+}
+
+func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
+	var (
+		dummyUUID   = "efd12e58-5786-11e8-b5a7-06148230260c"
+		dummyBucket = "dummy-backup-location"
+	)
+
+	expectedLogicalBackupS3Bucket := []ExpectedValue{
+		{
+			envIndex:       9,
+			envVarConstant: "LOGICAL_BACKUP_PROVIDER",
+			envVarValue:    "s3",
+		},
+		{
+			envIndex:       10,
+			envVarConstant: "LOGICAL_BACKUP_S3_BUCKET",
+			envVarValue:    dummyBucket,
+		},
+		{
+			envIndex:       11,
+			envVarConstant: "LOGICAL_BACKUP_S3_BUCKET_PREFIX",
+			envVarValue:    "spilo",
+		},
+		{
+			envIndex:       12,
+			envVarConstant: "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "/" + dummyUUID,
+		},
+		{
+			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_S3_REGION",
+			envVarValue:    "eu-central-1",
+		},
+		{
+			envIndex:       14,
+			envVarConstant: "LOGICAL_BACKUP_S3_ENDPOINT",
+			envVarValue:    "",
+		},
+		{
+			envIndex:       15,
+			envVarConstant: "LOGICAL_BACKUP_S3_SSE",
+			envVarValue:    "",
+		},
+		{
+			envIndex:       16,
+			envVarConstant: "LOGICAL_BACKUP_S3_RETENTION_TIME",
+			envVarValue:    "1 month",
+		},
+	}
+
+	expectedLogicalBackupGCPCreds := []ExpectedValue{
+		{
+			envIndex:       9,
+			envVarConstant: "LOGICAL_BACKUP_PROVIDER",
+			envVarValue:    "gcs",
+		},
+		{
+			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
+			envVarValue:    "some-path-to-credentials",
+		},
+	}
+
+	expectedLogicalBackupAzureStorage := []ExpectedValue{
+		{
+			envIndex:       9,
+			envVarConstant: "LOGICAL_BACKUP_PROVIDER",
+			envVarValue:    "az",
+		},
+		{
+			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
+			envVarValue:    "some-azure-storage-account-name",
+		},
+		{
+			envIndex:       14,
+			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
+			envVarValue:    "some-azure-storage-container",
+		},
+		{
+			envIndex:       15,
+			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
+			envVarValue:    "some-azure-storage-account-key",
+		},
+	}
+
+	expectedLogicalBackupRetentionTime := []ExpectedValue{
+		{
+			envIndex:       16,
+			envVarConstant: "LOGICAL_BACKUP_S3_RETENTION_TIME",
+			envVarValue:    "3 months",
+		},
+	}
+
+	tests := []struct {
+		subTest        string
+		opConfig       config.Config
+		expectedValues []ExpectedValue
+		pgsql          acidv1.Postgresql
+	}{
+		{
+			subTest: "logical backup with provider: s3",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:        "s3",
+					LogicalBackupS3Bucket:        dummyBucket,
+					LogicalBackupS3BucketPrefix:  "spilo",
+					LogicalBackupS3Region:        "eu-central-1",
+					LogicalBackupS3RetentionTime: "1 month",
+				},
+			},
+			expectedValues: expectedLogicalBackupS3Bucket,
+		},
+		{
+			subTest: "logical backup with provider: gcs",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:                     "gcs",
+					LogicalBackupS3Bucket:                     dummyBucket,
+					LogicalBackupGoogleApplicationCredentials: "some-path-to-credentials",
+				},
+			},
+			expectedValues: expectedLogicalBackupGCPCreds,
+		},
+		{
+			subTest: "logical backup with provider: az",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:                "az",
+					LogicalBackupS3Bucket:                dummyBucket,
+					LogicalBackupAzureStorageAccountName: "some-azure-storage-account-name",
+					LogicalBackupAzureStorageContainer:   "some-azure-storage-container",
+					LogicalBackupAzureStorageAccountKey:  "some-azure-storage-account-key",
+				},
+			},
+			expectedValues: expectedLogicalBackupAzureStorage,
+		},
+		{
+			subTest: "will override retention time parameter",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:        "s3",
+					LogicalBackupS3RetentionTime: "1 month",
+				},
+			},
+			expectedValues: expectedLogicalBackupRetentionTime,
+			pgsql: acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					LogicalBackupRetention: "3 months",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		pgsql := tt.pgsql
+		c.Postgresql = pgsql
+		c.UID = types.UID(dummyUUID)
+
+		actualEnvs := c.generateLogicalBackupPodEnvVars()
+
+		for _, ev := range tt.expectedValues {
+			env := actualEnvs[ev.envIndex]
+
+			if env.Name != ev.envVarConstant {
+				t.Errorf("%s %s: expected env name %s, have %s instead",
+					t.Name(), tt.subTest, ev.envVarConstant, env.Name)
+			}
+
+			if ev.envVarValueRef != nil {
+				if !reflect.DeepEqual(env.ValueFrom, ev.envVarValueRef) {
+					t.Errorf("%s %s: expected env value reference %#v, have %#v instead",
+						t.Name(), tt.subTest, ev.envVarValueRef, env.ValueFrom)
+				}
+				continue
+			}
+
+			if env.Value != ev.envVarValue {
+				t.Errorf("%s %s: expected env value %s, have %s instead",
+					t.Name(), tt.subTest, ev.envVarValue, env.Value)
+			}
 		}
 	}
 }
