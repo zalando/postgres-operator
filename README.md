@@ -61,7 +61,7 @@ production for over five years.
 | v1.11.0   | 11 &rarr; 16      | 1.27+             | 1.21.7  |
 | v1.10.*   | 10 &rarr; 15      | 1.21+             | 1.19.8  |
 | v1.9.0    | 10 &rarr; 15      | 1.21+             | 1.18.9  |
-| v1.8.*    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
+| v1.8.2    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
 
 
 ## Getting started
