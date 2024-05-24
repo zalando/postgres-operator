@@ -68,6 +68,8 @@ spec:
 #      matchLabels:
 #        environment: dev
 #        service: postgres
+#     subPath: $(NODE_NAME)/$(POD_NAME)
+#     isSubPathExpr: true
   additionalVolumes:
     - name: empty
       mountPath: /opt/empty

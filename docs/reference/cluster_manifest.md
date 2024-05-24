@@ -485,6 +485,9 @@ properties of the persistent storage that stores Postgres data.
 * **subPath**
   Subpath to use when mounting volume into Spilo container. Optional.
 
+* **isSubPathExpr**
+  Set it to true if the specified subPath is an expression. Optional.
+
 * **iops**
   When running the operator on AWS the latest generation of EBS volumes (`gp3`)
   allows for configuring the number of IOPS. Maximum is 16000. Optional.
