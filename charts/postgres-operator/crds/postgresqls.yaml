@@ -101,6 +101,8 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                     subPath:
                       type: string
+                    isSubPathExpr:
+                      type: boolean
               allowedSourceRanges:
                 type: array
                 nullable: true

@@ -242,6 +242,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   It allows you to mount existing PersistentVolumeClaims, ConfigMaps and Secrets inside the StatefulSet.
   Also an `emptyDir` volume can be shared between initContainer and statefulSet.
   Additionaly, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
+  Set `isSubPathExpr` to true if you want to include [API environment variables](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath-expanded-environment).
   You can also specify in which container the additional Volumes will be mounted with the `targetContainers` array option.
   If `targetContainers` is empty, additional volumes will be mounted only in the `postgres` container.
   If you set the `all` special item, it will be mounted in all containers (postgres + sidecars).
