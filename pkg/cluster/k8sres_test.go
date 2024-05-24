@@ -1902,7 +1902,7 @@ func TestAdditionalVolume(t *testing.T) {
 			Name:             "test6",
 			MountPath:        "/test6",
 			SubPath:          "$(POD_NAME)",
-			IsSubPathExpr:    true,
+			IsSubPathExpr:    util.True(),
 			TargetContainers: nil, // should mount only to postgres
 			VolumeSource: v1.VolumeSource{
 				EmptyDir: &v1.EmptyDirVolumeSource{},
@@ -1922,7 +1922,9 @@ func TestAdditionalVolume(t *testing.T) {
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
-				Size: "1G",
+				Size:          "1G",
+				SubPath:       "$(POD_NAME)",
+				IsSubPathExpr: util.True(),
 			},
 			AdditionalVolumes: additionalVolumes,
 			Sidecars: []acidv1.Sidecar{
@@ -1954,31 +1956,25 @@ func TestAdditionalVolume(t *testing.T) {
 	assert.NoError(t, err)
 
 	tests := []struct {
-		subTest         string
-		container       string
-		expectedMounts  []string
-		expectedSubPath []string
+		subTest              string
+		container            string
+		expectedMounts       []string
+		expectedSubPaths     []string
+		expectedSubPathExprs []string
 	}{
 		{
-			subTest:        "checking volume mounts of postgres container",
-			container:      constants.PostgresContainerName,
-			expectedMounts: []string{"pgdata", "test1", "test3", "test4"},
+			subTest:              "checking volume mounts of postgres container",
+			container:            constants.PostgresContainerName,
+			expectedMounts:       []string{"pgdata", "test1", "test3", "test4", "test5", "test6"},
+			expectedSubPaths:     []string{"", "", "", "", "subpath", ""},
+			expectedSubPathExprs: []string{"$(POD_NAME)", "", "", "", "", "$(POD_NAME)"},
 		},
 		{
-			subTest:        "checking volume mounts of sidecar container",
-			container:      "sidecar",
-			expectedMounts: []string{"pgdata", "test1", "test2"},
-		},
-		{
-			subTest:         "checking volume mounts with subPath",
-			container:       constants.PostgresContainerName,
-			expectedMounts:  []string{"test5"},
-			expectedSubPath: []string{"subpath"},
-		},
-		{
-			subTest:        "checking volume mounts with subPathExpr",
-			container:      constants.PostgresContainerName,
-			expectedMounts: []string{"test6"},
+			subTest:              "checking volume mounts of sidecar container",
+			container:            "sidecar",
+			expectedMounts:       []string{"pgdata", "test1", "test2"},
+			expectedSubPaths:     []string{"", "", ""},
+			expectedSubPathExprs: []string{"$(POD_NAME)", "", ""},
 		},
 	}
 
@@ -1990,6 +1986,7 @@ func TestAdditionalVolume(t *testing.T) {
 			mounts := []string{}
 			subPaths := []string{}
 			subPathExprs := []string{}
+
 			for _, volumeMounts := range container.VolumeMounts {
 				mounts = append(mounts, volumeMounts.Name)
 				subPaths = append(subPaths, volumeMounts.SubPath)
@@ -2001,14 +1998,14 @@ func TestAdditionalVolume(t *testing.T) {
 					t.Name(), tt.subTest, mounts, tt.expectedMounts)
 			}
 
-			if !util.IsEqualIgnoreOrder(subPaths, tt.expectedSubPath) {
+			if !util.IsEqualIgnoreOrder(subPaths, tt.expectedSubPaths) {
 				t.Errorf("%s %s: different volume subPaths: got %v, expected %v",
-					t.Name(), tt.subTest, mounts, tt.expectedSubPath)
+					t.Name(), tt.subTest, subPaths, tt.expectedSubPaths)
 			}
 
-			if !util.IsEqualIgnoreOrder(subPathExprs, []string{container.Name}) {
+			if !util.IsEqualIgnoreOrder(subPathExprs, tt.expectedSubPathExprs) {
 				t.Errorf("%s %s: different volume subPathExprs: got %v, expected %v",
-					t.Name(), tt.subTest, mounts, tt.expectedMounts)
+					t.Name(), tt.subTest, subPathExprs, tt.expectedSubPathExprs)
 			}
 		}
 	}

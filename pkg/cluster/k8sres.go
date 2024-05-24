@@ -668,13 +668,19 @@ func isBootstrapOnlyParameter(param string) bool {
 }
 
 func generateVolumeMounts(volume acidv1.Volume) []v1.VolumeMount {
-	return []v1.VolumeMount{
+	volumeMount := []v1.VolumeMount{
 		{
 			Name:      constants.DataVolumeName,
 			MountPath: constants.PostgresDataMount, //TODO: fetch from manifest
-			SubPath:   volume.SubPath,
 		},
 	}
+
+	if volume.IsSubPathExpr != nil && *volume.IsSubPathExpr {
+		volumeMount[0].SubPathExpr = volume.SubPath
+	} else {
+		volumeMount[0].SubPath = volume.SubPath
+	}
+	return volumeMount
 }
 
 func generateContainer(
@@ -1825,7 +1831,7 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 						MountPath: additionalVolume.MountPath,
 					}
 
-					if additionalVolume.IsSubPathExpr {
+					if additionalVolume.IsSubPathExpr != nil && *additionalVolume.IsSubPathExpr {
 						v.SubPathExpr = additionalVolume.SubPath
 					} else {
 						v.SubPath = additionalVolume.SubPath
