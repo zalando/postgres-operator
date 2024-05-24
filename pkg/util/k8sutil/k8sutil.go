@@ -261,6 +261,18 @@ func SamePDB(cur, new *apipolicyv1.PodDisruptionBudget) (match bool, reason stri
 	return
 }
 
+func (c *mockCustomResourceDefinition) Get(ctx context.Context, name string, options metav1.GetOptions) (*apiextv1.CustomResourceDefinition, error) {
+	return &apiextv1.CustomResourceDefinition{}, nil
+}
+
+func (c *mockCustomResourceDefinition) Create(ctx context.Context, crd *apiextv1.CustomResourceDefinition, options metav1.CreateOptions) (*apiextv1.CustomResourceDefinition, error) {
+	return &apiextv1.CustomResourceDefinition{}, nil
+}
+
+func (mock *MockCustomResourceDefinitionsGetter) CustomResourceDefinitions() apiextv1client.CustomResourceDefinitionInterface {
+	return &mockCustomResourceDefinition{}
+}
+
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
 	oldFormatSecret := &v1.Secret{}
 	oldFormatSecret.Name = "testcluster"
