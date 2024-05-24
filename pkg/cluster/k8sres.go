@@ -1820,11 +1820,18 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 		for _, additionalVolume := range additionalVolumes {
 			for _, target := range additionalVolume.TargetContainers {
 				if podSpec.Containers[i].Name == target || target == "all" {
-					mounts = append(mounts, v1.VolumeMount{
+					v := v1.VolumeMount{
 						Name:      additionalVolume.Name,
 						MountPath: additionalVolume.MountPath,
-						SubPath:   additionalVolume.SubPath,
-					})
+					}
+
+					if additionalVolume.IsSubPathExpr {
+						v.SubPathExpr = additionalVolume.SubPath
+					} else {
+						v.SubPath = additionalVolume.SubPath
+					}
+
+					mounts = append(mounts, v)
 				}
 			}
 		}

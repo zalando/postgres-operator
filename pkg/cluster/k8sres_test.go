@@ -1889,6 +1889,25 @@ func TestAdditionalVolume(t *testing.T) {
 				EmptyDir: &v1.EmptyDirVolumeSource{},
 			},
 		},
+		{
+			Name:             "test5",
+			MountPath:        "/test5",
+			SubPath:          "subpath",
+			TargetContainers: nil, // should mount only to postgres
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name:             "test6",
+			MountPath:        "/test6",
+			SubPath:          "$(POD_NAME)",
+			IsSubPathExpr:    true,
+			TargetContainers: nil, // should mount only to postgres
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
 	}
 
 	pg := acidv1.Postgresql{
@@ -1935,9 +1954,10 @@ func TestAdditionalVolume(t *testing.T) {
 	assert.NoError(t, err)
 
 	tests := []struct {
-		subTest        string
-		container      string
-		expectedMounts []string
+		subTest         string
+		container       string
+		expectedMounts  []string
+		expectedSubPath []string
 	}{
 		{
 			subTest:        "checking volume mounts of postgres container",
@@ -1949,6 +1969,17 @@ func TestAdditionalVolume(t *testing.T) {
 			container:      "sidecar",
 			expectedMounts: []string{"pgdata", "test1", "test2"},
 		},
+		{
+			subTest:         "checking volume mounts with subPath",
+			container:       constants.PostgresContainerName,
+			expectedMounts:  []string{"test5"},
+			expectedSubPath: []string{"subpath"},
+		},
+		{
+			subTest:        "checking volume mounts with subPathExpr",
+			container:      constants.PostgresContainerName,
+			expectedMounts: []string{"test6"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1957,12 +1988,26 @@ func TestAdditionalVolume(t *testing.T) {
 				continue
 			}
 			mounts := []string{}
+			subPaths := []string{}
+			subPathExprs := []string{}
 			for _, volumeMounts := range container.VolumeMounts {
 				mounts = append(mounts, volumeMounts.Name)
+				subPaths = append(subPaths, volumeMounts.SubPath)
+				subPathExprs = append(subPathExprs, volumeMounts.SubPathExpr)
 			}
 
 			if !util.IsEqualIgnoreOrder(mounts, tt.expectedMounts) {
-				t.Errorf("%s %s: different volume mounts: got %v, epxected %v",
+				t.Errorf("%s %s: different volume mounts: got %v, expected %v",
+					t.Name(), tt.subTest, mounts, tt.expectedMounts)
+			}
+
+			if !util.IsEqualIgnoreOrder(subPaths, tt.expectedSubPath) {
+				t.Errorf("%s %s: different volume subPaths: got %v, expected %v",
+					t.Name(), tt.subTest, mounts, tt.expectedSubPath)
+			}
+
+			if !util.IsEqualIgnoreOrder(subPathExprs, []string{container.Name}) {
+				t.Errorf("%s %s: different volume subPathExprs: got %v, expected %v",
 					t.Name(), tt.subTest, mounts, tt.expectedMounts)
 			}
 		}
