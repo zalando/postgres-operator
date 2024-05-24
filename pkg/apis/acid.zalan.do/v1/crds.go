@@ -146,10 +146,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type:     "object",
 								Required: []string{"name", "mountPath", "volumeSource"},
 								Properties: map[string]apiextv1.JSONSchemaProps{
+									"isSubPathExpr": {
+										Type: "boolean",
+									},
 									"name": {
 										Type: "string",
 									},
 									"mountPath": {
+										Type: "string",
+									},
+									"subPath": {
 										Type: "string",
 									},
 									"targetContainers": {
@@ -164,12 +170,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									"volumeSource": {
 										Type:                   "object",
 										XPreserveUnknownFields: util.True(),
-									},
-									"subPath": {
-										Type: "string",
-									},
-									"isSubPathExpr": {
-										Type: "boolean",
 									},
 								},
 							},
@@ -1033,6 +1033,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type:     "object",
 						Required: []string{"size"},
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"isSubPathExpr": {
+								Type: "boolean",
+							},
 							"iops": {
 								Type: "integer",
 							},

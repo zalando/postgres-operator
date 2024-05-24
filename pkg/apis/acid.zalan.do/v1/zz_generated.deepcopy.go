@@ -1452,6 +1452,11 @@ func (in *Volume) DeepCopyInto(out *Volume) {
 		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.IsSubPathExpr != nil {
+		in, out := &in.IsSubPathExpr, &out.IsSubPathExpr
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Iops != nil {
 		in, out := &in.Iops, &out.Iops
 		*out = new(int64)

@@ -1922,7 +1922,9 @@ func TestAdditionalVolume(t *testing.T) {
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
-				Size: "1G",
+				Size:          "1G",
+				SubPath:       "$(POD_NAME)",
+				IsSubPathExpr: util.True(),
 			},
 			AdditionalVolumes: additionalVolumes,
 			Sidecars: []acidv1.Sidecar{
@@ -1965,14 +1967,14 @@ func TestAdditionalVolume(t *testing.T) {
 			container:            constants.PostgresContainerName,
 			expectedMounts:       []string{"pgdata", "test1", "test3", "test4", "test5", "test6"},
 			expectedSubPaths:     []string{"", "", "", "", "subpath", ""},
-			expectedSubPathExprs: []string{"", "", "", "", "", "$(POD_NAME)"},
+			expectedSubPathExprs: []string{"$(POD_NAME)", "", "", "", "", "$(POD_NAME)"},
 		},
 		{
 			subTest:              "checking volume mounts of sidecar container",
 			container:            "sidecar",
 			expectedMounts:       []string{"pgdata", "test1", "test2"},
 			expectedSubPaths:     []string{"", "", ""},
-			expectedSubPathExprs: []string{"", "", ""},
+			expectedSubPathExprs: []string{"$(POD_NAME)", "", ""},
 		},
 	}
 
