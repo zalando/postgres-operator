@@ -60,10 +60,12 @@ from .utils import (
 # Disable access logs from Flask
 getLogger('gevent').setLevel(ERROR)
 
+basicConfig(stream=sys.stdout, level=INFO, format='%(asctime)s %(levelname)s: %(message)s',)
+console = StreamHandler(sys.stdout)
+console.setLevel(DEBUG)
+getLogger('').addHandler(console)
+
 logger = getLogger(__name__)
-logger.setLevel(INFO)
-handler = StreamHandler(sys.stderr)
-logger.addHandler(handler)
 
 SERVER_STATUS = {'shutdown': False}
 
@@ -987,7 +989,7 @@ def init_cluster():
 def main(port, debug, clusters: list):
     global TARGET_NAMESPACE
 
-    basicConfig(stream=sys.stdout, level=(DEBUG if debug else INFO), format='%(asctime)s %(levelname)s: %(message)s',)
+    logger.setLevel(DEBUG if debug else INFO)
 
     init_cluster()
 
