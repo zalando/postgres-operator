@@ -1,8 +1,13 @@
 apiVersion: v2
 name: postgres-operator
+annotations:
+  catalog.cattle.io/display-name: "Zalando Postgres Operator"
+  catalog.cattle.io/release-name: postgres-operator
+  catalog.cattle.io/namespace: postgres-operator
 version: 1.11.0
 appVersion: 1.11.0
 home: https://github.com/zalando/postgres-operator
+icon: https://github.com/zalando/postgres-operator/raw/master/docs/diagrams/logo.png
 description: Postgres Operator creates and manages PostgreSQL clusters running in Kubernetes
 keywords:
 - postgres
