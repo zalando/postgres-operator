@@ -4,7 +4,7 @@ from boto3 import client
 from datetime import datetime, timezone
 from furl import furl
 from json import dumps, loads
-from logging import StreamHandler, getLogger
+from logging import StreamHandler, INFO, getLogger
 from os import environ, getenv
 from requests import Session
 from urllib.parse import urljoin
