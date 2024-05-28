@@ -15,8 +15,6 @@ COPY requirements.txt .
 COPY start_server.sh .
 RUN pip install -r requirements.txt
 
-COPY wal-e-master wal_e
-RUN pip install -e wal_e
 COPY operator_ui operator_ui/
 
 ARG VERSION=dev

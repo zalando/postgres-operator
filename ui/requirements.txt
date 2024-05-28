@@ -11,4 +11,5 @@ kubernetes==11.0.0
 psycopg2-binary==2.9.5
 requests==2.32.2
 stups-tokens>=1.1.19
+wal_e==1.1.1
 werkzeug==3.0.3
