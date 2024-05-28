@@ -25,7 +25,7 @@ from gevent import sleep, spawn
 from gevent.pywsgi import WSGIServer
 from jq import jq
 from json import dumps, loads
-from logging import DEBUG, ERROR, INFO, basicConfig, exception, getLogger
+from logging import StreamHandler, DEBUG, ERROR, INFO, basicConfig, exception, getLogger
 from os import getenv
 from re import X, compile
 from requests.exceptions import RequestException
@@ -61,6 +61,8 @@ from .utils import (
 getLogger('gevent').setLevel(ERROR)
 
 logger = getLogger(__name__)
+handler = StreamHandler()
+logger.addHandler(handler)
 
 SERVER_STATUS = {'shutdown': False}
 
