@@ -15,6 +15,7 @@ from .utils import Attrs, defaulting, these
 
 
 logger = getLogger(__name__)
+logger.setLevel(INFO)
 handler = StreamHandler(sys.stdout)
 logger.addHandler(handler)
 
