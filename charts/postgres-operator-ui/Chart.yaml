@@ -1,9 +1,13 @@
 apiVersion: v2
-name: postgres-operator-ui
-version: 1.11.0
 appVersion: 1.11.0
+annotations:
+  catalog.cattle.io/display-name: "Zalando Postgres Operator UI"
+  catalog.cattle.io/release-name: postgres-operator-ui
+  catalog.cattle.io/namespace: postgres-operator
+description: Postgres Operator UI provides a graphical interface for a convenient
+  database-as-a-service user experience
 home: https://github.com/zalando/postgres-operator
-description: Postgres Operator UI provides a graphical interface for a convenient database-as-a-service user experience
+icon: https://github.com/zalando/postgres-operator/raw/master/docs/diagrams/logo.png
 keywords:
 - postgres
 - operator
@@ -12,8 +16,9 @@ keywords:
 - patroni
 - spilo
 maintainers:
-- name: Zalando
-  email: opensource@zalando.de
+- email: opensource@zalando.de
+  name: Zalando
+name: postgres-operator-ui
 sources:
 - https://github.com/zalando/postgres-operator
-engine: gotpl
+version: 1.11.0
