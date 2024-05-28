@@ -1,12 +1,12 @@
 questions:
 - variable: image.registry
-  default: "registry.opensource.zalan.do"
+  default: "ghcr.io"
   description: "The Docker registry URL to use for pulling the Postgres Operator image."
   type: string
   label: Docker Registry
   group: "Image"
 - variable: image.repository
-  default: "acid/postgres-operator"
+  default: "zalando/postgres-operator"
   description: >
     The Docker repository where the Postgres Operator image is located. This variable specifies the
     repository part of the image name, which is used to uniquely identify the image. The default value
@@ -87,7 +87,7 @@ questions:
   type: string
   group: "General"
 - variable: configGeneral.docker_image
-  default: "ghcr.io/zalando/spilo-15:2.1-p9"
+  default: "ghcr.io/zalando/spilo-16:3.2-p2"
   description: "Specifies the default Spilo docker image used by the postgres-operator chart."
   label: Default Spilo Docker Image
   type: string

@@ -10,14 +10,14 @@ questions:
   description: "The registry where the Postgres Operator UI image is hosted"
   label: "Image Registry"
   type: "string"
-  default: "registry.opensource.zalan.do"
+  default: "ghcr.io"
   required: true
   group: "Postgres Operator UI"
 - variable: image.repository
   description: "The name of the Postgres Operator UI image repository"
   label: "Image Repository"
   type: "string"
-  default: "acid/postgres-operator-ui"
+  default: "zalando/postgres-operator-ui"
   required: true
   group: "Postgres Operator UI"
 - variable: image.tag
