@@ -16,7 +16,7 @@ from .utils import Attrs, defaulting, these
 
 logger = getLogger(__name__)
 logger.setLevel(INFO)
-handler = StreamHandler(sys.stdout)
+handler = StreamHandler(sys.stderr)
 logger.addHandler(handler)
 
 session = Session()
