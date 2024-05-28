@@ -61,7 +61,7 @@ from .utils import (
 getLogger('gevent').setLevel(ERROR)
 
 logger = getLogger(__name__)
-handler = StreamHandler()
+handler = StreamHandler(sys.stdout)
 logger.addHandler(handler)
 
 SERVER_STATUS = {'shutdown': False}

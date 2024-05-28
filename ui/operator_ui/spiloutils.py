@@ -1,3 +1,5 @@
+import sys
+
 from boto3 import client
 from datetime import datetime, timezone
 from furl import furl
@@ -13,7 +15,7 @@ from .utils import Attrs, defaulting, these
 
 
 logger = getLogger(__name__)
-handler = StreamHandler()
+handler = StreamHandler(sys.stdout)
 logger.addHandler(handler)
 
 session = Session()
