@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # pylama:ignore=E402
 
-import gevent.monkey
+#import gevent.monkey
 
-gevent.monkey.patch_all()
+#gevent.monkey.patch_all()
 
 import requests
 import tokens
@@ -56,16 +56,15 @@ from .utils import (
     these,
 )
 
-
-# Disable access logs from Flask
-getLogger('gevent').setLevel(ERROR)
-
 basicConfig(stream=sys.stdout, level=INFO, format='%(asctime)s %(levelname)s: %(message)s',)
 console = StreamHandler(sys.stdout)
 console.setLevel(DEBUG)
 getLogger('').addHandler(console)
 
 logger = getLogger(__name__)
+
+# Disable access logs from Flask
+getLogger('gevent').setLevel(ERROR)
 
 SERVER_STATUS = {'shutdown': False}
 
