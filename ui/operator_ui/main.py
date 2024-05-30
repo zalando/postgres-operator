@@ -4,7 +4,6 @@
 import requests
 import tokens
 
-from operator_ui.adapters.logger import logger
 from backoff import expo, on_exception
 from click import ParamType, command, echo, option
 
@@ -50,6 +49,8 @@ from .utils import (
     identity,
     these,
 )
+
+from operator_ui.adapters.logger import logger
 
 SERVER_STATUS = {'shutdown': False}
 
