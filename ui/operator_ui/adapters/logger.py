@@ -12,13 +12,16 @@ dictConfig(
             }
         },
         "handlers": {
-            "json": {
+            "stream_handler": {
                 "class": "logging.StreamHandler",
                 "formatter": "json",
                 "stream": "ext://flask.logging.wsgi_errors_stream",
             }
         },
-        "root": {"handlers": ["json"]},
+        "root": {
+            "level": "DEBUG",
+            "handlers": ["stream_handler"]
+        }
     }
 )
 
