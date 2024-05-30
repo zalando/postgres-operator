@@ -4,7 +4,7 @@
 import requests
 import tokens
 
-from adapters.logger import logger
+from operator_ui.adapters.logger import logger
 from backoff import expo, on_exception
 from click import ParamType, command, echo, option
 
