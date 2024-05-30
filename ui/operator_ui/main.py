@@ -973,8 +973,6 @@ def init_cluster():
 def main(port, debug, clusters: list):
     global TARGET_NAMESPACE
 
-    logger.setLevel(DEBUG if debug else INFO)
-
     init_cluster()
 
     logger.info(f'App URL: {APP_URL}')
