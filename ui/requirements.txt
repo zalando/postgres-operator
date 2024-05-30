@@ -9,6 +9,7 @@ jq==1.7.0
 json_delta>=2.0.2
 kubernetes==11.0.0
 psycopg2-binary==2.9.5
+python-json-logger==2.0.7
 requests==2.32.2
 stups-tokens>=1.1.19
 wal_e==1.1.1
