@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 # pylama:ignore=E402
 
-#import gevent.monkey
-
-#gevent.monkey.patch_all()
-
 import requests
 import tokens
-import sys
 
+from adapters.logger import logger
 from backoff import expo, on_exception
 from click import ParamType, command, echo, option
 
@@ -25,7 +21,6 @@ from gevent import sleep, spawn
 from gevent.pywsgi import WSGIServer
 from jq import jq
 from json import dumps, loads
-from logging import StreamHandler, DEBUG, ERROR, INFO, basicConfig, exception, getLogger
 from os import getenv
 from re import X, compile
 from requests.exceptions import RequestException
@@ -55,16 +50,6 @@ from .utils import (
     identity,
     these,
 )
-
-basicConfig(stream=sys.stdout, level=INFO, format='%(asctime)s %(levelname)s: %(message)s',)
-console = StreamHandler(sys.stdout)
-console.setLevel(DEBUG)
-getLogger('').addHandler(console)
-
-logger = getLogger(__name__)
-
-# Disable access logs from Flask
-getLogger('gevent').setLevel(ERROR)
 
 SERVER_STATUS = {'shutdown': False}
 
