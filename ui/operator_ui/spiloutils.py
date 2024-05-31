@@ -2,7 +2,6 @@ from boto3 import client
 from datetime import datetime, timezone
 from furl import furl
 from json import dumps, loads
-from logging import getLogger
 from os import environ, getenv
 from requests import Session
 from urllib.parse import urljoin
@@ -11,8 +10,7 @@ from wal_e.cmd import configure_backup_cxt
 
 from .utils import Attrs, defaulting, these
 
-
-logger = getLogger(__name__)
+from operator_ui.adapters.logger import logger
 
 session = Session()
 
