@@ -1,0 +1,139 @@
+questions:
+- variable: replicaCount
+  description: "The number of replicas to deploy for the Postgres Operator UI"
+  label: "Replicas Count"
+  type: "int"
+  default: "1"
+  required: true
+  group: "Postgres Operator UI"
+- variable: image.registry
+  description: "The registry where the Postgres Operator UI image is hosted"
+  label: "Image Registry"
+  type: "string"
+  default: "ghcr.io"
+  required: true
+  group: "Postgres Operator UI"
+- variable: image.repository
+  description: "The name of the Postgres Operator UI image repository"
+  label: "Image Repository"
+  type: "string"
+  default: "zalando/postgres-operator-ui"
+  required: true
+  group: "Postgres Operator UI"
+- variable: image.tag
+  description: "The tag of the Postgres Operator UI image to use"
+  label: "Image Tag"
+  type: "string"
+  default: "v1.11.0"
+  required: true
+  group: "Postgres Operator UI"
+- variable: image.pullPolicy
+  description: "The image pull policy for the Postgres Operator UI container"
+  label: "Image Pull Policy"
+  type: "string"
+  default: "IfNotPresent"
+  required: true
+  group: "Postgres Operator UI"
+- variable: rbac.create
+  description: "Whether to create RBAC resources for the Postgres Operator UI"
+  label: "Create RBAC"
+  type: "boolean"
+  default: "true"
+  required: true
+  group: "Postgres Operator UI"
+- variable: serviceAccount.create
+  description: "Whether to create a ServiceAccount for the Postgres Operator UI"
+  label: "Create ServiceAccount"
+  type: "boolean"
+  default: "true"
+  required: true
+  group: "Postgres Operator UI"
+  show_subquestions_if: true
+  subquestions:
+  - variable: serviceAccount.name
+    description: "The name of the ServiceAccount to use. If not set and create is true, a name is generated using the fullname template"
+    type: "string"
+    default: ""
+    label: "ServiceAccount Name"
+    group: "Postgres Operator UI"
+- variable: resources.limits.cpu
+  description: "The CPU resource limits for the Postgres Operator UI container"
+  label: "CPU Resource Limits"
+  type: "string"
+  default: "200m"
+  required: true
+  group: "Postgres Operator UI"
+- variable: resources.limits.memory
+  description: "The memory resource limits for the Postgres Operator UI container"
+  label: "Memory Resource Limits"
+  type: "string"
+  default: "200Mi"
+  required: true
+  group: "Postgres Operator UI"
+- variable: resources.requests.cpu
+  description: "The CPU resource requests for the Postgres Operator UI container"
+  label: "CPU Resource Requests"
+  type: "string"
+  default: "100m"
+  required: true
+  group: "Postgres Operator UI"
+- variable: resources.requests.memory
+  description: "The memory resource requests for the Postgres Operator UI container"
+  label: "Memory Resource Requests"
+  type: "string"
+  default: "100Mi"
+  required: true
+  group: "Postgres Operator UI"
+- variable: envs.appUrl
+  description: "The URL of the Postgres Operator UI"
+  label: "Postgres Operator UI URL"
+  type: "string"
+  default: "http://localhost:8081"
+  required: true
+  group: "Postgres Operator UI"
+- variable: envs.operatorApiUrl
+  description: "The URL of the Postgres Operator API"
+  label: "Postgres Operator API URL"
+  type: "string"
+  default: "http://postgres-operator:8080"
+  required: true
+  group: "Postgres Operator UI"
+- variable: envs.operatorClusterNameLabel
+  description: "The label used to identify the Postgres Operator cluster"
+  label: "Postgres Operator Cluster Label"
+  type: "string"
+  default: "cluster-name"
+  required: true
+  group: "Postgres Operator UI"
+- variable: envs.resourcesVisible
+  description: "Whether to show resource usage information in the Postgres Operator UI"
+  label: "Show Resource Usage"
+  type: "boolean"
+  default: "False"
+  required: true
+  group: "Postgres Operator UI"
+- variable: envs.targetNamespace
+  description: "The namespace in which the Postgres Operator is running"
+  label: "Postgres Operator Namespace"
+  type: "string"
+  default: "default"
+  required: true
+  group: "Postgres Operator UI"
+- variable: service.type
+  description: "The type of service to create for the Postgres Operator UI"
+  label: "Service Type"
+  type: "enum"
+  options:
+  - "ClusterIP"
+  - "NodePort"
+  default: "ClusterIP"
+  required: true
+  group: "Postgres Operator UI"
+  show_subquestions_if: "NodePort"
+  subquestions:
+  - variable: service.nodePort
+    description: "The node port to use for the NodePort service type"
+    label: "Node Port"
+    type: "int"
+    default: "30080"
+    group: "Postgres Operator UI"
