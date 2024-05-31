@@ -1,4 +1,3 @@
-
 FROM registry.opensource.zalan.do/library/python-3.11-slim:latest
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
