@@ -1889,6 +1889,25 @@ func TestAdditionalVolume(t *testing.T) {
 				EmptyDir: &v1.EmptyDirVolumeSource{},
 			},
 		},
+		{
+			Name:             "test5",
+			MountPath:        "/test5",
+			SubPath:          "subpath",
+			TargetContainers: nil, // should mount only to postgres
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name:             "test6",
+			MountPath:        "/test6",
+			SubPath:          "$(POD_NAME)",
+			IsSubPathExpr:    util.True(),
+			TargetContainers: nil, // should mount only to postgres
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
 	}
 
 	pg := acidv1.Postgresql{
@@ -1903,7 +1922,9 @@ func TestAdditionalVolume(t *testing.T) {
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
-				Size: "1G",
+				Size:          "1G",
+				SubPath:       "$(POD_NAME)",
+				IsSubPathExpr: util.True(),
 			},
 			AdditionalVolumes: additionalVolumes,
 			Sidecars: []acidv1.Sidecar{
@@ -1935,19 +1956,25 @@ func TestAdditionalVolume(t *testing.T) {
 	assert.NoError(t, err)
 
 	tests := []struct {
-		subTest        string
-		container      string
-		expectedMounts []string
+		subTest              string
+		container            string
+		expectedMounts       []string
+		expectedSubPaths     []string
+		expectedSubPathExprs []string
 	}{
 		{
-			subTest:        "checking volume mounts of postgres container",
-			container:      constants.PostgresContainerName,
-			expectedMounts: []string{"pgdata", "test1", "test3", "test4"},
+			subTest:              "checking volume mounts of postgres container",
+			container:            constants.PostgresContainerName,
+			expectedMounts:       []string{"pgdata", "test1", "test3", "test4", "test5", "test6"},
+			expectedSubPaths:     []string{"", "", "", "", "subpath", ""},
+			expectedSubPathExprs: []string{"$(POD_NAME)", "", "", "", "", "$(POD_NAME)"},
 		},
 		{
-			subTest:        "checking volume mounts of sidecar container",
-			container:      "sidecar",
-			expectedMounts: []string{"pgdata", "test1", "test2"},
+			subTest:              "checking volume mounts of sidecar container",
+			container:            "sidecar",
+			expectedMounts:       []string{"pgdata", "test1", "test2"},
+			expectedSubPaths:     []string{"", "", ""},
+			expectedSubPathExprs: []string{"$(POD_NAME)", "", ""},
 		},
 	}
 
@@ -1957,13 +1984,28 @@ func TestAdditionalVolume(t *testing.T) {
 				continue
 			}
 			mounts := []string{}
+			subPaths := []string{}
+			subPathExprs := []string{}
+
 			for _, volumeMounts := range container.VolumeMounts {
 				mounts = append(mounts, volumeMounts.Name)
+				subPaths = append(subPaths, volumeMounts.SubPath)
+				subPathExprs = append(subPathExprs, volumeMounts.SubPathExpr)
 			}
 
 			if !util.IsEqualIgnoreOrder(mounts, tt.expectedMounts) {
-				t.Errorf("%s %s: different volume mounts: got %v, epxected %v",
+				t.Errorf("%s %s: different volume mounts: got %v, expected %v",
 					t.Name(), tt.subTest, mounts, tt.expectedMounts)
+			}
+
+			if !util.IsEqualIgnoreOrder(subPaths, tt.expectedSubPaths) {
+				t.Errorf("%s %s: different volume subPaths: got %v, expected %v",
+					t.Name(), tt.subTest, subPaths, tt.expectedSubPaths)
+			}
+
+			if !util.IsEqualIgnoreOrder(subPathExprs, tt.expectedSubPathExprs) {
+				t.Errorf("%s %s: different volume subPathExprs: got %v, expected %v",
+					t.Name(), tt.subTest, subPathExprs, tt.expectedSubPathExprs)
 			}
 		}
 	}
@@ -3520,6 +3562,191 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 		assert.NoError(t, err)
 		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
 			t.Errorf("%s - %s: expected resources %#v, got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
+		}
+	}
+}
+
+func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
+	var (
+		dummyUUID   = "efd12e58-5786-11e8-b5a7-06148230260c"
+		dummyBucket = "dummy-backup-location"
+	)
+
+	expectedLogicalBackupS3Bucket := []ExpectedValue{
+		{
+			envIndex:       9,
+			envVarConstant: "LOGICAL_BACKUP_PROVIDER",
+			envVarValue:    "s3",
+		},
+		{
+			envIndex:       10,
+			envVarConstant: "LOGICAL_BACKUP_S3_BUCKET",
+			envVarValue:    dummyBucket,
+		},
+		{
+			envIndex:       11,
+			envVarConstant: "LOGICAL_BACKUP_S3_BUCKET_PREFIX",
+			envVarValue:    "spilo",
+		},
+		{
+			envIndex:       12,
+			envVarConstant: "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "/" + dummyUUID,
+		},
+		{
+			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_S3_REGION",
+			envVarValue:    "eu-central-1",
+		},
+		{
+			envIndex:       14,
+			envVarConstant: "LOGICAL_BACKUP_S3_ENDPOINT",
+			envVarValue:    "",
+		},
+		{
+			envIndex:       15,
+			envVarConstant: "LOGICAL_BACKUP_S3_SSE",
+			envVarValue:    "",
+		},
+		{
+			envIndex:       16,
+			envVarConstant: "LOGICAL_BACKUP_S3_RETENTION_TIME",
+			envVarValue:    "1 month",
+		},
+	}
+
+	expectedLogicalBackupGCPCreds := []ExpectedValue{
+		{
+			envIndex:       9,
+			envVarConstant: "LOGICAL_BACKUP_PROVIDER",
+			envVarValue:    "gcs",
+		},
+		{
+			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
+			envVarValue:    "some-path-to-credentials",
+		},
+	}
+
+	expectedLogicalBackupAzureStorage := []ExpectedValue{
+		{
+			envIndex:       9,
+			envVarConstant: "LOGICAL_BACKUP_PROVIDER",
+			envVarValue:    "az",
+		},
+		{
+			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
+			envVarValue:    "some-azure-storage-account-name",
+		},
+		{
+			envIndex:       14,
+			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
+			envVarValue:    "some-azure-storage-container",
+		},
+		{
+			envIndex:       15,
+			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
+			envVarValue:    "some-azure-storage-account-key",
+		},
+	}
+
+	expectedLogicalBackupRetentionTime := []ExpectedValue{
+		{
+			envIndex:       16,
+			envVarConstant: "LOGICAL_BACKUP_S3_RETENTION_TIME",
+			envVarValue:    "3 months",
+		},
+	}
+
+	tests := []struct {
+		subTest        string
+		opConfig       config.Config
+		expectedValues []ExpectedValue
+		pgsql          acidv1.Postgresql
+	}{
+		{
+			subTest: "logical backup with provider: s3",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:        "s3",
+					LogicalBackupS3Bucket:        dummyBucket,
+					LogicalBackupS3BucketPrefix:  "spilo",
+					LogicalBackupS3Region:        "eu-central-1",
+					LogicalBackupS3RetentionTime: "1 month",
+				},
+			},
+			expectedValues: expectedLogicalBackupS3Bucket,
+		},
+		{
+			subTest: "logical backup with provider: gcs",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:                     "gcs",
+					LogicalBackupS3Bucket:                     dummyBucket,
+					LogicalBackupGoogleApplicationCredentials: "some-path-to-credentials",
+				},
+			},
+			expectedValues: expectedLogicalBackupGCPCreds,
+		},
+		{
+			subTest: "logical backup with provider: az",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:                "az",
+					LogicalBackupS3Bucket:                dummyBucket,
+					LogicalBackupAzureStorageAccountName: "some-azure-storage-account-name",
+					LogicalBackupAzureStorageContainer:   "some-azure-storage-container",
+					LogicalBackupAzureStorageAccountKey:  "some-azure-storage-account-key",
+				},
+			},
+			expectedValues: expectedLogicalBackupAzureStorage,
+		},
+		{
+			subTest: "will override retention time parameter",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:        "s3",
+					LogicalBackupS3RetentionTime: "1 month",
+				},
+			},
+			expectedValues: expectedLogicalBackupRetentionTime,
+			pgsql: acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					LogicalBackupRetention: "3 months",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		pgsql := tt.pgsql
+		c.Postgresql = pgsql
+		c.UID = types.UID(dummyUUID)
+
+		actualEnvs := c.generateLogicalBackupPodEnvVars()
+
+		for _, ev := range tt.expectedValues {
+			env := actualEnvs[ev.envIndex]
+
+			if env.Name != ev.envVarConstant {
+				t.Errorf("%s %s: expected env name %s, have %s instead",
+					t.Name(), tt.subTest, ev.envVarConstant, env.Name)
+			}
+
+			if ev.envVarValueRef != nil {
+				if !reflect.DeepEqual(env.ValueFrom, ev.envVarValueRef) {
+					t.Errorf("%s %s: expected env value reference %#v, have %#v instead",
+						t.Name(), tt.subTest, ev.envVarValueRef, env.ValueFrom)
+				}
+				continue
+			}
+
+			if env.Value != ev.envVarValue {
+				t.Errorf("%s %s: expected env value %s, have %s instead",
+					t.Name(), tt.subTest, ev.envVarValue, env.Value)
+			}
 		}
 	}
 }

@@ -10,7 +10,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: ghcr.io/zalando/spilo-16:3.2-p2
+  dockerImage: ghcr.io/zalando/spilo-16:3.2-p3
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -68,6 +68,8 @@ spec:
 #      matchLabels:
 #        environment: dev
 #        service: postgres
+#     subPath: $(NODE_NAME)/$(POD_NAME)
+#     isSubPathExpr: true
   additionalVolumes:
     - name: empty
       mountPath: /opt/empty
@@ -77,6 +79,16 @@ spec:
         emptyDir: {}
 #    - name: data
 #      mountPath: /home/postgres/pgdata/partitions
+#      targetContainers:
+#        - postgres
+#      volumeSource:
+#        PersistentVolumeClaim:
+#          claimName: pvc-postgresql-data-partitions
+#          readyOnly: false
+#    - name: data
+#      mountPath: /home/postgres/pgdata/partitions
+#      subPath: $(NODE_NAME)/$(POD_NAME)
+#      isSubPathExpr: true
 #      targetContainers:
 #        - postgres
 #      volumeSource:
@@ -151,6 +163,7 @@ spec:
 
 # run periodic backups with k8s cron jobs
 #  enableLogicalBackup: true
+#  logicalBackupRetention: "3 months"
 #  logicalBackupSchedule: "30 00 * * *"
 
 #  maintenanceWindows:

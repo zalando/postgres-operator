@@ -85,9 +85,13 @@ spec:
                     - mountPath
                     - volumeSource
                   properties:
+                    isSubPathExpr:
+                      type: boolean
                     name:
                       type: string
                     mountPath:
+                      type: string
+                    subPath:
                       type: string
                     targetContainers:
                       type: array
@@ -97,8 +101,6 @@ spec:
                     volumeSource:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-                    subPath:
-                      type: string
               allowedSourceRanges:
                 type: array
                 nullable: true
@@ -213,6 +215,8 @@ spec:
                 items:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+              logicalBackupRetention:
+                type: string
               logicalBackupSchedule:
                 type: string
                 pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
@@ -630,6 +634,8 @@ spec:
                 required:
                   - size
                 properties:
+                  isSubPathExpr:
+                    type: boolean
                   iops:
                     type: integer
                   selector:

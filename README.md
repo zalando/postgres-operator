@@ -24,7 +24,6 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Basic credential and user management on K8s, eases application deployments
 * Support for custom TLS certificates
 * UI to create and edit Postgres cluster manifests
-* Support for AWS EBS gp2 to gp3 migration, supporting iops and throughput configuration
 * Compatible with OpenShift
 
 ### PostgreSQL features
@@ -58,11 +57,11 @@ production for over five years.
 
 | Release   | Postgres versions | K8s versions      | Golang  |
 | :-------- | :---------------: | :---------------: | :-----: |
-| v1.11.*   | 11 &rarr; 16      | 1.21 &rarr; 1.28  | 1.21.7  |
-| v1.10.*   | 10 &rarr; 15      | 1.21 &rarr; 1.28  | 1.19.8  |
-| v1.9.0    | 10 &rarr; 15      | 1.21 &rarr; 1.28  | 1.18.9  |
-| v1.8.*    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
-| v1.7.1    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.16.9  |
+| v1.12.*   | 11 &rarr; 16      | 1.27+             | 1.22.3  |
+| v1.11.0   | 11 &rarr; 16      | 1.27+             | 1.21.7  |
+| v1.10.*   | 10 &rarr; 15      | 1.21+             | 1.19.8  |
+| v1.9.0    | 10 &rarr; 15      | 1.21+             | 1.18.9  |
+| v1.8.2    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
 
 
 ## Getting started

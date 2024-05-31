@@ -360,6 +360,10 @@ configuration they are grouped under the `kubernetes` key.
   `"retain"` - or `when_scaled` - default is also `"retain"`. The other possible
   option is `delete`.
 
+* **enable_secrets_deletion**
+  By default, the operator deletes secrets when removing the Postgres cluster
+  manifest. To keep secrets, set this option to `false`. The default is `true`.
+
 * **enable_persistent_volume_claim_deletion**
   By default, the operator deletes PersistentVolumeClaims when removing the
   Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
@@ -813,11 +817,11 @@ grouped under the `logical_backup` key.
   default values from `postgres_pod_resources` will be used.
 
 * **logical_backup_docker_image**
-  An image for pods of the logical backup job. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile)
+  An image for pods of the logical backup job. The [example image](https://github.com/zalando/postgres-operator/blob/master/logical-backup/Dockerfile)
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
-  an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
+  an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -844,6 +848,9 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
+
+* **logical_backup_s3_bucket_prefix**
+  S3 bucket prefix to use in configured bucket. Default: "spilo"
 
 * **logical_backup_s3_endpoint**
   When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.

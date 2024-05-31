@@ -146,10 +146,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type:     "object",
 								Required: []string{"name", "mountPath", "volumeSource"},
 								Properties: map[string]apiextv1.JSONSchemaProps{
+									"isSubPathExpr": {
+										Type: "boolean",
+									},
 									"name": {
 										Type: "string",
 									},
 									"mountPath": {
+										Type: "string",
+									},
+									"subPath": {
 										Type: "string",
 									},
 									"targetContainers": {
@@ -164,9 +170,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									"volumeSource": {
 										Type:                   "object",
 										XPreserveUnknownFields: util.True(),
-									},
-									"subPath": {
-										Type: "string",
 									},
 								},
 							},
@@ -342,6 +345,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								XPreserveUnknownFields: util.True(),
 							},
 						},
+					},
+					"logicalBackupRetention": {
+						Type: "string",
 					},
 					"logicalBackupSchedule": {
 						Type:    "string",
@@ -1027,6 +1033,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type:     "object",
 						Required: []string{"size"},
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"isSubPathExpr": {
+								Type: "boolean",
+							},
 							"iops": {
 								Type: "integer",
 							},
@@ -1318,6 +1327,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "boolean",
 							},
 							"enable_init_containers": {
+								Type: "boolean",
+							},
+							"enable_secrets_deletion": {
 								Type: "boolean",
 							},
 							"enable_persistent_volume_claim_deletion": {
@@ -1760,6 +1772,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 							},
 							"logical_backup_s3_bucket": {
+								Type: "string",
+							},
+							"logical_backup_s3_bucket_prefix": {
 								Type: "string",
 							},
 							"logical_backup_s3_endpoint": {

@@ -102,6 +102,7 @@ type KubernetesMetaConfiguration struct {
 	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
 	PersistentVolumeClaimRetentionPolicy     map[string]string   `json:"persistent_volume_claim_retention_policy,omitempty"`
+	EnableSecretsDeletion                    *bool               `json:"enable_secrets_deletion,omitempty"`
 	EnablePersistentVolumeClaimDeletion      *bool               `json:"enable_persistent_volume_claim_deletion,omitempty"`
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
@@ -228,6 +229,7 @@ type OperatorLogicalBackupConfiguration struct {
 	AzureStorageContainer        string `json:"logical_backup_azure_storage_container,omitempty"`
 	AzureStorageAccountKey       string `json:"logical_backup_azure_storage_account_key,omitempty"`
 	S3Bucket                     string `json:"logical_backup_s3_bucket,omitempty"`
+	S3BucketPrefix               string `json:"logical_backup_s3_bucket_prefix,omitempty"`
 	S3Region                     string `json:"logical_backup_s3_region,omitempty"`
 	S3Endpoint                   string `json:"logical_backup_s3_endpoint,omitempty"`
 	S3AccessKeyID                string `json:"logical_backup_s3_access_key_id,omitempty"`
