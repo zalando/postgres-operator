@@ -9,7 +9,6 @@ from uuid import UUID
 from wal_e.cmd import configure_backup_cxt
 
 from .utils import Attrs, defaulting, these
-
 from operator_ui.adapters.logger import logger
 
 session = Session()

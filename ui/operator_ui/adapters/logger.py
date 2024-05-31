@@ -19,7 +19,7 @@ dictConfig(
             }
         },
         "root": {
-            "level": "INFO",
+            "level": "DEBUG",
             "handlers": ["stream_handler"]
         }
     }
