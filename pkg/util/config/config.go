@@ -70,17 +70,17 @@ type Resources struct {
 type InfrastructureRole struct {
 	// Name of a secret which describes the role, and optionally name of a
 	// configmap with an extra information
-	SecretName spec.NamespacedName
+	SecretName spec.NamespacedName `name:"secretname,omitempty"`
 
-	UserKey     string
-	PasswordKey string
-	RoleKey     string
+	UserKey     string `name:"userkey,omitempty"`
+	PasswordKey string `name:"passwordkey,omitempty"`
+	RoleKey     string `name:"rolekey,omitempty"`
 
-	DefaultUserValue string
-	DefaultRoleValue string
+	DefaultUserValue string `name:"defaultuservalue,omitempty"`
+	DefaultRoleValue string `name:"defaultrolevalue,omitempty"`
 
 	// This field point out the detailed yaml definition of the role, if exists
-	Details string
+	Details string `name:"details,omitempty"`
 
 	// Specify if a secret contains multiple fields in the following format:
 	//
@@ -91,7 +91,7 @@ type InfrastructureRole struct {
 	// If it does, Name/Password/Role are interpreted not as unique field
 	// names, but as a template.
 
-	Template bool
+	Template bool `name:"template,omitempty"`
 }
 
 // Auth describes authentication specific configuration parameters
