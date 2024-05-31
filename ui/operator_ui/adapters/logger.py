@@ -42,4 +42,5 @@ class Logger:
     def exception(self, msg: str, *args, **kwargs):
         self.logger.exception(msg, *args, **kwargs)
 
+
 logger = Logger()

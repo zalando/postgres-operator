@@ -20,7 +20,6 @@ from gevent import sleep, spawn
 from gevent.pywsgi import WSGIServer
 from jq import jq
 from json import dumps, loads
-from logging import DEBUG, INFO
 from os import getenv
 from re import X, compile
 from requests.exceptions import RequestException
