@@ -130,7 +130,7 @@ configKubernetes:
   # enables initContainers to run actions before Spilo is started
   enable_init_containers: true
   # toggles if operator should delete secrets on cluster deletion
-  enable_secrets_deletion: true
+  # enable_secrets_deletion: true
   # toggles if operator should delete PVCs on cluster deletion
   enable_persistent_volume_claim_deletion: true
   # toggles pod anti affinity on the Postgres pods
@@ -375,7 +375,7 @@ configLogicalBackup:
   # S3 bucket to store backup results
   logical_backup_s3_bucket: "my-bucket-url"
   # S3 bucket prefix to use
-  logical_backup_s3_bucket_prefix: "spilo"
+  # logical_backup_s3_bucket_prefix: "spilo"
   # S3 region of bucket
   logical_backup_s3_region: ""
   # S3 endpoint url when not using AWS
