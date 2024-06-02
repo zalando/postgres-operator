@@ -19,6 +19,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1649,16 +1650,92 @@ func TestCompareServices(t *testing.T) {
 			if match && !tt.match {
 				t.Logf("match=%v current=%v, old=%v reason=%s", match, tt.current.Annotations, tt.new.Annotations, reason)
 				t.Errorf("%s - expected services to do not match: %q and %q", t.Name(), tt.current, tt.new)
-				return
 			}
 			if !match && tt.match {
 				t.Errorf("%s - expected services to be the same: %q and %q", t.Name(), tt.current, tt.new)
-				return
 			}
 			if !match && !tt.match {
 				if !strings.HasPrefix(reason, tt.reason) {
 					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
-					return
+				}
+			}
+		})
+	}
+}
+
+func newCronJob(image, schedule string, vars []v1.EnvVar) *batchv1.CronJob {
+	cron := &batchv1.CronJob{
+		Spec: batchv1.CronJobSpec{
+			Schedule: schedule,
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								v1.Container{
+									Name:  "logical-backup",
+									Image: image,
+									Env:   vars,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return cron
+}
+
+func TestCompareLogicalBackupJob(t *testing.T) {
+
+	img1 := "registry.opensource.zalan.do/acid/logical-backup:v1.0"
+	img2 := "registry.opensource.zalan.do/acid/logical-backup:v2.0"
+
+	tests := []struct {
+		about   string
+		current *batchv1.CronJob
+		new     *batchv1.CronJob
+		match   bool
+		reason  string
+	}{
+		{
+			about:   "two equal cronjobs",
+			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}),
+			new:     newCronJob(img1, "0 0 * * *", []v1.EnvVar{}),
+			match:   true,
+		},
+		{
+			about:   "two cronjobs with different image",
+			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}),
+			new:     newCronJob(img2, "0 0 * * *", []v1.EnvVar{}),
+			match:   false,
+			reason:  fmt.Sprintf("new job's image %q does not match the current one %q", img2, img1),
+		},
+		{
+			about:   "two cronjobs with different schedule",
+			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}),
+			new:     newCronJob(img1, "0 * * * *", []v1.EnvVar{}),
+			match:   false,
+			reason:  fmt.Sprintf("new job's schedule %q does not match the current one %q", "0 * * * *", "0 0 * * *"),
+		},
+		{
+			about:   "two cronjobs with different environment variables",
+			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "spilo"}}),
+			new:     newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "logical-backup"}}),
+			match:   false,
+			reason:  "logical backup container specs do not match: new cronjob container's logical-backup (index 0) environment does not match the current one",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.about, func(t *testing.T) {
+			match, reason := cl.compareLogicalBackupJob(tt.current, tt.new)
+			if match != tt.match {
+				t.Errorf("%s - unexpected match result %t when comparing cronjobs %q and %q", t.Name(), match, tt.current, tt.new)
+			} else {
+				if !strings.HasPrefix(reason, tt.reason) {
+					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
 				}
 			}
 		})

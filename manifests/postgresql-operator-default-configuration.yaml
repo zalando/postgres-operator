@@ -3,7 +3,7 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: ghcr.io/zalando/spilo-16:3.2-p2
+  docker_image: ghcr.io/zalando/spilo-16:3.2-p3
   # enable_crd_registration: true
   # crd_categories:
   # - all
@@ -59,6 +59,7 @@ configuration:
     # enable_cross_namespace_secret: "false"
     enable_finalizers: false
     enable_init_containers: true
+    enable_secrets_deletion: true
     enable_persistent_volume_claim_deletion: true
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
@@ -85,6 +86,7 @@ configuration:
     #   status: ready
     # node_readiness_label_merge: "OR"
     oauth_token_secret_name: postgresql-operator
+    pdb_master_label_selector: true
     pdb_name_format: "postgres-{cluster}-pdb"
     persistent_volume_claim_retention_policy: 
       when_deleted: "retain"
@@ -165,12 +167,13 @@ configuration:
     # logical_backup_cpu_request: ""
     # logical_backup_memory_limit: ""
     # logical_backup_memory_request: ""
-    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
+    logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.0"
     # logical_backup_google_application_credentials: ""
     logical_backup_job_prefix: "logical-backup-"
     logical_backup_provider: "s3"
     # logical_backup_s3_access_key_id: ""
     logical_backup_s3_bucket: "my-bucket-url"
+    # logical_backup_s3_bucket_prefix: "spilo"
     # logical_backup_s3_endpoint: ""
     # logical_backup_s3_region: ""
     # logical_backup_s3_secret_access_key: ""

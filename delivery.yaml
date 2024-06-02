@@ -18,7 +18,7 @@ pipeline:
         - desc: 'Install go'
           cmd: |
             cd /tmp
-            wget -q https://storage.googleapis.com/golang/go1.21.7.linux-amd64.tar.gz -O go.tar.gz
+            wget -q https://storage.googleapis.com/golang/go1.22.3.linux-amd64.tar.gz -O go.tar.gz
             tar -xf go.tar.gz
             mv go /usr/local
             ln -s /usr/local/go/bin/go /usr/bin/go
@@ -90,7 +90,7 @@ pipeline:
       commands:
         - desc: Build image
           cmd: |
-            cd docker/logical-backup
+            cd logical-backup
             export TAG=$(git describe --tags --always --dirty)
             IMAGE="registry-write.opensource.zalan.do/acid/logical-backup"
             docker build --rm -t "$IMAGE:$TAG$CDP_TAG" .

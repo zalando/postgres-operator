@@ -1283,7 +1283,7 @@ but only snapshots of your data. In its current state, see logical backups as a
 way to quickly create SQL dumps that you can easily restore in an empty test
 cluster.
 
-2. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile) implements the backup
+2. The [example image](https://github.com/zalando/postgres-operator/blob/master/logical-backup/Dockerfile) implements the backup
 via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket.
 `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when
 possible.
@@ -1399,7 +1399,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.8.1 .
+docker build -t ghcr.io/zalando/postgres-operator-ui:v1.12.0 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/

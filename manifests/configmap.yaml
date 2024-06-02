@@ -34,7 +34,7 @@ data:
   default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: ghcr.io/zalando/spilo-16:3.2-p2
+  docker_image: ghcr.io/zalando/spilo-16:3.2-p3
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_registration: "true"
@@ -49,6 +49,7 @@ data:
   enable_master_pooler_load_balancer: "false"
   enable_password_rotation: "false"
   enable_patroni_failsafe_mode: "false"
+  enable_secrets_deletion: "true"
   enable_persistent_volume_claim_deletion: "true"
   enable_pgversion_env_var: "true"
   # enable_pod_antiaffinity: "false"
@@ -82,7 +83,7 @@ data:
   # logical_backup_azure_storage_account_key: ""
   # logical_backup_cpu_limit: ""
   # logical_backup_cpu_request: ""
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.0"
   # logical_backup_google_application_credentials: ""
   logical_backup_job_prefix: "logical-backup-"
   # logical_backup_memory_limit: ""
@@ -90,6 +91,7 @@ data:
   logical_backup_provider: "s3"
   # logical_backup_s3_access_key_id: ""
   logical_backup_s3_bucket: "my-bucket-url"
+  # logical_backup_s3_bucket_prefix: "spilo"
   # logical_backup_s3_region: ""
   # logical_backup_s3_endpoint: ""
   # logical_backup_s3_secret_access_key: ""
@@ -119,6 +121,7 @@ data:
   patroni_api_check_timeout: "5s"
   # password_rotation_interval: "90"
   # password_rotation_user_retention: "180"
+  pdb_master_label_selector: "true"
   pdb_name_format: "postgres-{cluster}-pdb"
   persistent_volume_claim_retention_policy: "when_deleted:retain,when_scaled:retain"
   # pod_antiaffinity_preferred_during_scheduling: "false"

@@ -1367,7 +1367,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 		if err != nil {
 			return fmt.Errorf("could not generate the desired logical backup job state: %v", err)
 		}
-		if match, reason := k8sutil.SameLogicalBackupJob(job, desiredJob); !match {
+		if match, reason := c.compareLogicalBackupJob(job, desiredJob); !match {
 			c.logger.Infof("logical job %s is not in the desired state and needs to be updated",
 				c.getLogicalBackupJobName(),
 			)

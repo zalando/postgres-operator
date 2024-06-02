@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/setup-go@v2
         with:
-          go-version: "^1.21.7"
+          go-version: "^1.22.3"
 
       - name: Run unit tests
         run: make deps mocks test
@@ -81,7 +81,7 @@ jobs:
       - name: Build and push multiarch logical-backup image to ghcr
         uses: docker/build-push-action@v3
         with:
-          context: docker/logical-backup
+          context: logical-backup
           push: true
           build-args: BASE_IMAGE=ubuntu:22.04
           tags: "${{ steps.image_lb.outputs.BACKUP_IMAGE }}"

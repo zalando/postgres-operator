@@ -66,7 +66,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "ghcr.io/zalando/spilo-16:3.2-p2"
+                default: "ghcr.io/zalando/spilo-16:3.2-p3"
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -209,6 +209,9 @@ spec:
                   enable_init_containers:
                     type: boolean
                     default: true
+                  enable_secrets_deletion:
+                    type: boolean
+                    default: true
                   enable_persistent_volume_claim_deletion:
                     type: boolean
                     default: true
@@ -279,6 +282,9 @@ spec:
                   oauth_token_secret_name:
                     type: string
                     default: "postgresql-operator"
+                  pdb_master_label_selector:
+                    type: boolean
+                    default: true
                   pdb_name_format:
                     type: string
                     default: "postgres-{cluster}-pdb"
@@ -500,7 +506,7 @@ spec:
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
+                    default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.0"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
@@ -522,6 +528,8 @@ spec:
                   logical_backup_s3_access_key_id:
                     type: string
                   logical_backup_s3_bucket:
+                    type: string
+                  logical_backup_s3_bucket_prefix:
                     type: string
                   logical_backup_s3_endpoint:
                     type: string

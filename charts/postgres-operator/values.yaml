@@ -1,7 +1,7 @@
 image:
-  registry: registry.opensource.zalan.do
-  repository: acid/postgres-operator
-  tag: v1.11.0
+  registry: ghcr.io
+  repository: zalando/postgres-operator
+  tag: v1.12.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -38,7 +38,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: ghcr.io/zalando/spilo-16:3.2-p2
+  docker_image: ghcr.io/zalando/spilo-16:3.2-p3
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
@@ -129,6 +129,8 @@ configKubernetes:
   enable_finalizers: false
   # enables initContainers to run actions before Spilo is started
   enable_init_containers: true
+  # toggles if operator should delete secrets on cluster deletion
+  enable_secrets_deletion: true
   # toggles if operator should delete PVCs on cluster deletion
   enable_persistent_volume_claim_deletion: true
   # toggles pod anti affinity on the Postgres pods
@@ -169,7 +171,9 @@ configKubernetes:
   # namespaced name of the secret containing the OAuth2 token to pass to the teams API
   # oauth_token_secret_name: postgresql-operator
 
-  # defines the template for PDB (Pod Disruption Budget) names
+  # toggle if `spilo-role=master` selector should be added to the PDB (Pod Disruption Budget)
+  pdb_master_label_selector: true
+  # defines the template for PDB names
   pdb_name_format: "postgres-{cluster}-pdb"
   # specify the PVC retention policy when scaling down and/or deleting
   persistent_volume_claim_retention_policy:
@@ -358,7 +362,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.0"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -370,6 +374,8 @@ configLogicalBackup:
   logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
   logical_backup_s3_bucket: "my-bucket-url"
+  # S3 bucket prefix to use
+  logical_backup_s3_bucket_prefix: "spilo"
   # S3 region of bucket
   logical_backup_s3_region: ""
   # S3 endpoint url when not using AWS
