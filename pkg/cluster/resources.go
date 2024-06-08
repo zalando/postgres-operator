@@ -286,32 +286,38 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 }
 
 func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newService *v1.Service) (*v1.Service, error) {
-	var (
-		svc *v1.Service
-		err error
-	)
-
-	match, reason := c.compareServices(oldService, newService)
-	if match {
-		return oldService, nil
-	}
-
-	c.logServiceChanges(role, oldService, newService, false, reason)
-	c.setProcessName("updating %v service", role)
+	var err error
+	svc := oldService
 
 	serviceName := util.NameFromMeta(oldService.ObjectMeta)
+	match, reason := c.compareServices(oldService, newService)
+	if !match {
+		c.logServiceChanges(role, oldService, newService, false, reason)
+		c.setProcessName("updating %v service", role)
 
-	// now, patch the service spec, but when disabling LoadBalancers do update instead
-	// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
-	oldServiceType := oldService.Spec.Type
-	newServiceType := newService.Spec.Type
-	if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
-		newService.ResourceVersion = oldService.ResourceVersion
-		newService.Spec.ClusterIP = oldService.Spec.ClusterIP
+		// now, patch the service spec, but when disabling LoadBalancers do update instead
+		// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
+		oldServiceType := oldService.Spec.Type
+		newServiceType := newService.Spec.Type
+		if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
+			newService.ResourceVersion = oldService.ResourceVersion
+			newService.Spec.ClusterIP = oldService.Spec.ClusterIP
+		}
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not update service %q: %v", serviceName, err)
+		}
 	}
-	svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("could not update service %q: %v", serviceName, err)
+
+	if changed, _ := c.compareAnnotations(oldService.Annotations, newService.Annotations); changed {
+		patchData, err := metaAnnotationsPatch(newService.Annotations)
+		if err != nil {
+			return nil, fmt.Errorf("could not form patch for service %q annotations: %v", oldService.Name, err)
+		}
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(context.TODO(), newService.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not patch annotations for service %q: %v", oldService.Name, err)
+		}
 	}
 
 	return svc, nil

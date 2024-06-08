@@ -10,7 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -692,6 +691,26 @@ func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDe
 	return deployment, nil
 }
 
+// patchConnectionPoolerAnnotations updates the annotations of connection pooler deployment
+func patchConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, deployment *appsv1.Deployment, annotations map[string]string) (*appsv1.Deployment, error) {
+	patchData, err := metaAnnotationsPatch(annotations)
+	if err != nil {
+		return nil, fmt.Errorf("could not form patch for the connection pooler deployment metadata: %v", err)
+	}
+	result, err := KubeClient.Deployments(deployment.Namespace).Patch(
+		context.TODO(),
+		deployment.Name,
+		types.MergePatchType,
+		[]byte(patchData),
+		metav1.PatchOptions{},
+		"")
+	if err != nil {
+		return nil, fmt.Errorf("could not patch connection pooler annotations %q: %v", patchData, err)
+	}
+	return result, nil
+
+}
+
 // Test if two connection pooler configuration needs to be synced. For simplicity
 // compare not the actual K8S objects, but the configuration itself and request
 // sync if there is any difference.
@@ -1009,18 +1028,6 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			syncReason = append(syncReason, []string{"new connection pooler's pod template annotations do not match the current one: " + reason}...)
 			deployment.Spec.Template.Annotations = newPodAnnotations
 		}
-		newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(nil)) // including the downscaling annotations
-		ignoredAnnotations := c.extractIgnoredAnnotations(deployment.Annotations)
-		maps.Copy(newAnnotations, ignoredAnnotations)
-		if changed, reason := c.compareAnnotations(deployment.Annotations, newAnnotations); changed {
-			deployment.Annotations = newAnnotations
-			c.logger.Infof("new connection pooler deployments's annotations does not match the current one:" + reason)
-			c.logger.Debug("updating connection pooler deployments's annotations")
-			deployment, err = c.KubeClient.Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
-			if err != nil {
-				return nil, fmt.Errorf("could not update connection pooler annotations %q: %v", deployment.Name, err)
-			}
-		}
 
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
 		syncReason = append(syncReason, defaultsReason...)
@@ -1037,6 +1044,15 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 
 			if err != nil {
 				return syncReason, err
+			}
+			c.ConnectionPooler[role].Deployment = deployment
+		}
+
+		newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(nil)) // including the downscaling annotations
+		if changed, _ := c.compareAnnotations(deployment.Annotations, newAnnotations); changed {
+			deployment, err = patchConnectionPoolerAnnotations(c.KubeClient, deployment, newAnnotations)
+			if err != nil {
+				return nil, err
 			}
 			c.ConnectionPooler[role].Deployment = deployment
 		}
@@ -1068,13 +1084,13 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 				return nil, fmt.Errorf("could not delete pooler pod: %v", err)
 			}
 		} else if changed, _ := c.compareAnnotations(pod.Annotations, deployment.Spec.Template.Annotations); changed {
-			newAnnotations := c.extractIgnoredAnnotations(pod.Annotations)
-			maps.Copy(newAnnotations, deployment.Spec.Template.Annotations)
-			pod.Annotations = newAnnotations
-			c.logger.Debugf("updating annotations for connection pooler's pod %q", pod.Name)
-			_, err := c.KubeClient.Pods(pod.Namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{})
+			patchData, err := metaAnnotationsPatch(deployment.Spec.Template.Annotations)
 			if err != nil {
-				return nil, fmt.Errorf("could not update annotations for pod %q: %v", pod.Name, err)
+				return nil, fmt.Errorf("could not form patch for pooler's pod annotations: %v", err)
+			}
+			_, err = c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("could not patch annotations for pooler's pod %q: %v", pod.Name, err)
 			}
 		}
 	}

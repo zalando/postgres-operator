@@ -764,16 +764,6 @@ func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) 
 
 }
 
-func (c *Cluster) extractIgnoredAnnotations(annoList map[string]string) map[string]string {
-	result := make(map[string]string)
-	for _, ignore := range c.OpConfig.IgnoredAnnotations {
-		if _, ok := annoList[ignore]; ok {
-			result[ignore] = annoList[ignore]
-		}
-	}
-	return result
-}
-
 func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	if old.Spec.Type != new.Spec.Type {
 		return false, fmt.Sprintf("new service's type %q does not match the current one %q",
@@ -788,10 +778,6 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		if !util.IsEqualIgnoreOrder(oldSourceRanges, newSourceRanges) {
 			return false, "new service's LoadBalancerSourceRange does not match the current one"
 		}
-	}
-
-	if changed, reason := c.compareAnnotations(old.Annotations, new.Annotations); changed {
-		return !changed, "new service's annotations does not match the current one:" + reason
 	}
 
 	return true, ""

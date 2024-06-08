@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -21,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var requirePrimaryRestartWhenDecreased = []string{
@@ -201,8 +201,6 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		ignoredAnnotations := c.extractIgnoredAnnotations(svc.Annotations)
-		maps.Copy(desiredSvc.Annotations, ignoredAnnotations)
 		updatedSvc, err := c.updateService(role, svc, desiredSvc)
 		if err != nil {
 			return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
@@ -275,8 +273,6 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
 		c.PodDisruptionBudget = pdb
 		newPDB := c.generatePodDisruptionBudget()
-		ignoredAnnotations := c.extractIgnoredAnnotations(pdb.Annotations)
-		maps.Copy(newPDB.Annotations, ignoredAnnotations)
 		match, reason := c.ComparePodDisruptionBudget(pdb, newPDB)
 		if !match {
 			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
@@ -365,8 +361,6 @@ func (c *Cluster) syncStatefulSet(force bool) error {
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
-		ignoredAnnotations := c.extractIgnoredAnnotations(sset.Annotations)
-		maps.Copy(desiredSts.Annotations, ignoredAnnotations)
 		if reflect.DeepEqual(sset, desiredSts) && !force {
 			return nil
 		}
@@ -395,12 +389,13 @@ func (c *Cluster) syncStatefulSet(force bool) error {
 		if !cmp.rollingUpdate {
 			for _, pod := range pods {
 				if changed, _ := c.compareAnnotations(pod.Annotations, desiredSts.Spec.Template.Annotations); changed {
-					ignoredAnnotations := c.extractIgnoredAnnotations(pod.Annotations)
-					maps.Copy(ignoredAnnotations, desiredSts.Spec.Template.Annotations)
-					pod.Annotations = ignoredAnnotations
-					c.logger.Debugf("updating annotations for pod %q", pod.Name)
-					if _, err := c.KubeClient.Pods(pod.Namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{}); err != nil {
-						return fmt.Errorf("could not update annotations for pod %q: %v", pod.Name, err)
+					patchData, err := metaAnnotationsPatch(desiredSts.Spec.Template.Annotations)
+					if err != nil {
+						return fmt.Errorf("could not form patch for pod %q annotations: %v", pod.Name, err)
+					}
+					_, err = c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+					if err != nil {
+						return fmt.Errorf("could not patch annotations for pod %q: %v", pod.Name, err)
 					}
 				}
 			}
@@ -959,20 +954,23 @@ func (c *Cluster) updateSecret(
 		userMap[userKey] = pwdUser
 	}
 
-	ignoredAnnotations := c.extractIgnoredAnnotations(secret.Annotations)
-	maps.Copy(generatedSecret.Annotations, ignoredAnnotations)
-	if changed, reason := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations); changed {
-		c.logger.Infof("%q secret's annotations does not match the current one: %s", secretName, reason)
-		secret.Annotations = generatedSecret.Annotations
-		updateSecret = true
-	}
-
 	if updateSecret {
 		c.logger.Debugln(updateSecretMsg)
 		if _, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("could not update secret %s: %v", secretName, err)
 		}
 		c.Secrets[secret.UID] = secret
+	}
+
+	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations); changed {
+		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
+		if err != nil {
+			return fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
+		}
+		_, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("could not patch annotations for secret %q: %v", secret.Name, err)
+		}
 	}
 
 	return nil

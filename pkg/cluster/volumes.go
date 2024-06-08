@@ -3,13 +3,13 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"maps"
 	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -217,14 +217,6 @@ func (c *Cluster) syncVolumeClaims(noResize bool) error {
 			}
 		}
 
-		newAnnotations := c.annotationsSet(nil)
-		if changed, reason := c.compareAnnotations(pvc.Annotations, newAnnotations); changed {
-			maps.Copy(newAnnotations, c.extractIgnoredAnnotations(pvc.Annotations))
-			pvc.Annotations = newAnnotations
-			needsUpdate = true
-			c.logger.Debugf("persistent volume claim's annotations for volume %q needs to be updated: %s", pvc.Name, reason)
-		}
-
 		if needsUpdate {
 			c.logger.Debugf("updating persistent volume claim definition for volume %q", pvc.Name)
 			if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{}); err != nil {
@@ -233,6 +225,18 @@ func (c *Cluster) syncVolumeClaims(noResize bool) error {
 			c.logger.Debugf("successfully updated persistent volume claim %q", pvc.Name)
 		} else {
 			c.logger.Debugf("volume claim for volume %q do not require updates", pvc.Name)
+		}
+
+		newAnnotations := c.annotationsSet(nil)
+		if changed, _ := c.compareAnnotations(pvc.Annotations, newAnnotations); changed {
+			patchData, err := metaAnnotationsPatch(newAnnotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for the persistent volume claim for volume %q: %v", pvc.Name, err)
+			}
+			_, err = c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of the persistent volume claim for volume %q: %v", pvc.Name, err)
+			}
 		}
 	}
 
