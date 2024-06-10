@@ -360,6 +360,10 @@ configuration they are grouped under the `kubernetes` key.
   `"retain"` - or `when_scaled` - default is also `"retain"`. The other possible
   option is `delete`.
 
+* **enable_secrets_deletion**
+  By default, the operator deletes secrets when removing the Postgres cluster
+  manifest. To keep secrets, set this option to `false`. The default is `true`.
+
 * **enable_persistent_volume_claim_deletion**
   By default, the operator deletes PersistentVolumeClaims when removing the
   Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
@@ -817,7 +821,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
