@@ -180,8 +180,21 @@ func checkResourcesInheritedAnnotations(cluster *Cluster, resultAnnotations map[
 		return nil
 	}
 
+	checkEndpoints := func(annotations map[string]string) error {
+		endpointsList, err := cluster.KubeClient.Endpoints(namespace).List(context.TODO(), clusterOptions)
+		if err != nil {
+			return err
+		}
+		for _, ep := range endpointsList.Items {
+			if err := containsAnnotations(annotations, ep.Annotations, ep.Name, "Endpoints"); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	checkFuncs := []func(map[string]string) error{
-		checkSts, checkPods, checkSvc, checkPdb, checkPooler, checkPvc, checkSecrets,
+		checkSts, checkPods, checkSvc, checkPdb, checkPooler, checkPvc, checkSecrets, checkEndpoints,
 	}
 	for _, f := range checkFuncs {
 		if err := f(resultAnnotations); err != nil {
@@ -232,6 +245,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
+			NumberOfInstances: 2,
 		},
 	}
 
@@ -260,6 +274,8 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 					PodRoleLabel:          "spilo-role",
 					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
 					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					MinInstances:          -1,
+					MaxInstances:          -1,
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -376,6 +392,17 @@ func annotateResources(cluster *Cluster) error {
 	for _, secret := range secrets.Items {
 		secret.Annotations = externalAnnotations
 		if _, err = cluster.KubeClient.Secrets(namespace).Update(context.TODO(), &secret, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+	}
+
+	endpoints, err := cluster.KubeClient.Endpoints(namespace).List(context.TODO(), clusterOptions)
+	if err != nil {
+		return err
+	}
+	for _, ep := range endpoints.Items {
+		ep.Annotations = externalAnnotations
+		if _, err = cluster.KubeClient.Endpoints(namespace).Update(context.TODO(), &ep, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 	}

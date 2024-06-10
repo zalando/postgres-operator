@@ -239,7 +239,17 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	c.setProcessName("syncing %s endpoint", role)
 
 	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.endpointName(role), metav1.GetOptions{}); err == nil {
-		// TODO: No syncing of endpoints here, is this covered completely by updateService?
+		desiredEp := c.generateEndpoint(role, ep.Subsets)
+		if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations); changed {
+			patchData, err := metaAnnotationsPatch(desiredEp.Annotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
+			}
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), c.endpointName(role), types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of %s endpoint: %v", role, err)
+			}
+		}
 		c.Endpoints[role] = ep
 		return nil
 	}
@@ -1409,6 +1419,16 @@ func (c *Cluster) syncLogicalBackupJob() error {
 				return fmt.Errorf("could not update logical backup job to match desired state: %v", err)
 			}
 			c.logger.Info("the logical backup job is synced")
+		}
+		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations); changed {
+			patchData, err := metaAnnotationsPatch(desiredJob.Annotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for the logical backup job %q: %v", jobName, err)
+			}
+			_, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of the logical backup job %q: %v", jobName, err)
+			}
 		}
 		return nil
 	}
