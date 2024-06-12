@@ -521,7 +521,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 			}
 			if changed, reason := c.compareAnnotations(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations); changed {
 				needsReplace = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one: ", name)+reason)
+				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one: %s", name, reason))
 			}
 			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
 				name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
@@ -826,7 +826,7 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool
 	return true, ""
 }
 
-func (c *Cluster) ComparePodDisruptionBudget(cur, new *apipolicyv1.PodDisruptionBudget) (bool, string) {
+func (c *Cluster) comparePodDisruptionBudget(cur, new *apipolicyv1.PodDisruptionBudget) (bool, string) {
 	//TODO: improve comparison
 	if match := reflect.DeepEqual(new.Spec, cur.Spec); !match {
 		return false, "new PDB spec does not match the current one"

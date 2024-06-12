@@ -282,7 +282,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
 		c.PodDisruptionBudget = pdb
 		newPDB := c.generatePodDisruptionBudget()
-		match, reason := c.ComparePodDisruptionBudget(pdb, newPDB)
+		match, reason := c.comparePodDisruptionBudget(pdb, newPDB)
 		if !match {
 			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
 			if err = c.updatePodDisruptionBudget(newPDB); err != nil {
