@@ -1,7 +1,7 @@
 image:
   registry: ghcr.io
   repository: zalando/postgres-operator
-  tag: v1.12.0
+  tag: v1.12.1
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -362,7 +362,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.0"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.1"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
