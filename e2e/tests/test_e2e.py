@@ -909,25 +909,35 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         k8s = self.k8s
 
-        annotation_patch = {
-            "metadata": {
-                "annotations": {
-                    "k8s-status": "healthy"
-                },
-            }
-        }
 
         try:
+            patch_config_ignored_annotations = {
+                "data": {
+                    "ignored_annotations": "k8s-status",
+                }
+            }
+            k8s.update_config(patch_config_ignored_annotations)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
             sts = k8s.api.apps_v1.read_namespaced_stateful_set('acid-minimal-cluster', 'default')
+            svc = k8s.api.core_v1.read_namespaced_service('acid-minimal-cluster', 'default')
+
+            annotation_patch = {
+                "metadata": {
+                    "annotations": {
+                        "k8s-status": "healthy"
+                    },
+                }
+            }
+            
             old_sts_creation_timestamp = sts.metadata.creation_timestamp
             k8s.api.apps_v1.patch_namespaced_stateful_set(sts.metadata.name, sts.metadata.namespace, annotation_patch)
-            svc = k8s.api.core_v1.read_namespaced_service('acid-minimal-cluster', 'default')
             old_svc_creation_timestamp = svc.metadata.creation_timestamp
             k8s.api.core_v1.patch_namespaced_service(svc.metadata.name, svc.metadata.namespace, annotation_patch)
 
             patch_config_ignored_annotations = {
                 "data": {
-                    "ignored_annotations": "k8s-status",
+                    "ignored_annotations": "k8s-status, foo",
                 }
             }
             k8s.update_config(patch_config_ignored_annotations)
