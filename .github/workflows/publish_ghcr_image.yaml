@@ -65,7 +65,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          build-args: BASE_IMAGE=alpine:3.15
+          build-args: BASE_IMAGE=alpine:3
           tags: "${{ steps.image.outputs.OPERATOR_IMAGE }}"
           platforms: linux/amd64,linux/arm64
 
