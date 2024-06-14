@@ -83,7 +83,7 @@ data:
   # logical_backup_azure_storage_account_key: ""
   # logical_backup_cpu_limit: ""
   # logical_backup_cpu_request: ""
-  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.0"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"
   # logical_backup_google_application_credentials: ""
   logical_backup_job_prefix: "logical-backup-"
   # logical_backup_memory_limit: ""
