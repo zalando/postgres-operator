@@ -506,7 +506,7 @@ spec:
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                   logical_backup_docker_image:
                     type: string
-                    default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.1"
+                    default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
