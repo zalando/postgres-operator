@@ -18,7 +18,7 @@ spec:
       serviceAccountName: postgres-operator-ui
       containers:
         - name: "service"
-          image: ghcr.io/zalando/postgres-operator-ui:v1.12.1
+          image: ghcr.io/zalando/postgres-operator-ui:v1.12.2
           ports:
             - containerPort: 8081
               protocol: "TCP"
