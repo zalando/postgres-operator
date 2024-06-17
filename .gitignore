@@ -102,3 +102,5 @@ e2e/tls
 *.pot
 
 mocks
+
+ui/.npm/
