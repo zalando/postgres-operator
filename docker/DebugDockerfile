@@ -2,7 +2,7 @@ FROM golang:1.22-alpine
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 # We need root certificates to deal with teams api over https
-RUN  apk -U add --no-cache ca-certificates delve
+RUN apk -U add --no-cache ca-certificates delve
 
 COPY build/* /
 
