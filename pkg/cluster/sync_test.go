@@ -128,7 +128,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 	}
 
 	// now sync statefulset - the diff will trigger a replacement of the statefulset
-	cluster.syncStatefulSet(true)
+	cluster.syncStatefulSet()
 
 	// compare again after the SYNC - must be identical to the desired state
 	cmp = cluster.compareStatefulSetWith(desiredSts)
@@ -572,7 +572,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	cluster.Spec.StandbyCluster = &acidv1.StandbyDescription{
 		S3WalPath: "s3://custom/path/to/bucket/",
 	}
-	cluster.syncStatefulSet(true)
+	cluster.syncStatefulSet()
 	updatedSts := cluster.Statefulset
 
 	// check that pods do not have a STANDBY_* environment variable
@@ -605,7 +605,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	*/
 	// remove standby section
 	cluster.Spec.StandbyCluster = &acidv1.StandbyDescription{}
-	cluster.syncStatefulSet(true)
+	cluster.syncStatefulSet()
 	updatedSts2 := cluster.Statefulset
 
 	// check that pods do not have a STANDBY_* environment variable

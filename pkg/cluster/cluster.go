@@ -401,7 +401,7 @@ func (c *Cluster) Create() (err error) {
 
 	if len(c.Spec.Streams) > 0 {
 		// creating streams requires syncing the statefulset first
-		err = c.syncStatefulSet(true)
+		err = c.syncStatefulSet()
 		if err != nil {
 			return fmt.Errorf("could not sync statefulset: %v", err)
 		}
@@ -902,7 +902,6 @@ func (c *Cluster) hasFinalizer() bool {
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
 	userInitFailed := false
-	syncStatefulSet := false
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -933,7 +932,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	if IsBiggerPostgresVersion(oldSpec.Spec.PostgresqlParam.PgVersion, c.GetDesiredMajorVersion()) {
 		c.logger.Infof("postgresql version increased (%s -> %s), depending on config manual upgrade needed",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
-		syncStatefulSet = true
 	} else {
 		c.logger.Infof("postgresql major version unchanged or smaller, no changes needed")
 		// sticking with old version, this will also advance GetDesiredVersion next time.
@@ -991,18 +989,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume size sync.")
 	}
 
-	// streams configuration
-	if len(oldSpec.Spec.Streams) == 0 && len(newSpec.Spec.Streams) > 0 {
-		syncStatefulSet = true
-	}
-
 	// Statefulset
 	func() {
-		if err := c.syncStatefulSet(syncStatefulSet); err != nil {
+		if err := c.syncStatefulSet(); err != nil {
 			c.logger.Errorf("could not sync statefulsets: %v", err)
 			updateFailed = true
 		}
-		syncStatefulSet = false
 	}()
 
 	// add or remove standby_cluster section from Patroni config depending on changes in standby section

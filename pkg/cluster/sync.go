@@ -92,7 +92,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	if err = c.syncStatefulSet(true); err != nil {
+	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
 			return err
@@ -317,7 +317,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	return nil
 }
 
-func (c *Cluster) syncStatefulSet(force bool) error {
+func (c *Cluster) syncStatefulSet() error {
 	var (
 		restartWait         uint32
 		configPatched       bool
@@ -339,9 +339,6 @@ func (c *Cluster) syncStatefulSet(force bool) error {
 	}
 
 	if err != nil {
-		if !force {
-			return nil
-		}
 		// statefulset does not exist, try to re-create it
 		c.Statefulset = nil
 		c.logger.Infof("cluster's statefulset does not exist")
@@ -369,9 +366,6 @@ func (c *Cluster) syncStatefulSet(force bool) error {
 		desiredSts, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
-		}
-		if reflect.DeepEqual(sset, desiredSts) && !force {
-			return nil
 		}
 		c.logger.Debugf("syncing statefulsets")
 		// check if there are still pods with a rolling update flag
