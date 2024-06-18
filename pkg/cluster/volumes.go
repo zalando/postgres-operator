@@ -42,22 +42,14 @@ func (c *Cluster) syncVolumes() error {
 				c.logger.Errorf("errors occured during EBS volume adjustments: %v", err)
 			}
 		}
+	}
 
-		// resize pvc to adjust filesystem size until better K8s support
-		if err = c.syncVolumeClaims(false); err != nil {
-			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
-			return err
-		}
-	} else if c.OpConfig.StorageResizeMode == "pvc" {
-		if err = c.syncVolumeClaims(false); err != nil {
-			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
-			return err
-		}
-	} else if c.OpConfig.StorageResizeMode == "ebs" {
-		if err = c.syncVolumeClaims(true); err != nil {
-			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
-			return err
-		}
+	if err = c.syncVolumeClaims(); err != nil {
+		err = fmt.Errorf("could not sync persistent volume claims: %v", err)
+		return err
+	}
+
+	if c.OpConfig.StorageResizeMode == "ebs" {
 		// potentially enlarge volumes before changing the statefulset. By doing that
 		// in this order we make sure the operator is not stuck waiting for a pod that
 		// cannot start because it ran out of disk space.
@@ -67,11 +59,6 @@ func (c *Cluster) syncVolumes() error {
 		if err = c.syncEbsVolumes(); err != nil {
 			err = fmt.Errorf("could not sync persistent volumes: %v", err)
 			return err
-		}
-	} else {
-		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume size sync.")
-		if err := c.syncVolumeClaims(true); err != nil {
-			c.logger.Errorf("could not sync persistent volume claims: %v", err)
 		}
 	}
 
@@ -191,8 +178,17 @@ func (c *Cluster) populateVolumeMetaData() error {
 }
 
 // syncVolumeClaims reads all persistent volume claims and checks that their size matches the one declared in the statefulset.
-func (c *Cluster) syncVolumeClaims(noResize bool) error {
+func (c *Cluster) syncVolumeClaims() error {
 	c.setProcessName("syncing volume claims")
+
+	ignoreResize := false
+
+	if c.OpConfig.StorageResizeMode == "off" || c.OpConfig.StorageResizeMode == "ebs" {
+		ignoreResize = true
+		if c.OpConfig.StorageResizeMode == "off" {
+			c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume size sync.")
+		}
+	}
 
 	newSize, err := resource.ParseQuantity(c.Spec.Volume.Size)
 	if err != nil {
@@ -207,7 +203,7 @@ func (c *Cluster) syncVolumeClaims(noResize bool) error {
 	for _, pvc := range pvcs {
 		needsUpdate := false
 		currentSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
-		if !noResize && currentSize != manifestSize {
+		if !ignoreResize && currentSize != manifestSize {
 			if currentSize < manifestSize {
 				pvc.Spec.Resources.Requests[v1.ResourceStorage] = newSize
 				needsUpdate = true

@@ -935,12 +935,7 @@ class EndToEndTestCase(unittest.TestCase):
             old_svc_creation_timestamp = svc.metadata.creation_timestamp
             k8s.api.core_v1.patch_namespaced_service(svc.metadata.name, svc.metadata.namespace, annotation_patch)
 
-            patch_config_ignored_annotations = {
-                "data": {
-                    "ignored_annotations": "k8s-status, foo",
-                }
-            }
-            k8s.update_config(patch_config_ignored_annotations)
+            k8s.delete_operator_pod()
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             sts = k8s.api.apps_v1.read_namespaced_stateful_set('acid-minimal-cluster', 'default')
