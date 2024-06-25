@@ -478,7 +478,7 @@ priorityClassName: ""
 # priority class for database pods
 podPriorityClassName:
   # If create is false with no name set, no podPriorityClassName is specified.
-  # Hence, the pod priorityClass is the one with globalDefault set. 
+  # Hence, the pod priorityClass is the one with globalDefault set.
   # If there is no PriorityClass with globalDefault set, the priority of Pods with no priorityClassName is zero.
   create: true
   # If not set a name is generated using the fullname template and "-pod" suffix
@@ -503,6 +503,25 @@ securityContext:
 readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 10
+
+# configure extra ENVs
+# Extra ENVs are writen in kubernetes format and added "as is" to the pod's env variables
+# https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
+# https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#environment-variables
+# UI specific env variables can be found here: https://github.com/zalando/postgres-operator/blob/master/ui/operator_ui/main.py
+extraEnvs:
+  []
+  # Exemple of settings to make snapshot view working in the ui when using AWS
+  # - name: MY_VAR
+  #   value: my-value
+  # - name: GOMAXPROCS
+  #   valueFrom:
+  #     resourceFieldRef:
+  #       resource: limits.cpu
+  # - name: GOMEMLIMIT
+  #   valueFrom:
+  #     resourceFieldRef:
+  #       resource: limits.memory
 
 # Affinity for pod assignment
 # Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
