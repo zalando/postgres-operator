@@ -3,7 +3,6 @@ package k8sutil
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	b64 "encoding/base64"
 	"encoding/json"
@@ -17,7 +16,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/spec"
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apipolicyv1 "k8s.io/api/policy/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
@@ -248,17 +246,6 @@ func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg
 	}
 
 	return updatedPg, nil
-}
-
-// SamePDB compares the PodDisruptionBudgets
-func SamePDB(cur, new *apipolicyv1.PodDisruptionBudget) (match bool, reason string) {
-	//TODO: improve comparison
-	match = reflect.DeepEqual(new.Spec, cur.Spec)
-	if !match {
-		reason = "new PDB spec does not match the current one"
-	}
-
-	return
 }
 
 func (c *mockCustomResourceDefinition) Get(ctx context.Context, name string, options metav1.GetOptions) (*apiextv1.CustomResourceDefinition, error) {

@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
 # pylama:ignore=E402
 
-import gevent.monkey
-
-gevent.monkey.patch_all()
-
 import requests
 import tokens
-import sys
 
 from backoff import expo, on_exception
 from click import ParamType, command, echo, option
@@ -25,7 +20,6 @@ from gevent import sleep, spawn
 from gevent.pywsgi import WSGIServer
 from jq import jq
 from json import dumps, loads
-from logging import DEBUG, ERROR, INFO, basicConfig, exception, getLogger
 from os import getenv
 from re import X, compile
 from requests.exceptions import RequestException
@@ -56,11 +50,7 @@ from .utils import (
     these,
 )
 
-
-# Disable access logs from Flask
-getLogger('gevent').setLevel(ERROR)
-
-logger = getLogger(__name__)
+from operator_ui.adapters.logger import logger
 
 SERVER_STATUS = {'shutdown': False}
 
@@ -77,7 +67,7 @@ SPILO_S3_BACKUP_PREFIX = getenv('SPILO_S3_BACKUP_PREFIX', 'spilo/')
 SUPERUSER_TEAM = getenv('SUPERUSER_TEAM', 'acid')
 TARGET_NAMESPACE = getenv('TARGET_NAMESPACE')
 GOOGLE_ANALYTICS = getenv('GOOGLE_ANALYTICS', False)
-MIN_PODS= getenv('MIN_PODS', 2)
+MIN_PODS = getenv('MIN_PODS', 2)
 RESOURCES_VISIBLE = getenv('RESOURCES_VISIBLE', True)
 CUSTOM_MESSAGE_RED = getenv('CUSTOM_MESSAGE_RED', '')
 
@@ -983,8 +973,6 @@ def init_cluster():
 )
 def main(port, debug, clusters: list):
     global TARGET_NAMESPACE
-
-    basicConfig(stream=sys.stdout, level=(DEBUG if debug else INFO), format='%(asctime)s %(levelname)s: %(message)s',)
 
     init_cluster()
 

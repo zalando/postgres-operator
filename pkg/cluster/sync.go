@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var requirePrimaryRestartWhenDecreased = []string{
@@ -91,7 +92,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	c.logger.Debug("syncing statefulsets")
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
@@ -200,15 +200,12 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		if match, reason := c.compareServices(svc, desiredSvc); !match {
-			c.logServiceChanges(role, svc, desiredSvc, false, reason)
-			updatedSvc, err := c.updateService(role, svc, desiredSvc)
-			if err != nil {
-				return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
-			}
-			c.Services[role] = updatedSvc
-			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
+		updatedSvc, err := c.updateService(role, svc, desiredSvc)
+		if err != nil {
+			return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
+		c.Services[role] = updatedSvc
+		c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		return nil
 	}
 	if !k8sutil.ResourceNotFound(err) {
@@ -241,7 +238,17 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	c.setProcessName("syncing %s endpoint", role)
 
 	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.endpointName(role), metav1.GetOptions{}); err == nil {
-		// TODO: No syncing of endpoints here, is this covered completely by updateService?
+		desiredEp := c.generateEndpoint(role, ep.Subsets)
+		if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations); changed {
+			patchData, err := metaAnnotationsPatch(desiredEp.Annotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
+			}
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), c.endpointName(role), types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of %s endpoint: %v", role, err)
+			}
+		}
 		c.Endpoints[role] = ep
 		return nil
 	}
@@ -275,7 +282,8 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
 		c.PodDisruptionBudget = pdb
 		newPDB := c.generatePodDisruptionBudget()
-		if match, reason := k8sutil.SamePDB(pdb, newPDB); !match {
+		match, reason := c.comparePodDisruptionBudget(pdb, newPDB)
+		if !match {
 			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
 			if err = c.updatePodDisruptionBudget(newPDB); err != nil {
 				return err
@@ -326,10 +334,11 @@ func (c *Cluster) syncStatefulSet() error {
 
 	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
 	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(context.TODO(), c.statefulSetName(), metav1.GetOptions{})
+	if err != nil && !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("error during reading of statefulset: %v", err)
+	}
+
 	if err != nil {
-		if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("error during reading of statefulset: %v", err)
-		}
 		// statefulset does not exist, try to re-create it
 		c.Statefulset = nil
 		c.logger.Infof("cluster's statefulset does not exist")
@@ -354,6 +363,11 @@ func (c *Cluster) syncStatefulSet() error {
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))
 
 	} else {
+		desiredSts, err := c.generateStatefulSet(&c.Spec)
+		if err != nil {
+			return fmt.Errorf("could not generate statefulset: %v", err)
+		}
+		c.logger.Debugf("syncing statefulsets")
 		// check if there are still pods with a rolling update flag
 		for _, pod := range pods {
 			if c.getRollingUpdateFlagFromPod(&pod) {
@@ -374,12 +388,21 @@ func (c *Cluster) syncStatefulSet() error {
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 
-		desiredSts, err := c.generateStatefulSet(&c.Spec)
-		if err != nil {
-			return fmt.Errorf("could not generate statefulset: %v", err)
-		}
-
 		cmp := c.compareStatefulSetWith(desiredSts)
+		if !cmp.rollingUpdate {
+			for _, pod := range pods {
+				if changed, _ := c.compareAnnotations(pod.Annotations, desiredSts.Spec.Template.Annotations); changed {
+					patchData, err := metaAnnotationsPatch(desiredSts.Spec.Template.Annotations)
+					if err != nil {
+						return fmt.Errorf("could not form patch for pod %q annotations: %v", pod.Name, err)
+					}
+					_, err = c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+					if err != nil {
+						return fmt.Errorf("could not patch annotations for pod %q: %v", pod.Name, err)
+					}
+				}
+			}
+		}
 		if !cmp.match {
 			if cmp.rollingUpdate {
 				podsToRecreate = make([]v1.Pod, 0)
@@ -942,6 +965,17 @@ func (c *Cluster) updateSecret(
 		c.Secrets[secret.UID] = secret
 	}
 
+	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations); changed {
+		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
+		if err != nil {
+			return fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
+		}
+		_, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("could not patch annotations for secret %q: %v", secret.Name, err)
+		}
+	}
+
 	return nil
 }
 
@@ -1378,6 +1412,16 @@ func (c *Cluster) syncLogicalBackupJob() error {
 				return fmt.Errorf("could not update logical backup job to match desired state: %v", err)
 			}
 			c.logger.Info("the logical backup job is synced")
+		}
+		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations); changed {
+			patchData, err := metaAnnotationsPatch(desiredJob.Annotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for the logical backup job %q: %v", jobName, err)
+			}
+			_, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of the logical backup job %q: %v", jobName, err)
+			}
 		}
 		return nil
 	}

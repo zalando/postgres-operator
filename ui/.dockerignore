@@ -5,6 +5,8 @@
 .git
 __pycache__
 
+.npm/
+
 app/node_modules
 operator_ui/static/build/*.hot-update.js
 operator_ui/static/build/*.hot-update.json
