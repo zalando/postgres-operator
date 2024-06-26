@@ -691,8 +691,8 @@ func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDe
 	return deployment, nil
 }
 
-// updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
-func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, deployment *appsv1.Deployment, annotations map[string]string) (*appsv1.Deployment, error) {
+// patchConnectionPoolerAnnotations updates the annotations of connection pooler deployment
+func patchConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, deployment *appsv1.Deployment, annotations map[string]string) (*appsv1.Deployment, error) {
 	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
 		return nil, fmt.Errorf("could not form patch for the connection pooler deployment metadata: %v", err)
@@ -1022,6 +1022,13 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			syncReason = append(syncReason, specReason...)
 		}
 
+		newPodAnnotations := c.annotationsSet(c.generatePodAnnotations(&c.Spec))
+		if changed, reason := c.compareAnnotations(deployment.Spec.Template.Annotations, newPodAnnotations); changed {
+			specSync = true
+			syncReason = append(syncReason, []string{"new connection pooler's pod template annotations do not match the current one: " + reason}...)
+			deployment.Spec.Template.Annotations = newPodAnnotations
+		}
+
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
 		syncReason = append(syncReason, defaultsReason...)
 
@@ -1040,15 +1047,15 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			}
 			c.ConnectionPooler[role].Deployment = deployment
 		}
-	}
 
-	newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(c.ConnectionPooler[role].Deployment.Annotations))
-	if newAnnotations != nil {
-		deployment, err = updateConnectionPoolerAnnotations(c.KubeClient, c.ConnectionPooler[role].Deployment, newAnnotations)
-		if err != nil {
-			return nil, err
+		newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(nil)) // including the downscaling annotations
+		if changed, _ := c.compareAnnotations(deployment.Annotations, newAnnotations); changed {
+			deployment, err = patchConnectionPoolerAnnotations(c.KubeClient, deployment, newAnnotations)
+			if err != nil {
+				return nil, err
+			}
+			c.ConnectionPooler[role].Deployment = deployment
 		}
-		c.ConnectionPooler[role].Deployment = deployment
 	}
 
 	// check if pooler pods must be replaced due to secret update
@@ -1076,22 +1083,27 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			if err != nil {
 				return nil, fmt.Errorf("could not delete pooler pod: %v", err)
 			}
+		} else if changed, _ := c.compareAnnotations(pod.Annotations, deployment.Spec.Template.Annotations); changed {
+			patchData, err := metaAnnotationsPatch(deployment.Spec.Template.Annotations)
+			if err != nil {
+				return nil, fmt.Errorf("could not form patch for pooler's pod annotations: %v", err)
+			}
+			_, err = c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("could not patch annotations for pooler's pod %q: %v", pod.Name, err)
+			}
 		}
 	}
 
 	if service, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
 		c.ConnectionPooler[role].Service = service
 		desiredSvc := c.generateConnectionPoolerService(c.ConnectionPooler[role])
-		if match, reason := c.compareServices(service, desiredSvc); !match {
-			syncReason = append(syncReason, reason)
-			c.logServiceChanges(role, service, desiredSvc, false, reason)
-			newService, err = c.updateService(role, service, desiredSvc)
-			if err != nil {
-				return syncReason, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
-			}
-			c.ConnectionPooler[role].Service = newService
-			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
+		newService, err = c.updateService(role, service, desiredSvc)
+		if err != nil {
+			return syncReason, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
+		c.ConnectionPooler[role].Service = newService
+		c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		return NoSync, nil
 	}
 
