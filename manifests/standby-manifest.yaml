@@ -14,3 +14,4 @@ spec:
     # s3_wal_path: "s3://mybucket/spilo/acid-minimal-cluster/abcd1234-2a4b-4b2a-8c9c-c1234defg567/wal/14/"
     standby_host: "acid-minimal-cluster.default"
     # standby_port: "5432"
+    # standby_primary_slot_name: "slot"
