@@ -351,7 +351,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					},
 					"logicalBackupSchedule": {
 						Type:    "string",
-						Pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$",
 					},
 					"maintenanceWindows": {
 						Type: "array",
