@@ -139,7 +139,7 @@ rules:
   - delete
   - get
   - list
-{{- if toString .Values.configKubernetes.storage_resize_mode | eq "pvc" }}
+{{- if or (toString .Values.configKubernetes.storage_resize_mode | eq "pvc") (toString .Values.configKubernetes.storage_resize_mode | eq "mixed") }}
   - patch
   - update
 {{- end }}

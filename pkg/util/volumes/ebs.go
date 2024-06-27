@@ -36,7 +36,8 @@ func (r *EBSVolumeResizer) IsConnectedToProvider() bool {
 
 // VolumeBelongsToProvider checks if the given persistent volume is backed by EBS.
 func (r *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool {
-	return pv.Spec.AWSElasticBlockStore != nil && pv.Annotations[constants.VolumeStorateProvisionerAnnotation] == constants.EBSProvisioner
+	return (pv.Spec.AWSElasticBlockStore != nil && pv.Annotations[constants.VolumeStorateProvisionerAnnotation] == constants.EBSProvisioner) ||
+		(pv.Spec.CSI != nil && pv.Spec.CSI.Driver == constants.EBSDriver)
 }
 
 // ExtractVolumeID extracts volumeID from "aws://eu-central-1a/vol-075ddfc4a127d0bd4"
@@ -54,7 +55,12 @@ func (r *EBSVolumeResizer) ExtractVolumeID(volumeID string) (string, error) {
 
 // GetProviderVolumeID converts aws://eu-central-1b/vol-00f93d4827217c629 to vol-00f93d4827217c629 for EBS volumes
 func (r *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string, error) {
-	volumeID := pv.Spec.AWSElasticBlockStore.VolumeID
+	var volumeID string = ""
+	if pv.Spec.CSI != nil {
+		volumeID = pv.Spec.CSI.VolumeHandle
+	} else if pv.Spec.AWSElasticBlockStore != nil {
+		volumeID = pv.Spec.AWSElasticBlockStore.VolumeID
+	}
 	if volumeID == "" {
 		return "", fmt.Errorf("got empty volume id for volume %v", pv)
 	}
