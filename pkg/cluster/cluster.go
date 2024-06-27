@@ -1082,7 +1082,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}
 
 	// streams
-	if len(newSpec.Spec.Streams) > 0 {
+	if len(newSpec.Spec.Streams) > 0 || len(oldSpec.Spec.Streams) != len(newSpec.Spec.Streams) {
 		if err := c.syncStreams(); err != nil {
 			c.logger.Errorf("could not sync streams: %v", err)
 			updateFailed = true
