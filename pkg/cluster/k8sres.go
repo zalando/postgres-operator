@@ -1530,10 +1530,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.statefulSetName(),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
+			Name:            c.statefulSetName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.AnnotationsToPropagate(c.annotationsSet(nil)),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:                             &numberOfInstances,
@@ -1931,10 +1932,11 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.credentialSecretName(username),
-			Namespace:   pgUser.Namespace,
-			Labels:      lbls,
-			Annotations: c.annotationsSet(nil),
+			Name:            c.credentialSecretName(username),
+			Namespace:       pgUser.Namespace,
+			Labels:          lbls,
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -1992,10 +1994,11 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.serviceName(role),
-			Namespace:   c.Namespace,
-			Labels:      c.roleLabelsSet(true, role),
-			Annotations: c.annotationsSet(c.generateServiceAnnotations(role, spec)),
+			Name:            c.serviceName(role),
+			Namespace:       c.Namespace,
+			Labels:          c.roleLabelsSet(true, role),
+			Annotations:     c.annotationsSet(c.generateServiceAnnotations(role, spec)),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: serviceSpec,
 	}
@@ -2065,6 +2068,7 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 			Namespace:   c.Namespace,
 			Annotations: c.annotationsSet(nil),
 			Labels:      c.roleLabelsSet(true, role),
+			OwnerReferences: c.ownerReferences(),
 		},
 	}
 	if len(subsets) > 0 {
@@ -2225,10 +2229,11 @@ func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.podDisruptionBudgetName(),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.annotationsSet(nil),
+			Name:            c.podDisruptionBudgetName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
@@ -2361,10 +2366,11 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.getLogicalBackupJobName(),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.annotationsSet(nil),
+			Name:            c.getLogicalBackupJobName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
@@ -2521,17 +2527,12 @@ func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 func (c *Cluster) ownerReferences() []metav1.OwnerReference {
 	controller := true
 
-	if c.Statefulset == nil {
-		c.logger.Warning("Cannot get owner reference, no statefulset")
-		return []metav1.OwnerReference{}
-	}
-
 	return []metav1.OwnerReference{
 		{
-			UID:        c.Statefulset.ObjectMeta.UID,
-			APIVersion: "apps/v1",
-			Kind:       "StatefulSet",
-			Name:       c.Statefulset.ObjectMeta.Name,
+			UID:        c.Postgresql.ObjectMeta.UID,
+			APIVersion: acidv1.SchemeGroupVersion.Identifier(),
+			Kind:       acidv1.PostgresCRDResourceKind,
+			Name:       c.Postgresql.ObjectMeta.Name,
 			Controller: &controller,
 		},
 	}
