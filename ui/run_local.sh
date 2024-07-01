@@ -31,11 +31,11 @@ default_operator_ui_config='{
   "limit_iops": 16000,
   "limit_throughput": 1000,
   "postgresql_versions": [
+    "16",
     "15",
     "14",
     "13",
-    "12",
-    "11"
+    "12"
   ],
   "static_network_whitelist": {
     "localhost": ["172.0.0.1/32"]

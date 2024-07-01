@@ -355,6 +355,23 @@ This would be the recommended option to enable rotation in secrets of database
 owners, but only if they are not used as application users for regular read
 and write operations.
 
+### Ignore rotation for certain users
+
+If you wish to globally enable password rotation but need certain users to
+opt out from it there are two ways. First, you can remove the user from the
+manifest's `users` section. The corresponding secret to this user will no
+longer be synced by the operator then.
+
+Secondly, if you want the operator to continue syncing the secret (e.g. to
+recreate if it got accidentally removed) but cannot allow it being rotated,
+add the user to the following list in your manifest:
+
+```
+spec:
+  usersIgnoringSecretRotation:
+  - bar_user
+```
+
 ### Turning off password rotation
 
 When password rotation is turned off again the operator will check if the
@@ -1200,7 +1217,7 @@ aws_or_gcp:
 
 If cluster members have to be (re)initialized restoring physical backups
 happens automatically either from the backup location or by running
-[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html)
+[pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html)
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.
@@ -1266,7 +1283,7 @@ but only snapshots of your data. In its current state, see logical backups as a
 way to quickly create SQL dumps that you can easily restore in an empty test
 cluster.
 
-2. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile) implements the backup
+2. The [example image](https://github.com/zalando/postgres-operator/blob/master/logical-backup/Dockerfile) implements the backup
 via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket.
 `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when
 possible.
@@ -1348,6 +1365,8 @@ You can also expose the operator API through a [service](https://github.com/zala
 Some displayed options can be disabled from UI using simple flags under the
 `OPERATOR_UI_CONFIG` field in the deployment.
 
+The viewing and creation of clusters within the UI is limited to the namespace specified by the `TARGET_NAMESPACE` option. To allow the creation and viewing of clusters in all namespaces, set `TARGET_NAMESPACE` to `*`.
+
 ### Deploy the UI on K8s
 
 Now, apply all manifests from the `ui/manifests` folder to deploy the Postgres
@@ -1380,7 +1399,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.8.1 .
+docker build -t ghcr.io/zalando/postgres-operator-ui:v1.12.2 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/

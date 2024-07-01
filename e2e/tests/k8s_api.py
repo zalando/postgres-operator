@@ -202,6 +202,9 @@ class K8s:
         return len(self.api.policy_v1.list_namespaced_pod_disruption_budget(
             namespace, label_selector=labels).items)
 
+    def count_pvcs_with_label(self, labels, namespace='default'):
+        return len(self.api.core_v1.list_namespaced_persistent_volume_claim(namespace, label_selector=labels).items)
+
     def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: x.status.phase == 'Running', pods)))
@@ -311,7 +314,7 @@ class K8s:
 
     def get_patroni_running_members(self, pod="acid-minimal-cluster-0"):
         result = self.get_patroni_state(pod)
-        return list(filter(lambda x: "State" in x and x["State"] == "running", result))
+        return list(filter(lambda x: "State" in x and x["State"] in ["running", "streaming"], result))
 
     def get_deployment_replica_count(self, name="acid-minimal-cluster-pooler", namespace="default"):
         try:
@@ -506,6 +509,9 @@ class K8sBase:
         return len(self.api.policy_v1.list_namespaced_pod_disruption_budget(
             namespace, label_selector=labels).items)
 
+    def count_pvcs_with_label(self, labels, namespace='default'):
+        return len(self.api.core_v1.list_namespaced_persistent_volume_claim(namespace, label_selector=labels).items)
+
     def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: x.status.phase == 'Running', pods)))
@@ -577,7 +583,7 @@ class K8sBase:
 
     def get_patroni_running_members(self, pod):
         result = self.get_patroni_state(pod)
-        return list(filter(lambda x: x["State"] == "running", result))
+        return list(filter(lambda x: x["State"] in ["running", "streaming"], result))
 
     def get_statefulset_image(self, label_selector="application=spilo,cluster-name=acid-minimal-cluster", namespace='default'):
         ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=label_selector, limit=1)

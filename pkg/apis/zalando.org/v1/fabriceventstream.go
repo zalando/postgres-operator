@@ -33,9 +33,10 @@ type FabricEventStreamList struct {
 
 // EventStream defines the source, flow and sink of the event stream
 type EventStream struct {
-	EventStreamFlow   EventStreamFlow   `json:"flow"`
-	EventStreamSink   EventStreamSink   `json:"sink"`
-	EventStreamSource EventStreamSource `json:"source"`
+	EventStreamFlow     EventStreamFlow     `json:"flow"`
+	EventStreamSink     EventStreamSink     `json:"sink"`
+	EventStreamSource   EventStreamSource   `json:"source"`
+	EventStreamRecovery EventStreamRecovery `json:"recovery"`
 }
 
 // EventStreamFlow defines the flow characteristics of the event stream
@@ -49,6 +50,12 @@ type EventStreamSink struct {
 	Type         string  `json:"type"`
 	EventType    string  `json:"eventType,omitempty"`
 	MaxBatchSize *uint32 `json:"maxBatchSize,omitempty"`
+}
+
+// EventStreamRecovery defines the target of dead letter queue
+type EventStreamRecovery struct {
+	Type string           `json:"type"`
+	Sink *EventStreamSink `json:"sink"`
 }
 
 // EventStreamSource defines the source of the event stream and connection for FES operator

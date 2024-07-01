@@ -84,13 +84,22 @@ spec:
                   "limit_iops": 16000,
                   "limit_throughput": 1000,
                   "postgresql_versions": [
+                    "16",
                     "15",
                     "14",
                     "13",
-                    "12",
-                    "11"
+                    "12"
                   ]
                 }
             {{- if .Values.extraEnvs }}
             {{- .Values.extraEnvs | toYaml | nindent 12 }}
             {{- end }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+    {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+    {{- end }}
