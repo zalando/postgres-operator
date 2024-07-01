@@ -2068,7 +2068,7 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 			Namespace:   c.Namespace,
 			Annotations: c.annotationsSet(nil),
 			Labels:      c.roleLabelsSet(true, role),
-      OwnerReferences: c.ownerReferences(),
+			OwnerReferences: c.ownerReferences(),
 		},
 	}
 	if len(subsets) > 0 {
