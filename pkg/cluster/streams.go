@@ -43,6 +43,16 @@ func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) er
 	return nil
 }
 
+func (c *Cluster) deleteStream(stream *zalandov1.FabricEventStream) error {
+	c.setProcessName("deleting event stream")
+
+	err := c.KubeClient.FabricEventStreams(stream.Namespace).Delete(context.TODO(), stream.Name, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("could not delete event stream %q: %v", stream.Name, err)
+	}
+	return nil
+}
+
 func (c *Cluster) deleteStreams() error {
 	c.setProcessName("deleting event streams")
 
@@ -61,7 +71,7 @@ func (c *Cluster) deleteStreams() error {
 		return fmt.Errorf("could not list of FabricEventStreams: %v", err)
 	}
 	for _, stream := range streams.Items {
-		err = c.KubeClient.FabricEventStreams(stream.Namespace).Delete(context.TODO(), stream.Name, metav1.DeleteOptions{})
+		err := c.deleteStream(&stream)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("could not delete event stream %q: %v", stream.Name, err))
 		}
@@ -85,9 +95,13 @@ func gatherApplicationIds(streams []acidv1.Stream) []string {
 	return appIds
 }
 
-func (c *Cluster) syncPublication(publication, dbName string, tables map[string]acidv1.StreamTable) error {
+func (c *Cluster) syncPublication(slots map[string]map[string]string, publications map[string]map[string]acidv1.StreamTable, dbName string, slotNames []string) (map[string]map[string]string, error) {
 	createPublications := make(map[string]string)
 	alterPublications := make(map[string]string)
+	deletePublications := make(map[string]string)
+	slotsToSync := make(map[string]map[string]string)
+
+	c.logger.Debug("is this even going here????")
 
 	defer func() {
 		if err := c.closeDbConn(); err != nil {
@@ -97,47 +111,65 @@ func (c *Cluster) syncPublication(publication, dbName string, tables map[string]
 
 	// check for existing publications
 	if err := c.initDbConnWithName(dbName); err != nil {
-		return fmt.Errorf("could not init database connection")
+		return nil, fmt.Errorf("could not init database connection: %v", err)
 	}
 
 	currentPublications, err := c.getPublications()
 	if err != nil {
-		return fmt.Errorf("could not get current publications: %v", err)
+		return nil, fmt.Errorf("could not get current publications: %v", err)
 	}
 
-	tableNames := make([]string, len(tables))
-	i := 0
-	for t := range tables {
-		tableName, schemaName := getTableSchema(t)
-		tableNames[i] = fmt.Sprintf("%s.%s", schemaName, tableName)
-		i++
-	}
-	sort.Strings(tableNames)
-	tableList := strings.Join(tableNames, ", ")
+	// gather list of required publications
+	for _, slotName := range slotNames {
+		tables := publications[slotName]
+		tableNames := make([]string, len(publications[slotName]))
+		i := 0
+		for t := range tables {
+			tableName, schemaName := getTableSchema(t)
+			tableNames[i] = fmt.Sprintf("%s.%s", schemaName, tableName)
+			i++
+		}
+		sort.Strings(tableNames)
+		tableList := strings.Join(tableNames, ", ")
 
-	currentTables, exists := currentPublications[publication]
-	if !exists {
-		createPublications[publication] = tableList
-	} else if currentTables != tableList {
-		alterPublications[publication] = tableList
+		currentTables, exists := currentPublications[slotName]
+		if !exists {
+			createPublications[slotName] = tableList
+		} else if currentTables != tableList {
+			alterPublications[slotName] = tableList
+		}
+		slotsToSync[slotName] = slots[slotName]
 	}
 
-	if len(createPublications)+len(alterPublications) == 0 {
-		return nil
+	// check if there is any deletion
+	for slotName, tables := range currentPublications {
+		if _, exists := publications[slotName]; !exists {
+			deletePublications[slotName] = tables
+		}
+	}
+
+	if len(createPublications)+len(alterPublications)+len(deletePublications) == 0 {
+		return nil, nil
 	}
 
 	for publicationName, tables := range createPublications {
 		if err = c.executeCreatePublication(publicationName, tables); err != nil {
-			return fmt.Errorf("creation of publication %q failed: %v", publicationName, err)
+			return nil, fmt.Errorf("creation of publication %q failed: %v", publicationName, err)
 		}
 	}
 	for publicationName, tables := range alterPublications {
 		if err = c.executeAlterPublication(publicationName, tables); err != nil {
-			return fmt.Errorf("update of publication %q failed: %v", publicationName, err)
+			return nil, fmt.Errorf("update of publication %q failed: %v", publicationName, err)
+		}
+	}
+	for publicationName, _ := range deletePublications {
+		slotsToSync[publicationName] = nil
+		if err = c.executeDropPublication(publicationName); err != nil {
+			return nil, fmt.Errorf("deletion of publication %q failed: %v", publicationName, err)
 		}
 	}
 
-	return nil
+	return slotsToSync, nil
 }
 
 func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEventStream {
@@ -283,12 +315,13 @@ func (c *Cluster) syncStreams() error {
 	slotsToSync := make(map[string]map[string]string)
 	publications := make(map[string]map[string]acidv1.StreamTable)
 	requiredPatroniConfig := c.Spec.Patroni
+	databases := make(map[string][]string)
 
 	if len(requiredPatroniConfig.Slots) > 0 {
 		slots = requiredPatroniConfig.Slots
 	}
 
-	// gather list of required slots and publications
+	// gather list of required slots and publications, group by database
 	for _, stream := range c.Spec.Streams {
 		slot := map[string]string{
 			"database": stream.Database,
@@ -308,27 +341,37 @@ func (c *Cluster) syncStreams() error {
 			}
 			publications[slotName] = streamTables
 		}
+		// save the slotName in the database list
+		if _, exists := databases[stream.Database]; !exists {
+			databases[stream.Database] = []string{slotName}
+		} else {
+			if !util.SliceContains(databases[stream.Database], slotName) {
+				databases[stream.Database] = append(databases[stream.Database], slotName)
+			}
+		}
 	}
 
-	// create publications to each created slot
+	// sync publication in a database
 	c.logger.Debug("syncing database publications")
-	for publication, tables := range publications {
-		// but first check for existing publications
-		dbName := slots[publication]["database"]
-		err = c.syncPublication(publication, dbName, tables)
+	for dbName, slotNames := range databases {
+		c.logger.Debug(dbName, slotNames)
+		slotsToSyncDb, err := c.syncPublication(slots, publications, dbName, slotNames)
+		c.logger.Debug(slotsToSyncDb, err)
 		if err != nil {
-			c.logger.Warningf("could not sync publication %q in database %q: %v", publication, dbName, err)
+			c.logger.Warningf("could not sync publications in database %q: %v", dbName, err)
 			continue
 		}
-		slotsToSync[publication] = slots[publication]
+		// if it's not exists in the slotsToSync, add it
+		for slotName, slotSection := range slotsToSyncDb {
+			if _, exists := slotsToSync[slotName]; !exists {
+				slotsToSync[slotName] = slotSection
+			}
+		}
 	}
 
 	// no slots to sync = no streams defined or publications created
 	if len(slotsToSync) > 0 {
 		requiredPatroniConfig.Slots = slotsToSync
-	} else {
-		// try to delete existing stream resources
-		return c.deleteStreams()
 	}
 
 	c.logger.Debug("syncing logical replication slots")
@@ -395,6 +438,18 @@ func (c *Cluster) createOrUpdateStreams() error {
 				return fmt.Errorf("failed creating event streams with applicationId %s: %v", appId, err)
 			}
 			c.logger.Infof("event streams %q have been successfully created", streamCRD.Name)
+		}
+	}
+
+	// check if there is any deletion
+	for _, stream := range streams.Items {
+		if !util.SliceContains(appIds, stream.Spec.ApplicationId) {
+			c.logger.Infof("event streams with applicationId %s do not exist, create it", stream.Spec.ApplicationId)
+			err := c.deleteStream(&stream)
+			if err != nil {
+				return fmt.Errorf("failed deleting event streams with applicationId %s: %v", stream.Spec.ApplicationId, err)
+			}
+			c.logger.Infof("event streams %q have been successfully deleted", stream.Name)
 		}
 	}
 
