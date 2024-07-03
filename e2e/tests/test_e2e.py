@@ -1179,7 +1179,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    @unittest.skip("Skipping this test until fixed")
     def test_major_version_upgrade(self):
         k8s = self.k8s
         result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest-12.yaml")
@@ -1203,7 +1202,7 @@ class EndToEndTestCase(unittest.TestCase):
             version = p["server_version"][0:2]
             return version
 
-        self.evantuallyEqual(check_version_14, "14", "Version was not upgrade to 14")
+        self.eventuallyEqual(check_version_14, "14", "Version was not upgrade to 14")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_persistent_volume_claim_retention_policy(self):
