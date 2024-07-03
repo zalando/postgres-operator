@@ -67,6 +67,13 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
+	ignoreAutoVersionUpgradeKey := c.OpConfig.IgnoreAutoVersionUpgradeKey
+	if ignoreAutoVersionUpgradeKey != "" {
+		if value, exists := c.ObjectMeta.Annotations[ignoreAutoVersionUpgradeKey]; exists && value == "true" {
+			return nil
+		}
+	}
+
 	desiredVersion := c.GetDesiredMajorVersionAsInt()
 
 	if c.currentMajorVersion >= desiredVersion {

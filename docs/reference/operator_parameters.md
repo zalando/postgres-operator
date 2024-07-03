@@ -257,6 +257,14 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
   which violate the configured allowed `minimal_major_version` when
   `major_version_upgrade_mode` is set to `"full"`. The default is `"16"`.
 
+* **ignore_auto_version_upgrade_key**
+  Even if automatic major version upgrades are generally desired for most
+  clusters there might be exceptions where you want to be under full control
+  of the starting time to execute the upgrade script in Spilo manually.
+  With this option you can define an annotation key that can be used as a
+  toggle in cluster manifests to ignore globally enabled (or allowed per team)
+  automatic major version upgrade. The default is empty.
+
 ## Kubernetes resources
 
 Parameters to configure cluster-related Kubernetes objects created by the

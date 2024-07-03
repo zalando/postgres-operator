@@ -1254,6 +1254,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"major_version_upgrade": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"ignore_auto_version_upgrade_key": {
+								Type: "string",
+							},
 							"major_version_upgrade_mode": {
 								Type: "string",
 							},

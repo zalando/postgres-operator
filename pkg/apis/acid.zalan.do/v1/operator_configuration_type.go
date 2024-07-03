@@ -47,6 +47,7 @@ type PostgresUsersConfiguration struct {
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
 type MajorVersionUpgradeConfiguration struct {
+	IgnoreAutoVersionUpgradeKey      string   `json:"ignore_auto_version_upgrade_key,omitempty"`
 	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
 	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
 	MinimalMajorVersion              string   `json:"minimal_major_version" default:"12"`
