@@ -597,7 +597,9 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 		newCheck("new %s's %s (index %d) security context does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
 		newCheck("new %s's %s (index %d) volume mounts do not match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.VolumeMounts, b.VolumeMounts) }),
+			func(a, b v1.Container) bool {
+				return len(a.VolumeMounts) != len(b.VolumeMounts) && !reflect.DeepEqual(a.VolumeMounts, b.VolumeMounts)
+			}),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {
