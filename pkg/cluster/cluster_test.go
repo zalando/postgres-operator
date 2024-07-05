@@ -1845,3 +1845,183 @@ func TestComparePorts(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareVolumeMounts(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mountsA  []v1.VolumeMount
+		mountsB  []v1.VolumeMount
+		expected bool
+	}{
+		{
+			name:     "empty vs nil",
+			mountsA:  []v1.VolumeMount{},
+			mountsB:  nil,
+			expected: true,
+		},
+		{
+			name:     "both empty",
+			mountsA:  []v1.VolumeMount{},
+			mountsB:  []v1.VolumeMount{},
+			expected: true,
+		},
+		{
+			name: "same mounts",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "different mounts",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:        "data",
+					ReadOnly:    false,
+					MountPath:   "/data",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "one equal mount one different",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:        "poddata",
+					ReadOnly:    false,
+					MountPath:   "/poddata",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "same mounts, different order",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "new mounts added",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "one mount removed",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareVolumeMounts(tt.mountsA, tt.mountsB)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
