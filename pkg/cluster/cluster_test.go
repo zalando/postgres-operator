@@ -1563,27 +1563,23 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 					PodRoleLabel:         "spilo-role",
 				},
 				LogicalBackup: config.LogicalBackup{
-					LogicalBackupSchedule:                     "30 00 * * *",
-					LogicalBackupDockerImage:                  img1,
-					LogicalBackupProvider:                     "s3",
-					LogicalBackupAzureStorageAccountName:      "",
-					LogicalBackupAzureStorageContainer:        "",
-					LogicalBackupAzureStorageAccountKey:       "",
-					LogicalBackupS3Bucket:                     "",
-					LogicalBackupS3BucketPrefix:               "logical-backup",
-					LogicalBackupS3Region:                     "eu-central-1",
-					LogicalBackupS3Endpoint:                   "https://s3.amazonaws.com",
-					LogicalBackupS3AccessKeyID:                "access",
-					LogicalBackupS3SecretAccessKey:            "secret",
-					LogicalBackupS3SSE:                        "aws:kms",
-					LogicalBackupS3RetentionTime:              "3 months",
-					LogicalBackupGoogleApplicationCredentials: "",
-					LogicalBackupCronjobEnvironmentSecret:     "",
-					LogicalBackupJobPrefix:                    "logical-backup-",
-					LogicalBackupCPURequest:                   "100m",
-					LogicalBackupCPULimit:                     "100m",
-					LogicalBackupMemoryRequest:                "100Mi",
-					LogicalBackupMemoryLimit:                  "100Mi",
+					LogicalBackupSchedule:                 "30 00 * * *",
+					LogicalBackupDockerImage:              img1,
+					LogicalBackupJobPrefix:                "logical-backup-",
+					LogicalBackupCPURequest:               "100m",
+					LogicalBackupCPULimit:                 "100m",
+					LogicalBackupMemoryRequest:            "100Mi",
+					LogicalBackupMemoryLimit:              "100Mi",
+					LogicalBackupProvider:                 "s3",
+					LogicalBackupS3Bucket:                 "testBucket",
+					LogicalBackupS3BucketPrefix:           "spilo",
+					LogicalBackupS3Region:                 "eu-central-1",
+					LogicalBackupS3Endpoint:               "https://s3.amazonaws.com",
+					LogicalBackupS3AccessKeyID:            "access",
+					LogicalBackupS3SecretAccessKey:        "secret",
+					LogicalBackupS3SSE:                    "aws:kms",
+					LogicalBackupS3RetentionTime:          "3 months",
+					LogicalBackupCronjobEnvironmentSecret: "",
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -1645,8 +1641,13 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 			desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image = tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 			desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts
 
-			desiredEnvVars := append(desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env, tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env...)
-			desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env = desiredEnvVars
+			for _, testEnv := range tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+				for i, env := range desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+					if env.Name == testEnv.Name {
+						desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i] = testEnv
+					}
+				}
+			}
 
 			match, reason := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob)
 			if match != tt.match {
