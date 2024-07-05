@@ -1,0 +1,1311 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fabriceventstreams.zalando.org
+spec:
+  group: zalando.org
+  names:
+    kind: FabricEventStream
+    listKind: FabricEventStreamList
+    plural: fabriceventstreams
+    singular: fabriceventstream
+    shortNames:
+    - fes
+    categories:
+    - all
+  scope: Namespaced
+  conversion:
+    strategy: None
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: false
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: ApplicationID
+      type: string
+      jsonPath: .spec.applicationId
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required:
+              - eventStreams
+              - applicationId
+            properties:
+              applicationId:
+                type: string
+                description: The application name that these streams belong to as registered in YourTurn
+                example: donut
+              eventStreams:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - source
+                    - sink
+                  properties:
+                    uniqueStreamId:
+                      type: string
+                      description: |
+                        A unique-per-namespace ID supplied by a human to use for the deployment name. 
+                        Used to help distinguish streams from each other in telemetry output. 
+                        Ignored if multiple streams share the same source specification
+                      maxLength: 20
+                    source:
+                      description: |
+                        This section configures the source of the data which will be pushed onto Fabric Event Scheduler's work queue.
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        jdbcConnection:
+                          type: object
+                          description: Represents a JDBC connection to a replication slot.
+                          required:
+                            - slotName
+                            - jdbcUrl
+                            - databaseAuthentication
+                          properties:
+                            slotName:
+                              type: string
+                              description: The name of an existing replication slot to connect to.
+                              pattern: "^[0-9a-zA-Z_]+$"
+                              maxLength: 63
+                              example: my_slot
+                            pluginType:
+                              type: string
+                              description: Postgres WAL plugin. Defaults to wal2json initially, later migrating to pgoutput
+                              example: wal2json
+                            publicationName:
+                              type: string
+                              description: |
+                                The name of the Publication to subscribe to when using `pgoutput` plugin type.
+                                https://www.postgresql.org/docs/14/logical-replication-publication.html
+                                The recommendation is to manually create the publication, tailored to your CDC needs.
+                                If absent, FES will attempt to create this Publication (requires SUPERUSER permission).
+                              pattern: "^[0-9a-zA-Z_]+$"
+                              example: my_fes_publication
+                            jdbcUrl:
+                              type: string
+                              description: JDBC url of the database to connect to.
+                              example: jdbc:postgresql://host:port/database?sslmode=require
+                            databaseAuthentication:
+                              type: object
+                              description: Represents a Kubernetes secret.
+                              required:
+                                - type
+                                - name
+                                - userKey
+                                - passwordKey
+                              properties:
+                                type:
+                                  type: string
+                                  pattern: "^DatabaseAuthenticationSecret$"
+                                name:
+                                  type: string
+                                  description: |
+                                    Name of the secret to extract the username and password from.
+                                userKey:
+                                  type: string
+                                  description: |
+                                    The key in the secret which contains the username to be used for logical replication.
+                                passwordKey:
+                                  type: string
+                                  description: |
+                                    The key in the secret which contains the password to be used for logical replication.
+                              oneOf:
+                                - required:
+                                    - type
+                                    - name
+                                    - userKey
+                                    - passwordKey
+                                  properties:
+                                    type:
+                                      pattern: "^DatabaseAuthenticationSecret$"
+                        schema:
+                          type: string
+                          description: Name of the datbase schema to monitor. Defaults to `public`
+                          example: public
+                        table:
+                          type: object
+                          description: Which table should be monitored. Row updates to this table will be the data source.
+                          required:
+                            - name
+                          properties:
+                            name:
+                              type: string
+                              description: Table name.
+                              example: mytable
+                            idColumn:
+                              type: string
+                              description: The id column in the source table to use in telemetry. Defaults to `id`
+                              example: id
+                        subscription:
+                          type: object
+                          description: DynamoDb stream arn and lease table to use for a subscription
+                          required:
+                            - streamArn
+                            - leaseTableName
+                          properties:
+                            leaseTableName:
+                              type: string
+                              description: |
+                                The lease table used by the the KCL connector to keep track of shard positions in the DynamoDb Stream.
+                                Defaults to the fes resource name if not specified
+                            streamArn:
+                              type: string
+                              description: DynamoDb stream name to connect to
+                            stsAssumeRoleArn:
+                              type: string
+                              description: |
+                                ARN of a role to be assumed to access DynamoDB and DynamoDB Stream
+                                (needed for a cross-account access)
+                            arnResolutionMode:
+                              type: string
+                              description: |
+                                EXACT (default) - requires the exact stream ARN to be specified 
+                                DYNAMIC - Allows a wildcard (*) at the end of the ARN to enable dynamic fetching of the stream ID based on the tableName.
+                              default: "EXACT"
+                              enum:
+                                - "EXACT"
+                                - "DYNAMIC"
+                        nakadiSubscription:
+                          type: object
+                          description: Description of the stream used to receive events from Nakadi
+                          required:
+                            - eventTypeName
+                            - consumerGroup
+                            - adminTeams
+                          properties:
+                            eventTypeName:
+                              type: string
+                              description: The event type to receive
+                            consumerGroup:
+                              type: string
+                              description: What consumer group to use when creating or connecting to the stream
+                            adminTeams:
+                              type: array
+                              description: Names of the teams that will be added as admin permissions on the subscription
+                              items:
+                                type: string
+                            batchLimit:
+                              type: integer
+                              description: The maximum number of events to fetch in a single batch
+                              example: "100"
+                            maxUncommittedEvents:
+                              type: integer
+                              description: The maximum number of events that can be fetched but not yet committed
+                              example: "1000"
+                            readFrom:
+                              description: By default, new subscription start reading the end, use this to change to begin
+                              example: "end"
+                              type: string
+                              enum:
+                                - "begin"
+                                - "end"
+                        filter:
+                          description: JsonPath can be used to filter entities from the event stream. For example, to only emit events if an entity had its status set to active after the change OR if its status was active before the change. See example
+                          example:
+                            "[?(@.after.status=='active' || @.before.status=='active')]"
+                          type: string
+                          format: jsonpath
+                        minReplicas:
+                          description: Min replicas can be used to specify the number of replicas to use for the component to scale horizontally
+                          example: "3"
+                          type: integer
+                        operations:
+                          description: |
+                            List of source operations that should be processed.
+                            Default behaviour is to only skip DynamoDB REMOVE and Postgres DELETE operations.
+                          example: ["INSERT", "UPDATE", "DELETE"]
+                          type: array
+                          items:
+                            type: string
+                            enum:
+                              - "INSERT"
+                              - "UPDATE"
+                              - "MODIFY"
+                              - "DELETE"
+                              - "REMOVE"
+                              - "C"
+                              - "U"
+                              - "D"
+                              - "S"
+                      oneOf:
+                        - required:
+                            - type
+                            - jdbcConnection
+                            - table
+                          properties:
+                            type:
+                              pattern: "^PostgresLogicalReplication$"
+                        - required:
+                            - type
+                            - subscription
+                          properties:
+                            type:
+                              pattern: "^DynamoDbStreamsSubscription$"
+                        - required:
+                            - type
+                            - nakadiSubscription
+                          properties:
+                            type:
+                              pattern: "^NakadiStreamsSubscription$"
+                    flow:
+                      type: object
+                      description: |
+                        This section configures how the data from the source will be processed or transformed.
+                      properties:
+                        type:
+                          type: string
+                        callHomeUrl:
+                          type: string
+                          description: The value to put in the callHomeUri property.
+                        callHomeIdColumn:
+                          type: string
+                          description: Name of column holding the String value to put in entityId property.
+                          example: id
+                        flowIdColumn:
+                          description: Name of the flow id column in the source table if any.
+                          type: string
+                        spanCtxColumn:
+                          description: Name of the span context column in the source table if any.
+                          type: string
+                        dataTypeColumn:
+                          type: string
+                          description: Name of the column holding the String value to put in the data_type property.
+                          example: data_type
+                        dataType:
+                          type: string
+                          description: Value of the data_type field in the Nakadi event.
+                          example: change_data_capture
+                        dataOpColumn:
+                          type: string
+                          description: Name of the column holding the String value to put in the data_op property.
+                          example: data_op
+                        metadataColumn:
+                          type: string
+                          description: Name of the column holding the Json payload to put in the metadata property.
+                          example: metadata
+                        dataColumn:
+                          type: string
+                          description: Name of the column holding the Json payload to put in the data property.
+                          example: data
+                        payloadColumn:
+                          type: string
+                          description: Name of the column holding the Json payload for the Nakadi event. Defaults to 'payload'
+                          example: my_business_event
+                        redisKeyPrefix:
+                          type: string
+                          description: The prefix to add to the constructed key value to be added to redis. Defaults to the empty string.
+                          example: "prefix:"
+                        redisKeyColumns:
+                          type: array
+                          items:
+                            type: string
+                          description: The names of the columns who's values will be concatenated together seperated by redisKeySeparator and prefixed by redisKeyPrefix
+                          example: ["id", "sub_id"]
+                        redisValueColumn:
+                          type: string
+                          description: Name of the column holding the value of the key that will be stored in redis. Defaults to 'payload'
+                          example: value_column
+                        redisKeySeparator:
+                          type: string
+                          description: The separator character used to seperated redisKeyColumns value(s) when constructing a key. Defaults to '.'
+                          example: .
+                        lambdaFunctionArn:
+                          type: string
+                          description: Name of the lambda function holding the data transformation logic from the Stream.
+                          example: "arn:aws:lambda:eu-central-1:000000000000:function:convert-account-events"
+                        kafkaValueColumn:
+                          type: string
+                          description: Name of the column holding value for the kafka sink.
+                          example: data_col
+                        kafkaKeyColumn:
+                          type: string
+                          description: Name of the column holding the key for the kafka sink.
+                          example: key_col
+                        kafkaTopicColumn:
+                          type: string
+                          description: Name of the column holding the topic, overrides value in the kafka sink if present.
+                          example: topic_col
+                      oneOf:
+                        - required:
+                            - type
+                            - callHomeUrl
+                            - callHomeIdColumn
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToApiCallHomeEvent$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToNakadiDataEvent$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToGenericNakadiEvent$|^DynamoDbStreamToGenericNakadiEvent$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^PostgresWalFromNakadiProducerToGenericNakadiEvent$"
+                        - required:
+                            - type
+                            - lambdaFunctionArn
+                          properties:
+                            type:
+                              pattern: "^AwsLambdaConversion$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToNakadiCdcDataEvent$"
+                        - required:
+                            - type
+                            - redisKeyColumns
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToRedisKvEvent$"
+                        - required:
+                            - type
+                            - kafkaValueColumn
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToKafkaEvent$"
+                    sink:
+                      description: A sink belonging to an event stream.
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        queueName:
+                          type: string
+                        queueUrl:
+                          type: string
+                        maxBatchSize:
+                          type: integer
+                          minimum: 1
+                        eventType:
+                          type: string
+                          description: The nakadi event type.
+                        nakadiBaseUri:
+                          type: string
+                          description: The Nakadi base URI is defaulted per cluster environment. This property can be used to override it.
+                          format: uri
+                          example: https://nakadi-live.nakadi.zalan.do
+                        partitionKeyFields:
+                          type: array
+                          description: |
+                            The fields in the payload to be used by FES to partition the Events prior to publishing.
+                            Builders should define the same fields here as in the event type definition.
+                            If FES can locate non-null values for these fields, it will consistently partition events for parallel publishing. 
+                            The declared fields should consistently identify an entity, such that logical event ordering can be preserved. 
+                            If set incorrectly or null values are found, FES will not attempt partitioning and will publish in sequential batches.
+                            Example: ["user_id", "order.order_id"]
+                          items:
+                            type: string
+                        bucket:
+                          type: string
+                          description: The name of the S3 bucket.
+                        key:
+                          type: object
+                          description: Defines how FES should derive the s3 key for each event.
+                          properties:
+                            type:
+                              type: string
+                            keyPrefix:
+                              type: string
+                              description: The prefix of the generated key.
+                              example: "fes/output/"
+                          oneOf:
+                            - required:
+                                - type
+                              properties:
+                                type:
+                                  pattern: "^GeneratedUuid"
+                        tableName:
+                          type: string
+                        kafkaTopicName:
+                          description: The kafka topic which events will be published to
+                          type: string
+                        kafkaBootstrapServers:
+                          type: string
+                          description: |
+                            The kafka bootstrap servers. See https://docs.confluent.io/platform/current/installation/configuration/producer-configs.html#bootstrap-servers
+                        redisClusterEnabled:
+                          type: boolean
+                          description: |
+                            If the redis instances being connected to are a redis cluster, then this needs to specified as true.
+                            Non clustered redis instances operating in a main node/replica configuration do not need to specify this property.
+                        redisConnectionUrls:
+                          type: array
+                          description: |
+                            The redis connection urls used to connect to the redis instance(s) to sink to.
+                            Example: ["rediss://instance1.myredis-host.com:6379/0", "rediss://instance2.myredis-host.com:6379/0"]
+                          items:
+                            type: string
+                        redisAuthentication:
+                          type: object
+                          description: Represents a Kubernetes secret.
+                          required:
+                            - type
+                            - name
+                            - passwordKey
+                            - userKey
+                          properties:
+                            type:
+                              type: string
+                              pattern: "^Redis.*AuthenticationSecret$"
+                            name:
+                              type: string
+                              description: |
+                                Name of the secret to extract the username and password from.
+                            userKey:
+                              type: string
+                              description: |
+                                The key in the secret which contains the username to be used for redis ACL authentication.
+                                (Not required when using RedisLegacyAuthenticationSecret)
+                            passwordKey:
+                              type: string
+                              description: |
+                                The key in the secret which contains the password to be used for redis authentication (ACL or legacy)
+                          oneOf:
+                            - required:
+                                - type
+                                - name
+                                - passwordKey
+                              properties:
+                                type:
+                                  pattern: "^RedisLegacyAuthenticationSecret$"
+                            - required:
+                                - type
+                                - name
+                                - userKey
+                                - passwordKey
+                              properties:
+                                type:
+                                  pattern: "^RedisACLAuthenticationSecret$"
+                      oneOf:
+                        - required:
+                            - type
+                            - queueName
+                          properties:
+                            type:
+                              pattern: "^SqsStandard$"
+                        - required:
+                            - type
+                            - queueName
+                          properties:
+                            type:
+                              pattern: "^SqsFifo$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^Nakadi$"
+                        - required:
+                            - type
+                            - bucket
+                            - key
+                          properties:
+                            type:
+                              pattern: "^S3"
+                        - required:
+                            - type
+                            - tableName
+                          properties:
+                            type:
+                              pattern: "^DynamoDb$"
+                        - required:
+                            - type
+                            - redisConnectionUrls
+                          properties:
+                            type:
+                              pattern: "^Redis$"
+                        - required:
+                            - type
+                            - kafkaTopicName
+                            - kafkaBootstrapServers
+                          properties:
+                            type:
+                              pattern: "^Kafka$"
+                    recovery:
+                      type: object
+                      description: This section configures recovery strategy for publishing errors.
+                      properties:
+                        type:
+                          type: string
+                        sink:
+                          type: object
+                          description: The dead letter sink.
+                          properties:
+                            type:
+                              type: string
+                            queueName:
+                              type: string
+                            queueUrl:
+                              type: string
+                            maxBatchSize:
+                              type: integer
+                              minimum: 1
+                            eventType:
+                              type: string
+                              description: The nakadi event type.
+                            nakadiBaseUri:
+                              type: string
+                              description: The Nakadi base URI is defaulted per cluster environment. This property can be used to override it.
+                              format: uri
+                              example: https://nakadi-live.nakadi.zalan.do
+                            partitionKeyFields:
+                              type: array
+                              description: |
+                                The fields in the payload to be used by FES to partition the Events prior to publishing.
+                                Builders should define the same fields here as in the event type definition.
+                                If FES can locate non-null values for these fields, it will consistently partition events for parallel publishing. 
+                                The declared fields should consistently identify an entity, such that logical event ordering can be preserved. 
+                                If set incorrectly or null values are found, FES will not attempt partitioning and will publish in sequential batches.
+                                Example: ["user_id", "order.order_id"]
+                              items:
+                                type: string
+                            bucket:
+                              type: string
+                              description: The name of the S3 bucket.
+                            key:
+                              type: object
+                              description: Defines how FES should derive the s3 key for each event.
+                              properties:
+                                type:
+                                  type: string
+                                keyPrefix:
+                                  type: string
+                                  description: The prefix of the generated key.
+                                  example: "fes/output/"
+                              oneOf:
+                                - required:
+                                    - type
+                                  properties:
+                                    type:
+                                      pattern: "^GeneratedUuid"
+                            tableName:
+                              type: string
+                            kafkaTopicName:
+                              description: The kafka topic which events will be published to
+                              type: string
+                            kafkaBootstrapServers:
+                              type: string
+                              description: |
+                                The kafka bootstrap servers. See https://docs.confluent.io/platform/current/installation/configuration/producer-configs.html#bootstrap-servers
+                          oneOf:
+                            - required:
+                                - type
+                                - queueName
+                              properties:
+                                type:
+                                  pattern: "^SqsStandard$"
+                            - required:
+                                - type
+                                - queueName
+                              properties:
+                                type:
+                                  pattern: "^SqsFifo$"
+                            - required:
+                                - type
+                              properties:
+                                type:
+                                  pattern: "^Nakadi$"
+                            - required:
+                                - type
+                                - bucket
+                                - key
+                              properties:
+                                type:
+                                  pattern: "^S3"
+                            - required:
+                                - type
+                                - tableName
+                              properties:
+                                type:
+                                  pattern: "^DynamoDb$"
+                            - required:
+                                - type
+                                - kafkaTopicName
+                                - kafkaBootstrapServers
+                              properties:
+                                type:
+                                  pattern: "^Kafka$"
+                      oneOf:
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^None"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^Ignore"
+                        - required:
+                            - type
+                            - sink
+                          properties:
+                            type:
+                              pattern: "^DeadLetter"
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+  - name: v1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: ApplicationID
+      type: string
+      jsonPath: .spec.applicationId
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required:
+              - eventStreams
+              - applicationId
+            properties:
+              applicationId:
+                type: string
+                description: The application name that these streams belong to as registered in YourTurn
+                example: donut
+              eventStreams:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - source
+                    - sink
+                  properties:
+                    uniqueStreamId:
+                      type: string
+                      description: |
+                        A unique-per-namespace ID supplied by a human to use for the deployment name. 
+                        Used to help distinguish streams from each other in telemetry output. 
+                        Ignored if multiple streams share the same source specification
+                      maxLength: 20
+                    source:
+                      description: |
+                        This section configures the source of the data which will be pushed onto Fabric Event Scheduler's work queue.
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        jdbcConnection:
+                          type: object
+                          description: Represents a JDBC connection to a replication slot.
+                          required:
+                            - slotName
+                            - jdbcUrl
+                            - databaseAuthentication
+                          properties:
+                            slotName:
+                              type: string
+                              description: The name of an existing replication slot to connect to.
+                              pattern: "^[0-9a-zA-Z_]+$"
+                              maxLength: 63
+                              example: my_slot
+                            pluginType:
+                              type: string
+                              description: Postgres WAL plugin. Defaults to wal2json initially, later migrating to pgoutput
+                              example: wal2json
+                            publicationName:
+                              type: string
+                              description: |
+                                The name of the Publication to subscribe to when using `pgoutput` plugin type.
+                                https://www.postgresql.org/docs/14/logical-replication-publication.html
+                                The recommendation is to manually create the publication, tailored to your CDC needs.
+                                If absent, FES will attempt to create this Publication (requires SUPERUSER permission).
+                              pattern: "^[0-9a-zA-Z_]+$"
+                              example: my_fes_publication
+                            jdbcUrl:
+                              type: string
+                              description: JDBC url of the database to connect to.
+                              example: jdbc:postgresql://host:port/database?sslmode=require
+                            databaseAuthentication:
+                              type: object
+                              description: Represents a Kubernetes secret.
+                              required:
+                                - type
+                                - name
+                                - userKey
+                                - passwordKey
+                              properties:
+                                type:
+                                  type: string
+                                  pattern: "^DatabaseAuthenticationSecret$"
+                                name:
+                                  type: string
+                                  description: |
+                                    Name of the secret to extract the username and password from.
+                                userKey:
+                                  type: string
+                                  description: |
+                                    The key in the secret which contains the username to be used for logical replication.
+                                passwordKey:
+                                  type: string
+                                  description: |
+                                    The key in the secret which contains the password to be used for logical replication.
+                              oneOf:
+                                - required:
+                                    - type
+                                    - name
+                                    - userKey
+                                    - passwordKey
+                                  properties:
+                                    type:
+                                      pattern: "^DatabaseAuthenticationSecret$"
+                        schema:
+                          type: string
+                          description: Name of the datbase schema to monitor. Defaults to `public`
+                          example: public
+                        table:
+                          type: object
+                          description: Which table should be monitored. Row updates to this table will be the data source.
+                          required:
+                            - name
+                          properties:
+                            name:
+                              type: string
+                              description: Table name.
+                              example: mytable
+                            idColumn:
+                              type: string
+                              description: The id column in the source table to use in telemetry. Defaults to `id`
+                              example: id
+                        subscription:
+                          type: object
+                          description: DynamoDb stream arn and lease table to use for a subscription
+                          required:
+                            - streamArn
+                            - leaseTableName
+                          properties:
+                            leaseTableName:
+                              type: string
+                              description: |
+                                The lease table used by the the KCL connector to keep track of shard positions in the DynamoDb Stream.
+                                Defaults to the fes resource name if not specified
+                            streamArn:
+                              type: string
+                              description: DynamoDb stream name to connect to
+                            stsAssumeRoleArn:
+                              type: string
+                              description: |
+                                ARN of a role to be assumed to access DynamoDB and DynamoDB Stream
+                                (needed for a cross-account access)
+                            arnResolutionMode:
+                              type: string
+                              description: |
+                                EXACT (default) - requires the exact stream ARN to be specified 
+                                DYNAMIC - Allows a wildcard (*) at the end of the ARN to enable dynamic fetching of the stream ID based on the tableName.
+                              default: "EXACT"
+                              enum:
+                                - "EXACT"
+                                - "DYNAMIC"
+                        nakadiSubscription:
+                          type: object
+                          description: Nakadi event-type to subscribe to
+                          required:
+                            - eventTypeName
+                            - consumerGroup
+                            - adminTeams
+                          properties:
+                            eventTypeName:
+                              type: string
+                              description: The event type to receive
+                            consumerGroup:
+                              type: string
+                              description: What consumer group to use when creating or connecting to the stream
+                            adminTeams:
+                              type: array
+                              description: Names of the teams that will be added as admin permissions on the subscription
+                              items:
+                                type: string
+                            batchLimit:
+                              type: integer
+                              description: The maximum number of events to fetch in a single batch
+                              example: "100"
+                            maxUncommittedEvents:
+                              type: integer
+                              description: The maximum number of events that can be fetched but not yet committed
+                              example: "1000"
+                            readFrom:
+                              description: By default, new subscription start reading the end, use this to change to begin
+                              example: "end"
+                              type: string
+                              enum:
+                                - "begin"
+                                - "end"
+                        filter:
+                          description: JsonPath can be used to filter entities from the event stream. For example, to only emit events if an entity had its status set to active after the change OR if its status was active before the change. See example
+                          example:
+                            "[?(@.after.status=='active' || @.before.status=='active')]"
+                          type: string
+                          format: jsonpath
+                        minReplicas:
+                          description: Min replicas can be used to specify the number of replicas to use for the component to scale horizontally
+                          example: "3"
+                          type: integer
+                        operations:
+                          description: |
+                            List of source operations that should be processed.
+                            Default behaviour is to only skip DynamoDB REMOVE and Postgres DELETE operations.
+                          example: ["INSERT", "UPDATE", "DELETE"]
+                          type: array
+                          items:
+                            type: string
+                            enum:
+                              - "INSERT"
+                              - "UPDATE"
+                              - "MODIFY"
+                              - "DELETE"
+                              - "REMOVE"
+                              - "C"
+                              - "U"
+                              - "D"
+                              - "S"
+                      oneOf:
+                        - required:
+                            - type
+                            - jdbcConnection
+                            - table
+                          properties:
+                            type:
+                              pattern: "^PostgresLogicalReplication$"
+                        - required:
+                            - type
+                            - subscription
+                          properties:
+                            type:
+                              pattern: "^DynamoDbStreamsSubscription$"
+                        - required:
+                            - type
+                            - nakadiSubscription
+                          properties:
+                            type:
+                              pattern: "^NakadiStreamsSubscription$"
+                    flow:
+                      type: object
+                      description: |
+                        This section configures how the data from the source will be processed or transformed.
+                      properties:
+                        type:
+                          type: string
+                        callHomeUrl:
+                          type: string
+                          description: The value to put in the callHomeUri property.
+                        callHomeIdColumn:
+                          type: string
+                          description: Name of column holding the String value to put in entityId property.
+                          example: id
+                        flowIdColumn:
+                          description: Name of the flow id column in the source table if any.
+                          type: string
+                        spanCtxColumn:
+                          description: Name of the span context column in the source table if any.
+                          type: string
+                        dataTypeColumn:
+                          type: string
+                          description: Name of the column holding the String value to put in the data_type property.
+                          example: data_type
+                        dataType:
+                          type: string
+                          description: Value of the data_type field in the Nakadi event.
+                          example: change_data_capture
+                        dataOpColumn:
+                          type: string
+                          description: Name of the column holding the String value to put in the data_op property.
+                          example: data_op
+                        metadataColumn:
+                          type: string
+                          description: Name of the column holding the Json payload to put in the metadata property.
+                          example: metadata
+                        dataColumn:
+                          type: string
+                          description: Name of the column holding the Json payload to put in the data property.
+                          example: data
+                        payloadColumn:
+                          type: string
+                          description: Name of the column holding the Json payload for the Nakadi event. Defaults to 'payload'
+                          example: my_business_event
+                        redisKeyPrefix:
+                          type: string
+                          description: The prefix to add to the constructed key value to be added to redis. Defaults to the empty string.
+                          example: "prefix:"
+                        redisKeyColumns:
+                          type: array
+                          items:
+                            type: string
+                          description: The names of the columns who's values will be concatenated together seperated by redisKeySeparator and prefixed by redisKeyPrefix
+                          example: ["id", "sub_id"]
+                        redisValueColumn:
+                          type: string
+                          description: Name of the column holding the value of the key that will be stored in redis. Defaults to 'payload'
+                          example: value_column
+                        redisKeySeparator:
+                          type: string
+                          description: The separator character used to seperated redisKeyColumns value(s) when constructing a key. Defaults to '.'
+                          example: .
+                        lambdaFunctionArn:
+                          type: string
+                          description: Name of the lambda function holding the data transformation logic from the Stream.
+                          example: "arn:aws:lambda:eu-central-1:000000000000:function:convert-account-events"
+                        kafkaValueColumn:
+                          type: string
+                          description: Name of the column holding value for the kafka sink.
+                          example: data_col
+                        kafkaKeyColumn:
+                          type: string
+                          description: Name of the column holding the key for the kafka sink.
+                          example: key_col
+                        kafkaTopicColumn:
+                          type: string
+                          description: Name of the column holding the topic, overrides value in the kafka sink if present.
+                          example: topic_col
+                      oneOf:
+                        - required:
+                            - type
+                            - callHomeUrl
+                            - callHomeIdColumn
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToApiCallHomeEvent$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToNakadiDataEvent$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToGenericNakadiEvent$|^DynamoDbStreamToGenericNakadiEvent$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^PostgresWalFromNakadiProducerToGenericNakadiEvent$"
+                        - required:
+                            - type
+                            - lambdaFunctionArn
+                          properties:
+                            type:
+                              pattern: "^AwsLambdaConversion$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToNakadiCdcDataEvent$"
+                        - required:
+                            - type
+                            - redisKeyColumns
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToRedisKvEvent$"
+                        - required:
+                            - type
+                            - kafkaValueColumn
+                          properties:
+                            type:
+                              pattern: "^PostgresWalToKafkaEvent$"
+                    sink:
+                      description: A sink belonging to an event stream.
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        queueName:
+                          type: string
+                        queueUrl:
+                          type: string
+                        maxBatchSize:
+                          type: integer
+                          minimum: 1
+                        eventType:
+                          type: string
+                          description: The nakadi event type.
+                        nakadiBaseUri:
+                          type: string
+                          description: The Nakadi base URI is defaulted per cluster environment. This property can be used to override it.
+                          format: uri
+                          example: https://nakadi-live.nakadi.zalan.do
+                        partitionKeyFields:
+                          type: array
+                          description: |
+                            The fields in the payload to be used by FES to partition the Events prior to publishing.
+                            Builders should define the same fields here as in the event type definition.
+                            If FES can locate non-null values for these fields, it will consistently partition events for parallel publishing. 
+                            The declared fields should consistently identify an entity, such that logical event ordering can be preserved. 
+                            If set incorrectly or null values are found, FES will not attempt partitioning and will publish in sequential batches.
+                            Example: ["user_id", "order.order_id"]
+                          items:
+                            type: string
+                        bucket:
+                          type: string
+                          description: The name of the S3 bucket.
+                        key:
+                          type: object
+                          description: Defines how FES should derive the s3 key for each event.
+                          properties:
+                            type:
+                              type: string
+                            keyPrefix:
+                              type: string
+                              description: The prefix of the generated key.
+                              example: "fes/output/"
+                          oneOf:
+                            - required:
+                                - type
+                              properties:
+                                type:
+                                  pattern: "^GeneratedUuid"
+                        tableName:
+                          type: string
+                        kafkaTopicName:
+                          description: The kafka topic which events will be published to
+                          type: string
+                        kafkaBootstrapServers:
+                          type: string
+                          description: |
+                            The kafka bootstrap servers. See https://docs.confluent.io/platform/current/installation/configuration/producer-configs.html#bootstrap-servers
+                        redisClusterEnabled:
+                          type: boolean
+                          description: |
+                            If the redis instances being connected to are a redis cluster, then this needs to specified as true.
+                            Non clustered redis instances operating in a main node/replica configuration do not need to specify this property.
+                        redisConnectionUrls:
+                          type: array
+                          description: |
+                            The redis connection urls used to connect to the redis instance(s) to sink to.
+                            Example: ["rediss://instance1.myredis-host.com:6379/0", "rediss://instance2.myredis-host.com:6379/0"]
+                          items:
+                            type: string
+                        redisAuthentication:
+                          type: object
+                          description: Represents a Kubernetes secret.
+                          required:
+                            - type
+                            - name
+                            - passwordKey
+                            - userKey
+                          properties:
+                            type:
+                              type: string
+                              pattern: "^Redis.*AuthenticationSecret$"
+                            name:
+                              type: string
+                              description: |
+                                Name of the secret to extract the username and password from.
+                            userKey:
+                              type: string
+                              description: |
+                                The key in the secret which contains the username to be used for redis ACL authentication.
+                                (Not required when using RedisLegacyAuthenticationSecret)
+                            passwordKey:
+                              type: string
+                              description: |
+                                The key in the secret which contains the password to be used for redis authentication (ACL or legacy)
+                          oneOf:
+                            - required:
+                                - type
+                                - name
+                                - passwordKey
+                              properties:
+                                type:
+                                  pattern: "^RedisLegacyAuthenticationSecret$"
+                            - required:
+                                - type
+                                - name
+                                - userKey
+                                - passwordKey
+                              properties:
+                                type:
+                                  pattern: "^RedisACLAuthenticationSecret$"
+                      oneOf:
+                        - required:
+                            - type
+                            - queueName
+                          properties:
+                            type:
+                              pattern: "^SqsStandard$"
+                        - required:
+                            - type
+                            - queueName
+                          properties:
+                            type:
+                              pattern: "^SqsFifo$"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^Nakadi$"
+                        - required:
+                            - type
+                            - bucket
+                            - key
+                          properties:
+                            type:
+                              pattern: "^S3"
+                        - required:
+                            - type
+                            - tableName
+                          properties:
+                            type:
+                              pattern: "^DynamoDb$"
+                        - required:
+                            - type
+                            - redisConnectionUrls
+                          properties:
+                            type:
+                              pattern: "^Redis$"
+                        - required:
+                            - type
+                            - kafkaTopicName
+                            - kafkaBootstrapServers
+                          properties:
+                            type:
+                              pattern: "^Kafka$"
+                    recovery:
+                      type: object
+                      description: This section configures recovery strategy for publishing errors.
+                      properties:
+                        type:
+                          type: string
+                        sink:
+                          type: object
+                          description: The dead letter sink.
+                          properties:
+                            type:
+                              type: string
+                            queueName:
+                              type: string
+                            queueUrl:
+                              type: string
+                            maxBatchSize:
+                              type: integer
+                              minimum: 1
+                            eventType:
+                              type: string
+                              description: The nakadi event type.
+                            nakadiBaseUri:
+                              type: string
+                              description: The Nakadi base URI is defaulted per cluster environment. This property can be used to override it.
+                              format: uri
+                              example: https://nakadi-live.nakadi.zalan.do
+                            partitionKeyFields:
+                              type: array
+                              description: |
+                                The fields in the payload to be used by FES to partition the Events prior to publishing.
+                                Builders should define the same fields here as in the event type definition.
+                                If FES can locate non-null values for these fields, it will consistently partition events for parallel publishing. 
+                                The declared fields should consistently identify an entity, such that logical event ordering can be preserved. 
+                                If set incorrectly or null values are found, FES will not attempt partitioning and will publish in sequential batches.
+                                Example: ["user_id", "order.order_id"]
+                              items:
+                                type: string
+                            bucket:
+                              type: string
+                              description: The name of the S3 bucket.
+                            key:
+                              type: object
+                              description: Defines how FES should derive the s3 key for each event.
+                              properties:
+                                type:
+                                  type: string
+                                keyPrefix:
+                                  type: string
+                                  description: The prefix of the generated key.
+                                  example: "fes/output/"
+                              oneOf:
+                                - required:
+                                    - type
+                                  properties:
+                                    type:
+                                      pattern: "^GeneratedUuid"
+                            tableName:
+                              type: string
+                            kafkaTopicName:
+                              description: The kafka topic which events will be published to
+                              type: string
+                            kafkaBootstrapServers:
+                              type: string
+                              description: |
+                                The kafka bootstrap servers. See https://docs.confluent.io/platform/current/installation/configuration/producer-configs.html#bootstrap-servers
+                          oneOf:
+                            - required:
+                                - type
+                                - queueName
+                              properties:
+                                type:
+                                  pattern: "^SqsStandard$"
+                            - required:
+                                - type
+                                - queueName
+                              properties:
+                                type:
+                                  pattern: "^SqsFifo$"
+                            - required:
+                                - type
+                              properties:
+                                type:
+                                  pattern: "^Nakadi$"
+                            - required:
+                                - type
+                                - bucket
+                                - key
+                              properties:
+                                type:
+                                  pattern: "^S3"
+                            - required:
+                                - type
+                                - tableName
+                              properties:
+                                type:
+                                  pattern: "^DynamoDb$"
+                            - required:
+                                - type
+                                - kafkaTopicName
+                                - kafkaBootstrapServers
+                              properties:
+                                type:
+                                  pattern: "^Kafka$"
+                      oneOf:
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^None"
+                        - required:
+                            - type
+                          properties:
+                            type:
+                              pattern: "^Ignore"
+                        - required:
+                            - type
+                            - sink
+                          properties:
+                            type:
+                              pattern: "^DeadLetter"
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true

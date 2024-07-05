@@ -129,7 +129,8 @@ class EndToEndTestCase(unittest.TestCase):
                          "infrastructure-roles.yaml",
                          "infrastructure-roles-new.yaml",
                          "custom-team-membership.yaml",
-                         "e2e-storage-class.yaml"]:
+                         "e2e-storage-class.yaml",
+                         "fes.crd.yaml"]:
             result = k8s.create_with_kubectl("manifests/" + filename)
             print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
 
@@ -212,7 +213,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         # create a table in one of the database of acid-minimal-cluster
         create_stream_table = """
-            CREATE TABLE data.test_table (id int, payload jsonb);
+            CREATE TABLE test_table (id int, payload jsonb);
         """
         self.query_database(leader.metadata.name, "foo", create_stream_table)
 
@@ -226,7 +227,7 @@ class EndToEndTestCase(unittest.TestCase):
                         "database": "foo",
                         "enableRecovery": True,
                         "tables": {
-                            "data.test_table": {
+                            "test_table": {
                                 "eventType": "test-event",
                                 "idColumn": "id",
                                 "payloadColumn": "payload",

@@ -101,8 +101,6 @@ func (c *Cluster) syncPublication(slots map[string]map[string]string, publicatio
 	deletePublications := make(map[string]string)
 	slotsToSync := make(map[string]map[string]string)
 
-	c.logger.Debug("is this even going here????")
-
 	defer func() {
 		if err := c.closeDbConn(); err != nil {
 			c.logger.Errorf("could not close database connection: %v", err)
@@ -119,7 +117,6 @@ func (c *Cluster) syncPublication(slots map[string]map[string]string, publicatio
 		return nil, fmt.Errorf("could not get current publications: %v", err)
 	}
 
-	// gather list of required publications
 	for _, slotName := range slotNames {
 		tables := publications[slotName]
 		tableNames := make([]string, len(publications[slotName]))
@@ -361,7 +358,7 @@ func (c *Cluster) syncStreams() error {
 			c.logger.Warningf("could not sync publications in database %q: %v", dbName, err)
 			continue
 		}
-		// if it's not exists in the slotsToSync, add it
+		// if does not exist in the slotsToSync, add it
 		for slotName, slotSection := range slotsToSyncDb {
 			if _, exists := slotsToSync[slotName]; !exists {
 				slotsToSync[slotName] = slotSection
@@ -444,7 +441,7 @@ func (c *Cluster) createOrUpdateStreams() error {
 	// check if there is any deletion
 	for _, stream := range streams.Items {
 		if !util.SliceContains(appIds, stream.Spec.ApplicationId) {
-			c.logger.Infof("event streams with applicationId %s do not exist, create it", stream.Spec.ApplicationId)
+			c.logger.Infof("event streams with applicationId %s do not exist in the manifest, delete it", stream.Spec.ApplicationId)
 			err := c.deleteStream(&stream)
 			if err != nil {
 				return fmt.Errorf("failed deleting event streams with applicationId %s: %v", stream.Spec.ApplicationId, err)
