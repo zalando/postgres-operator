@@ -200,7 +200,7 @@ class EndToEndTestCase(unittest.TestCase):
             "Not all additional users found in database", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_stream_resources(self):
+    def test_aa_stream_resources(self):
         '''
            Create a Postgres cluster with streaming resources and check them.
         '''
@@ -219,20 +219,22 @@ class EndToEndTestCase(unittest.TestCase):
         # update the manifest with the streaming section
         patch_streaming_config = {
             "spec": {
-                "streams": {
-                    "applicationId": "test-app",
-                    "batchSize": 100,
-                    "database": "foo",
-                    "enableRecovery": True,
-                    "tables": {
-                        "data.test_table": {
-                            "eventType": "test-event",
-                            "idColumn": "id",
-                            "payloadColumn": "payload",
-                            "recoveryEventType": "test-event-dlq"
+                "streams": [
+                    {
+                        "applicationId": "test-app",
+                        "batchSize": 100,
+                        "database": "foo",
+                        "enableRecovery": True,
+                        "tables": {
+                            "data.test_table": {
+                                "eventType": "test-event",
+                                "idColumn": "id",
+                                "payloadColumn": "payload",
+                                "recoveryEventType": "test-event-dlq"
+                            }
                         }
                     }
-                }
+                ]  
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
