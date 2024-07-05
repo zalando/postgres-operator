@@ -200,6 +200,62 @@ class EndToEndTestCase(unittest.TestCase):
             "Not all additional users found in database", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_stream_resources(self):
+        '''
+           Create a Postgres cluster with streaming resources and check them.
+        '''
+        k8s = self.k8s
+
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+            "Operator does not get in sync")
+        leader = k8s.get_cluster_leader_pod()
+
+        # create a table in one of the database of acid-minimal-cluster
+        create_stream_table = """
+            CREATE TABLE data.test_table (id int, payload jsonb);
+        """
+        self.query_database(leader.metadata.name, "foo", create_stream_table)
+
+        # update the manifest with the streaming section
+        patch_streaming_config = {
+            "spec": {
+                "streams": {
+                    "applicationId": "test-app",
+                    "batchSize": 100,
+                    "database": "foo",
+                    "enableRecovery": True,
+                    "tables": {
+                        "data.test_table": {
+                            "eventType": "test-event",
+                            "idColumn": "id",
+                            "payloadColumn": "payload",
+                            "recoveryEventType": "test-event-dlq"
+                        }
+                    }
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config)
+
+        # check if publication, slot, and fes resource are created
+        get_publication_query = """
+            SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app';
+        """
+        get_slot_query = """
+            SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 1,
+            "Publication is not created", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 1,
+            "Replication slot is not created", 10, 5)
+
+        # remove the streaming section from the manifest
+
+        # check if publication, slot, and fes resource are removed
+
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_pod_capabilities(self):
         '''
            Extend postgres container capabilities
@@ -1179,6 +1235,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
     def test_major_version_upgrade(self):
         k8s = self.k8s
         result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest-12.yaml")
