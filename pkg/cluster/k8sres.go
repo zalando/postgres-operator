@@ -892,7 +892,7 @@ func (c *Cluster) generatePodTemplate(
 		addSecretVolume(&podSpec, additionalSecretMount, additionalSecretMountPath)
 	}
 
-	if additionalVolumes != nil {
+	if len(additionalVolumes) > 0 {
 		c.addAdditionalVolumes(&podSpec, additionalVolumes)
 	}
 

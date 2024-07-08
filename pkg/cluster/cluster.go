@@ -597,7 +597,7 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 		newCheck("new %s's %s (index %d) security context does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
 		newCheck("new %s's %s (index %d) volume mounts do not match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.VolumeMounts, b.VolumeMounts) }),
+			func(a, b v1.Container) bool { return !compareVolumeMounts(a.VolumeMounts, b.VolumeMounts) }),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {
@@ -736,6 +736,27 @@ func comparePorts(a, b []v1.ContainerPort) bool {
 	}
 
 	return true
+}
+
+func compareVolumeMounts(old, new []v1.VolumeMount) bool {
+	if len(old) != len(new) {
+		return false
+	}
+	for _, mount := range old {
+		if !volumeMountExists(mount, new) {
+			return false
+		}
+	}
+	return true
+}
+
+func volumeMountExists(mount v1.VolumeMount, mounts []v1.VolumeMount) bool {
+	for _, m := range mounts {
+		if reflect.DeepEqual(mount, m) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) {
