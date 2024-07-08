@@ -240,6 +240,7 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # check if publication, slot, and fes resource are created
         get_publication_query = """
@@ -252,10 +253,28 @@ class EndToEndTestCase(unittest.TestCase):
             "Publication is not created", 10, 5)
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 1,
             "Replication slot is not created", 10, 5)
-
+        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
+                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
+                "Could not find Fabric Event Stream resource", 10, 5)
+        
         # remove the streaming section from the manifest
+        patch_streaming_config_removal = {
+            "spec": {
+                "streams": []  
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config_removal)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # check if publication, slot, and fes resource are removed
+        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
+                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 0,
+                'Could not delete Fabric Event Stream resource', 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 0,
+            "Publication is not deleted", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 0,
+            "Replication slot is not deleted", 10, 5)
 
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)

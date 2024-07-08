@@ -318,6 +318,26 @@ func (c *Cluster) syncStreams() error {
 		slots = requiredPatroniConfig.Slots
 	}
 
+	// list existing publications
+	if err := c.initDbConn(); err != nil {
+		return fmt.Errorf("could not init database connection")
+	}
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+	}()
+	listDatabases, err := c.getDatabases()
+	if err != nil {
+		return fmt.Errorf("could not get list of databases: %v", err)
+	}
+	// get database name with empty list of slot, except template0 and template1
+	for dbName, _ := range listDatabases {
+		if dbName != "template0" && dbName != "template1" {
+			databases[dbName] = []string{}
+		}
+	}
+
 	// gather list of required slots and publications, group by database
 	for _, stream := range c.Spec.Streams {
 		slot := map[string]string{
