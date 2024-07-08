@@ -200,82 +200,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", owner_query)), 3,
             "Not all additional users found in database", 10, 5)
 
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_aa_stream_resources(self):
-        '''
-           Create a Postgres cluster with streaming resources and check them.
-        '''
-        k8s = self.k8s
-
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
-            "Operator does not get in sync")
-        leader = k8s.get_cluster_leader_pod()
-
-        # create a table in one of the database of acid-minimal-cluster
-        create_stream_table = """
-            CREATE TABLE test_table (id int, payload jsonb);
-        """
-        self.query_database(leader.metadata.name, "foo", create_stream_table)
-
-        # update the manifest with the streaming section
-        patch_streaming_config = {
-            "spec": {
-                "streams": [
-                    {
-                        "applicationId": "test-app",
-                        "batchSize": 100,
-                        "database": "foo",
-                        "enableRecovery": True,
-                        "tables": {
-                            "test_table": {
-                                "eventType": "test-event",
-                                "idColumn": "id",
-                                "payloadColumn": "payload",
-                                "recoveryEventType": "test-event-dlq"
-                            }
-                        }
-                    }
-                ]  
-            }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-        # check if publication, slot, and fes resource are created
-        get_publication_query = """
-            SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app';
-        """
-        get_slot_query = """
-            SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app';
-        """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 1,
-            "Publication is not created", 10, 5)
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 1,
-            "Replication slot is not created", 10, 5)
-        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
-                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
-                "Could not find Fabric Event Stream resource", 10, 5)
-        
-        # remove the streaming section from the manifest
-        patch_streaming_config_removal = {
-            "spec": {
-                "streams": []  
-            }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config_removal)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-        # check if publication, slot, and fes resource are removed
-        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
-                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 0,
-                'Could not delete Fabric Event Stream resource', 10, 5)
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 0,
-            "Publication is not deleted", 10, 5)
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 0,
-            "Replication slot is not deleted", 10, 5)
-
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_pod_capabilities(self):
@@ -2066,6 +1990,82 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-standby-cluster")
             time.sleep(5)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_stream_resources(self):
+        '''
+           Create and delete fabric event streaming resources.
+        '''
+        k8s = self.k8s
+
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+            "Operator does not get in sync")
+        leader = k8s.get_cluster_leader_pod()
+
+        # create a table in one of the database of acid-minimal-cluster
+        create_stream_table = """
+            CREATE TABLE test_table (id int, payload jsonb);
+        """
+        self.query_database(leader.metadata.name, "foo", create_stream_table)
+
+        # update the manifest with the streaming section
+        patch_streaming_config = {
+            "spec": {
+                "streams": [
+                    {
+                        "applicationId": "test-app",
+                        "batchSize": 100,
+                        "database": "foo",
+                        "enableRecovery": True,
+                        "tables": {
+                            "test_table": {
+                                "eventType": "test-event",
+                                "idColumn": "id",
+                                "payloadColumn": "payload",
+                                "recoveryEventType": "test-event-dlq"
+                            }
+                        }
+                    }
+                ]  
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        # check if publication, slot, and fes resource are created
+        get_publication_query = """
+            SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app';
+        """
+        get_slot_query = """
+            SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 1,
+            "Publication is not created", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 1,
+            "Replication slot is not created", 10, 5)
+        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
+                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
+                "Could not find Fabric Event Stream resource", 10, 5)
+        
+        # remove the streaming section from the manifest
+        patch_streaming_config_removal = {
+            "spec": {
+                "streams": []  
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config_removal)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        # check if publication, slot, and fes resource are removed
+        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
+                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 0,
+                'Could not delete Fabric Event Stream resource', 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 0,
+            "Publication is not deleted", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 0,
+            "Replication slot is not deleted", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):

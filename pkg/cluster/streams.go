@@ -371,9 +371,7 @@ func (c *Cluster) syncStreams() error {
 	// sync publication in a database
 	c.logger.Debug("syncing database publications")
 	for dbName, slotNames := range databases {
-		c.logger.Debug(dbName, slotNames)
 		slotsToSyncDb, err := c.syncPublication(slots, publications, dbName, slotNames)
-		c.logger.Debug(slotsToSyncDb, err)
 		if err != nil {
 			c.logger.Warningf("could not sync publications in database %q: %v", dbName, err)
 			continue
