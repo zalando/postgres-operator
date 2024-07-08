@@ -3564,6 +3564,11 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 		cluster.Spec.LogicalBackupSchedule = tt.specSchedule
 		cronJob, err := cluster.generateLogicalBackupJob()
 		assert.NoError(t, err)
+
+		if !reflect.DeepEqual(cronJob.ObjectMeta.OwnerReferences, cluster.ownerReferences()) {
+			t.Errorf("%s - %s: expected owner references %#v, got %#v", t.Name(), tt.subTest, cluster.ownerReferences(), cronJob.ObjectMeta.OwnerReferences)
+		}
+
 		if cronJob.Spec.Schedule != tt.expectedSchedule {
 			t.Errorf("%s - %s: expected schedule %s, got %s", t.Name(), tt.subTest, tt.expectedSchedule, cronJob.Spec.Schedule)
 		}

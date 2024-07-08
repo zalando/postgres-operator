@@ -1864,9 +1864,10 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 	volumeMode := v1.PersistentVolumeFilesystem
 	volumeClaim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        constants.DataVolumeName,
-			Annotations: c.annotationsSet(nil),
-			Labels:      c.labelsSet(true),
+			Name:            constants.DataVolumeName,
+			Annotations:     c.annotationsSet(nil),
+			Labels:          c.labelsSet(true),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
@@ -1930,13 +1931,21 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 		lbls = c.connectionPoolerLabels("", false).MatchLabels
 	}
 
+	// if secret lives in another namespace we cannot set ownerReferences
+	var ownerReferences []metav1.OwnerReference
+	if c.Config.OpConfig.EnableCrossNamespaceSecret && strings.Contains(username, ".") {
+		ownerReferences = nil
+	} else {
+		ownerReferences = c.ownerReferences()
+	}
+
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.credentialSecretName(username),
 			Namespace:       pgUser.Namespace,
 			Labels:          lbls,
 			Annotations:     c.annotationsSet(nil),
-			OwnerReferences: c.ownerReferences(),
+			OwnerReferences: ownerReferences,
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -2064,10 +2073,10 @@ func (c *Cluster) getCustomServiceAnnotations(role PostgresRole, spec *acidv1.Po
 func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.endpointName(role),
-			Namespace:   c.Namespace,
-			Annotations: c.annotationsSet(nil),
-			Labels:      c.roleLabelsSet(true, role),
+			Name:            c.endpointName(role),
+			Namespace:       c.Namespace,
+			Annotations:     c.annotationsSet(nil),
+			Labels:          c.roleLabelsSet(true, role),
 			OwnerReferences: c.ownerReferences(),
 		},
 	}
