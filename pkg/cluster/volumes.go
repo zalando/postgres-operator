@@ -9,9 +9,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/aws/aws-sdk-go/aws"
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -42,18 +42,14 @@ func (c *Cluster) syncVolumes() error {
 				c.logger.Errorf("errors occured during EBS volume adjustments: %v", err)
 			}
 		}
+	}
 
-		// resize pvc to adjust filesystem size until better K8s support
-		if err = c.syncVolumeClaims(); err != nil {
-			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
-			return err
-		}
-	} else if c.OpConfig.StorageResizeMode == "pvc" {
-		if err = c.syncVolumeClaims(); err != nil {
-			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
-			return err
-		}
-	} else if c.OpConfig.StorageResizeMode == "ebs" {
+	if err = c.syncVolumeClaims(); err != nil {
+		err = fmt.Errorf("could not sync persistent volume claims: %v", err)
+		return err
+	}
+
+	if c.OpConfig.StorageResizeMode == "ebs" {
 		// potentially enlarge volumes before changing the statefulset. By doing that
 		// in this order we make sure the operator is not stuck waiting for a pod that
 		// cannot start because it ran out of disk space.
@@ -64,8 +60,6 @@ func (c *Cluster) syncVolumes() error {
 			err = fmt.Errorf("could not sync persistent volumes: %v", err)
 			return err
 		}
-	} else {
-		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume sync.")
 	}
 
 	return nil
@@ -187,18 +181,58 @@ func (c *Cluster) populateVolumeMetaData() error {
 func (c *Cluster) syncVolumeClaims() error {
 	c.setProcessName("syncing volume claims")
 
-	needsResizing, err := c.volumeClaimsNeedResizing(c.Spec.Volume)
+	ignoreResize := false
+
+	if c.OpConfig.StorageResizeMode == "off" || c.OpConfig.StorageResizeMode == "ebs" {
+		ignoreResize = true
+		c.logger.Debugf("Storage resize mode is set to %q. Skipping volume size sync of PVCs.", c.OpConfig.StorageResizeMode)
+		
+	}
+
+	newSize, err := resource.ParseQuantity(c.Spec.Volume.Size)
 	if err != nil {
-		return fmt.Errorf("could not compare size of the volume claims: %v", err)
+		return fmt.Errorf("could not parse volume size from the manifest: %v", err)
 	}
+	manifestSize := quantityToGigabyte(newSize)
 
-	if !needsResizing {
-		c.logger.Infof("volume claims do not require changes")
-		return nil
+	pvcs, err := c.listPersistentVolumeClaims()
+	if err != nil {
+		return fmt.Errorf("could not receive persistent volume claims: %v", err)
 	}
+	for _, pvc := range pvcs {
+		needsUpdate := false
+		currentSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
+		if !ignoreResize && currentSize != manifestSize {
+			if currentSize < manifestSize {
+				pvc.Spec.Resources.Requests[v1.ResourceStorage] = newSize
+				needsUpdate = true
+				c.logger.Debugf("persistent volume claim for volume %q needs to be resized", pvc.Name)
+			} else {
+				c.logger.Warningf("cannot shrink persistent volume")
+			}
+		}
 
-	if err := c.resizeVolumeClaims(c.Spec.Volume); err != nil {
-		return fmt.Errorf("could not sync volume claims: %v", err)
+		if needsUpdate {
+			c.logger.Debugf("updating persistent volume claim definition for volume %q", pvc.Name)
+			if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{}); err != nil {
+				return fmt.Errorf("could not update persistent volume claim: %q", err)
+			}
+			c.logger.Debugf("successfully updated persistent volume claim %q", pvc.Name)
+		} else {
+			c.logger.Debugf("volume claim for volume %q do not require updates", pvc.Name)
+		}
+
+		newAnnotations := c.annotationsSet(nil)
+		if changed, _ := c.compareAnnotations(pvc.Annotations, newAnnotations); changed {
+			patchData, err := metaAnnotationsPatch(newAnnotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for the persistent volume claim for volume %q: %v", pvc.Name, err)
+			}
+			_, err = c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of the persistent volume claim for volume %q: %v", pvc.Name, err)
+			}
+		}
 	}
 
 	c.logger.Infof("volume claims have been synced successfully")
@@ -258,35 +292,6 @@ func (c *Cluster) deletePersistentVolumeClaims() error {
 		c.logger.Debugln("no PVCs to delete")
 	}
 
-	return nil
-}
-
-func (c *Cluster) resizeVolumeClaims(newVolume acidv1.Volume) error {
-	c.logger.Debugln("resizing PVCs")
-	pvcs, err := c.listPersistentVolumeClaims()
-	if err != nil {
-		return err
-	}
-	newQuantity, err := resource.ParseQuantity(newVolume.Size)
-	if err != nil {
-		return fmt.Errorf("could not parse volume size: %v", err)
-	}
-	newSize := quantityToGigabyte(newQuantity)
-	for _, pvc := range pvcs {
-		volumeSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
-		if volumeSize >= newSize {
-			if volumeSize > newSize {
-				c.logger.Warningf("cannot shrink persistent volume")
-			}
-			continue
-		}
-		pvc.Spec.Resources.Requests[v1.ResourceStorage] = newQuantity
-		c.logger.Debugf("updating persistent volume claim definition for volume %q", pvc.Name)
-		if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("could not update persistent volume claim: %q", err)
-		}
-		c.logger.Debugf("successfully updated persistent volume claim %q", pvc.Name)
-	}
 	return nil
 }
 
@@ -404,25 +409,6 @@ func (c *Cluster) resizeVolumes() error {
 		return fmt.Errorf("could not resize EBS volumes: some persistent volumes are not compatible with existing resizing providers")
 	}
 	return nil
-}
-
-func (c *Cluster) volumeClaimsNeedResizing(newVolume acidv1.Volume) (bool, error) {
-	newSize, err := resource.ParseQuantity(newVolume.Size)
-	manifestSize := quantityToGigabyte(newSize)
-	if err != nil {
-		return false, fmt.Errorf("could not parse volume size from the manifest: %v", err)
-	}
-	pvcs, err := c.listPersistentVolumeClaims()
-	if err != nil {
-		return false, fmt.Errorf("could not receive persistent volume claims: %v", err)
-	}
-	for _, pvc := range pvcs {
-		currentSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
-		if currentSize != manifestSize {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func (c *Cluster) volumesNeedResizing() (bool, error) {
