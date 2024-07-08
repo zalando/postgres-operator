@@ -186,6 +186,10 @@ func (c *Controller) modifyConfigFromEnvironment() {
 	if c.config.NoTeamsAPI {
 		c.opConfig.EnableTeamsAPI = false
 	}
+
+	c.config.RestConfig.QPS = float32(c.opConfig.KubeQPS)
+	c.config.RestConfig.Burst = c.opConfig.KubeBurst
+
 	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
 	if scalyrAPIKey != "" {
 		c.opConfig.ScalyrAPIKey = scalyrAPIKey

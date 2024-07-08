@@ -253,6 +253,8 @@ type Config struct {
 	EnableSecretsDeletion                    *bool             `name:"enable_secrets_deletion" default:"true"`
 	EnablePersistentVolumeClaimDeletion      *bool             `name:"enable_persistent_volume_claim_deletion" default:"true"`
 	PersistentVolumeClaimRetentionPolicy     map[string]string `name:"persistent_volume_claim_retention_policy" default:"when_deleted:retain,when_scaled:retain"`
+	KubeQPS                                  int               `name:"kube_qps" default:"5"`
+	KubeBurst                                int               `name:"kube_burst" default:"10"`
 }
 
 // MustMarshal marshals the config or panics
