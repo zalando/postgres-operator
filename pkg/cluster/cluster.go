@@ -423,6 +423,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		match = false
 		reasons = append(reasons, "new statefulset's number of replicas does not match the current one")
 	}
+	if !reflect.DeepEqual(c.Statefulset.OwnerReferences, statefulSet.OwnerReferences) {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's ownerReferences do not match")
+	}
 	if changed, reason := c.compareAnnotations(c.Statefulset.Annotations, statefulSet.Annotations); changed {
 		match = false
 		needsReplace = true
@@ -519,9 +524,13 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 				reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
 				continue
 			}
+			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].OwnerReferences, statefulSet.Spec.VolumeClaimTemplates[i].OwnerReferences) {
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's ownerReferences for volume %q do not match the current ones", name))
+			}
 			if changed, reason := c.compareAnnotations(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations); changed {
 				needsReplace = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one: %s", name, reason))
+				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q do not match the current ones: %s", name, reason))
 			}
 			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
 				name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name

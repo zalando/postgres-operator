@@ -249,6 +249,16 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 				return fmt.Errorf("could not patch annotations of %s endpoint: %v", role, err)
 			}
 		}
+		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredEp.ObjectMeta.OwnerReferences) {
+			patchData, err := metaOwnerReferencesPatch(desiredEp.ObjectMeta.OwnerReferences)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
+			}
+			_, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), c.endpointName(role), types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch owner references of %s endpoint: %v", role, err)
+			}
+		}
 		c.Endpoints[role] = ep
 		return nil
 	}
@@ -976,6 +986,17 @@ func (c *Cluster) updateSecret(
 		}
 	}
 
+	if !reflect.DeepEqual(secret.ObjectMeta.OwnerReferences, generatedSecret.ObjectMeta.OwnerReferences) {
+		patchData, err := metaOwnerReferencesPatch(generatedSecret.ObjectMeta.OwnerReferences)
+		if err != nil {
+			return fmt.Errorf("could not form patch for secret %q owner references: %v", secret.Name, err)
+		}
+		_, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("could not patch owner references for secret %q: %v", secret.Name, err)
+		}
+	}
+
 	return nil
 }
 
@@ -1421,6 +1442,16 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			_, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 			if err != nil {
 				return fmt.Errorf("could not patch annotations of the logical backup job %q: %v", jobName, err)
+			}
+		}
+		if !reflect.DeepEqual(job.ObjectMeta.OwnerReferences, desiredJob.ObjectMeta.OwnerReferences) {
+			patchData, err := metaOwnerReferencesPatch(desiredJob.ObjectMeta.OwnerReferences)
+			if err != nil {
+				return fmt.Errorf("could not form patch for the logical backup %q: %v", job.Name, err)
+			}
+			_, err = c.KubeClient.CronJobs(job.Namespace).Patch(context.TODO(), job.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch owner references for logical backup job %q: %v", job.Name, err)
 			}
 		}
 		return nil

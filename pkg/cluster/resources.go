@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -317,6 +318,17 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(context.TODO(), newService.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("could not patch annotations for service %q: %v", oldService.Name, err)
+		}
+	}
+
+	if !reflect.DeepEqual(oldService.ObjectMeta.OwnerReferences, newService.ObjectMeta.OwnerReferences) {
+		patchData, err := metaOwnerReferencesPatch(newService.ObjectMeta.OwnerReferences)
+		if err != nil {
+			return nil, fmt.Errorf("could not form patch for service %q owner references: %v", oldService.Name, err)
+		}
+		_, err = c.KubeClient.Services(serviceName.Namespace).Patch(context.TODO(), serviceName.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not patch owner references for service %q: %v", oldService.Name, err)
 		}
 	}
 

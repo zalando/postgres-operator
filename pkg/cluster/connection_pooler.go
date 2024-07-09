@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -751,6 +752,14 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 	if spec == nil {
 		spec = &acidv1.ConnectionPooler{}
 	}
+
+	if reflect.DeepEqual(deployment.ObjectMeta.OwnerReferences, c.ownerReferences()) {
+		sync = true
+		msg := fmt.Sprintf("objectReferences are different (having %#v, required %#v)",
+			deployment.ObjectMeta.OwnerReferences, c.ownerReferences())
+		reasons = append(reasons, msg)
+	}
+
 	if spec.NumberOfInstances == nil &&
 		*deployment.Spec.Replicas != *config.NumberOfInstances {
 

@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -186,7 +187,7 @@ func (c *Cluster) syncVolumeClaims() error {
 	if c.OpConfig.StorageResizeMode == "off" || c.OpConfig.StorageResizeMode == "ebs" {
 		ignoreResize = true
 		c.logger.Debugf("Storage resize mode is set to %q. Skipping volume size sync of PVCs.", c.OpConfig.StorageResizeMode)
-		
+
 	}
 
 	newSize, err := resource.ParseQuantity(c.Spec.Volume.Size)
@@ -231,6 +232,16 @@ func (c *Cluster) syncVolumeClaims() error {
 			_, err = c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 			if err != nil {
 				return fmt.Errorf("could not patch annotations of the persistent volume claim for volume %q: %v", pvc.Name, err)
+			}
+		}
+		if !reflect.DeepEqual(pvc.ObjectMeta.OwnerReferences, c.ownerReferences()) {
+			patchData, err := metaOwnerReferencesPatch(c.ownerReferences())
+			if err != nil {
+				return fmt.Errorf("could not form patch for the persistent volume claim for volume %q: %v", pvc.Name, err)
+			}
+			_, err = c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch owner references of the persistent volume claim for volume %q: %v", pvc.Name, err)
 			}
 		}
 	}
