@@ -368,10 +368,6 @@ spec:
                       type: string
                   watched_namespace:
                     type: string
-                  kube_qps:
-                    type: integer
-                  kube_burst:
-                    type: integer
               postgres_pod_resources:
                 type: object
                 properties:

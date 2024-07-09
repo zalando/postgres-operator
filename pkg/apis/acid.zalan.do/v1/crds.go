@@ -1558,12 +1558,6 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"watched_namespace": {
 								Type: "string",
 							},
-							"kube_qps": {
-								Type: "integer",
-							},
-							"kube_burst": {
-								Type: "integer",
-							},
 						},
 					},
 					"patroni": {
