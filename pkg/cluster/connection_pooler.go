@@ -753,7 +753,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		spec = &acidv1.ConnectionPooler{}
 	}
 
-	if reflect.DeepEqual(deployment.ObjectMeta.OwnerReferences, c.ownerReferences()) {
+	if !reflect.DeepEqual(deployment.ObjectMeta.OwnerReferences, c.ownerReferences()) {
 		sync = true
 		msg := fmt.Sprintf("objectReferences are different (having %#v, required %#v)",
 			deployment.ObjectMeta.OwnerReferences, c.ownerReferences())
@@ -1034,7 +1034,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		newPodAnnotations := c.annotationsSet(c.generatePodAnnotations(&c.Spec))
 		if changed, reason := c.compareAnnotations(deployment.Spec.Template.Annotations, newPodAnnotations); changed {
 			specSync = true
-			syncReason = append(syncReason, []string{"new connection pooler's pod template annotations do not match the current one: " + reason}...)
+			syncReason = append(syncReason, []string{"new connection pooler's pod template annotations do not match the current ones: " + reason}...)
 			deployment.Spec.Template.Annotations = newPodAnnotations
 		}
 

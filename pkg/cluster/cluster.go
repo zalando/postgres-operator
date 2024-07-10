@@ -858,11 +858,14 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool
 
 func (c *Cluster) comparePodDisruptionBudget(cur, new *apipolicyv1.PodDisruptionBudget) (bool, string) {
 	//TODO: improve comparison
-	if match := reflect.DeepEqual(new.Spec, cur.Spec); !match {
-		return false, "new PDB spec does not match the current one"
+	if !reflect.DeepEqual(new.Spec, cur.Spec) {
+		return false, "new PDB's spec does not match the current one"
+	}
+	if !reflect.DeepEqual(new.ObjectMeta.OwnerReferences, cur.ObjectMeta.OwnerReferences) {
+		return false, "new PDB's owner references do not match the current ones"
 	}
 	if changed, reason := c.compareAnnotations(cur.Annotations, new.Annotations); changed {
-		return false, "new PDB's annotations does not match the current one:" + reason
+		return false, "new PDB's annotations do not match the current ones:" + reason
 	}
 	return true, ""
 }
