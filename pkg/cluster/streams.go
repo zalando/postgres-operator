@@ -95,11 +95,10 @@ func gatherApplicationIds(streams []acidv1.Stream) []string {
 	return appIds
 }
 
-func (c *Cluster) syncPublication(slots map[string]map[string]string, publications map[string]map[string]acidv1.StreamTable, dbName string, slotNames []string) (map[string]map[string]string, error) {
+func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]zalandov1.Slot, slotsToSync *map[string]map[string]string) error {
 	createPublications := make(map[string]string)
 	alterPublications := make(map[string]string)
-	deletePublications := make(map[string]string)
-	slotsToSync := make(map[string]map[string]string)
+	deletePublications := []string{}
 
 	defer func() {
 		if err := c.closeDbConn(); err != nil {
@@ -109,17 +108,17 @@ func (c *Cluster) syncPublication(slots map[string]map[string]string, publicatio
 
 	// check for existing publications
 	if err := c.initDbConnWithName(dbName); err != nil {
-		return nil, fmt.Errorf("could not init database connection: %v", err)
+		return fmt.Errorf("could not init database connection: %v", err)
 	}
 
 	currentPublications, err := c.getPublications()
 	if err != nil {
-		return nil, fmt.Errorf("could not get current publications: %v", err)
+		return fmt.Errorf("could not get current publications: %v", err)
 	}
 
-	for _, slotName := range slotNames {
-		tables := publications[slotName]
-		tableNames := make([]string, len(publications[slotName]))
+	for slotName, slotAndPublication := range databaseSlotsList {
+		tables := slotAndPublication.Publication
+		tableNames := make([]string, len(tables))
 		i := 0
 		for t := range tables {
 			tableName, schemaName := getTableSchema(t)
@@ -135,38 +134,38 @@ func (c *Cluster) syncPublication(slots map[string]map[string]string, publicatio
 		} else if currentTables != tableList {
 			alterPublications[slotName] = tableList
 		}
-		slotsToSync[slotName] = slots[slotName]
+		(*slotsToSync)[slotName] = slotAndPublication.Slot
 	}
 
 	// check if there is any deletion
-	for slotName, tables := range currentPublications {
-		if _, exists := publications[slotName]; !exists {
-			deletePublications[slotName] = tables
+	for slotName, _ := range currentPublications {
+		if _, exists := databaseSlotsList[slotName]; !exists {
+			deletePublications = append(deletePublications, slotName)
 		}
 	}
 
 	if len(createPublications)+len(alterPublications)+len(deletePublications) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	for publicationName, tables := range createPublications {
 		if err = c.executeCreatePublication(publicationName, tables); err != nil {
-			return nil, fmt.Errorf("creation of publication %q failed: %v", publicationName, err)
+			return fmt.Errorf("creation of publication %q failed: %v", publicationName, err)
 		}
 	}
 	for publicationName, tables := range alterPublications {
 		if err = c.executeAlterPublication(publicationName, tables); err != nil {
-			return nil, fmt.Errorf("update of publication %q failed: %v", publicationName, err)
+			return fmt.Errorf("update of publication %q failed: %v", publicationName, err)
 		}
 	}
-	for publicationName, _ := range deletePublications {
-		slotsToSync[publicationName] = nil
+	for _, publicationName := range deletePublications {
+		(*slotsToSync)[publicationName] = nil
 		if err = c.executeDropPublication(publicationName); err != nil {
-			return nil, fmt.Errorf("deletion of publication %q failed: %v", publicationName, err)
+			return fmt.Errorf("deletion of publication %q failed: %v", publicationName, err)
 		}
 	}
 
-	return slotsToSync, nil
+	return nil
 }
 
 func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEventStream {
@@ -308,17 +307,15 @@ func (c *Cluster) syncStreams() error {
 		return nil
 	}
 
-	slots := make(map[string]map[string]string)
+	databaseSlots := make(map[string]map[string]zalandov1.Slot)
 	slotsToSync := make(map[string]map[string]string)
-	publications := make(map[string]map[string]acidv1.StreamTable)
 	requiredPatroniConfig := c.Spec.Patroni
-	databases := make(map[string][]string)
 
-	if len(requiredPatroniConfig.Slots) > 0 {
-		slots = requiredPatroniConfig.Slots
-	}
+	// skip this for now
+	// if len(requiredPatroniConfig.Slots) > 0 {
+	// 	slots = requiredPatroniConfig.Slots
+	// }
 
-	// list existing publications
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
 	}
@@ -334,53 +331,47 @@ func (c *Cluster) syncStreams() error {
 	// get database name with empty list of slot, except template0 and template1
 	for dbName, _ := range listDatabases {
 		if dbName != "template0" && dbName != "template1" {
-			databases[dbName] = []string{}
+			databaseSlots[dbName] = map[string]zalandov1.Slot{}
 		}
 	}
 
 	// gather list of required slots and publications, group by database
 	for _, stream := range c.Spec.Streams {
+		if _, exists := databaseSlots[stream.Database]; !exists {
+			c.logger.Warningf("database %q does not exist in the cluster", stream.Database)
+			continue
+		}
 		slot := map[string]string{
 			"database": stream.Database,
 			"plugin":   constants.EventStreamSourcePluginType,
 			"type":     "logical",
 		}
 		slotName := getSlotName(stream.Database, stream.ApplicationId)
-		if _, exists := slots[slotName]; !exists {
-			slots[slotName] = slot
-			publications[slotName] = stream.Tables
+		if _, exists := databaseSlots[stream.Database][slotName]; !exists {
+			databaseSlots[stream.Database][slotName] = zalandov1.Slot{
+				Slot:        slot,
+				Publication: stream.Tables,
+			}
 		} else {
-			streamTables := publications[slotName]
+			slotAndPublication := databaseSlots[stream.Database][slotName]
+			streamTables := slotAndPublication.Publication
 			for tableName, table := range stream.Tables {
 				if _, exists := streamTables[tableName]; !exists {
 					streamTables[tableName] = table
 				}
 			}
-			publications[slotName] = streamTables
-		}
-		// save the slotName in the database list
-		if _, exists := databases[stream.Database]; !exists {
-			databases[stream.Database] = []string{slotName}
-		} else {
-			if !util.SliceContains(databases[stream.Database], slotName) {
-				databases[stream.Database] = append(databases[stream.Database], slotName)
-			}
+			slotAndPublication.Publication = streamTables
+			databaseSlots[stream.Database][slotName] = slotAndPublication
 		}
 	}
 
 	// sync publication in a database
 	c.logger.Debug("syncing database publications")
-	for dbName, slotNames := range databases {
-		slotsToSyncDb, err := c.syncPublication(slots, publications, dbName, slotNames)
+	for dbName, databaseSlotsList := range databaseSlots {
+		err := c.syncPublication(dbName, databaseSlotsList, &slotsToSync)
 		if err != nil {
 			c.logger.Warningf("could not sync publications in database %q: %v", dbName, err)
 			continue
-		}
-		// if does not exist in the slotsToSync, add it
-		for slotName, slotSection := range slotsToSyncDb {
-			if _, exists := slotsToSync[slotName]; !exists {
-				slotsToSync[slotName] = slotSection
-			}
 		}
 	}
 
