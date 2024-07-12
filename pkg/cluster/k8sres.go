@@ -1864,10 +1864,9 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 	volumeMode := v1.PersistentVolumeFilesystem
 	volumeClaim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            constants.DataVolumeName,
-			Annotations:     c.annotationsSet(nil),
-			Labels:          c.labelsSet(true),
-			OwnerReferences: c.ownerReferences(),
+			Name:        constants.DataVolumeName,
+			Annotations: c.annotationsSet(nil),
+			Labels:      c.labelsSet(true),
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
