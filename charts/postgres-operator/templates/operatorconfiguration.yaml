@@ -42,4 +42,5 @@ configuration:
 {{ tpl (toYaml .Values.configConnectionPooler) . | indent 4 }}
   patroni:
 {{ tpl (toYaml .Values.configPatroni) . | indent 4 }}
+  allow_ephemeral_volumes: {{ .Values.allowEphemeralVolumes }}
 {{- end }}

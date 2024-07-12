@@ -220,3 +220,4 @@ configuration:
     # connection_pooler_user: "pooler"
   patroni:
     enable_patroni_failsafe_mode: false
+  allow_ephemeral_volumes: false

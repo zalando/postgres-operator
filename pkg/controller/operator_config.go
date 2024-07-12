@@ -277,5 +277,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		fromCRD.ConnectionPooler.MaxDBConnections,
 		k8sutil.Int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
 
+	// Ephemeral config
+	result.AllowEphemeralVolumes = util.CoalesceBool(fromCRD.AllowEphemeralVolumes, util.False())
+
 	return result
 }

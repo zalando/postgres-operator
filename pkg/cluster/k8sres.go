@@ -692,6 +692,7 @@ func generateContainer(
 	privilegedMode bool,
 	privilegeEscalationMode *bool,
 	additionalPodCapabilities *v1.Capabilities,
+	useEphemeralVolumes *bool,
 ) *v1.Container {
 	return &v1.Container{
 		Name:            name,
@@ -1394,6 +1395,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
+		nil,
 	)
 
 	// Patroni responds 200 to probe only if it either owns the leader lock or postgres is running and DCS is accessible
@@ -2287,6 +2289,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.VolumeMount{},
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
 		c.OpConfig.SpiloAllowPrivilegeEscalation,
+		nil,
 		nil,
 	)
 

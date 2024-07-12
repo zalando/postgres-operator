@@ -690,6 +690,9 @@ spec:
                   enable_patroni_failsafe_mode:
                     type: boolean
                     default: false
+              allow_ephemeral_volumes:
+                type: boolean
+                default: false
           status:
             type: object
             additionalProperties:

@@ -1966,6 +1966,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"allow_ephemeral_volums": {
+						Type: "boolean",
+					},
 				},
 			},
 			"status": {

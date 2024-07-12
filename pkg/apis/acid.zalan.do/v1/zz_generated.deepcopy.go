@@ -461,6 +461,11 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 	out.LogicalBackup = in.LogicalBackup
 	in.ConnectionPooler.DeepCopyInto(&out.ConnectionPooler)
 	in.Patroni.DeepCopyInto(&out.Patroni)
+	if in.AllowEphemeralVolumes != nil {
+		in, out := &in.AllowEphemeralVolumes, &out.AllowEphemeralVolumes
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

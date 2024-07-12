@@ -253,6 +253,7 @@ type Config struct {
 	EnableSecretsDeletion                    *bool             `name:"enable_secrets_deletion" default:"true"`
 	EnablePersistentVolumeClaimDeletion      *bool             `name:"enable_persistent_volume_claim_deletion" default:"true"`
 	PersistentVolumeClaimRetentionPolicy     map[string]string `name:"persistent_volume_claim_retention_policy" default:"when_deleted:retain,when_scaled:retain"`
+	AllowEphemeralVolumes                    *bool             `json:"allow_ephemeral_volumes,omitempty"`
 }
 
 // MustMarshal marshals the config or panics
