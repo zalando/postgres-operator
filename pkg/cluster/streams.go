@@ -311,10 +311,9 @@ func (c *Cluster) syncStreams() error {
 	slotsToSync := make(map[string]map[string]string)
 	requiredPatroniConfig := c.Spec.Patroni
 
-	// skip this for now
-	// if len(requiredPatroniConfig.Slots) > 0 {
-	// 	slots = requiredPatroniConfig.Slots
-	// }
+	if len(requiredPatroniConfig.Slots) > 0 {
+		slotsToSync = requiredPatroniConfig.Slots
+	}
 
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
@@ -373,11 +372,6 @@ func (c *Cluster) syncStreams() error {
 			c.logger.Warningf("could not sync publications in database %q: %v", dbName, err)
 			continue
 		}
-	}
-
-	// no slots to sync = no streams defined or publications created
-	if len(slotsToSync) > 0 {
-		requiredPatroniConfig.Slots = slotsToSync
 	}
 
 	c.logger.Debug("syncing logical replication slots")
