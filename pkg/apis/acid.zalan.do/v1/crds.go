@@ -898,6 +898,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"useEphemeralVolume": {
+						Type: "boolean",
+					},
 					"useLoadBalancer": {
 						Type:        "boolean",
 						Description: "deprecated",

@@ -575,6 +575,9 @@ spec:
                         - PreferNoSchedule
                     tolerationSeconds:
                       type: integer
+              useEphemeralVolume:
+                type: boolean
+                default: false
               useLoadBalancer:
                 type: boolean
                 description: deprecated

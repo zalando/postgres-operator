@@ -881,6 +881,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.UseEphemeralVolume != nil {
+		in, out := &in.UseEphemeralVolume, &out.UseEphemeralVolume
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
