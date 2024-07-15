@@ -25,6 +25,7 @@ type CRD struct {
 
 // Resources describes kubernetes resource specific configuration parameters
 type Resources struct {
+	EnableOwnerReferences         *bool               `name:"enable_owner_references" default:"false"`
 	ResourceCheckInterval         time.Duration       `name:"resource_check_interval" default:"3s"`
 	ResourceCheckTimeout          time.Duration       `name:"resource_check_timeout" default:"10m"`
 	PodLabelWaitTimeout           time.Duration       `name:"pod_label_wait_timeout" default:"10m"`

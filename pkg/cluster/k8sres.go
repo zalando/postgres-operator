@@ -2533,17 +2533,26 @@ func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 // survived, we can't delete an object because it will affect the functioning
 // cluster).
 func (c *Cluster) ownerReferences() []metav1.OwnerReference {
-	controller := true
-
-	return []metav1.OwnerReference{
-		{
-			UID:        c.Postgresql.ObjectMeta.UID,
-			APIVersion: acidv1.SchemeGroupVersion.Identifier(),
-			Kind:       acidv1.PostgresCRDResourceKind,
-			Name:       c.Postgresql.ObjectMeta.Name,
-			Controller: &controller,
-		},
+	currentOwnerReferences := c.ObjectMeta.OwnerReferences
+	if c.OpConfig.EnableOwnerReferences == nil || !*c.OpConfig.EnableOwnerReferences {
+		return currentOwnerReferences
 	}
+
+	for _, ownerRef := range currentOwnerReferences {
+		if ownerRef.UID == c.Postgresql.ObjectMeta.UID {
+			return currentOwnerReferences
+		}
+	}
+
+	controllerReference := metav1.OwnerReference{
+		UID:        c.Postgresql.ObjectMeta.UID,
+		APIVersion: acidv1.SchemeGroupVersion.Identifier(),
+		Kind:       acidv1.PostgresCRDResourceKind,
+		Name:       c.Postgresql.ObjectMeta.Name,
+		Controller: util.True(),
+	}
+
+	return append(currentOwnerReferences, controllerReference)
 }
 
 func ensurePath(file string, defaultDir string, defaultFile string) string {
