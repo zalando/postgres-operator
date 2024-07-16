@@ -1566,6 +1566,9 @@ func TestPodAffinity(t *testing.T) {
 }
 
 func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
+	if len(deployment.ObjectMeta.OwnerReferences) == 0 {
+		return nil
+	}
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
 	if owner.Name != cluster.Postgresql.ObjectMeta.Name {
@@ -1577,6 +1580,9 @@ func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deploymen
 }
 
 func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role PostgresRole) error {
+	if len(service.ObjectMeta.OwnerReferences) == 0 {
+		return nil
+	}
 	owner := service.ObjectMeta.OwnerReferences[0]
 
 	if owner.Name != cluster.Postgresql.ObjectMeta.Name {
@@ -2362,6 +2368,9 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 	}
 
 	testPodDisruptionBudgetOwnerReference := func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		if len(podDisruptionBudget.ObjectMeta.OwnerReferences) == 0 {
+			return nil
+		}
 		owner := podDisruptionBudget.ObjectMeta.OwnerReferences[0]
 
 		if owner.Name != cluster.Postgresql.ObjectMeta.Name {
@@ -2445,11 +2454,27 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				testLabelsAndSelectors,
 			},
 		},
-		// With PDBMasterLabelSelector disabled.
 		{
 			scenario: "With PDBMasterLabelSelector disabled",
 			spec: New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+				logger,
+				eventRecorder),
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(1),
+				testLabelsAndSelectors,
+			},
+		},
+		{
+			scenario: "With OwnerReference enabled",
+			spec: New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
