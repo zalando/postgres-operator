@@ -312,7 +312,9 @@ func (c *Cluster) syncStreams() error {
 	requiredPatroniConfig := c.Spec.Patroni
 
 	if len(requiredPatroniConfig.Slots) > 0 {
-		slotsToSync = requiredPatroniConfig.Slots
+		for slotName, slotConfig := range requiredPatroniConfig.Slots {
+			slotsToSync[slotName] = slotConfig
+		}
 	}
 
 	if err := c.initDbConn(); err != nil {
@@ -381,6 +383,7 @@ func (c *Cluster) syncStreams() error {
 	}
 
 	// sync logical replication slots in Patroni config
+	requiredPatroniConfig.Slots = slotsToSync
 	configPatched, _, _, err := c.syncPatroniConfig(pods, requiredPatroniConfig, nil)
 	if err != nil {
 		c.logger.Warningf("Patroni config updated? %v - errors during config sync: %v", configPatched, err)
