@@ -1586,8 +1586,11 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.update_config(enable_owner_refs)
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
+            time.sleep(5)  # wait for the operator to sync the cluster and update resources
+
             # check if child resources were updated with owner references
             sset = k8s.api.apps_v1.read_namespaced_stateful_set(cluster_name, self.test_namespace)
+            print("OwnerReference sset: {}".format(sset.metadata.owner_references[0]))
             self.eventuallyTrue(lambda: k8s.compare_owner_reference(sset.metadata.owner_references[0]), "statefulset is missing owner reference")
 
             svc = k8s.api.apps_v1.read_namespaced_service(cluster_name, self.test_namespace)
