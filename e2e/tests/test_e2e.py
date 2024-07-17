@@ -1590,25 +1590,25 @@ class EndToEndTestCase(unittest.TestCase):
 
             # check if child resources were updated with owner references
             sset = k8s.api.apps_v1.read_namespaced_stateful_set(cluster_name, self.test_namespace)
-            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(sset.metadata.owner_references[0]), "statefulset is missing owner reference")
+            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(sset.metadata.owner_references), "statefulset is missing owner reference")
 
-            svc = k8s.api.apps_v1.read_namespaced_service(cluster_name, self.test_namespace)
-            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(svc.metadata.owner_references[0]), "primary service is missing owner reference")
+            svc = k8s.api.core_v1.read_namespaced_service(cluster_name, self.test_namespace)
+            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(svc.metadata.owner_references), "primary service is missing owner reference")
             replica_svc = k8s.api.core_v1.read_namespaced_service(cluster_name + "-repl", self.test_namespace)
-            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(replica_svc.metadata.owner_references[0]), "replica service is missing owner reference")
+            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(replica_svc.metadata.owner_references), "replica service is missing owner reference")
 
-            ep = k8s.api.apps_v1.read_namespaced_endpoints(cluster_name, self.test_namespace)
-            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(ep.metadata.owner_references[0]), "primary endpoint statefulset is missing owner reference")
+            ep = k8s.api.core_v1.read_namespaced_endpoints(cluster_name, self.test_namespace)
+            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(ep.metadata.owner_references), "primary endpoint statefulset is missing owner reference")
             replica_ep = k8s.api.core_v1.read_namespaced_endpoints(cluster_name + "-repl", self.test_namespace)
-            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(replica_ep.metadata.owner_references[0]), "replica endpoint is missing owner reference")
+            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(replica_ep.metadata.owner_references), "replica endpoint is missing owner reference")
 
             pdb = k8s.api.policy_v1.read_namespaced_pod_disruption_budget("postgres-{}-pdb".format(cluster_name), self.test_namespace)
-            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(pdb.metadata.owner_references[0]), "pod disruption budget is missing owner reference")
+            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(pdb.metadata.owner_references), "pod disruption budget is missing owner reference")
 
             pg_secret = k8s.api.core_v1.read_namespaced_secret("postgres.{}.credentials.postgresql.acid.zalan.do".format(cluster_name), self.test_namespace)
-            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(pg_secret.metadata.owner_references[0]), "postgres secret is missing owner reference")
+            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(pg_secret.metadata.owner_references), "postgres secret is missing owner reference")
             standby_secret = k8s.api.core_v1.read_namespaced_secret("standby.{}.credentials.postgresql.acid.zalan.do".format(cluster_name), self.test_namespace)
-            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(standby_secret.metadata.owner_references[0]), "standby secret is missing owner reference")
+            self.eventuallyTrue(lambda: k8s.has_postgresql_owner_reference(standby_secret.metadata.owner_references), "standby secret is missing owner reference")
 
             # delete the new cluster to test owner references
             # and also to make k8s_api.get_operator_state work better in subsequent tests
