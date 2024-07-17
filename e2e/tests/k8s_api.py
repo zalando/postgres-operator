@@ -99,6 +99,7 @@ class K8s:
     def compare_owner_reference(self, owner_reference):
         controller_reference = {
             "apiVersion": "acid.zalan.do/v1",
+            "block_owner_deletion": None,
             "controller": True,
             "kind": "postgresql",
             "name": owner_reference.name,
