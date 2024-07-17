@@ -96,16 +96,8 @@ class K8s:
             "acid.zalan.do", "v1", namespace, "postgresqls", name)
         return pg.get("status", {}).get("PostgresClusterStatus", None)
 
-    def compare_owner_reference(self, owner_reference):
-        controller_reference = {'api_version': 'acid.zalan.do/v1',
-            'block_owner_deletion': None,
-            'controller': True,
-            'kind': 'postgresql',
-            'name': owner_reference.name,
-            'uid': owner_reference.uid}
-
-        print("got {}, expected {}".format(owner_reference, controller_reference))
-        return owner_reference == controller_reference
+    def has_postgresql_owner_reference(self, owner_reference):
+        return owner_reference.kind == 'postgresql' and owner_reference.controller
 
     def wait_for_pod_start(self, pod_labels, namespace='default'):
         pod_phase = 'No pod running'
