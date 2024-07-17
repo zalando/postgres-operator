@@ -1590,7 +1590,6 @@ class EndToEndTestCase(unittest.TestCase):
 
             # check if child resources were updated with owner references
             sset = k8s.api.apps_v1.read_namespaced_stateful_set(cluster_name, self.test_namespace)
-            print("OwnerReference sset: {}".format(sset.metadata.owner_references[0]))
             self.eventuallyTrue(lambda: k8s.compare_owner_reference(sset.metadata.owner_references[0]), "statefulset is missing owner reference")
 
             svc = k8s.api.apps_v1.read_namespaced_service(cluster_name, self.test_namespace)
