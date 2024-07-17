@@ -2011,6 +2011,13 @@ class EndToEndTestCase(unittest.TestCase):
         # update the manifest with the streaming section
         patch_streaming_config = {
             "spec": {
+                 "patroni": {
+                    "slots": {
+                        "manual_slot": {
+                            "type": "physical"
+                        }
+                    }
+                 },
                 "streams": [
                     {
                         "applicationId": "test-app",
@@ -2026,7 +2033,7 @@ class EndToEndTestCase(unittest.TestCase):
                             }
                         }
                     }
-                ]  
+                ]
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -2047,7 +2054,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
                 "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
                 "Could not find Fabric Event Stream resource", 10, 5)
-        
+
         # remove the streaming section from the manifest
         patch_streaming_config_removal = {
             "spec": {
@@ -2066,6 +2073,13 @@ class EndToEndTestCase(unittest.TestCase):
             "Publication is not deleted", 10, 5)
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 0,
             "Replication slot is not deleted", 10, 5)
+
+        # check the manual_slot should not get deleted
+        get_manual_slot_query = """
+            SELECT * FROM pg_replication_slots WHERE slot_name = 'manual_slot';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_manual_slot_query)), 1,
+            "Slot defined in patroni config is deleted", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
