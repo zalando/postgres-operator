@@ -1618,9 +1618,9 @@ class EndToEndTestCase(unittest.TestCase):
                 "acid.zalan.do", "v1", self.test_namespace, "postgresqls", "acid-test-cluster")
 
             # pvcs and Patroni config service/endpoint should not be affected
-            self.assertTrue(k8s.count_pvcs_with_label(cluster_label), 2, "PVCs were deleted although no owner reference set")
-            self.assertTrue(k8s.count_services_with_label(cluster_label), 1, "Unexpected number of running services")
-            self.assertTrue(k8s.count_endpoints_with_label(cluster_label), 1, "Unexpected number of running endpoints")
+            self.assertTrue(k8s.count_pvcs_with_label(cluster_label) > 0, "PVCs were deleted although no owner reference set")
+            self.assertTrue(k8s.count_services_with_label(cluster_label) > 0, "Unexpected number of running services")
+            self.assertTrue(k8s.count_endpoints_with_label(cluster_label) > 0, "Unexpected number of running endpoints")
 
             # statefulset, pod disruption budget and secrets should be deleted via owner reference
             self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_label), 0, "Pods not deleted")
