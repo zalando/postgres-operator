@@ -250,13 +250,11 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 			}
 		}
 		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredEp.ObjectMeta.OwnerReferences) {
-			patchData, err := metaOwnerReferencesPatch(desiredEp.ObjectMeta.OwnerReferences)
+			c.logger.Infof("new %s endpoints's owner referneces do not match the current ones", role)
+			c.setProcessName("updating %v endpoint", role)
+			_, err = c.KubeClient.Endpoints(c.Namespace).Update(context.TODO(), ep, metav1.UpdateOptions{})
 			if err != nil {
-				return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
-			}
-			_, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), c.endpointName(role), types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
-			if err != nil {
-				return fmt.Errorf("could not patch owner references of %s endpoint: %v", role, err)
+				return fmt.Errorf("could not update owner references of %s endpoint: %v", role, err)
 			}
 		}
 		c.Endpoints[role] = ep
@@ -967,6 +965,11 @@ func (c *Cluster) updateSecret(
 		userMap[userKey] = pwdUser
 	}
 
+	if !reflect.DeepEqual(secret.ObjectMeta.OwnerReferences, generatedSecret.ObjectMeta.OwnerReferences) {
+		updateSecret = true
+		updateSecretMsg = fmt.Sprintf("secret %s owner references do not match the current ones and require an update", secretName)
+	}
+
 	if updateSecret {
 		c.logger.Debugln(updateSecretMsg)
 		if _, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
@@ -983,17 +986,6 @@ func (c *Cluster) updateSecret(
 		_, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
 			return fmt.Errorf("could not patch annotations for secret %q: %v", secret.Name, err)
-		}
-	}
-
-	if !reflect.DeepEqual(secret.ObjectMeta.OwnerReferences, generatedSecret.ObjectMeta.OwnerReferences) {
-		patchData, err := metaOwnerReferencesPatch(generatedSecret.ObjectMeta.OwnerReferences)
-		if err != nil {
-			return fmt.Errorf("could not form patch for secret %q owner references: %v", secret.Name, err)
-		}
-		_, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
-		if err != nil {
-			return fmt.Errorf("could not patch owner references for secret %q: %v", secret.Name, err)
 		}
 	}
 

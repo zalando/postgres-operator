@@ -1623,6 +1623,9 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.update_config(disable_owner_refs)
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
+            time.sleep(5)  # wait for the operator to remove owner references
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+
             # check if child resources were updated without Postgresql owner references
             self.assertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster, "default", True), "Owner references still present on some child resources of {}".format(default_test_cluster))
 
@@ -2263,25 +2266,25 @@ class EndToEndTestCase(unittest.TestCase):
 
         # check if child resources were updated with owner references
         sset = k8s.api.apps_v1.read_namespaced_stateful_set(cluster_name, cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(sset.metadata.owner_references, inverse), "statefulset is missing owner reference")
+        self.assertTrue(self.has_postgresql_owner_reference(sset.metadata.owner_references, inverse), "statefulset owner reference check failed")
 
         svc = k8s.api.core_v1.read_namespaced_service(cluster_name, cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(svc.metadata.owner_references, inverse), "primary service is missing owner reference")
+        self.assertTrue(self.has_postgresql_owner_reference(svc.metadata.owner_references, inverse), "primary service owner reference check failed")
         replica_svc = k8s.api.core_v1.read_namespaced_service(cluster_name + "-repl", cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(replica_svc.metadata.owner_references, inverse), "replica service is missing owner reference")
+        self.assertTrue(self.has_postgresql_owner_reference(replica_svc.metadata.owner_references, inverse), "replica service owner reference check failed")
 
         ep = k8s.api.core_v1.read_namespaced_endpoints(cluster_name, cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(ep.metadata.owner_references, inverse), "primary endpoint statefulset is missing owner reference")
+        self.assertTrue(self.has_postgresql_owner_reference(ep.metadata.owner_references, inverse), "primary endpoint owner reference check failed")
         replica_ep = k8s.api.core_v1.read_namespaced_endpoints(cluster_name + "-repl", cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(replica_ep.metadata.owner_references, inverse), "replica endpoint is missing owner reference")
+        self.assertTrue(self.has_postgresql_owner_reference(replica_ep.metadata.owner_references, inverse), "replica owner reference check failed")
 
         pdb = k8s.api.policy_v1.read_namespaced_pod_disruption_budget("postgres-{}-pdb".format(cluster_name), cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(pdb.metadata.owner_references, inverse), "pod disruption budget is missing owner reference")
+        self.assertTrue(self.has_postgresql_owner_reference(pdb.metadata.owner_references, inverse), "pod disruption owner reference check failed")
 
         pg_secret = k8s.api.core_v1.read_namespaced_secret("postgres.{}.credentials.postgresql.acid.zalan.do".format(cluster_name), cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(pg_secret.metadata.owner_references, inverse), "postgres secret is missing owner reference")
+        self.assertTrue(self.has_postgresql_owner_reference(pg_secret.metadata.owner_references, inverse), "postgres secret owner reference check failed")
         standby_secret = k8s.api.core_v1.read_namespaced_secret("standby.{}.credentials.postgresql.acid.zalan.do".format(cluster_name), cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(standby_secret.metadata.owner_references, inverse), "standby secret is missing owner reference")
+        self.assertTrue(self.has_postgresql_owner_reference(standby_secret.metadata.owner_references, inverse), "standby secret owner reference check failed")
 
         return True
 
