@@ -1590,8 +1590,8 @@ class EndToEndTestCase(unittest.TestCase):
             time.sleep(5)  # wait for the operator to sync the cluster and update resources
 
             # check if child resources were updated with owner references
-            self.AssertTrue(self.check_cluster_child_resources_owner_references(cluster_name, self.test_namespace), "Owner references not set on all child resources of {}".format(cluster_name))
-            self.AssertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster), "Owner references not set on all child resources of {}".format(default_test_cluster))
+            self.assertTrue(self.check_cluster_child_resources_owner_references(cluster_name, self.test_namespace), "Owner references not set on all child resources of {}".format(cluster_name))
+            self.assertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster), "Owner references not set on all child resources of {}".format(default_test_cluster))
 
             # delete the new cluster to test owner references
             # and also to make k8s_api.get_operator_state work better in subsequent tests
@@ -1624,7 +1624,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # check if child resources were updated without Postgresql owner references
-            self.AssertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster, True), "Owner references still present on some child resources of {}".format(default_test_cluster))
+            self.assertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster, True), "Owner references still present on some child resources of {}".format(default_test_cluster))
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -1827,7 +1827,6 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
             replica = k8s.get_cluster_replica_pod()
             self.assertTrue(replica.metadata.creation_timestamp > old_creation_timestamp, "Old master pod was not recreated")
-
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
