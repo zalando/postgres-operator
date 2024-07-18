@@ -1624,7 +1624,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # check if child resources were updated without Postgresql owner references
-            self.assertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster, True), "Owner references still present on some child resources of {}".format(default_test_cluster))
+            self.assertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster, "default", True), "Owner references still present on some child resources of {}".format(default_test_cluster))
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
