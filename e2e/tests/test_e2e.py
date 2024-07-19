@@ -1336,7 +1336,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyTrue(verify_pod_resources, "Pod resources where not adjusted")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_aa_multi_namespace_support(self):
+    def test_multi_namespace_support(self):
         '''
         Create a customized Postgres cluster in a non-default namespace.
         '''
@@ -1568,7 +1568,7 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler pods not scaled down")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_aaa_owner_references(self):
+    def test_owner_references(self):
         '''
            Enable owner references, test if resources get updated and test cascade deletion of test cluster.
         '''
@@ -1590,7 +1590,6 @@ class EndToEndTestCase(unittest.TestCase):
             time.sleep(5)  # wait for the operator to sync the cluster and update resources
 
             # check if child resources were updated with owner references
-            print('Operator log: {}'.format(k8s.get_operator_log()))
             self.assertTrue(self.check_cluster_child_resources_owner_references(cluster_name, self.test_namespace), "Owner references not set on all child resources of {}".format(cluster_name))
             self.assertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster), "Owner references not set on all child resources of {}".format(default_test_cluster))
 
@@ -1625,7 +1624,6 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             time.sleep(5)  # wait for the operator to remove owner references
-            print('Operator log: {}'.format(k8s.get_operator_log()))
 
             # check if child resources were updated without Postgresql owner references
             self.assertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster, "default", True), "Owner references still present on some child resources of {}".format(default_test_cluster))
