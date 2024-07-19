@@ -166,17 +166,6 @@ func metaAnnotationsPatch(annotations map[string]string) ([]byte, error) {
 	}{&meta})
 }
 
-// metaOwnerReferencesPatch produces a JSON of the object metadata that has only the ownerReferences
-// field in order to use it in a MergePatch. Note that we don't patch the complete metadata, since
-// it contains the current revision of the object that could be outdated at the time we patch.
-func metaOwnerReferencesPatch(ownerReferences []metav1.OwnerReference) ([]byte, error) {
-	var meta metav1.ObjectMeta
-	meta.OwnerReferences = ownerReferences
-	return json.Marshal(struct {
-		ObjMeta interface{} `json:"metadata"`
-	}{&meta})
-}
-
 func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate bool, reason string) {
 	if isUpdate {
 		c.logger.Infof("pod disruption budget %q has been changed", util.NameFromMeta(old.ObjectMeta))
@@ -187,6 +176,10 @@ func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate
 	}
 
 	logNiceDiff(c.logger, old.Spec, new.Spec)
+
+	if reason != "" {
+		c.logger.Infof("reason: %s", reason)
+	}
 }
 
 func logNiceDiff(log *logrus.Entry, old, new interface{}) {

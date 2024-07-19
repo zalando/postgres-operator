@@ -664,9 +664,17 @@ func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 
 // Perform actual patching of a connection pooler deployment, assuming that all
 // the check were already done before.
-func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDeployment *appsv1.Deployment, doUpdate bool) (*appsv1.Deployment, error) {
 	if newDeployment == nil {
 		return nil, fmt.Errorf("there is no connection pooler in the cluster")
+	}
+
+	if doUpdate {
+		updatedDeployment, err := KubeClient.Deployments(newDeployment.Namespace).Update(context.TODO(), newDeployment, metav1.UpdateOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not update pooler deployment to match desired state: %v", err)
+		}
+		return updatedDeployment, nil
 	}
 
 	patchData, err := specPatch(newDeployment.Spec)
@@ -751,13 +759,6 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 
 	if spec == nil {
 		spec = &acidv1.ConnectionPooler{}
-	}
-
-	if !reflect.DeepEqual(deployment.ObjectMeta.OwnerReferences, c.ownerReferences()) {
-		sync = true
-		msg := fmt.Sprintf("objectReferences are different (having %#v, required %#v)",
-			deployment.ObjectMeta.OwnerReferences, c.ownerReferences())
-		reasons = append(reasons, msg)
 	}
 
 	if spec.NumberOfInstances == nil &&
@@ -1023,8 +1024,13 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			newConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		var specSync bool
+		var specSync, updateDeployment bool
 		var specReason []string
+
+		if !reflect.DeepEqual(deployment.ObjectMeta.OwnerReferences, c.ownerReferences()) {
+			c.logger.Info("new connection pooler owner references do not match the current ones")
+			updateDeployment = true
+		}
 
 		if oldSpec != nil {
 			specSync, specReason = needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler, c.logger)
@@ -1041,7 +1047,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
 		syncReason = append(syncReason, defaultsReason...)
 
-		if specSync || defaultsSync {
+		if specSync || defaultsSync || updateDeployment {
 			c.logger.Infof("update connection pooler deployment %s, reason: %+v",
 				c.connectionPoolerName(role), syncReason)
 			newDeployment, err = c.generateConnectionPoolerDeployment(c.ConnectionPooler[role])
@@ -1049,7 +1055,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 				return syncReason, fmt.Errorf("could not generate deployment for connection pooler: %v", err)
 			}
 
-			deployment, err = updateConnectionPoolerDeployment(c.KubeClient, newDeployment)
+			deployment, err = updateConnectionPoolerDeployment(c.KubeClient, newDeployment, updateDeployment)
 
 			if err != nil {
 				return syncReason, err
@@ -1112,7 +1118,6 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			return syncReason, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
 		c.ConnectionPooler[role].Service = newService
-		c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		return NoSync, nil
 	}
 
