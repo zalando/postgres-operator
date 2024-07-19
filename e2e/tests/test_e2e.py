@@ -2055,6 +2055,12 @@ class EndToEndTestCase(unittest.TestCase):
                 "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
                 "Could not find Fabric Event Stream resource", 10, 5)
 
+        # patch non-postgres user created publication
+        create_nonstream_publication = """
+            CREATE PUBLICATION mypublication FOR TABLE test_table;
+        """
+        self.query_database_with_user(leader.metadata.name, "foo", create_nonstream_publication, "foo_user")
+
         # remove the streaming section from the manifest
         patch_streaming_config_removal = {
             "spec": {
@@ -2078,8 +2084,13 @@ class EndToEndTestCase(unittest.TestCase):
         get_manual_slot_query = """
             SELECT * FROM pg_replication_slots WHERE slot_name = 'manual_slot';
         """
+        get_nonstream_publication_query = """
+            SELECT * FROM pg_publication WHERE pubname = 'mypublication';
+        """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_manual_slot_query)), 1,
             "Slot defined in patroni config is deleted", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_nonstream_publication_query)), 1,
+            "Publication defined not in stream section is deleted", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
