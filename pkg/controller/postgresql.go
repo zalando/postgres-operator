@@ -455,8 +455,8 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	}
 
 	if eventType == EventDelete {
-		// when ownerReferences are used operator cannot block deletion
-		if c.opConfig.EnableOwnerReferences == nil && !*c.opConfig.EnableOwnerReferences {
+		// when owner references are used operator cannot block deletion
+		if c.opConfig.EnableOwnerReferences == nil || !*c.opConfig.EnableOwnerReferences {
 			// only allow deletion if delete annotations are set and conditions are met
 			if err := c.meetsClusterDeleteAnnotations(informerOldSpec); err != nil {
 				c.logger.WithField("cluster-name", clusterName).Warnf(
