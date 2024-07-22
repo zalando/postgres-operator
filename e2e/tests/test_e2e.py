@@ -2055,7 +2055,13 @@ class EndToEndTestCase(unittest.TestCase):
                 "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
                 "Could not find Fabric Event Stream resource", 10, 5)
 
-        # patch non-postgres user created publication
+        # grant create and ownership of test_tabble to foo_user
+        grant_permission_foo_user = """
+            GRANT CREATE ON DATABASE foo TO foo_user;
+            ALTER TABLE test_table OWNER TO foo_user;
+        """
+        self.query_database(leader.metadata.name, "foo", grant_permission_foo_user)
+        # non-postgres user creates a publication
         create_nonstream_publication = """
             CREATE PUBLICATION mypublication FOR TABLE test_table;
         """
@@ -2080,7 +2086,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 0,
             "Replication slot is not deleted", 10, 5)
 
-        # check the manual_slot should not get deleted
+        # check the manual_slot and mypublication should not get deleted
         get_manual_slot_query = """
             SELECT * FROM pg_replication_slots WHERE slot_name = 'manual_slot';
         """
@@ -2089,7 +2095,7 @@ class EndToEndTestCase(unittest.TestCase):
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_manual_slot_query)), 1,
             "Slot defined in patroni config is deleted", 10, 5)
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_nonstream_publication_query)), 1,
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_nonstream_publication_query)), 1,
             "Publication defined not in stream section is deleted", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
