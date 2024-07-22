@@ -2055,10 +2055,11 @@ class EndToEndTestCase(unittest.TestCase):
                 "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
                 "Could not find Fabric Event Stream resource", 10, 5)
 
-        # grant create and ownership of test_tabble to foo_user
+        # grant create and ownership of test_tabble to foo_user, reset search path to default
         grant_permission_foo_user = """
             GRANT CREATE ON DATABASE foo TO foo_user;
             ALTER TABLE test_table OWNER TO foo_user;
+            ALTER ROLE foo_user RESET search_path;
         """
         self.query_database(leader.metadata.name, "foo", grant_permission_foo_user)
         # non-postgres user creates a publication
@@ -2066,19 +2067,11 @@ class EndToEndTestCase(unittest.TestCase):
             CREATE PUBLICATION mypublication FOR TABLE test_table;
         """
         self.query_database_with_user(leader.metadata.name, "foo", create_nonstream_publication, "foo_user")
-        # check if query_database_with_user foo_user work
-        print(self.query_database_with_user(leader.metadata.name, "foo", "SELECT * FROM pg_publication;", "foo_user"))
-        # check if the publication is created
-        get_nonstream_publication_query = """
-            SELECT * FROM pg_publication WHERE pubname = 'mypublication';
-        """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_nonstream_publication_query)), 1,
-            "Publication defined not in stream section failed to be created", 10, 5)
 
         # remove the streaming section from the manifest
         patch_streaming_config_removal = {
             "spec": {
-                "streams": []  
+                "streams": []
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -2097,6 +2090,9 @@ class EndToEndTestCase(unittest.TestCase):
         # check the manual_slot and mypublication should not get deleted
         get_manual_slot_query = """
             SELECT * FROM pg_replication_slots WHERE slot_name = 'manual_slot';
+        """
+        get_nonstream_publication_query = """
+            SELECT * FROM pg_publication WHERE pubname = 'mypublication';
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_manual_slot_query)), 1,
             "Slot defined in patroni config is deleted", 10, 5)
