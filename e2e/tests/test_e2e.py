@@ -2066,6 +2066,14 @@ class EndToEndTestCase(unittest.TestCase):
             CREATE PUBLICATION mypublication FOR TABLE test_table;
         """
         self.query_database_with_user(leader.metadata.name, "foo", create_nonstream_publication, "foo_user")
+        # check if query_database_with_user foo_user work
+        print(self.query_database_with_user(leader.metadata.name, "foo", "SELECT * FROM pg_publication;", "foo_user"))
+        # check if the publication is created
+        get_nonstream_publication_query = """
+            SELECT * FROM pg_publication WHERE pubname = 'mypublication';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_nonstream_publication_query)), 1,
+            "Publication defined not in stream section failed to be created", 10, 5)
 
         # remove the streaming section from the manifest
         patch_streaming_config_removal = {
@@ -2089,9 +2097,6 @@ class EndToEndTestCase(unittest.TestCase):
         # check the manual_slot and mypublication should not get deleted
         get_manual_slot_query = """
             SELECT * FROM pg_replication_slots WHERE slot_name = 'manual_slot';
-        """
-        get_nonstream_publication_query = """
-            SELECT * FROM pg_publication WHERE pubname = 'mypublication';
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_manual_slot_query)), 1,
             "Slot defined in patroni config is deleted", 10, 5)
