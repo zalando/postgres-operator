@@ -1329,7 +1329,7 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_init_containers": {
 								Type: "boolean",
 							},
-							"enable_owner_refereces": {
+							"enable_owner_references": {
 								Type: "boolean",
 							},
 							"enable_persistent_volume_claim_deletion": {

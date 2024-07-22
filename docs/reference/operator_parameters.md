@@ -269,16 +269,14 @@ configuration they are grouped under the `kubernetes` key.
   cluster is in a broken state (e.g. failed initialization) and the operator
   cannot fully sync it, there can be leftovers. By enabling finalizers the
   operator will ensure all managed resources are deleted prior to the
-  Postgresql resource. The default is `false`.
+  Postgresql resource. See also [admin docs](../administrator.md#owner-references-and-finalizers)
+  for more information The default is `false`.
 
 * **enable_owner_references**
-  The operator can set owner references to most of it's child resources to
-  improve cluster monitoring and enable cascading deletion. As described in
-  the finalizers option above, the removal of a never fully synced cluster
-  leaves over orphaned resources. But with owner references enabled they
-  will get deleted as well. Only a Patroni config service and PVCs will be
-  left for the user to delete them. The default is `false`. Warning, enabling
-  this option disables configured delete protection checks (see below).
+  The operator can set owner references on its child resources (except PVCs,
+  Patroni config service/endpoint, cross-namespace secrets) to improve cluster
+  monitoring and enable cascading deletion. The default is `false`. Warning,
+  enabling this option disables configured delete protection checks (see below).
 
 * **delete_annotation_date_key**
   key name for annotation that compares manifest value with current date in the

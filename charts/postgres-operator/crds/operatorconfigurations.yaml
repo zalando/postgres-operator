@@ -211,7 +211,7 @@ spec:
                   enable_init_containers:
                     type: boolean
                     default: true
-                  enable_owner_refereces:
+                  enable_owner_references:
                     type: boolean
                     default: false
                   enable_persistent_volume_claim_deletion:
