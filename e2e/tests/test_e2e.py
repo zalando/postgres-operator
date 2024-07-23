@@ -2001,6 +2001,16 @@ class EndToEndTestCase(unittest.TestCase):
             "Operator does not get in sync")
         leader = k8s.get_cluster_leader_pod()
 
+        # patch ClusterRole to enable listing FES resources
+        cluster_role = k8s.api.rbac_api.read_cluster_role("postgres-operator")
+        fes_cluster_role_rule = client.V1PolicyRule(
+            api_groups=["zalando.org"],
+            resources=["fabriceventstreams"],
+            verbs=["list"]
+        )
+        cluster_role.rules.append(fes_cluster_role_rule)
+        k8s.api.rbac_api.patch_cluster_role("postgres-operator", cluster_role)
+
         # create a table in one of the database of acid-minimal-cluster
         create_stream_table = """
             CREATE TABLE test_table (id int, payload jsonb);
