@@ -2006,7 +2006,7 @@ class EndToEndTestCase(unittest.TestCase):
         fes_cluster_role_rule = client.V1PolicyRule(
             api_groups=["zalando.org"],
             resources=["fabriceventstreams"],
-            verbs=["list"]
+            verbs=["create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"]
         )
         cluster_role.rules.append(fes_cluster_role_rule)
         k8s.api.rbac_api.patch_cluster_role("postgres-operator", cluster_role)
