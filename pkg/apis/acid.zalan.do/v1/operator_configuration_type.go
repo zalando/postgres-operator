@@ -107,6 +107,7 @@ type KubernetesMetaConfiguration struct {
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
 	EnableFinalizers                         *bool               `json:"enable_finalizers,omitempty"`
+	EnablePostgresTopologySpreadConstraints  bool                `json:"enable_postgres_topology_spread_constraints,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
