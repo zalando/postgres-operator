@@ -1997,19 +1997,6 @@ class EndToEndTestCase(unittest.TestCase):
            Create and delete fabric event streaming resources.
         '''
         k8s = self.k8s
-
-        # patch ClusterRole to enable listing FES resources
-        patch_cluster_role_config = {
-            "rules": [
-                {
-                    "apiGroups": ["zalando.org"],
-                    "resources": ["fabriceventstreams"],
-                    "verbs": ["list"]
-                }
-            ]
-        }
-        k8s.api.rbac_api.patch_cluster_role("postgres-operator", patch_cluster_role_config)
-
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
             "Operator does not get in sync")
         leader = k8s.get_cluster_leader_pod()
