@@ -2064,7 +2064,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
                 "Could not find Fabric Event Stream resource", 10, 5)
 
-        # grant create and ownership of test_tabble to foo_user, reset search path to default
+        # grant create and ownership of test_table to foo_user, reset search path to default
         grant_permission_foo_user = """
             GRANT CREATE ON DATABASE foo TO foo_user;
             ALTER TABLE test_table OWNER TO foo_user;
