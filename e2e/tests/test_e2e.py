@@ -2001,7 +2001,7 @@ class EndToEndTestCase(unittest.TestCase):
             "Operator does not get in sync")
         leader = k8s.get_cluster_leader_pod()
 
-        # patch ClusterRole to enable listing FES resources
+        # patch ClusterRole with CRUD privileges on FES resources
         cluster_role = k8s.api.rbac_api.read_cluster_role("postgres-operator")
         fes_cluster_role_rule = client.V1PolicyRule(
             api_groups=["zalando.org"],
