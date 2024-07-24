@@ -2077,7 +2077,7 @@ class EndToEndTestCase(unittest.TestCase):
         """
         self.query_database_with_user(leader.metadata.name, "foo", create_nonstream_publication, "foo_user")
 
-        # remove the streaming section from the manifest
+        # remove the streams section from the manifest
         patch_streaming_config_removal = {
             "spec": {
                 "streams": []
