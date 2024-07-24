@@ -2017,7 +2017,7 @@ class EndToEndTestCase(unittest.TestCase):
         """
         self.query_database(leader.metadata.name, "foo", create_stream_table)
 
-        # update the manifest with the streaming section
+        # update the manifest with the streams section
         patch_streaming_config = {
             "spec": {
                  "patroni": {
