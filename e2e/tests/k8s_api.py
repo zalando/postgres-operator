@@ -20,6 +20,7 @@ class K8sApi:
 
         self.config = config.load_kube_config()
         self.k8s_client = client.ApiClient()
+        self.rbac_api = client.RbacAuthorizationV1Api()
 
         self.core_v1 = client.CoreV1Api()
         self.apps_v1 = client.AppsV1Api()
