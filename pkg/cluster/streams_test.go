@@ -466,7 +466,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	cluster.Postgresql.Spec = pgUpdated.Spec
-	cluster.syncStreams()
+	cluster.createOrUpdateStreams()
 
 	streamList, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	if len(streamList.Items) > 0 || err != nil {
