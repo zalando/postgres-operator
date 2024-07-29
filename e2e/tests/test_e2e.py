@@ -2041,6 +2041,20 @@ class EndToEndTestCase(unittest.TestCase):
                                 "recoveryEventType": "test-event-dlq"
                             }
                         }
+                    },
+                    {
+                        "applicationId": "test-app2",
+                        "batchSize": 100,
+                        "database": "foo",
+                        "enableRecovery": True,
+                        "tables": {
+                            "test_non_exist_table": {
+                                "eventType": "test-event",
+                                "idColumn": "id",
+                                "payloadColumn": "payload",
+                                "recoveryEventType": "test-event-dlq"
+                            }
+                        }
                     }
                 ]
             }
@@ -2061,8 +2075,20 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 1,
             "Replication slot is not created", 10, 5)
         self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
-                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
+                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 2,
                 "Could not find Fabric Event Stream resource", 10, 5)
+
+        # check if the non-existing table in the stream section does not create a publication and slot
+        get_publication_query_not_exist_table = """
+            SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app2';
+        """
+        get_slot_query_not_exist_table = """
+            SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app2';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query_not_exist_table)), 0,
+            "Publication is created for non-existing tables", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query_not_exist_table)), 0,
+            "Replication slot is created for non-existing tables", 10, 5)
 
         # grant create and ownership of test_table to foo_user, reset search path to default
         grant_permission_foo_user = """

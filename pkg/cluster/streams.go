@@ -134,7 +134,6 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 		} else if currentTables != tableList {
 			alterPublications[slotName] = tableList
 		}
-		(*slotsToSync)[slotName] = slotAndPublication.Slot
 	}
 
 	// check if there is any deletion
@@ -152,17 +151,19 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 		if err = c.executeCreatePublication(publicationName, tables); err != nil {
 			return fmt.Errorf("creation of publication %q failed: %v", publicationName, err)
 		}
+		(*slotsToSync)[publicationName] = databaseSlotsList[publicationName].Slot
 	}
 	for publicationName, tables := range alterPublications {
 		if err = c.executeAlterPublication(publicationName, tables); err != nil {
 			return fmt.Errorf("update of publication %q failed: %v", publicationName, err)
 		}
+		(*slotsToSync)[publicationName] = databaseSlotsList[publicationName].Slot
 	}
 	for _, publicationName := range deletePublications {
-		(*slotsToSync)[publicationName] = nil
 		if err = c.executeDropPublication(publicationName); err != nil {
 			return fmt.Errorf("deletion of publication %q failed: %v", publicationName, err)
 		}
+		(*slotsToSync)[publicationName] = nil
 	}
 
 	return nil
