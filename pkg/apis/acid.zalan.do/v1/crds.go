@@ -535,6 +535,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"maximum_lag_on_failover": {
 								Type: "integer",
 							},
+							"max_locks_per_transaction": {
+								Type: "integer",
+							},
 							"pg_hba": {
 								Type: "array",
 								Items: &apiextv1.JSONSchemaPropsOrArray{
