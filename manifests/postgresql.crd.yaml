@@ -336,6 +336,8 @@ spec:
                     type: integer
                   maximum_lag_on_failover:
                     type: integer
+                  max_locks_on_transaction:
+                    type: integer
                   pg_hba:
                     type: array
                     items:

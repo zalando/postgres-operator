@@ -332,6 +332,10 @@ explanation of `ttl` and `loop_wait` parameters.
   Patroni `maximum_lag_on_failover` parameter value, optional. The default is
   set by the Spilo Docker image. Optional.
 
+* **max_locks_per_transaction**
+  Patroni `max_locks_per_transaction` parameter value, optional. The default is
+  set by the Spilo Docker image. Optional.
+
 * **slots**
   permanent replication slots that Patroni preserves after failover by
   re-creating them on the new primary immediately after doing a promote. Slots

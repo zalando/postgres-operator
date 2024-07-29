@@ -151,6 +151,7 @@ spec:
     synchronous_mode_strict: false
     synchronous_node_count: 1
     maximum_lag_on_failover: 33554432
+    max_locks_per_transaction: 1024
 
 # restore a Postgres DB with point-in-time-recovery
 # with a non-empty timestamp, clone from an S3 bucket using the latest backup before the timestamp

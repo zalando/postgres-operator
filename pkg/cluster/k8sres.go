@@ -53,16 +53,17 @@ type pgUser struct {
 }
 
 type patroniDCS struct {
-	TTL                      uint32                       `json:"ttl,omitempty"`
-	LoopWait                 uint32                       `json:"loop_wait,omitempty"`
-	RetryTimeout             uint32                       `json:"retry_timeout,omitempty"`
-	MaximumLagOnFailover     float32                      `json:"maximum_lag_on_failover,omitempty"`
-	SynchronousMode          bool                         `json:"synchronous_mode,omitempty"`
-	SynchronousModeStrict    bool                         `json:"synchronous_mode_strict,omitempty"`
-	SynchronousNodeCount     uint32                       `json:"synchronous_node_count,omitempty"`
-	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
-	Slots                    map[string]map[string]string `json:"slots,omitempty"`
-	FailsafeMode             *bool                        `json:"failsafe_mode,omitempty"`
+	TTL                        uint32                       `json:"ttl,omitempty"`
+	LoopWait                   uint32                       `json:"loop_wait,omitempty"`
+	RetryTimeout               uint32                       `json:"retry_timeout,omitempty"`
+	MaximumLagOnFailover       float32                      `json:"maximum_lag_on_failover,omitempty"`
+	MaximumLocksPerTransaction float32                      `json:"max_locks_per_transaction,omitempty"`
+	SynchronousMode            bool                         `json:"synchronous_mode,omitempty"`
+	SynchronousModeStrict      bool                         `json:"synchronous_mode_strict,omitempty"`
+	SynchronousNodeCount       uint32                       `json:"synchronous_node_count,omitempty"`
+	PGBootstrapConfiguration   map[string]interface{}       `json:"postgresql,omitempty"`
+	Slots                      map[string]map[string]string `json:"slots,omitempty"`
+	FailsafeMode               *bool                        `json:"failsafe_mode,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -446,6 +447,9 @@ PatroniInitDBParams:
 		config.Bootstrap.DCS.FailsafeMode = patroni.FailsafeMode
 	} else if opConfig.EnablePatroniFailsafeMode != nil {
 		config.Bootstrap.DCS.FailsafeMode = opConfig.EnablePatroniFailsafeMode
+	}
+	if patroni.MaximumLocksPerTransaction >= 1 {
+		config.Bootstrap.DCS.MaximumLocksPerTransaction = patroni.MaximumLocksPerTransaction
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})

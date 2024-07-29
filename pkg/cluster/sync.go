@@ -657,6 +657,9 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	if desiredPatroniConfig.MaximumLagOnFailover > 0 && desiredPatroniConfig.MaximumLagOnFailover != effectivePatroniConfig.MaximumLagOnFailover {
 		configToSet["maximum_lag_on_failover"] = desiredPatroniConfig.MaximumLagOnFailover
 	}
+	if desiredPatroniConfig.MaximumLocksPerTransaction > 0 && desiredPatroniConfig.MaximumLocksPerTransaction != effectivePatroniConfig.MaximumLocksPerTransaction {
+		configToSet["max_locks_per_transaction"] = desiredPatroniConfig.MaximumLocksPerTransaction
+	}
 	if desiredPatroniConfig.PgHba != nil && !reflect.DeepEqual(desiredPatroniConfig.PgHba, effectivePatroniConfig.PgHba) {
 		configToSet["pg_hba"] = desiredPatroniConfig.PgHba
 	}
