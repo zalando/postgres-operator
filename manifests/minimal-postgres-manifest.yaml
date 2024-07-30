@@ -15,6 +15,7 @@ spec:
   databases:
     foo: zalando  # dbname: owner
   preparedDatabases:
-    bar: {}
+    bar:
+      defaultUsers: true
   postgresql:
-    version: "16"
+    version: "14"
