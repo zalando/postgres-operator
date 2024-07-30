@@ -2075,7 +2075,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 1,
             "Replication slot is not created", 10, 5)
         self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
-                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 2,
+                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
                 "Could not find Fabric Event Stream resource", 10, 5)
 
         # check if the non-existing table in the stream section does not create a publication and slot
