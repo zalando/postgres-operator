@@ -384,19 +384,11 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.Postg
 		c.logger.Warningf("parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
 	}
 
-	noeffect := func(param string, explanation string) {
-		c.logger.Warningf("parameter %q takes no effect. %s", param, explanation)
-	}
-
 	if spec.UseLoadBalancer != nil {
 		deprecate("useLoadBalancer", "enableMasterLoadBalancer")
 	}
 	if spec.ReplicaLoadBalancer != nil {
 		deprecate("replicaLoadBalancer", "enableReplicaLoadBalancer")
-	}
-
-	if len(spec.MaintenanceWindows) > 0 {
-		noeffect("maintenanceWindows", "Not implemented.")
 	}
 
 	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&

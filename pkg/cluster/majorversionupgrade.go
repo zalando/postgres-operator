@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -55,6 +56,27 @@ func (c *Cluster) isUpgradeAllowedForTeam(owningTeam string) bool {
 	return util.SliceContains(allowedTeams, owningTeam)
 }
 
+func (c *Cluster) isInMainternanceWindow() bool {
+	if c.Spec.MaintenanceWindows == nil {
+		return true
+	}
+	now := time.Now()
+	currentDay := now.Weekday()
+	currentTime := now.Format("15:04")
+
+	for _, window := range c.Spec.MaintenanceWindows {
+		startTime := window.StartTime.Format("15:04")
+		endTime := window.EndTime.Format("15:04")
+
+		if window.Everyday || window.Weekday == currentDay {
+			if currentTime >= startTime && currentTime <= endTime {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 /*
 Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
 
@@ -71,6 +93,11 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	if c.currentMajorVersion >= desiredVersion {
 		c.logger.Infof("cluster version up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
+		return nil
+	}
+
+	if !c.isInMainternanceWindow() {
+		c.logger.Infof("skipping major version upgrade, not in maintenance window")
 		return nil
 	}
 
