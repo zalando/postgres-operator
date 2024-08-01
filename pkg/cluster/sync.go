@@ -231,20 +231,16 @@ func (c *Cluster) syncService(role PostgresRole) error {
 
 func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	var (
-		ep             *v1.Endpoints
-		updateEndpoint bool
-		err            error
+		ep  *v1.Endpoints
+		err error
 	)
 	c.setProcessName("syncing %s endpoint", role)
 
 	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.endpointName(role), metav1.GetOptions{}); err == nil {
 		desiredEp := c.generateEndpoint(role, ep.Subsets)
+		// if owner references differ we update which would also change annotations
 		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredEp.ObjectMeta.OwnerReferences) {
-			updateEndpoint = true
 			c.logger.Infof("new %s endpoints's owner references do not match the current ones", role)
-		}
-
-		if updateEndpoint {
 			c.setProcessName("updating %v endpoint", role)
 			ep, err = c.KubeClient.Endpoints(c.Namespace).Update(context.TODO(), desiredEp, metav1.UpdateOptions{})
 			if err != nil {
