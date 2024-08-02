@@ -79,18 +79,12 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
-func (c *Cluster) endpointName(role PostgresRole) string {
-	name := c.Name
-	if role == Replica {
-		name = fmt.Sprintf("%s-%s", name, "repl")
-	}
-
-	return name
-}
-
 func (c *Cluster) serviceName(role PostgresRole) string {
 	name := c.Name
-	if role == Replica {
+	switch role {
+	case Replica:
+		name = fmt.Sprintf("%s-%s", name, "repl")
+	case Patroni:
 		name = fmt.Sprintf("%s-%s", name, "repl")
 	}
 
@@ -2061,7 +2055,7 @@ func (c *Cluster) getCustomServiceAnnotations(role PostgresRole, spec *acidv1.Po
 func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.endpointName(role),
+			Name:        c.serviceName(role),
 			Namespace:   c.Namespace,
 			Annotations: c.annotationsSet(nil),
 			Labels:      c.roleLabelsSet(true, role),

@@ -31,11 +31,23 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found statefulset: %q (uid: %q)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 	}
 
-	for _, obj := range c.Secrets {
-		c.logger.Infof("found secret: %q (uid: %q) namesapce: %s", util.NameFromMeta(obj.ObjectMeta), obj.UID, obj.ObjectMeta.Namespace)
+	for appId, stream := range c.Streams {
+		c.logger.Infof("found stream: %q with application id %q (uid: %q)", util.NameFromMeta(stream.ObjectMeta), appId, stream.UID)
 	}
 
-	if !c.patroniKubernetesUseConfigMaps() {
+	if c.LogicalBackupJob != nil {
+		c.logger.Infof("found logical backup job: %q (uid: %q)", util.NameFromMeta(c.LogicalBackupJob.ObjectMeta), c.LogicalBackupJob.UID)
+	}
+
+	for _, secret := range c.Secrets {
+		c.logger.Infof("found secret: %q (uid: %q) namespace: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID, secret.ObjectMeta.Namespace)
+	}
+
+	if c.patroniKubernetesUseConfigMaps() {
+		for suffix, configmap := range c.ConfigMaps {
+			c.logger.Infof("found %s config map: %q (uid: %q)", suffix, util.NameFromMeta(configmap.ObjectMeta), configmap.UID)
+		}
+	} else {
 		for role, endpoint := range c.Endpoints {
 			c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
 		}
@@ -61,6 +73,15 @@ func (c *Cluster) listResources() error {
 
 	for _, obj := range pvcs {
 		c.logger.Infof("found PVC: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+	}
+
+	for role, poolerObjs := range c.ConnectionPooler {
+		if poolerObjs.Deployment != nil {
+			c.logger.Infof("found %s pooler deployment: %q (uid: %q) ", role, util.NameFromMeta(poolerObjs.Deployment.ObjectMeta), poolerObjs.Deployment.UID)
+		}
+		if poolerObjs.Service != nil {
+			c.logger.Infof("found %s pooler service: %q (uid: %q) ", role, util.NameFromMeta(poolerObjs.Service.ObjectMeta), poolerObjs.Service.UID)
+		}
 	}
 
 	return nil
@@ -332,11 +353,10 @@ func (c *Cluster) deleteService(role PostgresRole) error {
 	}
 
 	if err := c.KubeClient.Services(c.Services[role].Namespace).Delete(context.TODO(), c.Services[role].Name, c.deleteOptions); err != nil {
-		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("%s service has already been deleted", role)
-		} else if err != nil {
-			return err
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not delete %s service: %v", role, err)
 		}
+		c.logger.Debugf("%s service has already been deleted", role)
 	}
 
 	c.logger.Infof("%s service %q has been deleted", role, util.NameFromMeta(c.Services[role].ObjectMeta))
@@ -478,15 +498,35 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	}
 
 	if err := c.KubeClient.Endpoints(c.Endpoints[role].Namespace).Delete(context.TODO(), c.Endpoints[role].Name, c.deleteOptions); err != nil {
-		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("%s endpoint has already been deleted", role)
-		} else if err != nil {
-			return fmt.Errorf("could not delete endpoint: %v", err)
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not delete %s endpoint: %v", role, err)
 		}
+		c.logger.Debugf("%s endpoint has already been deleted", role)
 	}
 
 	c.logger.Infof("%s endpoint %q has been deleted", role, util.NameFromMeta(c.Endpoints[role].ObjectMeta))
 	delete(c.Endpoints, role)
+
+	return nil
+}
+
+func (c *Cluster) deletePatroniConfigMap(suffix string) error {
+	c.setProcessName("deleting config map")
+	c.logger.Debugln("deleting config map")
+	if c.ConfigMaps[suffix] == nil {
+		c.logger.Debugf("there is no %s config map in the cluster", suffix)
+		return nil
+	}
+
+	if err := c.KubeClient.ConfigMaps(c.ConfigMaps[suffix].Namespace).Delete(context.TODO(), c.ConfigMaps[suffix].Name, c.deleteOptions); err != nil {
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not delete %s configmap %q: %v", suffix, c.ConfigMaps[suffix].Name, err)
+		}
+		c.logger.Debugf("%s config map has already been deleted", suffix)
+	}
+
+	c.logger.Infof("%s config map %q has been deleted", suffix, util.NameFromMeta(c.ConfigMaps[suffix].ObjectMeta))
+	delete(c.ConfigMaps, suffix)
 
 	return nil
 }
@@ -540,10 +580,11 @@ func (c *Cluster) createLogicalBackupJob() (err error) {
 	}
 	c.logger.Debugf("Generated cronJobSpec: %v", logicalBackupJobSpec)
 
-	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(context.TODO(), logicalBackupJobSpec, metav1.CreateOptions{})
+	cronJob, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(context.TODO(), logicalBackupJobSpec, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("could not create k8s cron job: %v", err)
 	}
+	c.LogicalBackupJob = cronJob
 
 	return nil
 }
@@ -557,7 +598,7 @@ func (c *Cluster) patchLogicalBackupJob(newJob *batchv1.CronJob) error {
 	}
 
 	// update the backup job spec
-	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Patch(
+	cronJob, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Patch(
 		context.TODO(),
 		c.getLogicalBackupJobName(),
 		types.MergePatchType,
@@ -567,20 +608,24 @@ func (c *Cluster) patchLogicalBackupJob(newJob *batchv1.CronJob) error {
 	if err != nil {
 		return fmt.Errorf("could not patch logical backup job: %v", err)
 	}
+	c.LogicalBackupJob = cronJob
 
 	return nil
 }
 
 func (c *Cluster) deleteLogicalBackupJob() error {
-
+	if c.LogicalBackupJob == nil {
+		return nil
+	}
 	c.logger.Info("removing the logical backup job")
 
-	err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(context.TODO(), c.getLogicalBackupJobName(), c.deleteOptions)
+	err := c.KubeClient.CronJobsGetter.CronJobs(c.LogicalBackupJob.Namespace).Delete(context.TODO(), c.getLogicalBackupJobName(), c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("logical backup cron job %q has already been deleted", c.getLogicalBackupJobName())
 	} else if err != nil {
 		return err
 	}
+	c.LogicalBackupJob = nil
 
 	return nil
 }

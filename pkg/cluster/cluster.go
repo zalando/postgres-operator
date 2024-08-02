@@ -3,7 +3,6 @@ package cluster
 // Postgres CustomResourceDefinition object i.e. Spilo
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	zalandov1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
 
 	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -62,9 +62,12 @@ type Config struct {
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
 	Endpoints           map[PostgresRole]*v1.Endpoints
+	ConfigMaps          map[string]*v1.ConfigMap
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
 	PodDisruptionBudget *policyv1.PodDisruptionBudget
+	LogicalBackupJob    *batchv1.CronJob
+	Streams             map[string]*zalandov1.FabricEventStream
 	//Pods are treated separately
 	//PVCs are treated separately
 }
@@ -134,7 +137,8 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 		kubeResources: kubeResources{
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
-			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
+			Endpoints: make(map[PostgresRole]*v1.Endpoints),
+			Streams:   make(map[string]*zalandov1.FabricEventStream)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
 			PasswordEncryption:   passwordEncryption,
 			RoleDeletionSuffix:   cfg.OpConfig.RoleDeletionSuffix,
@@ -357,6 +361,20 @@ func (c *Cluster) Create() (err error) {
 	c.logger.Infof("pods are ready")
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Pods are ready")
 
+	// sync resources created by Patroni
+	if c.patroniKubernetesUseConfigMaps() {
+		if err = c.syncConfigMaps(); err != nil {
+			c.logger.Warnf("Patroni configmaps not yet synced: %v", err)
+		}
+	} else {
+		if err = c.syncEndpoint(Patroni); err != nil {
+			err = fmt.Errorf("%s endpoint not yet synced: %v", Patroni, err)
+		}
+	}
+	if err = c.syncService(Patroni); err != nil {
+		err = fmt.Errorf("%s servic not yet synced: %v", Patroni, err)
+	}
+
 	// create database objects unless we are running without pods or disabled
 	// that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
@@ -382,10 +400,6 @@ func (c *Cluster) Create() (err error) {
 		c.logger.Info("a k8s cron job for logical backup has been successfully created")
 	}
 
-	if err := c.listResources(); err != nil {
-		c.logger.Errorf("could not list resources: %v", err)
-	}
-
 	// Create connection pooler deployment and services if necessary. Since we
 	// need to perform some operations with the database itself (e.g. install
 	// lookup function), do it as the last step, when everything is available.
@@ -408,6 +422,10 @@ func (c *Cluster) Create() (err error) {
 		if err = c.syncStreams(); err != nil {
 			c.logger.Errorf("could not create streams: %v", err)
 		}
+	}
+
+	if err := c.listResources(); err != nil {
+		c.logger.Errorf("could not list resources: %v", err)
 	}
 
 	return nil
@@ -1182,8 +1200,7 @@ func (c *Cluster) Delete() error {
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budget: %v", err)
 	}
 
-	for _, role := range []PostgresRole{Master, Replica} {
-
+	for _, role := range []PostgresRole{Master, Replica, Patroni} {
 		if !c.patroniKubernetesUseConfigMaps() {
 			if err := c.deleteEndpoint(role); err != nil {
 				anyErrors = true
@@ -1199,10 +1216,14 @@ func (c *Cluster) Delete() error {
 		}
 	}
 
-	if err := c.deletePatroniClusterObjects(); err != nil {
-		anyErrors = true
-		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove leftover patroni objects; %v", err)
+	if c.patroniKubernetesUseConfigMaps() {
+		for _, suffix := range []string{"leader", "config", "sync", "failover"} {
+			if err := c.deletePatroniConfigMap(suffix); err != nil {
+				anyErrors = true
+				c.logger.Warningf("could not delete %s config map: %v", suffix, err)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s config map: %v", suffix, err)
+			}
+		}
 	}
 
 	// Delete connection pooler objects anyway, even if it's not mentioned in the
@@ -1733,97 +1754,4 @@ func (c *Cluster) Lock() {
 // Unlock unlocks the cluster
 func (c *Cluster) Unlock() {
 	c.mu.Unlock()
-}
-
-type simpleActionWithResult func()
-
-type clusterObjectGet func(name string) (spec.NamespacedName, error)
-
-type clusterObjectDelete func(name string) error
-
-func (c *Cluster) deletePatroniClusterObjects() error {
-	// TODO: figure out how to remove leftover patroni objects in other cases
-	var actionsList []simpleActionWithResult
-
-	if !c.patroniUsesKubernetes() {
-		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
-	}
-
-	actionsList = append(actionsList, c.deletePatroniClusterServices)
-	if c.patroniKubernetesUseConfigMaps() {
-		actionsList = append(actionsList, c.deletePatroniClusterConfigMaps)
-	} else {
-		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
-	}
-
-	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
-	for _, deleter := range actionsList {
-		deleter()
-	}
-	return nil
-}
-
-func deleteClusterObject(
-	get clusterObjectGet,
-	del clusterObjectDelete,
-	objType string,
-	clusterName string,
-	logger *logrus.Entry) {
-	for _, suffix := range patroniObjectSuffixes {
-		name := fmt.Sprintf("%s-%s", clusterName, suffix)
-
-		namespacedName, err := get(name)
-		if err == nil {
-			logger.Debugf("deleting %s %q",
-				objType, namespacedName)
-
-			if err = del(name); err != nil {
-				logger.Warningf("could not delete %s %q: %v",
-					objType, namespacedName, err)
-			}
-
-		} else if !k8sutil.ResourceNotFound(err) {
-			logger.Warningf("could not fetch %s %q: %v",
-				objType, namespacedName, err)
-		}
-	}
-}
-
-func (c *Cluster) deletePatroniClusterServices() {
-	get := func(name string) (spec.NamespacedName, error) {
-		svc, err := c.KubeClient.Services(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		return util.NameFromMeta(svc.ObjectMeta), err
-	}
-
-	deleteServiceFn := func(name string) error {
-		return c.KubeClient.Services(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
-	}
-
-	deleteClusterObject(get, deleteServiceFn, "service", c.Name, c.logger)
-}
-
-func (c *Cluster) deletePatroniClusterEndpoints() {
-	get := func(name string) (spec.NamespacedName, error) {
-		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		return util.NameFromMeta(ep.ObjectMeta), err
-	}
-
-	deleteEndpointFn := func(name string) error {
-		return c.KubeClient.Endpoints(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
-	}
-
-	deleteClusterObject(get, deleteEndpointFn, "endpoint", c.Name, c.logger)
-}
-
-func (c *Cluster) deletePatroniClusterConfigMaps() {
-	get := func(name string) (spec.NamespacedName, error) {
-		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		return util.NameFromMeta(cm.ObjectMeta), err
-	}
-
-	deleteConfigMapFn := func(name string) error {
-		return c.KubeClient.ConfigMaps(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
-	}
-
-	deleteClusterObject(get, deleteConfigMapFn, "configmap", c.Name, c.logger)
 }
