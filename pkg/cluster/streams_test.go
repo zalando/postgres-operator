@@ -41,6 +41,10 @@ var (
 	fesUser     string = fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
 	slotName    string = fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
 
+	fakeCreatedSlots map[string]map[string]string = map[string]map[string]string{
+		slotName: {},
+	}
+
 	pg = acidv1.Postgresql{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Postgresql",
@@ -222,7 +226,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	// create the streams
-	err = cluster.createOrUpdateStreams()
+	err = cluster.createOrUpdateStreams(fakeCreatedSlots)
 	assert.NoError(t, err)
 
 	// compare generated stream with expected stream
@@ -248,7 +252,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	}
 
 	// sync streams once again
-	err = cluster.createOrUpdateStreams()
+	err = cluster.createOrUpdateStreams(fakeCreatedSlots)
 	assert.NoError(t, err)
 
 	streams, err = cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
@@ -397,7 +401,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	// now create the stream
-	err = cluster.createOrUpdateStreams()
+	err = cluster.createOrUpdateStreams(fakeCreatedSlots)
 	assert.NoError(t, err)
 
 	// change specs of streams and patch CRD
@@ -419,7 +423,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	cluster.Postgresql.Spec = pgPatched.Spec
-	err = cluster.createOrUpdateStreams()
+	err = cluster.createOrUpdateStreams(fakeCreatedSlots)
 	assert.NoError(t, err)
 
 	// compare stream returned from API with expected stream
@@ -448,11 +452,28 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	cluster.Postgresql.Spec = pgPatched.Spec
-	err = cluster.createOrUpdateStreams()
+	err = cluster.createOrUpdateStreams(fakeCreatedSlots)
 	assert.NoError(t, err)
 
 	result = cluster.generateFabricEventStream(appId)
 	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
 		t.Errorf("Malformed FabricEventStream after disabling event recovery, expected %#v, got %#v", streams.Items[0], result)
+	}
+
+	mockClient := k8sutil.NewMockKubernetesClient()
+	cluster.KubeClient.CustomResourceDefinitionsGetter = mockClient.CustomResourceDefinitionsGetter
+
+	// remove streams from manifest
+	pgPatched.Spec.Streams = nil
+	pgUpdated, err := cluster.KubeClient.Postgresqls(namespace).Update(
+		context.TODO(), pgPatched, metav1.UpdateOptions{})
+	assert.NoError(t, err)
+
+	cluster.Postgresql.Spec = pgUpdated.Spec
+	cluster.createOrUpdateStreams(fakeCreatedSlots)
+
+	streamList, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
+	if len(streamList.Items) > 0 || err != nil {
+		t.Errorf("stream resource has not been removed or unexpected error %v", err)
 	}
 }

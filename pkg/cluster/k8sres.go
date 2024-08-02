@@ -887,7 +887,7 @@ func (c *Cluster) generatePodTemplate(
 		addSecretVolume(&podSpec, additionalSecretMount, additionalSecretMountPath)
 	}
 
-	if additionalVolumes != nil {
+	if len(additionalVolumes) > 0 {
 		c.addAdditionalVolumes(&podSpec, additionalVolumes)
 	}
 
@@ -2056,9 +2056,10 @@ func (c *Cluster) getCustomServiceAnnotations(role PostgresRole, spec *acidv1.Po
 func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.endpointName(role),
-			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(true, role),
+			Name:        c.endpointName(role),
+			Namespace:   c.Namespace,
+			Annotations: c.annotationsSet(nil),
+			Labels:      c.roleLabelsSet(true, role),
 		},
 	}
 	if len(subsets) > 0 {

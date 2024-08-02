@@ -129,7 +129,8 @@ class EndToEndTestCase(unittest.TestCase):
                          "infrastructure-roles.yaml",
                          "infrastructure-roles-new.yaml",
                          "custom-team-membership.yaml",
-                         "e2e-storage-class.yaml"]:
+                         "e2e-storage-class.yaml",
+                         "fes.crd.yaml"]:
             result = k8s.create_with_kubectl("manifests/" + filename)
             print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
 
@@ -198,6 +199,7 @@ class EndToEndTestCase(unittest.TestCase):
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", owner_query)), 3,
             "Not all additional users found in database", 10, 5)
+
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_pod_capabilities(self):
@@ -909,28 +911,33 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         k8s = self.k8s
 
-        annotation_patch = {
-            "metadata": {
-                "annotations": {
-                    "k8s-status": "healthy"
-                },
-            }
-        }
 
         try:
-            sts = k8s.api.apps_v1.read_namespaced_stateful_set('acid-minimal-cluster', 'default')
-            old_sts_creation_timestamp = sts.metadata.creation_timestamp
-            k8s.api.apps_v1.patch_namespaced_stateful_set(sts.metadata.name, sts.metadata.namespace, annotation_patch)
-            svc = k8s.api.core_v1.read_namespaced_service('acid-minimal-cluster', 'default')
-            old_svc_creation_timestamp = svc.metadata.creation_timestamp
-            k8s.api.core_v1.patch_namespaced_service(svc.metadata.name, svc.metadata.namespace, annotation_patch)
-
             patch_config_ignored_annotations = {
                 "data": {
                     "ignored_annotations": "k8s-status",
                 }
             }
             k8s.update_config(patch_config_ignored_annotations)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            sts = k8s.api.apps_v1.read_namespaced_stateful_set('acid-minimal-cluster', 'default')
+            svc = k8s.api.core_v1.read_namespaced_service('acid-minimal-cluster', 'default')
+
+            annotation_patch = {
+                "metadata": {
+                    "annotations": {
+                        "k8s-status": "healthy"
+                    },
+                }
+            }
+            
+            old_sts_creation_timestamp = sts.metadata.creation_timestamp
+            k8s.api.apps_v1.patch_namespaced_stateful_set(sts.metadata.name, sts.metadata.namespace, annotation_patch)
+            old_svc_creation_timestamp = svc.metadata.creation_timestamp
+            k8s.api.core_v1.patch_namespaced_service(svc.metadata.name, svc.metadata.namespace, annotation_patch)
+
+            k8s.delete_operator_pod()
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             sts = k8s.api.apps_v1.read_namespaced_stateful_set('acid-minimal-cluster', 'default')
@@ -1198,7 +1205,7 @@ class EndToEndTestCase(unittest.TestCase):
             version = p["server_version"][0:2]
             return version
 
-        self.evantuallyEqual(check_version_14, "14", "Version was not upgrade to 14")
+        self.eventuallyEqual(check_version_14, "14", "Version was not upgrade to 14")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_persistent_volume_claim_retention_policy(self):
@@ -1985,6 +1992,149 @@ class EndToEndTestCase(unittest.TestCase):
             time.sleep(5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_stream_resources(self):
+        '''
+           Create and delete fabric event streaming resources.
+        '''
+        k8s = self.k8s
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+            "Operator does not get in sync")
+        leader = k8s.get_cluster_leader_pod()
+
+        # patch ClusterRole with CRUD privileges on FES resources
+        cluster_role = k8s.api.rbac_api.read_cluster_role("postgres-operator")
+        fes_cluster_role_rule = client.V1PolicyRule(
+            api_groups=["zalando.org"],
+            resources=["fabriceventstreams"],
+            verbs=["create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"]
+        )
+        cluster_role.rules.append(fes_cluster_role_rule)
+        k8s.api.rbac_api.patch_cluster_role("postgres-operator", cluster_role)
+
+        # create a table in one of the database of acid-minimal-cluster
+        create_stream_table = """
+            CREATE TABLE test_table (id int, payload jsonb);
+        """
+        self.query_database(leader.metadata.name, "foo", create_stream_table)
+
+        # update the manifest with the streams section
+        patch_streaming_config = {
+            "spec": {
+                 "patroni": {
+                    "slots": {
+                        "manual_slot": {
+                            "type": "physical"
+                        }
+                    }
+                 },
+                "streams": [
+                    {
+                        "applicationId": "test-app",
+                        "batchSize": 100,
+                        "database": "foo",
+                        "enableRecovery": True,
+                        "tables": {
+                            "test_table": {
+                                "eventType": "test-event",
+                                "idColumn": "id",
+                                "payloadColumn": "payload",
+                                "recoveryEventType": "test-event-dlq"
+                            }
+                        }
+                    },
+                    {
+                        "applicationId": "test-app2",
+                        "batchSize": 100,
+                        "database": "foo",
+                        "enableRecovery": True,
+                        "tables": {
+                            "test_non_exist_table": {
+                                "eventType": "test-event",
+                                "idColumn": "id",
+                                "payloadColumn": "payload",
+                                "recoveryEventType": "test-event-dlq"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        # check if publication, slot, and fes resource are created
+        get_publication_query = """
+            SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app';
+        """
+        get_slot_query = """
+            SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 1,
+            "Publication is not created", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 1,
+            "Replication slot is not created", 10, 5)
+        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
+                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
+                "Could not find Fabric Event Stream resource", 10, 5)
+
+        # check if the non-existing table in the stream section does not create a publication and slot
+        get_publication_query_not_exist_table = """
+            SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app2';
+        """
+        get_slot_query_not_exist_table = """
+            SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app2';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query_not_exist_table)), 0,
+            "Publication is created for non-existing tables", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query_not_exist_table)), 0,
+            "Replication slot is created for non-existing tables", 10, 5)
+
+        # grant create and ownership of test_table to foo_user, reset search path to default
+        grant_permission_foo_user = """
+            GRANT CREATE ON DATABASE foo TO foo_user;
+            ALTER TABLE test_table OWNER TO foo_user;
+            ALTER ROLE foo_user RESET search_path;
+        """
+        self.query_database(leader.metadata.name, "foo", grant_permission_foo_user)
+        # non-postgres user creates a publication
+        create_nonstream_publication = """
+            CREATE PUBLICATION mypublication FOR TABLE test_table;
+        """
+        self.query_database_with_user(leader.metadata.name, "foo", create_nonstream_publication, "foo_user")
+
+        # remove the streams section from the manifest
+        patch_streaming_config_removal = {
+            "spec": {
+                "streams": []
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config_removal)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        # check if publication, slot, and fes resource are removed
+        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
+                "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 0,
+                'Could not delete Fabric Event Stream resource', 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 0,
+            "Publication is not deleted", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 0,
+            "Replication slot is not deleted", 10, 5)
+
+        # check the manual_slot and mypublication should not get deleted
+        get_manual_slot_query = """
+            SELECT * FROM pg_replication_slots WHERE slot_name = 'manual_slot';
+        """
+        get_nonstream_publication_query = """
+            SELECT * FROM pg_publication WHERE pubname = 'mypublication';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_manual_slot_query)), 1,
+            "Slot defined in patroni config is deleted", 10, 5)
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_nonstream_publication_query)), 1,
+            "Publication defined not in stream section is deleted", 10, 5)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
         '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
@@ -2110,7 +2260,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.count_statefulsets_with_label(cluster_label), 0, "Statefulset not deleted")
             self.eventuallyEqual(lambda: k8s.count_deployments_with_label(cluster_label), 0, "Deployments not deleted")
             self.eventuallyEqual(lambda: k8s.count_pdbs_with_label(cluster_label), 0, "Pod disruption budget not deleted")
-            self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 7, "Secrets were deleted although disabled in config")
+            self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 8, "Secrets were deleted although disabled in config")
             self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 3, "PVCs were deleted although disabled in config")
 
         except timeout_decorator.TimeoutError:
