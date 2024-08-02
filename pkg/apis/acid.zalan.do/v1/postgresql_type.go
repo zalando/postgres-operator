@@ -3,8 +3,8 @@ package v1
 // Postgres CRD definition, please use CamelCase for field names.
 
 import (
-	"time"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -263,7 +263,7 @@ type Condition struct {
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus struct {
-	PostgresClusterStatus string `json:"postgresClusterStatus"`
+	PostgresClusterStatus string     `json:"postgresClusterStatus"`
 	NumberOfInstances     int32      `json:"numberOfInstances"`
 	LabelSelector         string     `json:"labelSelector"`
 	ObservedGeneration    int64      `json:"observedGeneration,omitempty"`

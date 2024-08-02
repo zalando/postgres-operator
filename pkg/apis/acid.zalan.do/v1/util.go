@@ -100,7 +100,3 @@ func (postgresStatus PostgresStatus) Running() bool {
 func (postgresStatus PostgresStatus) Creating() bool {
 	return postgresStatus.PostgresClusterStatus == ClusterStatusCreating
 }
-
-//func (postgresStatus PostgresStatus) String() string {
-//	return postgresStatus.PostgresClusterStatus
-//}

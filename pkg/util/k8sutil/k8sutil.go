@@ -193,7 +193,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 }
 
 // SetPostgresCRDStatus of Postgres cluster
-func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string, numberOfInstances int32, labelSelector string, observedGeneration int64, existingCondition apiacidv1.Conditions, message string) (*apiacidv1.Postgresql, error) {
+func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string, numberOfInstances int32, labelSelector string, observedGeneration int64, existingConditions apiacidv1.Conditions, message string) (*apiacidv1.Postgresql, error) {
 	var pg *apiacidv1.Postgresql
 	pgStatus := apiacidv1.PostgresStatus{}
 	pgStatus.PostgresClusterStatus = status
@@ -201,9 +201,8 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 	pgStatus.LabelSelector = labelSelector
 	pgStatus.ObservedGeneration = observedGeneration
 
-	newConditions := updateConditions(existingCondition, status, message)
+	newConditions := updateConditions(existingConditions, status, message)
 	pgStatus.Conditions = newConditions
-
 
 	patch, err := json.Marshal(struct {
 		PgStatus interface{} `json:"status"`
