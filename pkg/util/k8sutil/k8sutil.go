@@ -3,6 +3,7 @@ package k8sutil
 import (
 	"context"
 	"fmt"
+	"time"
 
 	b64 "encoding/base64"
 	"encoding/json"
@@ -192,10 +193,17 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 }
 
 // SetPostgresCRDStatus of Postgres cluster
-func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string) (*apiacidv1.Postgresql, error) {
+func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string, numberOfInstances int32, labelSelector string, observedGeneration int64, existingCondition apiacidv1.Conditions, message string) (*apiacidv1.Postgresql, error) {
 	var pg *apiacidv1.Postgresql
-	var pgStatus apiacidv1.PostgresStatus
+	pgStatus := apiacidv1.PostgresStatus{}
 	pgStatus.PostgresClusterStatus = status
+	pgStatus.NumberOfInstances = numberOfInstances
+	pgStatus.LabelSelector = labelSelector
+	pgStatus.ObservedGeneration = observedGeneration
+
+	newConditions := updateConditions(existingCondition, status, message)
+	pgStatus.Conditions = newConditions
+
 
 	patch, err := json.Marshal(struct {
 		PgStatus interface{} `json:"status"`
@@ -215,6 +223,77 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 	}
 
 	return pg, nil
+}
+
+func updateConditions(existingConditions apiacidv1.Conditions, currentStatus string, message string) apiacidv1.Conditions {
+	now := apiacidv1.VolatileTime{Inner: metav1.NewTime(time.Now())}
+	var readyCondition, reconciliationCondition *apiacidv1.Condition
+
+	// Find existing conditions
+	for i := range existingConditions {
+		if existingConditions[i].Type == "Ready" {
+			readyCondition = &existingConditions[i]
+		} else if existingConditions[i].Type == "ReconciliationSuccessful" {
+			reconciliationCondition = &existingConditions[i]
+		}
+	}
+
+	// Initialize conditions if not present
+	switch currentStatus {
+	case "Creating":
+		if reconciliationCondition == nil {
+			existingConditions = append(existingConditions, apiacidv1.Condition{Type: "ReconciliationSuccessful"})
+			reconciliationCondition = &existingConditions[len(existingConditions)-1]
+
+		}
+	default:
+		if readyCondition == nil {
+			existingConditions = append(existingConditions, apiacidv1.Condition{Type: "Ready"})
+			readyCondition = &existingConditions[len(existingConditions)-1]
+		}
+	}
+
+	// Update Ready condition
+	switch currentStatus {
+	case "Running":
+		readyCondition.Status = v1.ConditionTrue
+		readyCondition.LastTransitionTime = now
+	case "CreateFailed":
+		readyCondition.Status = v1.ConditionFalse
+		readyCondition.LastTransitionTime = now
+	case "UpdateFailed", "SyncFailed", "Invalid":
+		if readyCondition.Status == v1.ConditionFalse {
+			readyCondition.LastTransitionTime = now
+		}
+	case "Updating":
+		// not updatinf time, just setting the status
+		if readyCondition.Status == v1.ConditionFalse {
+			readyCondition.Status = v1.ConditionFalse
+		} else {
+			readyCondition.Status = v1.ConditionTrue
+		}
+	}
+
+	// Update ReconciliationSuccessful condition
+	reconciliationCondition.LastTransitionTime = now
+	reconciliationCondition.Message = message
+	if currentStatus == "Running" {
+		reconciliationCondition.Status = v1.ConditionTrue
+		reconciliationCondition.Reason = ""
+	} else {
+		reconciliationCondition.Status = v1.ConditionFalse
+		reconciliationCondition.Reason = currentStatus
+	}
+	// Directly modify elements in the existingConditions slice
+	for i := range existingConditions {
+		if existingConditions[i].Type == "Ready" && readyCondition != nil {
+			existingConditions[i] = *readyCondition
+		} else if existingConditions[i].Type == "ReconciliationSuccessful" && reconciliationCondition != nil {
+			existingConditions[i] = *reconciliationCondition
+		}
+	}
+
+	return existingConditions
 }
 
 // SetFinalizer of Postgres cluster

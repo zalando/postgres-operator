@@ -4,6 +4,7 @@ package v1
 
 import (
 	"time"
+	"k8s.io/apimachinery/pkg/api/equality"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -225,9 +226,48 @@ type Sidecar struct {
 // UserFlags defines flags (such as superuser, nologin) that could be assigned to individual users
 type UserFlags []string
 
+type Conditions []Condition
+
+type ConditionType string
+type VolatileTime struct {
+	Inner metav1.Time `json:",inline"`
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (t VolatileTime) MarshalJSON() ([]byte, error) {
+	return t.Inner.MarshalJSON()
+}
+
+// UnmarshalJSON implements the json.Unmarshaller interface.
+func (t *VolatileTime) UnmarshalJSON(b []byte) error {
+	return t.Inner.UnmarshalJSON(b)
+}
+
+func init() {
+	equality.Semantic.AddFunc(
+		// Always treat VolatileTime fields as equivalent.
+		func(VolatileTime, VolatileTime) bool {
+			return true
+		},
+	)
+}
+
+// Condition contains the conditions of the PostgreSQL cluster
+type Condition struct {
+	Type               ConditionType      `json:"type" description:"type of status condition"`
+	Status             v1.ConditionStatus `json:"status" description:"status of the condition, one of True, False, Unknown"`
+	LastTransitionTime VolatileTime       `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
+	Reason             string             `json:"reason,omitempty" description:"one-word CamelCase reason for the condition's last transition"`
+	Message            string             `json:"message,omitempty" description:"human-readable message indicating details about last transition"`
+}
+
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus struct {
-	PostgresClusterStatus string `json:"PostgresClusterStatus"`
+	PostgresClusterStatus string `json:"postgresClusterStatus"`
+	NumberOfInstances     int32      `json:"numberOfInstances"`
+	LabelSelector         string     `json:"labelSelector"`
+	ObservedGeneration    int64      `json:"observedGeneration,omitempty"`
+	Conditions            Conditions `json:"conditions,omitempty"`
 }
 
 // ConnectionPooler Options for connection pooler
