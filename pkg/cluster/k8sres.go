@@ -85,7 +85,7 @@ func (c *Cluster) serviceName(role PostgresRole) string {
 	case Replica:
 		name = fmt.Sprintf("%s-%s", name, "repl")
 	case Patroni:
-		name = fmt.Sprintf("%s-%s", name, "repl")
+		name = fmt.Sprintf("%s-%s", name, "config")
 	}
 
 	return name
