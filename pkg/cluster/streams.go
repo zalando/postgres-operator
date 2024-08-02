@@ -134,7 +134,6 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 		} else if currentTables != tableList {
 			alterPublications[slotName] = tableList
 		}
-		(*slotsToSync)[slotName] = slotAndPublication.Slot
 	}
 
 	// check if there is any deletion
@@ -148,24 +147,30 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 		return nil
 	}
 
+	var errorMessage error = nil
 	for publicationName, tables := range createPublications {
 		if err = c.executeCreatePublication(publicationName, tables); err != nil {
-			return fmt.Errorf("creation of publication %q failed: %v", publicationName, err)
+			errorMessage = fmt.Errorf("creation of publication %q failed: %v", publicationName, err)
+			continue
 		}
+		(*slotsToSync)[publicationName] = databaseSlotsList[publicationName].Slot
 	}
 	for publicationName, tables := range alterPublications {
 		if err = c.executeAlterPublication(publicationName, tables); err != nil {
-			return fmt.Errorf("update of publication %q failed: %v", publicationName, err)
+			errorMessage = fmt.Errorf("update of publication %q failed: %v", publicationName, err)
+			continue
 		}
+		(*slotsToSync)[publicationName] = databaseSlotsList[publicationName].Slot
 	}
 	for _, publicationName := range deletePublications {
-		(*slotsToSync)[publicationName] = nil
 		if err = c.executeDropPublication(publicationName); err != nil {
-			return fmt.Errorf("deletion of publication %q failed: %v", publicationName, err)
+			errorMessage = fmt.Errorf("deletion of publication %q failed: %v", publicationName, err)
+			continue
 		}
+		(*slotsToSync)[publicationName] = nil
 	}
 
-	return nil
+	return errorMessage
 }
 
 func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEventStream {
@@ -390,7 +395,7 @@ func (c *Cluster) syncStreams() error {
 	}
 
 	// finally sync stream CRDs
-	err = c.createOrUpdateStreams()
+	err = c.createOrUpdateStreams(slotsToSync)
 	if err != nil {
 		return err
 	}
@@ -398,7 +403,7 @@ func (c *Cluster) syncStreams() error {
 	return nil
 }
 
-func (c *Cluster) createOrUpdateStreams() error {
+func (c *Cluster) createOrUpdateStreams(createdSlots map[string]map[string]string) error {
 
 	// fetch different application IDs from streams section
 	// there will be a separate event stream resource for each ID
@@ -413,7 +418,7 @@ func (c *Cluster) createOrUpdateStreams() error {
 		return fmt.Errorf("could not list of FabricEventStreams: %v", err)
 	}
 
-	for _, appId := range appIds {
+	for idx, appId := range appIds {
 		streamExists := false
 
 		// update stream when it exists and EventStreams array differs
@@ -435,6 +440,12 @@ func (c *Cluster) createOrUpdateStreams() error {
 		}
 
 		if !streamExists {
+			// check if there is any slot with the applicationId
+			slotName := getSlotName(c.Spec.Streams[idx].Database, appId)
+			if _, exists := createdSlots[slotName]; !exists {
+				c.logger.Warningf("no slot %s with applicationId %s exists, skipping event stream creation", slotName, appId)
+				continue
+			}
 			c.logger.Infof("event streams with applicationId %s do not exist, create it", appId)
 			streamCRD, err := c.createStreams(appId)
 			if err != nil {
