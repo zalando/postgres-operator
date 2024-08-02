@@ -82,7 +82,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 
 	if c.patroniKubernetesUseConfigMaps() {
 		if err = c.syncConfigMaps(); err != nil {
-			c.logger.Errorf("could not sync configmaps: %v", err)
+			c.logger.Errorf("could not sync config maps: %v", err)
 		}
 	}
 
@@ -182,7 +182,7 @@ func (c *Cluster) syncFinalizer() error {
 func (c *Cluster) syncConfigMaps() error {
 	for _, suffix := range []string{"leader", "config", "sync", "failover"} {
 		if err := c.syncConfigMap(suffix); err != nil {
-			return fmt.Errorf("could not sync %s configmap: %v", suffix, err)
+			return fmt.Errorf("could not sync %s config map: %v", suffix, err)
 		}
 	}
 
@@ -195,7 +195,7 @@ func (c *Cluster) syncConfigMap(suffix string) error {
 		err error
 	)
 	name := fmt.Sprintf("%s-%s", c.Name, suffix)
-	c.logger.Debugf("syncing %s configmap", name)
+	c.logger.Debugf("syncing %s config map", name)
 	c.setProcessName("syncing %s config map", name)
 
 	if cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{}); err == nil {

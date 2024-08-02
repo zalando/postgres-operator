@@ -520,7 +520,7 @@ func (c *Cluster) deletePatroniConfigMap(suffix string) error {
 
 	if err := c.KubeClient.ConfigMaps(c.ConfigMaps[suffix].Namespace).Delete(context.TODO(), c.ConfigMaps[suffix].Name, c.deleteOptions); err != nil {
 		if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("could not delete %s configmap %q: %v", suffix, c.ConfigMaps[suffix].Name, err)
+			return fmt.Errorf("could not delete %s config map %q: %v", suffix, c.ConfigMaps[suffix].Name, err)
 		}
 		c.logger.Debugf("%s config map has already been deleted", suffix)
 	}
