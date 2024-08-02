@@ -47,11 +47,6 @@ const (
 	operatorPort                   = 8080
 )
 
-type pgUser struct {
-	Password string   `json:"password"`
-	Options  []string `json:"options"`
-}
-
 type patroniDCS struct {
 	TTL                      uint32                       `json:"ttl,omitempty"`
 	LoopWait                 uint32                       `json:"loop_wait,omitempty"`

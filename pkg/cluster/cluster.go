@@ -646,7 +646,7 @@ func compareEnv(a, b []v1.EnvVar) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	equal := true
+	var equal bool
 	for _, enva := range a {
 		hasmatch := false
 		for _, envb := range b {
