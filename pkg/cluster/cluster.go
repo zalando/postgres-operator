@@ -135,10 +135,11 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 		systemUsers:    make(map[string]spec.PgUser),
 		podSubscribers: make(map[spec.NamespacedName]chan PodEvent),
 		kubeResources: kubeResources{
-			Secrets:   make(map[types.UID]*v1.Secret),
-			Services:  make(map[PostgresRole]*v1.Service),
-			Endpoints: make(map[PostgresRole]*v1.Endpoints),
-			Streams:   make(map[string]*zalandov1.FabricEventStream)},
+			Secrets:    make(map[types.UID]*v1.Secret),
+			Services:   make(map[PostgresRole]*v1.Service),
+			Endpoints:  make(map[PostgresRole]*v1.Endpoints),
+			ConfigMaps: make(map[string]*v1.ConfigMap),
+			Streams:    make(map[string]*zalandov1.FabricEventStream)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
 			PasswordEncryption:   passwordEncryption,
 			RoleDeletionSuffix:   cfg.OpConfig.RoleDeletionSuffix,
