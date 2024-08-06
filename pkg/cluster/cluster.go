@@ -1202,18 +1202,18 @@ func (c *Cluster) Delete() error {
 	}
 
 	for _, role := range []PostgresRole{Master, Replica, Patroni} {
+		if err := c.deleteService(role); err != nil {
+			anyErrors = true
+			c.logger.Warningf("could not delete %s service: %v", role, err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s service: %v", role, err)
+		}
+
 		if !c.patroniKubernetesUseConfigMaps() {
 			if err := c.deleteEndpoint(role); err != nil {
 				anyErrors = true
 				c.logger.Warningf("could not delete %s endpoint: %v", role, err)
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s endpoint: %v", role, err)
 			}
-		}
-
-		if err := c.deleteService(role); err != nil {
-			anyErrors = true
-			c.logger.Warningf("could not delete %s service: %v", role, err)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s service: %v", role, err)
 		}
 	}
 
