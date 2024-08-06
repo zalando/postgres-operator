@@ -188,7 +188,10 @@ class K8s:
         return len(self.api.core_v1.list_namespaced_service(namespace, label_selector=labels).items)
 
     def count_endpoints_with_label(self, labels, namespace='default'):
-        return len(self.api.core_v1.list_namespaced_endpoints(namespace, label_selector=labels).items)
+        eps = self.api.core_v1.list_namespaced_endpoints(namespace, label_selector=labels).items
+        for ep in eps:
+            print("found endpoint: {}".format(ep.metadata.name))
+        return len(eps)
 
     def count_secrets_with_label(self, labels, namespace='default'):
         return len(self.api.core_v1.list_namespaced_secret(namespace, label_selector=labels).items)
