@@ -80,10 +80,8 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
-	if c.patroniKubernetesUseConfigMaps() {
-		if err = c.syncConfigMaps(); err != nil {
-			c.logger.Errorf("could not sync config maps: %v", err)
-		}
+	if err = c.syncPatroniResources(); err != nil {
+		c.logger.Errorf("could not sync Patroni resources: %v", err)
 	}
 
 	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
@@ -179,40 +177,74 @@ func (c *Cluster) syncFinalizer() error {
 	return nil
 }
 
-func (c *Cluster) syncConfigMaps() error {
-	for _, suffix := range []string{"leader", "config", "sync", "failover"} {
-		if err := c.syncConfigMap(suffix); err != nil {
-			return fmt.Errorf("could not sync %s config map: %v", suffix, err)
+func (c *Cluster) syncPatroniResources() error {
+	errors := make([]string, 0)
+
+	if err := c.syncService(Patroni); err != nil {
+		errors = append(errors, fmt.Sprintf("could not sync %s service: %v", Patroni, err))
+	}
+
+	for _, suffix := range patroniObjectSuffixes {
+		if c.patroniKubernetesUseConfigMaps() {
+			if err := c.syncPatroniConfigMap(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("could not sync %s Patroni config map: %v", suffix, err))
+			}
+		} else {
+			if err := c.syncPatroniEndpoint(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("could not sync %s Patroni endpoint: %v", suffix, err))
+			}
 		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
 	}
 
 	return nil
 }
 
-func (c *Cluster) syncConfigMap(suffix string) error {
+func (c *Cluster) syncPatroniConfigMap(suffix string) error {
 	var (
 		cm  *v1.ConfigMap
 		err error
 	)
 	name := fmt.Sprintf("%s-%s", c.Name, suffix)
-	c.logger.Debugf("syncing %s config map", name)
-	c.setProcessName("syncing %s config map", name)
+	c.logger.Debugf("syncing %s Patroni config map", name)
+	c.setProcessName("syncing %s Patroni config map", name)
 
 	if cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
-		c.ConfigMaps[suffix] = cm
+		c.PatroniConfigMaps[suffix] = cm
 		return nil
 	}
 	if !k8sutil.ResourceNotFound(err) {
-		return fmt.Errorf("could not get %s config map: %v", suffix, err)
+		return fmt.Errorf("could not get %s Patroni config map: %v", suffix, err)
 	}
-	// no existing config map, Patroni will handle it
-	c.ConfigMaps[suffix] = nil
+
+	return nil
+}
+
+func (c *Cluster) syncPatroniEndpoint(suffix string) error {
+	var (
+		ep  *v1.Endpoints
+		err error
+	)
+	name := fmt.Sprintf("%s-%s", c.Name, suffix)
+	c.logger.Debugf("syncing %s Patroni endpoint", name)
+	c.setProcessName("syncing %s Patroni endpoint", name)
+
+	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+		c.PatroniEndpoints[suffix] = ep
+		return nil
+	}
+	if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get %s Patroni endpoint: %v", suffix, err)
+	}
 
 	return nil
 }
 
 func (c *Cluster) syncServices() error {
-	for _, role := range []PostgresRole{Master, Replica, Patroni} {
+	for _, role := range []PostgresRole{Master, Replica} {
 		c.logger.Debugf("syncing %s service", role)
 
 		if !c.patroniKubernetesUseConfigMaps() {
@@ -284,11 +316,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	c.setProcessName("syncing %s endpoint", role)
 
 	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
-		c.Endpoints[role] = ep
-		// do not touch config endpoint managed by Patroni
-		if role == Patroni {
-			return nil
-		}
 		desiredEp := c.generateEndpoint(role, ep.Subsets)
 		if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations); changed {
 			patchData, err := metaAnnotationsPatch(desiredEp.Annotations)
@@ -305,10 +332,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	}
 	if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s endpoint: %v", role, err)
-	}
-	// if config endpoint does not exist Patroni will create it
-	if role == Patroni {
-		return nil
 	}
 	// no existing endpoint, create new one
 	c.Endpoints[role] = nil

@@ -43,18 +43,22 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found secret: %q (uid: %q) namespace: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID, secret.ObjectMeta.Namespace)
 	}
 
-	if c.patroniKubernetesUseConfigMaps() {
-		for suffix, configmap := range c.ConfigMaps {
-			c.logger.Infof("found %s config map: %q (uid: %q)", suffix, util.NameFromMeta(configmap.ObjectMeta), configmap.UID)
-		}
-	} else {
-		for role, endpoint := range c.Endpoints {
-			c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
-		}
-	}
-
 	for role, service := range c.Services {
 		c.logger.Infof("found %s service: %q (uid: %q)", role, util.NameFromMeta(service.ObjectMeta), service.UID)
+	}
+
+	for role, endpoint := range c.Endpoints {
+		c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+	}
+
+	if c.patroniKubernetesUseConfigMaps() {
+		for suffix, configmap := range c.PatroniConfigMaps {
+			c.logger.Infof("found %s Patroni config map: %q (uid: %q)", suffix, util.NameFromMeta(configmap.ObjectMeta), configmap.UID)
+		}
+	} else {
+		for suffix, endpoint := range c.PatroniEndpoints {
+			c.logger.Infof("found %s Patroni endpoint: %q (uid: %q)", suffix, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+		}
 	}
 
 	pods, err := c.listPods()
@@ -510,23 +514,73 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	return nil
 }
 
+func (c *Cluster) deletePatroniResources() error {
+	c.setProcessName("deleting Patroni resources")
+	errors := make([]string, 0)
+
+	if err := c.deleteService(Patroni); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	for _, suffix := range patroniObjectSuffixes {
+		if c.patroniKubernetesUseConfigMaps() {
+			if err := c.deletePatroniConfigMap(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("%v", err))
+			}
+		} else {
+			if err := c.deletePatroniEndpoint(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("%v", err))
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
+
+	return nil
+}
+
 func (c *Cluster) deletePatroniConfigMap(suffix string) error {
-	c.setProcessName("deleting config map")
-	c.logger.Debugln("deleting config map")
-	if c.ConfigMaps[suffix] == nil {
-		c.logger.Debugf("there is no %s config map in the cluster", suffix)
+	c.setProcessName("deleting Patroni config map")
+	c.logger.Debugln("deleting Patroni config map")
+	cm := c.PatroniConfigMaps[suffix]
+	if cm == nil {
+		c.logger.Debugf("there is no %s Patroni config map in the cluster", suffix)
 		return nil
 	}
 
-	if err := c.KubeClient.ConfigMaps(c.ConfigMaps[suffix].Namespace).Delete(context.TODO(), c.ConfigMaps[suffix].Name, c.deleteOptions); err != nil {
+	if err := c.KubeClient.ConfigMaps(cm.Namespace).Delete(context.TODO(), cm.Name, c.deleteOptions); err != nil {
 		if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("could not delete %s config map %q: %v", suffix, c.ConfigMaps[suffix].Name, err)
+			return fmt.Errorf("could not delete %s Patroni config map %q: %v", suffix, cm.Name, err)
 		}
-		c.logger.Debugf("%s config map has already been deleted", suffix)
+		c.logger.Debugf("%s Patroni config map has already been deleted", suffix)
 	}
 
-	c.logger.Infof("%s config map %q has been deleted", suffix, util.NameFromMeta(c.ConfigMaps[suffix].ObjectMeta))
-	delete(c.ConfigMaps, suffix)
+	c.logger.Infof("%s Patroni config map %q has been deleted", suffix, util.NameFromMeta(cm.ObjectMeta))
+	delete(c.PatroniConfigMaps, suffix)
+
+	return nil
+}
+
+func (c *Cluster) deletePatroniEndpoint(suffix string) error {
+	c.setProcessName("deleting Patroni endpoint")
+	c.logger.Debugln("deleting Patroni endpoint")
+	ep := c.PatroniEndpoints[suffix]
+	if ep == nil {
+		c.logger.Debugf("there is no %s Patroni endpoint in the cluster", suffix)
+		return nil
+	}
+
+	if err := c.KubeClient.Endpoints(ep.Namespace).Delete(context.TODO(), ep.Name, c.deleteOptions); err != nil {
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not delete %s Patroni endpoint %q: %v", suffix, ep.Name, err)
+		}
+		c.logger.Debugf("%s Patroni endpoint has already been deleted", suffix)
+	}
+
+	c.logger.Infof("%s Patroni endpoint %q has been deleted", suffix, util.NameFromMeta(ep.ObjectMeta))
+	delete(c.PatroniEndpoints, suffix)
 
 	return nil
 }

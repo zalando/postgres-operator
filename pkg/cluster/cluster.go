@@ -30,7 +30,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	apipolicyv1 "k8s.io/api/policy/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,7 +61,8 @@ type Config struct {
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
 	Endpoints           map[PostgresRole]*v1.Endpoints
-	ConfigMaps          map[string]*v1.ConfigMap
+	PatroniEndpoints    map[string]*v1.Endpoints
+	PatroniConfigMaps   map[string]*v1.ConfigMap
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
 	PodDisruptionBudget *policyv1.PodDisruptionBudget
@@ -135,11 +135,12 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 		systemUsers:    make(map[string]spec.PgUser),
 		podSubscribers: make(map[spec.NamespacedName]chan PodEvent),
 		kubeResources: kubeResources{
-			Secrets:    make(map[types.UID]*v1.Secret),
-			Services:   make(map[PostgresRole]*v1.Service),
-			Endpoints:  make(map[PostgresRole]*v1.Endpoints),
-			ConfigMaps: make(map[string]*v1.ConfigMap),
-			Streams:    make(map[string]*zalandov1.FabricEventStream)},
+			Secrets:           make(map[types.UID]*v1.Secret),
+			Services:          make(map[PostgresRole]*v1.Service),
+			Endpoints:         make(map[PostgresRole]*v1.Endpoints),
+			PatroniEndpoints:  make(map[string]*v1.Endpoints),
+			PatroniConfigMaps: make(map[string]*v1.ConfigMap),
+			Streams:           make(map[string]*zalandov1.FabricEventStream)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
 			PasswordEncryption:   passwordEncryption,
 			RoleDeletionSuffix:   cfg.OpConfig.RoleDeletionSuffix,
@@ -363,17 +364,8 @@ func (c *Cluster) Create() (err error) {
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Pods are ready")
 
 	// sync resources created by Patroni
-	if c.patroniKubernetesUseConfigMaps() {
-		if err = c.syncConfigMaps(); err != nil {
-			c.logger.Warnf("Patroni configmaps not yet synced: %v", err)
-		}
-	} else {
-		if err = c.syncEndpoint(Patroni); err != nil {
-			err = fmt.Errorf("%s endpoint not yet synced: %v", Patroni, err)
-		}
-	}
-	if err = c.syncService(Patroni); err != nil {
-		err = fmt.Errorf("%s servic not yet synced: %v", Patroni, err)
+	if err = c.syncPatroniResources(); err != nil {
+		c.logger.Warnf("Patroni resources not yet synced: %v", err)
 	}
 
 	// create database objects unless we are running without pods or disabled
@@ -866,7 +858,7 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool
 	return true, ""
 }
 
-func (c *Cluster) comparePodDisruptionBudget(cur, new *apipolicyv1.PodDisruptionBudget) (bool, string) {
+func (c *Cluster) comparePodDisruptionBudget(cur, new *policyv1.PodDisruptionBudget) (bool, string) {
 	//TODO: improve comparison
 	if match := reflect.DeepEqual(new.Spec, cur.Spec); !match {
 		return false, "new PDB spec does not match the current one"
@@ -1201,13 +1193,7 @@ func (c *Cluster) Delete() error {
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budget: %v", err)
 	}
 
-	for _, role := range []PostgresRole{Master, Replica, Patroni} {
-		if err := c.deleteService(role); err != nil {
-			anyErrors = true
-			c.logger.Warningf("could not delete %s service: %v", role, err)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s service: %v", role, err)
-		}
-
+	for _, role := range []PostgresRole{Master, Replica} {
 		if !c.patroniKubernetesUseConfigMaps() {
 			if err := c.deleteEndpoint(role); err != nil {
 				anyErrors = true
@@ -1215,16 +1201,18 @@ func (c *Cluster) Delete() error {
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s endpoint: %v", role, err)
 			}
 		}
+
+		if err := c.deleteService(role); err != nil {
+			anyErrors = true
+			c.logger.Warningf("could not delete %s service: %v", role, err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s service: %v", role, err)
+		}
 	}
 
-	if c.patroniKubernetesUseConfigMaps() {
-		for _, suffix := range []string{"leader", "config", "sync", "failover"} {
-			if err := c.deletePatroniConfigMap(suffix); err != nil {
-				anyErrors = true
-				c.logger.Warningf("could not delete %s config map: %v", suffix, err)
-				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s config map: %v", suffix, err)
-			}
-		}
+	if err := c.deletePatroniResources(); err != nil {
+		anyErrors = true
+		c.logger.Warningf("could not delete all Patroni resources: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete all Patroni resources: %v", err)
 	}
 
 	// Delete connection pooler objects anyway, even if it's not mentioned in the
