@@ -290,7 +290,6 @@ func (c *Cluster) syncService(role PostgresRole) error {
 		return nil
 	}
 	// no existing service, create new one
-	c.Services[role] = nil
 	c.logger.Infof("could not find the cluster's %s service", role)
 
 	if svc, err = c.createService(role); err == nil {
@@ -334,7 +333,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 		return fmt.Errorf("could not get %s endpoint: %v", role, err)
 	}
 	// no existing endpoint, create new one
-	c.Endpoints[role] = nil
 	c.logger.Infof("could not find the cluster's %s endpoint", role)
 
 	if ep, err = c.createEndpoint(role); err == nil {
@@ -376,7 +374,6 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 		return fmt.Errorf("could not get pod disruption budget: %v", err)
 	}
 	// no existing pod disruption budget, create new one
-	c.PodDisruptionBudget = nil
 	c.logger.Infof("could not find the cluster's pod disruption budget")
 
 	if pdb, err = c.createPodDisruptionBudget(); err != nil {
@@ -418,7 +415,6 @@ func (c *Cluster) syncStatefulSet() error {
 
 	if err != nil {
 		// statefulset does not exist, try to re-create it
-		c.Statefulset = nil
 		c.logger.Infof("cluster's statefulset does not exist")
 
 		sset, err = c.createStatefulSet()
@@ -783,7 +779,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	// check if specified slots exist in config and if they differ
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
 		// only add slots specified in manifest to c.replicationSlots
-		for manifestSlotName, _ := range c.Spec.Patroni.Slots {
+		for manifestSlotName := range c.Spec.Patroni.Slots {
 			if manifestSlotName == slotName {
 				c.replicationSlots[slotName] = desiredSlot
 			}

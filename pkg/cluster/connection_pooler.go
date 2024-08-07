@@ -654,7 +654,7 @@ func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 	if err != nil {
 		c.logger.Debugf("could not get connection pooler secret %s: %v", secretName, err)
 	} else {
-		if err = c.deleteSecret(secret.UID, *secret); err != nil {
+		if err = c.deleteSecret(secret.UID); err != nil {
 			return fmt.Errorf("could not delete pooler secret: %v", err)
 		}
 	}

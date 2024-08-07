@@ -589,8 +589,8 @@ func (c *Cluster) deleteSecrets() error {
 	c.setProcessName("deleting secrets")
 	errors := make([]string, 0)
 
-	for uid, secret := range c.Secrets {
-		err := c.deleteSecret(uid, *secret)
+	for uid := range c.Secrets {
+		err := c.deleteSecret(uid)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("%v", err))
 		}
@@ -603,8 +603,9 @@ func (c *Cluster) deleteSecrets() error {
 	return nil
 }
 
-func (c *Cluster) deleteSecret(uid types.UID, secret v1.Secret) error {
+func (c *Cluster) deleteSecret(uid types.UID) error {
 	c.setProcessName("deleting secret")
+	secret := c.Secrets[uid]
 	secretName := util.NameFromMeta(secret.ObjectMeta)
 	c.logger.Debugf("deleting secret %q", secretName)
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
