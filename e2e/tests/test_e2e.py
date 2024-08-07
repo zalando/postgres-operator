@@ -400,8 +400,8 @@ class EndToEndTestCase(unittest.TestCase):
                         "max_connections": new_max_connections_value,
                         "wal_level": "logical"
                      }
-                 },
-                 "patroni": {
+                },
+                "patroni": {
                     "slots": {
                         "first_slot": {
                             "type": "physical"
@@ -412,7 +412,7 @@ class EndToEndTestCase(unittest.TestCase):
                     "retry_timeout": 9,
                     "synchronous_mode": True,
                     "failsafe_mode": True,
-                 }
+                }
             }
         }
 
@@ -515,7 +515,7 @@ class EndToEndTestCase(unittest.TestCase):
             pg_add_new_slots_patch = {
                 "spec": {
                     "patroni": {
-                         "slots": {
+                        "slots": {
                             "test_slot": {
                                 "type": "logical",
                                 "database": "foo",
@@ -2020,13 +2020,13 @@ class EndToEndTestCase(unittest.TestCase):
         # update the manifest with the streams section
         patch_streaming_config = {
             "spec": {
-                 "patroni": {
+                "patroni": {
                     "slots": {
                         "manual_slot": {
                             "type": "physical"
                         }
                     }
-                 },
+                },
                 "streams": [
                     {
                         "applicationId": "test-app",

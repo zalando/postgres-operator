@@ -185,10 +185,10 @@ var (
 
 func TestGatherApplicationIds(t *testing.T) {
 	testAppIds := []string{appId}
-	appIds := gatherApplicationIds(pg.Spec.Streams)
+	appIds := getDistinctApplicationIds(pg.Spec.Streams)
 
 	if !util.IsEqualIgnoreOrder(testAppIds, appIds) {
-		t.Errorf("gathered applicationIds do not match, expected %#v, got %#v", testAppIds, appIds)
+		t.Errorf("list of applicationIds does not match, expected %#v, got %#v", testAppIds, appIds)
 	}
 }
 
@@ -444,7 +444,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 		context.TODO(), &pg, metav1.UpdateOptions{})
 	assert.NoError(t, err)
 
-	appIds := gatherApplicationIds(pgUpdated.Spec.Streams)
+	appIds := getDistinctApplicationIds(pgUpdated.Spec.Streams)
 	cluster.cleanupRemovedStreams(appIds)
 
 	streams, err = cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)

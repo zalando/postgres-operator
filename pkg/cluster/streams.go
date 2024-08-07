@@ -79,7 +79,7 @@ func (c *Cluster) deleteStreams() error {
 	return nil
 }
 
-func gatherApplicationIds(streams []acidv1.Stream) []string {
+func getDistinctApplicationIds(streams []acidv1.Stream) []string {
 	appIds := make([]string, 0)
 	for _, stream := range streams {
 		if !util.SliceContains(appIds, stream.ApplicationId) {
@@ -336,7 +336,7 @@ func (c *Cluster) syncStreams() error {
 		}
 	}
 
-	// gather list of required slots and publications, group by database
+	// get list of required slots and publications, group by database
 	for _, stream := range c.Spec.Streams {
 		if _, exists := databaseSlots[stream.Database]; !exists {
 			c.logger.Warningf("database %q does not exist in the cluster", stream.Database)
@@ -390,13 +390,13 @@ func (c *Cluster) syncStreams() error {
 	}
 
 	// finally sync stream CRDs
-	// fetch different application IDs from streams section
+	// get distinct application IDs from streams section
 	// there will be a separate event stream resource for each ID
-	appIds := gatherApplicationIds(c.Spec.Streams)
+	appIds := getDistinctApplicationIds(c.Spec.Streams)
 	for _, appId := range appIds {
 		slotExists := false
 		for slotName := range slotsToSync {
-			if strings.HasSuffix(slotName, appId) {
+			if strings.HasSuffix(slotName, strings.Replace(appId, "-", "_", -1)) {
 				slotExists = true
 				if err = c.syncStream(appId); err != nil {
 					c.logger.Warningf("could not sync event streams with applicationId %s: %v", appId, err)
@@ -405,7 +405,7 @@ func (c *Cluster) syncStreams() error {
 			}
 		}
 		if !slotExists {
-			c.logger.Warningf("no replication slot for stream with applicationId %s exists, skipping event stream creation", appId)
+			c.logger.Warningf("no replication slot for streams with applicationId %s exists, skipping event stream creation", appId)
 		}
 	}
 
@@ -425,14 +425,14 @@ func (c *Cluster) syncStream(appId string) error {
 			streamExists = true
 			desiredStreams := c.generateFabricEventStream(appId)
 			if match, reason := sameStreams(stream.Spec.EventStreams, desiredStreams.Spec.EventStreams); !match {
-				c.logger.Debugf("updating event stream with applicationId %s: %s", appId, reason)
+				c.logger.Debugf("updating event streams with applicationId %s: %s", appId, reason)
 				desiredStreams.ObjectMeta = stream.ObjectMeta
 				updatedStream, err := c.updateStreams(desiredStreams)
 				if err != nil {
-					return fmt.Errorf("failed updating event stream %s with applicationId %s: %v", stream.Name, appId, err)
+					return fmt.Errorf("failed updating event streams %s with applicationId %s: %v", stream.Name, appId, err)
 				}
 				c.Streams[appId] = updatedStream
-				c.logger.Infof("event stream %q with applicationId %s has been successfully updated", updatedStream.Name, appId)
+				c.logger.Infof("event streams %q with applicationId %s have been successfully updated", updatedStream.Name, appId)
 			}
 			continue
 		}
