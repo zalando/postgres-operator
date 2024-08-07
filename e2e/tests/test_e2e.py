@@ -1182,7 +1182,10 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_major_version_upgrade(self):
+    def test_aaa_major_version_upgrade(self):
+        """
+        Test major version upgrade
+        """
         def check_version():
             p = k8s.patroni_rest("acid-upgrade-test-0", "")
             version = str(p["server_version"])[0:2]
@@ -1199,6 +1202,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_config_upgrade_full)
+        k8s.wait_for_operator_pod_start()
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.create_with_kubectl("manifests/minimal-postgres-manifest-12.yaml")
@@ -1220,14 +1224,14 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # should have finish failover
-        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label) # timeout here!!! 
+        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(check_version, "14", "Version should be upgraded from 12 to 14")
 
         # should not upgrade because current time is not in maintenanceWindow
         current_time = datetime.now()
-        maintenance_window_future = f"{(current_time+timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=60)).strftime('%H:%M')}"
+        maintenance_window_future = f"{(current_time+timedelta(minutes=60)).strftime('%H:%M')}-{(current_time+timedelta(minutes=120)).strftime('%H:%M')}"
         pg_patch_version_15 = {
             "spec": {
                 "postgresql": {
@@ -1267,7 +1271,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         # should have finish failover
         master_nodes, replica_nodes = k8s.get_cluster_nodes()
-        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label) # timeout here 
+        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(check_version, "16", "Version should be upgraded from 14 to 16")
