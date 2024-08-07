@@ -1182,7 +1182,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_aaa_major_version_upgrade(self):
+    def test_major_version_upgrade(self):
         """
         Test major version upgrade
         """
