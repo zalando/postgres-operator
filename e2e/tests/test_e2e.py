@@ -116,6 +116,7 @@ class EndToEndTestCase(unittest.TestCase):
             configmap = yaml.safe_load(f)
             configmap["data"]["workers"] = "1"
             configmap["data"]["docker_image"] = SPILO_CURRENT
+            configmap["data"]["major_version_upgrade_mode"] = "full"
 
         with open("manifests/configmap.yaml", 'w') as f:
             yaml.dump(configmap, f, Dumper=yaml.Dumper)
@@ -1194,16 +1195,12 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-upgrade-test'
 
-        #patch configmap to change major_version_upgrade_mode to 'full' and use full spilo image
-        patch_config_upgrade_full = {
-            "data": {
-                "docker_image": SPILO_FULL_IMAGE,
-                "major_version_upgrade_mode": "full"
-            }
-        }
-        k8s.update_config(patch_config_upgrade_full)
-        k8s.wait_for_operator_pod_start()
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        with open("manifests/minimal-postgres-manifest-12.yaml", 'r+') as f:
+            upgrade_manifest = yaml.safe_load(f)
+            upgrade_manifest["spec"]["dockerImage"] = SPILO_FULL_IMAGE
+
+        with open("manifests/minimal-postgres-manifest-12.yaml", 'w') as f:
+            yaml.dump(upgrade_manifest, f, Dumper=yaml.Dumper)
 
         k8s.create_with_kubectl("manifests/minimal-postgres-manifest-12.yaml")
         self.eventuallyEqual(lambda: k8s.count_running_pods(labels=cluster_label), 2, "No 2 pods running")
