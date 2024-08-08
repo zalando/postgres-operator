@@ -42,7 +42,14 @@ configGeneral:
   # Optionally specify an array of imagePullSecrets for the spilo pod
   # image_pull_secrets:
   # - myRegistryKeySecretName
-  # max number of instances in Postgres cluster. -1 = no limit
+
+  # key name for annotation to ignore globally configured instance limits
+  # ignore_instance_limits_annotation_key: ""
+
+  # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
+  # kubernetes_use_configmaps: false
+
+  # min number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # max number of instances in Postgres cluster. -1 = no limit
   max_instances: -1
