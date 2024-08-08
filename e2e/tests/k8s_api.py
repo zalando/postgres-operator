@@ -218,14 +218,12 @@ class K8s:
         pod_phase = 'Failing over'
         new_pod_node = ''
         pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
-        print("failover_targets: ", failover_targets)
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
                 new_pod_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
             time.sleep(self.RETRY_TIMEOUT_SEC)
-            print("pod_phase: ", pod_phase, "new_pod_node: ", new_pod_node)
         
         while pods_with_update_flag != 0:
             pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
@@ -526,14 +524,12 @@ class K8sBase:
         pod_phase = 'Failing over'
         new_pod_node = ''
         pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
-        print("failover_targets: ", failover_targets)
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
                 new_pod_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
             time.sleep(self.RETRY_TIMEOUT_SEC)
-            print("pod_phase: ", pod_phase, "new_pod_node: ", new_pod_node)
 
         while pods_with_update_flag != 0:
             pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)

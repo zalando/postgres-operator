@@ -1207,7 +1207,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(check_version, 12, "Version is not correct")
 
-        master_nodes, replica_nodes = k8s.get_cluster_nodes(cluster_labels=cluster_label)
+        master_nodes, _ = k8s.get_cluster_nodes(cluster_labels=cluster_label)
         # should upgrade immediately
         pg_patch_version_14 = {
             "spec": {
@@ -1267,7 +1267,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # should have finish failover
-        master_nodes, replica_nodes = k8s.get_cluster_nodes()
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
