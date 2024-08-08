@@ -37,42 +37,63 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 			},
 		}, client, pg, logger, eventRecorder)
 
-	cluster.Spec.MaintenanceWindows = nil
-	if !cluster.isInMainternanceWindow() {
-		t.Errorf("Expected isInMainternanceWindow to return true")
-	}
-
-	cluster.Spec.MaintenanceWindows = []acidv1.MaintenanceWindow{
-		{
-			Everyday:  true,
-			StartTime: mustParseTime("00:00"),
-			EndTime:   mustParseTime("23:59"),
-		},
-		{
-			Weekday:   time.Monday,
-			StartTime: mustParseTime("00:00"),
-			EndTime:   mustParseTime("23:59"),
-		},
-	}
-	if !cluster.isInMainternanceWindow() {
-		t.Errorf("Expected isInMainternanceWindow to return true")
-	}
-
 	now := time.Now()
 	futureTimeStart := now.Add(1 * time.Hour)
 	futureTimeStartFormatted := futureTimeStart.Format("15:04")
 	futureTimeEnd := now.Add(2 * time.Hour)
 	futureTimeEndFormatted := futureTimeEnd.Format("15:04")
 
-	cluster.Spec.MaintenanceWindows = []acidv1.MaintenanceWindow{
+	tests := []struct {
+		name     string
+		windows  []acidv1.MaintenanceWindow
+		expected bool
+	}{
 		{
-			Weekday:   now.Weekday(),
-			StartTime: mustParseTime(futureTimeStartFormatted),
-			EndTime:   mustParseTime(futureTimeEndFormatted),
+			name:     "no maintenance windows",
+			windows:  nil,
+			expected: true,
+		},
+		{
+			name: "maintenance windows with everyday",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Everyday:  true,
+					StartTime: mustParseTime("00:00"),
+					EndTime:   mustParseTime("23:59"),
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "maintenance windows with weekday",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime("00:00"),
+					EndTime:   mustParseTime("23:59"),
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "maintenance windows with future interval time",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime(futureTimeStartFormatted),
+					EndTime:   mustParseTime(futureTimeEndFormatted),
+				},
+			},
+			expected: false,
 		},
 	}
-	if cluster.isInMainternanceWindow() {
-		t.Errorf("Expected isInMainternanceWindow to return false")
-	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster.Spec.MaintenanceWindows = tt.windows
+			if cluster.isInMainternanceWindow() != tt.expected {
+				t.Errorf("Expected isInMainternanceWindow to return %t", tt.expected)
+			}
+		})
+	}
 }
