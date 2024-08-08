@@ -44,7 +44,7 @@ To run the end 2 end test and keep the kind state execute:
 NOCLEANUP=True ./run.sh main
 ```
 
-## Run indidual test
+## Run individual test
 
 After having executed a normal E2E run with `NOCLEANUP=True` Kind still continues to run, allowing you subsequent test runs.
 

@@ -23,15 +23,17 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"strconv"
+
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"log"
-	"strconv"
 )
 
 // extVolumeCmd represents the extVolume command
@@ -63,9 +65,9 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 	}
 
 	namespace := getCurrentNamespace()
-	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
+	postgresql, err := postgresConfig.Postgresqls(namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
 	if err != nil {
-		log.Fatalf("hii %v", err)
+		log.Fatal(err)
 	}
 
 	oldSize, err := resource.ParseQuantity(postgresql.Spec.Volume.Size)
@@ -86,7 +88,7 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 
 	if newSize.Value() > oldSize.Value() {
 		patchInstances := volumePatch(newSize)
-		response, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name, types.MergePatchType, patchInstances, "")
+		response, err := postgresConfig.Postgresqls(namespace).Patch(context.TODO(), postgresql.Name, types.MergePatchType, patchInstances, metav1.PatchOptions{})
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -23,17 +23,19 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"strings"
+
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"log"
-	"strings"
 )
 
-var allowedPrivileges = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSURL"}
+var allowedPrivileges = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSRLS"}
 
 // addUserCmd represents the addUser command
 var addUserCmd = &cobra.Command{
@@ -90,7 +92,7 @@ func addUser(user string, clusterName string, permissions []string) {
 	}
 
 	namespace := getCurrentNamespace()
-	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
+	postgresql, err := postgresConfig.Postgresqls(namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -114,7 +116,7 @@ func addUser(user string, clusterName string, permissions []string) {
 	}
 
 	patch := applyUserPatch(user, Privileges)
-	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name, types.MergePatchType, patch, "")
+	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Patch(context.TODO(), postgresql.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}

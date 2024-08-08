@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"golang.org/x/crypto/pbkdf2"
@@ -150,6 +151,29 @@ func IsEqualIgnoreOrder(a, b []string) bool {
 	sort.Strings(b_copy)
 
 	return reflect.DeepEqual(a_copy, b_copy)
+}
+
+// Iterate through slice and remove certain string, then return cleaned slice
+func RemoveString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+// SliceReplaceElement
+func StringSliceReplaceElement(s []string, a, b string) (result []string) {
+	tmp := make([]string, 0, len(s))
+	for _, str := range s {
+		if str == a {
+			str = b
+		}
+		tmp = append(tmp, str)
+	}
+	return tmp
 }
 
 // SubstractStringSlices finds elements in a that are not in b and return them as a result slice.
@@ -311,6 +335,20 @@ func testNil(values ...*int32) bool {
 	return false
 }
 
+// ToIntStr converts int to IntOrString type
+func ToIntStr(val int) *intstr.IntOrString {
+	b := intstr.FromInt(val)
+	return &b
+}
+
+// Bool2Int converts bool to int
+func Bool2Int(flag bool) int {
+	if flag {
+		return 1
+	}
+	return 0
+}
+
 // MaxInt32 : Return maximum of two integers provided via pointers. If one value
 // is not defined, return the other one. If both are not defined, result is also
 // undefined, caller needs to check for that.
@@ -349,4 +387,22 @@ func StrArrToLocalObjectReferenceArr(arr []string) []corev1.LocalObjectReference
 		ret[k] = corev1.LocalObjectReference{Name: v}
 	}
 	return ret
+}
+
+func MinResource(maxRequestStr, requestStr string) (resource.Quantity, error) {
+
+	isSmaller, err := IsSmallerQuantity(maxRequestStr, requestStr)
+	if isSmaller && err == nil {
+		maxRequest, err := resource.ParseQuantity(maxRequestStr)
+		if err != nil {
+			return maxRequest, err
+		}
+		return maxRequest, nil
+	}
+
+	request, err := resource.ParseQuantity(requestStr)
+	if err != nil {
+		return request, err
+	}
+	return request, nil
 }

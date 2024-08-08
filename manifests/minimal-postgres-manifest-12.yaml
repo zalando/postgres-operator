@@ -1,0 +1,20 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-upgrade-test
+spec:
+  teamId: "acid"
+  volume:
+    size: 1Gi
+  numberOfInstances: 2
+  users:
+    zalando:  # database owner
+    - superuser
+    - createdb
+    foo_user: []  # role for application foo
+  databases:
+    foo: zalando  # dbname: owner
+  preparedDatabases:
+    bar: {}
+  postgresql:
+    version: "12"

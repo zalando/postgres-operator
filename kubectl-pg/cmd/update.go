@@ -23,14 +23,16 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"os"
+
 	"github.com/spf13/cobra"
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"log"
 )
 
 // updateCmd represents kubectl pg update
@@ -55,7 +57,10 @@ kubectl pg update -f cluster-manifest.yaml
 func updatePgResources(fileName string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
-	ymlFile, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ymlFile, err := os.ReadFile(fileName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -67,13 +72,13 @@ func updatePgResources(fileName string) {
 	}
 
 	newPostgresObj := obj.(*v1.Postgresql)
-	oldPostgresObj, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Get(newPostgresObj.Name, metav1.GetOptions{})
+	oldPostgresObj, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Get(context.TODO(), newPostgresObj.Name, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	newPostgresObj.ResourceVersion = oldPostgresObj.ResourceVersion
-	response, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(newPostgresObj)
+	response, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(context.TODO(), newPostgresObj, metav1.UpdateOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}

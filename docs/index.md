@@ -8,10 +8,10 @@ manages PostgreSQL clusters on Kubernetes (K8s):
    user submits a new manifest, the operator fetches that manifest and spawns a
    new Postgres cluster along with all necessary entities such as K8s
    StatefulSets and Postgres roles.  See this
-   [Postgres cluster manifest](../manifests/complete-postgres-manifest.yaml)
+   [Postgres cluster manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/complete-postgres-manifest.yaml)
    for settings that a manifest may contain.
 
-2. The operator also watches updates to [its own configuration](../manifests/configmap.yaml)
+2. The operator also watches updates to [its own configuration](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
    and alters running Postgres clusters if necessary.  For instance, if the
    Docker image in a pod is changed, the operator carries out the rolling
    update, which means it re-spawns pods of each managed StatefulSet one-by-one
@@ -71,6 +71,8 @@ Please, report any issues discovered to https://github.com/zalando/postgres-oper
 
 ## Talks
 
+- "Watching after your PostGIS herd" talk by Felix Kunde, FOSS4G 2021: [video](https://www.youtube.com/watch?v=T96FvjSv98A) | [slides](https://docs.google.com/presentation/d/1IICz2RsjNAcosKVGFna7io-65T2zBbGcBHFFtca24cc/edit?usp=sharing)
+
 - "PostgreSQL on K8S at Zalando: Two years in production" talk by Alexander Kukushkin, FOSSDEM 2020: [video](https://fosdem.org/2020/schedule/event/postgresql_postgresql_on_k8s_at_zalando_two_years_in_production/) | [slides](https://fosdem.org/2020/schedule/event/postgresql_postgresql_on_k8s_at_zalando_two_years_in_production/attachments/slides/3883/export/events/attachments/postgresql_postgresql_on_k8s_at_zalando_two_years_in_production/slides/3883/PostgreSQL_on_K8s_at_Zalando_Two_years_in_production.pdf)
 
 - "Postgres as a Service at Zalando" talk by Jan Mußler, DevOpsDays Poznań 2019: [video](https://www.youtube.com/watch?v=FiWS5m72XI8)
@@ -87,10 +89,20 @@ Please, report any issues discovered to https://github.com/zalando/postgres-oper
 
 ## Posts
 
+- Series of blog posts on how to use the Zalando Operator, configure backups and use etcd as DCS by [thedatabaseme](https://thedatabaseme.de/tag/zalando-operator/), Mar. 2022-23.
+
+- "Zalando Postgres Operator in Production: the way of Helm" by Zangir Kapishov on [medium](https://medium.com/@zkapishov/zalando-postgres-operator-in-production-the-way-of-helm-ccfd639ccb2d), Jan. 2023.
+
+- "Chaos testing of a Postgres cluster managed by the Zalando Postgres Operator" by Nikolay Sivko on [coroot](https://coroot.com/blog/chaos-testing-zalando-postgres-operator), Aug. 2022.
+
+- "Getting started with the Zalando Operator for PostgreSQL" by Daniel Westermann on [dbi services blog](https://www.dbi-services.com/blog/getting-started-with-the-zalando-operator-for-postgresql/), Mar. 2021.
+
+- "Our experience with Postgres Operator for Kubernetes by Zalando" by Nikolay Bogdanov on [Palark blog](https://blog.palark.com/our-experience-with-postgres-operator-for-kubernetes-by-zalando/), Feb. 2021.
+
 - "How to set up continuous backups and monitoring" by Pål Kristensen on [GitHub](https://github.com/zalando/postgres-operator/issues/858#issuecomment-608136253), Mar. 2020.
 
 - "Postgres on Kubernetes with the Zalando operator" by Vito Botta on [has_many :code](https://vitobotta.com/2020/02/05/postgres-kubernetes-zalando-operator/), Feb. 2020.
 
-- "Running PostgreSQL in Google Kubernetes Engine" by Kenneth Rørvik on [Repill Linpro](https://www.redpill-linpro.com/techblog/2019/09/28/postgres-in-kubernetes.html), Sep. 2019.
+- "Running PostgreSQL in Google Kubernetes Engine" by Kenneth Rørvik on [Repill Linpro blog](https://www.redpill-linpro.com/techblog/2019/09/28/postgres-in-kubernetes.html), Sep. 2019.
 
 - "Zalando Postgres Operator: One Year Later" by Sergey Dudoladov on [Open Source Zalando](https://opensource.zalando.com/blog/2018/11/postgres-operator/), Nov. 2018

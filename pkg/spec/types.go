@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -32,7 +31,8 @@ const (
 	RoleOriginTeamsAPI
 	RoleOriginSystem
 	RoleOriginBootstrap
-	RoleConnectionPooler
+	RoleOriginConnectionPooler
+	RoleOriginStream
 )
 
 type syncUserOperation int
@@ -42,17 +42,22 @@ const (
 	PGSyncUserAdd = iota
 	PGsyncUserAlter
 	PGSyncAlterSet // handle ALTER ROLE SET parameter = value
+	PGSyncUserRename
 )
 
 // PgUser contains information about a single user.
 type PgUser struct {
 	Origin     RoleOrigin        `yaml:"-"`
 	Name       string            `yaml:"-"`
+	Namespace  string            `yaml:"-"`
 	Password   string            `yaml:"-"`
 	Flags      []string          `yaml:"user_flags"`
 	MemberOf   []string          `yaml:"inrole"`
 	Parameters map[string]string `yaml:"db_parameters"`
 	AdminRole  string            `yaml:"admin_role"`
+	IsDbOwner  bool              `yaml:"is_db_owner"`
+	Deleted    bool              `yaml:"deleted"`
+	Rotated    bool              `yaml:"rotated"`
 }
 
 func (user *PgUser) Valid() bool {
@@ -114,6 +119,7 @@ type ControllerConfig struct {
 	CRDReadyWaitTimeout  time.Duration
 	ConfigMapName        NamespacedName
 	Namespace            string
+	IgnoredAnnotations   []string
 
 	EnableJsonLogging bool
 }
@@ -189,7 +195,7 @@ func (r RoleOrigin) String() string {
 		return "system role"
 	case RoleOriginBootstrap:
 		return "bootstrapped role"
-	case RoleConnectionPooler:
+	case RoleOriginConnectionPooler:
 		return "connection pooler role"
 	default:
 		panic(fmt.Sprintf("bogus role origin value %d", r))
@@ -203,7 +209,7 @@ func GetOperatorNamespace() string {
 		if namespaceFromEnvironment := os.Getenv("OPERATOR_NAMESPACE"); namespaceFromEnvironment != "" {
 			return namespaceFromEnvironment
 		}
-		operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
+		operatorNamespaceBytes, err := os.ReadFile(fileWithNamespace)
 		if err != nil {
 			log.Fatalf("Unable to detect operator namespace from within its pod due to: %v", err)
 		}

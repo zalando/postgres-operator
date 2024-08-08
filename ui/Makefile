@@ -21,8 +21,8 @@ test:
 	tox
 
 appjs:
-	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:10.1.0-alpine npm install
-	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:10.1.0-alpine npm run build
+	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:lts-alpine npm install --cache /workdir/.npm
+	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:lts-alpine npm run build --cache /workdir/.npm
 
 docker: appjs
 	echo `(env)`

@@ -2,28 +2,21 @@ version: "2017-09-20"
 pipeline:
     - id: build-postgres-operator
       type: script
-      vm: large
+      vm_config:
+        type: linux
+        size: large
+        image: cdp-runtime/go
       cache:
         paths:
-          - /go/pkg/mod
+          - /go/pkg/mod       # pkg cache for Go modules
+          - ~/.cache/go-build # Go build cache
       commands:
-        - desc: 'Update'
+        - desc: Run unit tests
           cmd: |
-            apt-get update
-        - desc: 'Install required build software'
+            make deps mocks test
+
+        - desc: Build Docker image
           cmd: |
-            apt-get install -y make git apt-transport-https ca-certificates curl build-essential python3 python3-pip
-        - desc: 'Install go'
-          cmd: |
-            cd /tmp
-            wget -q https://storage.googleapis.com/golang/go1.15.6.linux-amd64.tar.gz -O go.tar.gz
-            tar -xf go.tar.gz
-            mv go /usr/local
-            ln -s /usr/local/go/bin/go /usr/bin/go
-            go version
-        - desc: 'Build docker image'
-          cmd: |
-            export PATH=$PATH:$HOME/go/bin
             IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
             if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
             then
@@ -32,29 +25,12 @@ pipeline:
               IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
             fi
             export IMAGE
-            make deps mocks docker
-        - desc: 'Run unit tests'
-          cmd: |
-            export PATH=$PATH:$HOME/go/bin
-            go test ./...
-        - desc: 'Run e2e tests'
-          cmd: |
-            make e2e
-        - desc: 'Push docker image'
-          cmd: |
-            export PATH=$PATH:$HOME/go/bin
-            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
-            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
-            then
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
-            else
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
-            fi
-            export IMAGE
-            make push
+            make docker push
 
     - id: build-operator-ui
       type: script
+      vm_config:
+        type: linux
 
       commands:
         - desc: 'Prepare environment'
@@ -83,11 +59,13 @@ pipeline:
 
     - id: build-logical-backup
       type: script
+      vm_config:
+        type: linux
 
       commands:
         - desc: Build image
           cmd: |
-            cd docker/logical-backup
+            cd logical-backup
             export TAG=$(git describe --tags --always --dirty)
             IMAGE="registry-write.opensource.zalan.do/acid/logical-backup"
             docker build --rm -t "$IMAGE:$TAG$CDP_TAG" .

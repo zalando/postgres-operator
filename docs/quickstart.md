@@ -11,10 +11,10 @@ solutions:
 
 * [minikube](https://github.com/kubernetes/minikube/releases), which creates a
   single-node K8s cluster inside a VM (requires KVM or VirtualBox),
-* [kind](https://kind.sigs.k8s.io/), which allows creating multi-nodes K8s
+* [kind](https://kind.sigs.k8s.io/) and [k3d](https://k3d.io), which allows creating multi-nodes K8s
   clusters running on Docker (requires Docker)
 
-To interact with the K8s infrastructure install it's CLI runtime [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl).
+To interact with the K8s infrastructure install its CLI runtime [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl).
 
 This quickstart assumes that you have started minikube or created a local kind
 cluster. Note that you can also use built-in K8s support in the Docker Desktop
@@ -37,7 +37,7 @@ The Postgres Operator can be deployed in the following ways:
 * Kustomization
 * Helm chart
 
-### Manual deployment setup
+### Manual deployment setup on Kubernetes
 
 The Postgres Operator can be installed simply by applying yaml manifests. Note,
 we provide the `/manifests` directory as an example only; you should consider
@@ -56,7 +56,7 @@ kubectl create -f manifests/api-service.yaml  # operator API to be used by UI
 ```
 
 There is a [Kustomization](https://github.com/kubernetes-sigs/kustomize)
-manifest that [combines the mentioned resources](../manifests/kustomization.yaml)
+manifest that [combines the mentioned resources](https://github.com/zalando/postgres-operator/blob/master/manifests/kustomization.yaml)
 (except for the CRD) - it can be used with kubectl 1.14 or newer as easy as:
 
 ```bash
@@ -64,32 +64,45 @@ kubectl apply -k github.com/zalando/postgres-operator/manifests
 ```
 
 For convenience, we have automated starting the operator with minikube using the
-`run_operator_locally` script. It applies the [`acid-minimal-cluster`](../manifests/minimal-postgres-manifest.yaml).
+`run_operator_locally` script. It applies the [`acid-minimal-cluster`](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml).
 manifest.
 
 ```bash
 ./run_operator_locally.sh
 ```
 
+### Manual deployment setup on OpenShift
+
+To install the Postgres Operator in OpenShift you have to change the config
+parameter `kubernetes_use_configmaps` to `"true"`. Otherwise, the operator
+and Patroni will store leader and config keys in `Endpoints` that are not
+supported in OpenShift. This requires also a slightly different set of rules
+for the `postgres-operator` and `postgres-pod` cluster roles.
+
+```bash
+oc create -f manifests/operator-service-account-rbac-openshift.yaml
+```
+
 ### Helm chart
 
-Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
-chart which saves you the manual steps. Clone this repo and change directory to
-the repo root. With Helm v3 installed you should be able to run:
+Alternatively, the operator can be installed by using the provided
+[Helm](https://helm.sh/) chart which saves you the manual steps. The charts
+for both the Postgres Operator and its UI are hosted via the `gh-pages` branch.
+They only work only with Helm v3. Helm v2 support was dropped with v1.8.0.
 
 ```bash
-helm install postgres-operator ./charts/postgres-operator
+# add repo for postgres-operator
+helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+
+# install the postgres-operator
+helm install postgres-operator postgres-operator-charts/postgres-operator
+
+# add repo for postgres-operator-ui
+helm repo add postgres-operator-ui-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui
+
+# install the postgres-operator-ui
+helm install postgres-operator-ui postgres-operator-ui-charts/postgres-operator-ui
 ```
-
-To use CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
-
-```bash
-helm install postgres-operator ./charts/postgres-operator -f ./charts/postgres-operator/values-crd.yaml
-```
-
-The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will
-be skipped with warning when using v3. Documentation for installing applications
-with Helm 2 can be found in the [v2 docs](https://v2.helm.sh/docs/).
 
 ## Check if Postgres Operator is running
 
@@ -118,8 +131,8 @@ In the following paragraphs we describe how to access and manage PostgreSQL
 clusters from the command line with kubectl. But it can also be done from the
 browser-based [Postgres Operator UI](operator-ui.md). Before deploying the UI
 make sure the operator is running and its REST API is reachable through a
-[K8s service](../manifests/api-service.yaml). The URL to this API must be
-configured in the [deployment manifest](../ui/manifests/deployment.yaml#L43)
+[K8s service](https://github.com/zalando/postgres-operator/blob/master/manifests/api-service.yaml). The URL to this API must be
+configured in the [deployment manifest](https://github.com/zalando/postgres-operator/blob/master/ui/manifests/deployment.yaml#L43)
 of the UI.
 
 To deploy the UI simply apply all its manifests files or use the UI helm chart:
@@ -203,7 +216,7 @@ Non-encrypted connections are rejected by default, so set the SSL mode to
 require:
 
 ```bash
-export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d)
 export PGSSLMODE=require
 psql -U postgres
 ```

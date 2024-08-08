@@ -23,17 +23,18 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"strconv"
+
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"log"
-	"strconv"
 )
 
 // scaleCmd represents the scale command
@@ -44,6 +45,9 @@ var scaleCmd = &cobra.Command{
 Scaling to 0 leads to down time.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName, err := cmd.Flags().GetString("cluster")
+		if err != nil {
+			log.Fatal(err)
+		}
 		namespace, err := cmd.Flags().GetString("namespace")
 		if err != nil {
 			log.Fatal(err)
@@ -76,7 +80,7 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		log.Fatal(err)
 	}
 
-	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
+	postgresql, err := postgresConfig.Postgresqls(namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -100,7 +104,7 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 	}
 
 	patchInstances := scalePatch(numberOfInstances)
-	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name, types.MergePatchType, patchInstances, "")
+	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(context.TODO(), postgresql.Name, types.MergePatchType, patchInstances, metav1.PatchOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -127,8 +131,7 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32) {
 		log.Fatal(err)
 	}
 
-	var operator *v1.Deployment
-	operator = getPostgresOperator(k8sClient)
+	operator := getPostgresOperator(k8sClient)
 
 	operatorContainer := operator.Spec.Template.Spec.Containers
 	var configMapName, operatorConfigName string
@@ -145,7 +148,7 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32) {
 	}
 
 	if operatorConfigName == "" {
-		configMap, err := k8sClient.CoreV1().ConfigMaps(operator.Namespace).Get(configMapName, metav1.GetOptions{})
+		configMap, err := k8sClient.CoreV1().ConfigMaps(operator.Namespace).Get(context.TODO(), configMapName, metav1.GetOptions{})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -172,7 +175,7 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32) {
 			log.Fatal(err)
 		}
 
-		operatorConfig, err := pgClient.OperatorConfigurations(operator.Namespace).Get(operatorConfigName, metav1.GetOptions{})
+		operatorConfig, err := pgClient.OperatorConfigurations(operator.Namespace).Get(context.TODO(), operatorConfigName, metav1.GetOptions{})
 		if err != nil {
 			log.Fatalf("unable to read operator configuration %v", err)
 		}

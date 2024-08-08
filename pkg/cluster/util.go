@@ -6,7 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -14,7 +14,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -78,7 +78,14 @@ func (c *Cluster) isProtectedUsername(username string) bool {
 }
 
 func (c *Cluster) isSystemUsername(username string) bool {
-	return (username == c.OpConfig.SuperUsername || username == c.OpConfig.ReplicationUsername)
+	// is there a pooler system user defined
+	for _, systemUser := range c.systemUsers {
+		if username == systemUser.Name {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isValidFlag(flag string) bool {
@@ -159,7 +166,7 @@ func metaAnnotationsPatch(annotations map[string]string) ([]byte, error) {
 	}{&meta})
 }
 
-func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpdate bool, reason string) {
+func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate bool, reason string) {
 	if isUpdate {
 		c.logger.Infof("pod disruption budget %q has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
@@ -227,47 +234,72 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 	}
 }
 
-func (c *Cluster) logVolumeChanges(old, new acidv1.Volume) {
-	c.logger.Infof("volume specification has been changed")
-	logNiceDiff(c.logger, old, new)
+func getPostgresContainer(podSpec *v1.PodSpec) (pgContainer v1.Container) {
+	for _, container := range podSpec.Containers {
+		if container.Name == constants.PostgresContainerName {
+			pgContainer = container
+		}
+	}
+
+	// if no postgres container was found, take the first one in the podSpec
+	if reflect.DeepEqual(pgContainer, v1.Container{}) && len(podSpec.Containers) > 0 {
+		pgContainer = podSpec.Containers[0]
+	}
+	return pgContainer
 }
 
 func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	if teamID == "" {
-		return nil, fmt.Errorf("no teamId specified")
+		msg := "no teamId specified"
+		if c.OpConfig.EnableTeamIdClusternamePrefix {
+			return nil, fmt.Errorf(msg)
+		}
+		c.logger.Warnf(msg)
+		return nil, nil
 	}
 
-	c.logger.Debugf("fetching possible additional team members for team %q", teamID)
 	members := []string{}
-	additionalMembers := c.PgTeamMap[c.Spec.TeamID].AdditionalMembers
-	for _, member := range additionalMembers {
-		members = append(members, member)
+
+	if c.OpConfig.EnablePostgresTeamCRD && c.Config.PgTeamMap != nil {
+		c.logger.Debugf("fetching possible additional team members for team %q", teamID)
+		additionalMembers := []string{}
+
+		for team, membership := range *c.Config.PgTeamMap {
+			if team == teamID {
+				additionalMembers = membership.AdditionalMembers
+				c.logger.Debugf("found %d additional members for team %q", len(additionalMembers), teamID)
+			}
+		}
+
+		members = append(members, additionalMembers...)
 	}
 
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debugf("team API is disabled, only returning %d members for team %q", len(members), teamID)
+		c.logger.Debugf("team API is disabled")
 		return members, nil
 	}
 
 	token, err := c.oauthTokenGetter.getOAuthToken()
 	if err != nil {
-		c.logger.Warnf("could not get oauth token to authenticate to team service API, only returning %d members for team %q: %v", len(members), teamID, err)
-		return members, nil
+		return nil, fmt.Errorf("could not get oauth token to authenticate to team service API: %v", err)
 	}
 
-	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
+	teamInfo, statusCode, err := c.teamsAPIClient.TeamInfo(teamID, token)
+
 	if err != nil {
-		c.logger.Warnf("could not get team info for team %q, only returning %d members: %v", teamID, len(members), err)
-		return members, nil
-	}
-
-	for _, member := range teamInfo.Members {
-		if !(util.SliceContains(members, member)) {
-			members = append(members, member)
+		if statusCode == http.StatusNotFound {
+			c.logger.Warningf("could not get team info for team %q: %v", teamID, err)
+		} else {
+			return nil, fmt.Errorf("could not get team info for team %q: %v", teamID, err)
+		}
+	} else {
+		for _, member := range teamInfo.Members {
+			if !(util.SliceContains(members, member)) {
+				members = append(members, member)
+			}
 		}
 	}
-
 	return members, nil
 }
 
@@ -281,12 +313,10 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 	pgCRDAnnotations := c.ObjectMeta.Annotations
 
 	// allow to inherit certain labels from the 'postgres' object
-	if pgCRDAnnotations != nil {
-		for k, v := range pgCRDAnnotations {
-			for _, match := range c.OpConfig.InheritedAnnotations {
-				if k == match {
-					annotations[k] = v
-				}
+	for k, v := range pgCRDAnnotations {
+		for _, match := range c.OpConfig.InheritedAnnotations {
+			if k == match {
+				annotations[k] = v
 			}
 		}
 	}
@@ -298,7 +328,7 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 	return nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
+func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
@@ -314,7 +344,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{
 			}
 		case <-timeout:
 			return nil, fmt.Errorf("pod label wait timeout")
-		case <-stopChan:
+		case <-stopCh:
 			return nil, fmt.Errorf("pod label wait cancelled")
 		}
 	}
@@ -482,16 +512,55 @@ func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) la
 	return lbls
 }
 
-func (c *Cluster) masterDNSName() string {
+func (c *Cluster) dnsName(role PostgresRole) string {
+	var dnsString, oldDnsString string
+
+	if role == Master {
+		dnsString = c.masterDNSName(c.Name)
+	} else {
+		dnsString = c.replicaDNSName(c.Name)
+	}
+
+	// if cluster name starts with teamID we might need to provide backwards compatibility
+	clusterNameWithoutTeamPrefix, _ := acidv1.ExtractClusterName(c.Name, c.Spec.TeamID)
+	if clusterNameWithoutTeamPrefix != "" {
+		if role == Master {
+			oldDnsString = c.oldMasterDNSName(clusterNameWithoutTeamPrefix)
+		} else {
+			oldDnsString = c.oldReplicaDNSName(clusterNameWithoutTeamPrefix)
+		}
+		dnsString = fmt.Sprintf("%s,%s", dnsString, oldDnsString)
+	}
+
+	return dnsString
+}
+
+func (c *Cluster) masterDNSName(clusterName string) string {
 	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
-		"cluster", c.Spec.ClusterName,
+		"cluster", clusterName,
+		"namespace", c.Namespace,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
-func (c *Cluster) replicaDNSName() string {
+func (c *Cluster) replicaDNSName(clusterName string) string {
 	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
-		"cluster", c.Spec.ClusterName,
+		"cluster", clusterName,
+		"namespace", c.Namespace,
+		"team", c.teamName(),
+		"hostedzone", c.OpConfig.DbHostedZone))
+}
+
+func (c *Cluster) oldMasterDNSName(clusterName string) string {
+	return strings.ToLower(c.OpConfig.MasterLegacyDNSNameFormat.Format(
+		"cluster", clusterName,
+		"team", c.teamName(),
+		"hostedzone", c.OpConfig.DbHostedZone))
+}
+
+func (c *Cluster) oldReplicaDNSName(clusterName string) string {
+	return strings.ToLower(c.OpConfig.ReplicaLegacyDNSNameFormat.Format(
+		"cluster", clusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
@@ -509,10 +578,6 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 		"cluster", clusterName,
 		"tprkind", acidv1.PostgresCRDResourceKind,
 		"tprgroup", acidzalando.GroupName)
-}
-
-func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
-	return replicas[rand.Intn(len(replicas))]
 }
 
 func cloneSpec(from *acidv1.Postgresql) (*acidv1.Postgresql, error) {
@@ -575,4 +640,25 @@ func mergeContainers(containers ...[]v1.Container) ([]v1.Container, []string) {
 		}
 	}
 	return result, conflicts
+}
+
+func trimCronjobName(name string) string {
+	maxLength := 52
+	if len(name) > maxLength {
+		name = name[0:maxLength]
+		name = strings.TrimRight(name, "-")
+	}
+	return name
+}
+
+func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (acidv1.Resources, error) {
+	var resources acidv1.Resources
+	resourcesJSON, err := json.Marshal(resourcesRequirement)
+	if err != nil {
+		return acidv1.Resources{}, fmt.Errorf("could not marshal K8s resources requirements")
+	}
+	if err = json.Unmarshal(resourcesJSON, &resources); err != nil {
+		return acidv1.Resources{}, fmt.Errorf("could not unmarshal K8s resources requirements into acidv1.Resources struct")
+	}
+	return resources, nil
 }

@@ -81,7 +81,7 @@ func (ps *PostgresStatus) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		metaErr := json.Unmarshal(data, &status)
 		if metaErr != nil {
-			return fmt.Errorf("Could not parse status: %v; err %v", string(data), metaErr)
+			return fmt.Errorf("could not parse status: %v; err %v", string(data), metaErr)
 		}
 		tmp.PostgresClusterStatus = status
 	}
@@ -110,15 +110,9 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	}
 	tmp2 := Postgresql(tmp)
 
-	if clusterName, err := extractClusterName(tmp2.ObjectMeta.Name, tmp2.Spec.TeamID); err != nil {
-		tmp2.Error = err.Error()
-		tmp2.Status = PostgresStatus{PostgresClusterStatus: ClusterStatusInvalid}
-	} else if err := validateCloneClusterDescription(tmp2.Spec.Clone); err != nil {
-
+	if err := validateCloneClusterDescription(tmp2.Spec.Clone); err != nil {
 		tmp2.Error = err.Error()
 		tmp2.Status.PostgresClusterStatus = ClusterStatusInvalid
-	} else {
-		tmp2.Spec.ClusterName = clusterName
 	}
 
 	*p = tmp2

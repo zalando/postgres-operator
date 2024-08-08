@@ -4,8 +4,6 @@ metadata:
   name: postgresteams.acid.zalan.do
   labels:
     app.kubernetes.io/name: postgres-operator
-  annotations:
-    "helm.sh/hook": crd-install
 spec:
   group: acid.zalan.do
   names:

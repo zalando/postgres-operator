@@ -37,8 +37,20 @@ type OperatorConfigurationList struct {
 
 // PostgresUsersConfiguration defines the system users of Postgres.
 type PostgresUsersConfiguration struct {
-	SuperUsername       string `json:"super_username,omitempty"`
-	ReplicationUsername string `json:"replication_username,omitempty"`
+	SuperUsername                 string   `json:"super_username,omitempty"`
+	ReplicationUsername           string   `json:"replication_username,omitempty"`
+	AdditionalOwnerRoles          []string `json:"additional_owner_roles,omitempty"`
+	EnablePasswordRotation        bool     `json:"enable_password_rotation,omitempty"`
+	PasswordRotationInterval      uint32   `json:"password_rotation_interval,omitempty"`
+	PasswordRotationUserRetention uint32   `json:"password_rotation_user_retention,omitempty"`
+}
+
+// MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
+type MajorVersionUpgradeConfiguration struct {
+	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
+	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"12"`
+	TargetMajorVersion               string   `json:"target_major_version" default:"16"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
@@ -49,15 +61,19 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountRoleBindingDefinition string                       `json:"pod_service_account_role_binding_definition,omitempty"`
 	PodTerminateGracePeriod                Duration                     `json:"pod_terminate_grace_period,omitempty"`
 	SpiloPrivileged                        bool                         `json:"spilo_privileged,omitempty"`
+	SpiloAllowPrivilegeEscalation          *bool                        `json:"spilo_allow_privilege_escalation,omitempty"`
 	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
 	SpiloRunAsGroup                        *int64                       `json:"spilo_runasgroup,omitempty"`
 	SpiloFSGroup                           *int64                       `json:"spilo_fsgroup,omitempty"`
+	AdditionalPodCapabilities              []string                     `json:"additional_pod_capabilities,omitempty"`
 	WatchedNamespace                       string                       `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate        `json:"pdb_name_format,omitempty"`
+	PDBMasterLabelSelector                 *bool                        `json:"pdb_master_label_selector,omitempty"`
 	EnablePodDisruptionBudget              *bool                        `json:"enable_pod_disruption_budget,omitempty"`
 	StorageResizeMode                      string                       `json:"storage_resize_mode,omitempty"`
 	EnableInitContainers                   *bool                        `json:"enable_init_containers,omitempty"`
 	EnableSidecars                         *bool                        `json:"enable_sidecars,omitempty"`
+	SharePgSocketWithSidecars              *bool                        `json:"share_pgsocket_with_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate        `json:"secret_name_template,omitempty"`
 	ClusterDomain                          string                       `json:"cluster_domain,omitempty"`
 	OAuthTokenSecretName                   spec.NamespacedName          `json:"oauth_token_secret_name,omitempty"`
@@ -68,20 +84,29 @@ type KubernetesMetaConfiguration struct {
 	InheritedLabels                        []string                     `json:"inherited_labels,omitempty"`
 	InheritedAnnotations                   []string                     `json:"inherited_annotations,omitempty"`
 	DownscalerAnnotations                  []string                     `json:"downscaler_annotations,omitempty"`
+	IgnoredAnnotations                     []string                     `json:"ignored_annotations,omitempty"`
 	ClusterNameLabel                       string                       `json:"cluster_name_label,omitempty"`
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
 	DeleteAnnotationNameKey                string                       `json:"delete_annotation_name_key,omitempty"`
 	NodeReadinessLabel                     map[string]string            `json:"node_readiness_label,omitempty"`
+	NodeReadinessLabelMerge                string                       `json:"node_readiness_label_merge,omitempty"`
 	CustomPodAnnotations                   map[string]string            `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
-	PodToleration              map[string]string   `json:"toleration,omitempty"`
-	PodEnvironmentConfigMap    spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
-	PodEnvironmentSecret       string              `json:"pod_environment_secret,omitempty"`
-	PodPriorityClassName       string              `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout       Duration            `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey string              `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy        string              `json:"pod_management_policy,omitempty"`
+	PodToleration                            map[string]string   `json:"toleration,omitempty"`
+	PodEnvironmentConfigMap                  spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
+	PodEnvironmentSecret                     string              `json:"pod_environment_secret,omitempty"`
+	PodPriorityClassName                     string              `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout                     Duration            `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity                    bool                `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityPreferredDuringScheduling bool                `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
+	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
+	PersistentVolumeClaimRetentionPolicy     map[string]string   `json:"persistent_volume_claim_retention_policy,omitempty"`
+	EnableSecretsDeletion                    *bool               `json:"enable_secrets_deletion,omitempty"`
+	EnablePersistentVolumeClaimDeletion      *bool               `json:"enable_persistent_volume_claim_deletion,omitempty"`
+	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
+	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
+	EnableFinalizers                         *bool               `json:"enable_finalizers,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -92,27 +117,35 @@ type PostgresPodResourcesDefaults struct {
 	DefaultMemoryLimit   string `json:"default_memory_limit,omitempty"`
 	MinCPULimit          string `json:"min_cpu_limit,omitempty"`
 	MinMemoryLimit       string `json:"min_memory_limit,omitempty"`
+	MaxCPURequest        string `json:"max_cpu_request,omitempty"`
+	MaxMemoryRequest     string `json:"max_memory_request,omitempty"`
 }
 
 // OperatorTimeouts defines the timeout of ResourceCheck, PodWait, ReadyWait
 type OperatorTimeouts struct {
-	ResourceCheckInterval  Duration `json:"resource_check_interval,omitempty"`
-	ResourceCheckTimeout   Duration `json:"resource_check_timeout,omitempty"`
-	PodLabelWaitTimeout    Duration `json:"pod_label_wait_timeout,omitempty"`
-	PodDeletionWaitTimeout Duration `json:"pod_deletion_wait_timeout,omitempty"`
-	ReadyWaitInterval      Duration `json:"ready_wait_interval,omitempty"`
-	ReadyWaitTimeout       Duration `json:"ready_wait_timeout,omitempty"`
+	ResourceCheckInterval   Duration `json:"resource_check_interval,omitempty"`
+	ResourceCheckTimeout    Duration `json:"resource_check_timeout,omitempty"`
+	PodLabelWaitTimeout     Duration `json:"pod_label_wait_timeout,omitempty"`
+	PodDeletionWaitTimeout  Duration `json:"pod_deletion_wait_timeout,omitempty"`
+	ReadyWaitInterval       Duration `json:"ready_wait_interval,omitempty"`
+	ReadyWaitTimeout        Duration `json:"ready_wait_timeout,omitempty"`
+	PatroniAPICheckInterval Duration `json:"patroni_api_check_interval,omitempty"`
+	PatroniAPICheckTimeout  Duration `json:"patroni_api_check_timeout,omitempty"`
 }
 
 // LoadBalancerConfiguration defines the LB configuration
 type LoadBalancerConfiguration struct {
-	DbHostedZone              string                `json:"db_hosted_zone,omitempty"`
-	EnableMasterLoadBalancer  bool                  `json:"enable_master_load_balancer,omitempty"`
-	EnableReplicaLoadBalancer bool                  `json:"enable_replica_load_balancer,omitempty"`
-	CustomServiceAnnotations  map[string]string     `json:"custom_service_annotations,omitempty"`
-	MasterDNSNameFormat       config.StringTemplate `json:"master_dns_name_format,omitempty"`
-	ReplicaDNSNameFormat      config.StringTemplate `json:"replica_dns_name_format,omitempty"`
-	ExternalTrafficPolicy     string                `json:"external_traffic_policy" default:"Cluster"`
+	DbHostedZone                    string                `json:"db_hosted_zone,omitempty"`
+	EnableMasterLoadBalancer        bool                  `json:"enable_master_load_balancer,omitempty"`
+	EnableMasterPoolerLoadBalancer  bool                  `json:"enable_master_pooler_load_balancer,omitempty"`
+	EnableReplicaLoadBalancer       bool                  `json:"enable_replica_load_balancer,omitempty"`
+	EnableReplicaPoolerLoadBalancer bool                  `json:"enable_replica_pooler_load_balancer,omitempty"`
+	CustomServiceAnnotations        map[string]string     `json:"custom_service_annotations,omitempty"`
+	MasterDNSNameFormat             config.StringTemplate `json:"master_dns_name_format,omitempty"`
+	MasterLegacyDNSNameFormat       config.StringTemplate `json:"master_legacy_dns_name_format,omitempty"`
+	ReplicaDNSNameFormat            config.StringTemplate `json:"replica_dns_name_format,omitempty"`
+	ReplicaLegacyDNSNameFormat      config.StringTemplate `json:"replica_legacy_dns_name_format,omitempty"`
+	ExternalTrafficPolicy           string                `json:"external_traffic_policy" default:"Cluster"`
 }
 
 // AWSGCPConfiguration defines the configuration for AWS
@@ -122,6 +155,7 @@ type AWSGCPConfiguration struct {
 	AWSRegion                    string `json:"aws_region,omitempty"`
 	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
 	GCPCredentials               string `json:"gcp_credentials,omitempty"`
+	WALAZStorageAccount          string `json:"wal_az_storage_account,omitempty"`
 	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
 	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
 	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
@@ -150,6 +184,8 @@ type TeamsAPIConfiguration struct {
 	PostgresSuperuserTeams          []string          `json:"postgres_superuser_teams,omitempty"`
 	EnablePostgresTeamCRD           bool              `json:"enable_postgres_team_crd,omitempty"`
 	EnablePostgresTeamCRDSuperusers bool              `json:"enable_postgres_team_crd_superusers,omitempty"`
+	EnableTeamMemberDeprecation     bool              `json:"enable_team_member_deprecation,omitempty"`
+	RoleDeletionSuffix              string            `json:"role_deletion_suffix,omitempty"`
 }
 
 // LoggingRESTAPIConfiguration defines Logging API conf
@@ -189,48 +225,70 @@ type OperatorLogicalBackupConfiguration struct {
 	Schedule                     string `json:"logical_backup_schedule,omitempty"`
 	DockerImage                  string `json:"logical_backup_docker_image,omitempty"`
 	BackupProvider               string `json:"logical_backup_provider,omitempty"`
+	AzureStorageAccountName      string `json:"logical_backup_azure_storage_account_name,omitempty"`
+	AzureStorageContainer        string `json:"logical_backup_azure_storage_container,omitempty"`
+	AzureStorageAccountKey       string `json:"logical_backup_azure_storage_account_key,omitempty"`
 	S3Bucket                     string `json:"logical_backup_s3_bucket,omitempty"`
+	S3BucketPrefix               string `json:"logical_backup_s3_bucket_prefix,omitempty"`
 	S3Region                     string `json:"logical_backup_s3_region,omitempty"`
 	S3Endpoint                   string `json:"logical_backup_s3_endpoint,omitempty"`
 	S3AccessKeyID                string `json:"logical_backup_s3_access_key_id,omitempty"`
 	S3SecretAccessKey            string `json:"logical_backup_s3_secret_access_key,omitempty"`
 	S3SSE                        string `json:"logical_backup_s3_sse,omitempty"`
+	RetentionTime                string `json:"logical_backup_s3_retention_time,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
+	CronjobEnvironmentSecret     string `json:"logical_backup_cronjob_environment_secret,omitempty"`
+	CPURequest                   string `json:"logical_backup_cpu_request,omitempty"`
+	MemoryRequest                string `json:"logical_backup_memory_request,omitempty"`
+	CPULimit                     string `json:"logical_backup_cpu_limit,omitempty"`
+	MemoryLimit                  string `json:"logical_backup_memory_limit,omitempty"`
+}
+
+// PatroniConfiguration defines configuration for Patroni
+type PatroniConfiguration struct {
+	FailsafeMode *bool `json:"enable_patroni_failsafe_mode,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
-	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
-	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
-	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
-	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
-	EtcdHost                   string                             `json:"etcd_host,omitempty"`
-	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
-	DockerImage                string                             `json:"docker_image,omitempty"`
-	ImagePullSecrets           []string                           `json:"image_pull_secrets,omitempty"`
-	Workers                    uint32                             `json:"workers,omitempty"`
-	MinInstances               int32                              `json:"min_instances,omitempty"`
-	MaxInstances               int32                              `json:"max_instances,omitempty"`
-	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
-	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
-	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
-	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
-	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
-	SidecarContainers          []v1.Container                     `json:"sidecars,omitempty"`
-	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
-	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
-	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
-	Timeouts                   OperatorTimeouts                   `json:"timeouts"`
-	LoadBalancer               LoadBalancerConfiguration          `json:"load_balancer"`
-	AWSGCP                     AWSGCPConfiguration                `json:"aws_or_gcp"`
-	OperatorDebug              OperatorDebugConfiguration         `json:"debug"`
-	TeamsAPI                   TeamsAPIConfiguration              `json:"teams_api"`
-	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
-	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
-	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
-	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	EnableCRDRegistration         *bool                              `json:"enable_crd_registration,omitempty"`
+	EnableCRDValidation           *bool                              `json:"enable_crd_validation,omitempty"`
+	CRDCategories                 []string                           `json:"crd_categories,omitempty"`
+	EnableLazySpiloUpgrade        bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
+	EnablePgVersionEnvVar         bool                               `json:"enable_pgversion_env_var,omitempty"`
+	EnableSpiloWalPathCompat      bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
+	EnableTeamIdClusternamePrefix bool                               `json:"enable_team_id_clustername_prefix,omitempty"`
+	EtcdHost                      string                             `json:"etcd_host,omitempty"`
+	KubernetesUseConfigMaps       bool                               `json:"kubernetes_use_configmaps,omitempty"`
+	DockerImage                   string                             `json:"docker_image,omitempty"`
+	ImagePullSecrets              []string                           `json:"image_pull_secrets,omitempty"`	
+	Workers                       uint32                             `json:"workers,omitempty"`
+	ResyncPeriod                  Duration                           `json:"resync_period,omitempty"`
+	RepairPeriod                  Duration                           `json:"repair_period,omitempty"`
+	SetMemoryRequestToLimit       bool                               `json:"set_memory_request_to_limit,omitempty"`
+	ShmVolume                     *bool                              `json:"enable_shm_volume,omitempty"`
+	SidecarImages                 map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
+	SidecarContainers             []v1.Container                     `json:"sidecars,omitempty"`
+	PostgresUsersConfiguration    PostgresUsersConfiguration         `json:"users"`
+	MajorVersionUpgrade           MajorVersionUpgradeConfiguration   `json:"major_version_upgrade"`
+	Kubernetes                    KubernetesMetaConfiguration        `json:"kubernetes"`
+	PostgresPodResources          PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
+	Timeouts                      OperatorTimeouts                   `json:"timeouts"`
+	LoadBalancer                  LoadBalancerConfiguration          `json:"load_balancer"`
+	AWSGCP                        AWSGCPConfiguration                `json:"aws_or_gcp"`
+	OperatorDebug                 OperatorDebugConfiguration         `json:"debug"`
+	TeamsAPI                      TeamsAPIConfiguration              `json:"teams_api"`
+	LoggingRESTAPI                LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
+	Scalyr                        ScalyrConfiguration                `json:"scalyr"`
+	LogicalBackup                 OperatorLogicalBackupConfiguration `json:"logical_backup"`
+	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	Patroni                       PatroniConfiguration               `json:"patroni"`
+
+	MinInstances                      int32  `json:"min_instances,omitempty"`
+	MaxInstances                      int32  `json:"max_instances,omitempty"`
+	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
 }
 
-//Duration shortens this frequently used name
+// Duration shortens this frequently used name
 type Duration time.Duration

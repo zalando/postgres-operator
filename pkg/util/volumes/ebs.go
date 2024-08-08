@@ -39,8 +39,12 @@ func (r *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool
 	return pv.Spec.AWSElasticBlockStore != nil && pv.Annotations[constants.VolumeStorateProvisionerAnnotation] == constants.EBSProvisioner
 }
 
-// ExtractVolumeID extracts volumeID
+// ExtractVolumeID extracts volumeID from "aws://eu-central-1a/vol-075ddfc4a127d0bd4"
+// or return only the vol-075ddfc4a127d0bd4 when it doesn't have "aws://"
 func (r *EBSVolumeResizer) ExtractVolumeID(volumeID string) (string, error) {
+	if (strings.HasPrefix(volumeID, "vol-")) && !(strings.HasPrefix(volumeID, "aws://")) {
+		return volumeID, nil
+	}
 	idx := strings.LastIndex(volumeID, constants.EBSVolumeIDStart) + 1
 	if idx == 0 {
 		return "", fmt.Errorf("malformed EBS volume id %q", volumeID)
@@ -141,18 +145,9 @@ func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 }
 
 // ModifyVolume Modify EBS volume
-func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType string, newSize int64, iops int64, throughput int64) error {
+func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSize *int64, iops *int64, throughput *int64) error {
 	/* first check if the volume is already of a requested size */
-	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeID}})
-	if err != nil {
-		return fmt.Errorf("could not get information about the volume: %v", err)
-	}
-	vol := volumeOutput.Volumes[0]
-	if *vol.VolumeId != volumeID {
-		return fmt.Errorf("describe volume %q returned information about a non-matching volume %q", volumeID, *vol.VolumeId)
-	}
-
-	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeID, VolumeType: &newType, Iops: &iops, Throughput: &throughput}
+	input := ec2.ModifyVolumeInput{Size: newSize, VolumeId: &volumeID, VolumeType: newType, Iops: iops, Throughput: throughput}
 	output, err := r.connection.ModifyVolume(&input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)

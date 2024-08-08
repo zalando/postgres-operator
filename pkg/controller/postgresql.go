@@ -158,7 +158,14 @@ func (c *Controller) acquireInitialListOfClusters() error {
 	return nil
 }
 
-func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) *cluster.Cluster {
+func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) (*cluster.Cluster, error) {
+	if c.opConfig.EnableTeamIdClusternamePrefix {
+		if _, err := acidv1.ExtractClusterName(clusterName.Name, pgSpec.Spec.TeamID); err != nil {
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusInvalid)
+			return nil, err
+		}
+	}
+
 	cl := cluster.New(c.makeClusterConfig(), c.KubeClient, *pgSpec, lg, c.eventRecorder)
 	cl.Run(c.stopCh)
 	teamName := strings.ToLower(cl.Spec.TeamID)
@@ -171,12 +178,13 @@ func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedNam
 	c.clusterLogs[clusterName] = ringlog.New(c.opConfig.RingLogLines)
 	c.clusterHistory[clusterName] = ringlog.New(c.opConfig.ClusterHistoryEntries)
 
-	return cl
+	return cl, nil
 }
 
 func (c *Controller) processEvent(event ClusterEvent) {
 	var clusterName spec.NamespacedName
 	var clHistory ringlog.RingLogger
+	var err error
 
 	lg := c.logger.WithField("worker", event.WorkerID)
 
@@ -199,10 +207,10 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	if event.EventType == EventRepair {
 		runRepair, lastOperationStatus := cl.NeedsRepair()
 		if !runRepair {
-			lg.Debugf("Observed cluster status %s, repair is not required", lastOperationStatus)
+			lg.Debugf("observed cluster status %s, repair is not required", lastOperationStatus)
 			return
 		}
-		lg.Debugf("Observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
+		lg.Debugf("observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
 		event.EventType = EventSync
 	}
 
@@ -216,8 +224,8 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			c.mergeDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 		}
 
-		if err := c.submitRBACCredentials(event); err != nil {
-			c.logger.Warnf("Pods and/or Patroni may misfunction due to the lack of permissions: %v", err)
+		if err = c.submitRBACCredentials(event); err != nil {
+			c.logger.Warnf("pods and/or Patroni may misfunction due to the lack of permissions: %v", err)
 		}
 
 	}
@@ -225,21 +233,26 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	switch event.EventType {
 	case EventAdd:
 		if clusterFound {
-			lg.Infof("Recieved add event for already existing Postgres cluster")
+			lg.Infof("received add event for already existing Postgres cluster")
 			return
 		}
 
 		lg.Infof("creating a new Postgres cluster")
 
-		cl = c.addCluster(lg, clusterName, event.NewSpec)
+		cl, err = c.addCluster(lg, clusterName, event.NewSpec)
+		if err != nil {
+			lg.Errorf("creation of cluster is blocked: %v", err)
+			return
+		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
-		if err := cl.Create(); err != nil {
+		err = cl.Create()
+		if err != nil {
+			cl.Status = acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusInvalid}
 			cl.Error = fmt.Sprintf("could not create cluster: %v", err)
 			lg.Error(cl.Error)
 			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Create", "%v", cl.Error)
-
 			return
 		}
 
@@ -252,7 +265,8 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			return
 		}
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Update(event.OldSpec, event.NewSpec); err != nil {
+		err = cl.Update(event.OldSpec, event.NewSpec)
+		if err != nil {
 			cl.Error = fmt.Sprintf("could not update cluster: %v", err)
 			lg.Error(cl.Error)
 
@@ -271,14 +285,18 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			lg.Errorf("unknown cluster: %q", clusterName)
 			return
 		}
-		lg.Infoln("deletion of the cluster started")
 
 		teamName := strings.ToLower(cl.Spec.TeamID)
-
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		cl.Delete()
-		// Fixme - no error handling for delete ?
-		// c.eventRecorder.Eventf(cl.GetReference, v1.EventTypeWarning, "Delete", "%v", cl.Error)
+
+		// when using finalizers the deletion already happened
+		if c.opConfig.EnableFinalizers == nil || !*c.opConfig.EnableFinalizers {
+			lg.Infoln("deletion of the cluster started")
+			if err := cl.Delete(); err != nil {
+				cl.Error = fmt.Sprintf("could not delete cluster: %v", err)
+				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Delete", "%v", cl.Error)
+			}
+		}
 
 		func() {
 			defer c.clustersMu.Unlock()
@@ -303,19 +321,34 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
-			cl = c.addCluster(lg, clusterName, event.NewSpec)
+			cl, err = c.addCluster(lg, clusterName, event.NewSpec)
+			if err != nil {
+				lg.Errorf("syncing of cluster is blocked: %v", err)
+				return
+			}
 		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Sync(event.NewSpec); err != nil {
-			cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
-			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Sync", "%v", cl.Error)
-			lg.Error(cl.Error)
-			return
+
+		// has this cluster been marked as deleted already, then we shall start cleaning up
+		if !cl.ObjectMeta.DeletionTimestamp.IsZero() {
+			lg.Infof("cluster has a DeletionTimestamp of %s, starting deletion now.", cl.ObjectMeta.DeletionTimestamp.Format(time.RFC3339))
+			if err = cl.Delete(); err != nil {
+				cl.Error = fmt.Sprintf("error deleting cluster and its resources: %v", err)
+				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Delete", "%v", cl.Error)
+				lg.Error(cl.Error)
+				return
+			}
+		} else {
+			if err = cl.Sync(event.NewSpec); err != nil {
+				cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
+				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Sync", "%v", cl.Error)
+				lg.Error(cl.Error)
+				return
+			}
+			lg.Infof("cluster has been synced")
 		}
 		cl.Error = ""
-
-		lg.Infof("cluster has been synced")
 	}
 }
 
@@ -328,7 +361,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	for {
-		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}) error { return nil }))
+		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}, bool) error { return nil }))
 		if err != nil {
 			if err == cache.ErrFIFOClosed {
 				return
@@ -348,11 +381,11 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.PostgresSpec) {
 
 	deprecate := func(deprecated, replacement string) {
-		c.logger.Warningf("Parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
+		c.logger.Warningf("parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
 	}
 
 	noeffect := func(param string, explanation string) {
-		c.logger.Warningf("Parameter %q takes no effect. %s", param, explanation)
+		c.logger.Warningf("parameter %q takes no effect. %s", param, explanation)
 	}
 
 	if spec.UseLoadBalancer != nil {
@@ -368,7 +401,7 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.Postg
 
 	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
 		(spec.EnableReplicaLoadBalancer != nil || spec.EnableMasterLoadBalancer != nil) {
-		c.logger.Warnf("Both old and new load balancer parameters are present in the manifest, ignoring old ones")
+		c.logger.Warnf("both old and new load balancer parameters are present in the manifest, ignoring old ones")
 	}
 }
 
@@ -505,8 +538,6 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 		// We will not get multiple Add events for the same cluster
 		c.queueClusterEvent(nil, pg, EventAdd)
 	}
-
-	return
 }
 
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
@@ -521,8 +552,6 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 		}
 		c.queueClusterEvent(pgOld, pgNew, EventUpdate)
 	}
-
-	return
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {
@@ -530,8 +559,6 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 	if pg != nil {
 		c.queueClusterEvent(pg, nil, EventDelete)
 	}
-
-	return
 }
 
 func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
@@ -547,12 +574,13 @@ func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
 }
 
 /*
-  Ensures the pod service account and role bindings exists in a namespace
-  before a PG cluster is created there so that a user does not have to deploy
-  these credentials manually.  StatefulSets require the service account to
-  create pods; Patroni requires relevant RBAC bindings to access endpoints.
+Ensures the pod service account and role bindings exists in a namespace
+before a PG cluster is created there so that a user does not have to deploy
+these credentials manually.  StatefulSets require the service account to
+create pods; Patroni requires relevant RBAC bindings to access endpoints
+or config maps.
 
-  The operator does not sync accounts/role bindings after creation.
+The operator does not sync accounts/role bindings after creation.
 */
 func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 

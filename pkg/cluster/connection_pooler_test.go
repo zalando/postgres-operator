@@ -1,21 +1,39 @@
 package cluster
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
-func mockInstallLookupFunction(schema string, user string, role PostgresRole) error {
+func newFakeK8sPoolerTestClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset()
+
+	return k8sutil.KubernetesClient{
+		PodsGetter:         clientSet.CoreV1(),
+		PostgresqlsGetter:  acidClientSet.AcidV1(),
+		StatefulSetsGetter: clientSet.AppsV1(),
+		DeploymentsGetter:  clientSet.AppsV1(),
+		ServicesGetter:     clientSet.CoreV1(),
+	}, clientSet
+}
+
+func mockInstallLookupFunction(schema string, user string) error {
 	return nil
 }
 
@@ -23,83 +41,122 @@ func boolToPointer(value bool) *bool {
 	return &value
 }
 
-func int32ToPointer(value int32) *int32 {
-	return &value
+func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
+	for _, role := range [2]PostgresRole{Master, Replica} {
+
+		poolerLabels := cluster.labelsSet(false)
+		poolerLabels["application"] = "db-connection-pooler"
+		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
+
+		if cluster.ConnectionPooler[role] != nil && cluster.ConnectionPooler[role].Deployment != nil &&
+			util.MapContains(cluster.ConnectionPooler[role].Deployment.Labels, poolerLabels) &&
+			(cluster.ConnectionPooler[role].Deployment.Spec.Replicas == nil ||
+				*cluster.ConnectionPooler[role].Deployment.Spec.Replicas != 2) {
+			return fmt.Errorf("Wrong number of instances")
+		}
+	}
+	return nil
 }
 
-func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
-	testName := "Test connection pooler creation"
-	var cluster = New(
-		Config{
-			OpConfig: config.Config{
-				ProtectedRoles: []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
-				},
-				ConnectionPooler: config.ConnectionPooler{
-					ConnectionPoolerDefaultCPURequest:    "100m",
-					ConnectionPoolerDefaultCPULimit:      "100m",
-					ConnectionPoolerDefaultMemoryRequest: "100Mi",
-					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:                    int32ToPointer(1),
-				},
-			},
-		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
-
-	cluster.Statefulset = &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-sts",
-		},
+func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
+	if cluster.ConnectionPooler == nil {
+		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	cluster.Spec = acidv1.PostgresSpec{
-		ConnectionPooler:              &acidv1.ConnectionPooler{},
-		EnableReplicaConnectionPooler: boolToPointer(true),
-	}
+	for _, role := range []PostgresRole{Master, Replica} {
+		poolerLabels := cluster.labelsSet(false)
+		poolerLabels["application"] = "db-connection-pooler"
+		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
 
-	reason, err := cluster.createConnectionPooler(mockInstallLookupFunction)
+		if cluster.ConnectionPooler[role].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[role].Deployment.Labels, poolerLabels) {
+			return fmt.Errorf("Deployment was not saved or labels not attached %s %s", role, cluster.ConnectionPooler[role].Deployment.Labels)
+		}
 
-	if err != nil {
-		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
-			testName, err, reason)
-	}
-	for _, role := range [2]PostgresRole{Master, Replica} {
-		if cluster.ConnectionPooler[role] != nil {
-			if cluster.ConnectionPooler[role].Deployment == nil {
-				t.Errorf("%s: Connection pooler deployment is empty for role %s", testName, role)
-			}
-
-			if cluster.ConnectionPooler[role].Service == nil {
-				t.Errorf("%s: Connection pooler service is empty for role %s", testName, role)
-			}
+		if cluster.ConnectionPooler[role].Service == nil || !util.MapContains(cluster.ConnectionPooler[role].Service.Labels, poolerLabels) {
+			return fmt.Errorf("Service was not saved or labels not attached %s %s", role, cluster.ConnectionPooler[role].Service.Labels)
 		}
 	}
-	oldSpec := &acidv1.Postgresql{
-		Spec: acidv1.PostgresSpec{
-			EnableConnectionPooler:        boolToPointer(true),
-			EnableReplicaConnectionPooler: boolToPointer(true),
-		},
-	}
-	newSpec := &acidv1.Postgresql{
-		Spec: acidv1.PostgresSpec{
-			EnableConnectionPooler:        boolToPointer(false),
-			EnableReplicaConnectionPooler: boolToPointer(false),
-		},
+
+	return nil
+}
+
+func MasterObjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
+	if cluster.ConnectionPooler == nil {
+		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	// Delete connection pooler via sync
-	_, err = cluster.syncConnectionPooler(oldSpec, newSpec, mockInstallLookupFunction)
-	if err != nil {
-		t.Errorf("%s: Cannot sync connection pooler, %s", testName, err)
+	poolerLabels := cluster.labelsSet(false)
+	poolerLabels["application"] = "db-connection-pooler"
+	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(Master)
+
+	if cluster.ConnectionPooler[Master].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[Master].Deployment.Labels, poolerLabels) {
+		return fmt.Errorf("Deployment was not saved or labels not attached %s", cluster.ConnectionPooler[Master].Deployment.Labels)
 	}
 
+	if cluster.ConnectionPooler[Master].Service == nil || !util.MapContains(cluster.ConnectionPooler[Master].Service.Labels, poolerLabels) {
+		return fmt.Errorf("Service was not saved or labels not attached %s", cluster.ConnectionPooler[Master].Service.Labels)
+	}
+
+	return nil
+}
+
+func ReplicaObjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
+	if cluster.ConnectionPooler == nil {
+		return fmt.Errorf("Connection pooler resources are empty")
+	}
+
+	poolerLabels := cluster.labelsSet(false)
+	poolerLabels["application"] = "db-connection-pooler"
+	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(Replica)
+
+	if cluster.ConnectionPooler[Replica].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[Replica].Deployment.Labels, poolerLabels) {
+		return fmt.Errorf("Deployment was not saved or labels not attached %s", cluster.ConnectionPooler[Replica].Deployment.Labels)
+	}
+
+	if cluster.ConnectionPooler[Replica].Service == nil || !util.MapContains(cluster.ConnectionPooler[Replica].Service.Labels, poolerLabels) {
+		return fmt.Errorf("Service was not saved or labels not attached %s", cluster.ConnectionPooler[Replica].Service.Labels)
+	}
+
+	return nil
+}
+
+func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
 	for _, role := range [2]PostgresRole{Master, Replica} {
-		err = cluster.deleteConnectionPooler(role)
-		if err != nil {
-			t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
+		if cluster.ConnectionPooler[role] != nil &&
+			(cluster.ConnectionPooler[role].Deployment != nil || cluster.ConnectionPooler[role].Service != nil) {
+			return fmt.Errorf("Connection pooler was not deleted for role %v", role)
 		}
 	}
+
+	return nil
+}
+
+func OnlyMasterDeleted(cluster *Cluster, err error, reason SyncReason) error {
+
+	if cluster.ConnectionPooler[Master] != nil &&
+		(cluster.ConnectionPooler[Master].Deployment != nil || cluster.ConnectionPooler[Master].Service != nil) {
+		return fmt.Errorf("Connection pooler master was not deleted")
+	}
+	return nil
+}
+
+func OnlyReplicaDeleted(cluster *Cluster, err error, reason SyncReason) error {
+
+	if cluster.ConnectionPooler[Replica] != nil &&
+		(cluster.ConnectionPooler[Replica].Deployment != nil || cluster.ConnectionPooler[Replica].Service != nil) {
+		return fmt.Errorf("Connection pooler replica was not deleted")
+	}
+	return nil
+}
+
+func noEmptySync(cluster *Cluster, err error, reason SyncReason) error {
+	for _, msg := range reason {
+		if strings.HasPrefix(msg, "update [] from '<nil>' to '") {
+			return fmt.Errorf("There is an empty reason, %s", msg)
+		}
+	}
+
+	return nil
 }
 
 func TestNeedConnectionPooler(t *testing.T) {
@@ -210,133 +267,180 @@ func TestNeedConnectionPooler(t *testing.T) {
 	}
 }
 
-func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
-	for _, role := range [2]PostgresRole{Master, Replica} {
-		if cluster.ConnectionPooler[role] != nil && cluster.ConnectionPooler[role].Deployment != nil &&
-			(cluster.ConnectionPooler[role].Deployment.Spec.Replicas == nil ||
-				*cluster.ConnectionPooler[role].Deployment.Spec.Replicas != 2) {
-			return fmt.Errorf("Wrong number of instances")
-		}
-	}
-	return nil
-}
+func TestConnectionPoolerCreateDeletion(t *testing.T) {
 
-func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
-	if cluster.ConnectionPooler == nil {
-		return fmt.Errorf("Connection pooler resources are empty")
-	}
+	testName := "test connection pooler creation and deletion"
+	clientSet := fake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	namespace := "default"
 
-	for _, role := range []PostgresRole{Master, Replica} {
-		if cluster.ConnectionPooler[role].Deployment == nil {
-			return fmt.Errorf("Deployment was not saved %s", role)
-		}
-
-		if cluster.ConnectionPooler[role].Service == nil {
-			return fmt.Errorf("Service was not saved %s", role)
-		}
+	client := k8sutil.KubernetesClient{
+		StatefulSetsGetter: clientSet.AppsV1(),
+		ServicesGetter:     clientSet.CoreV1(),
+		PodsGetter:         clientSet.CoreV1(),
+		DeploymentsGetter:  clientSet.AppsV1(),
+		PostgresqlsGetter:  acidClientSet.AcidV1(),
+		SecretsGetter:      clientSet.CoreV1(),
 	}
 
-	return nil
-}
-
-func MasterobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
-	if cluster.ConnectionPooler == nil {
-		return fmt.Errorf("Connection pooler resources are empty")
-	}
-
-	if cluster.ConnectionPooler[Master].Deployment == nil {
-		return fmt.Errorf("Deployment was not saved")
-	}
-
-	if cluster.ConnectionPooler[Master].Service == nil {
-		return fmt.Errorf("Service was not saved")
-	}
-
-	return nil
-}
-
-func ReplicaobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
-	if cluster.ConnectionPooler == nil {
-		return fmt.Errorf("Connection pooler resources are empty")
-	}
-
-	if cluster.ConnectionPooler[Replica].Deployment == nil {
-		return fmt.Errorf("Deployment was not saved")
-	}
-
-	if cluster.ConnectionPooler[Replica].Service == nil {
-		return fmt.Errorf("Service was not saved")
-	}
-
-	return nil
-}
-
-func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
-	for _, role := range [2]PostgresRole{Master, Replica} {
-		if cluster.ConnectionPooler[role] != nil &&
-			(cluster.ConnectionPooler[role].Deployment != nil || cluster.ConnectionPooler[role].Service != nil) {
-			return fmt.Errorf("Connection pooler was not deleted for role %v", role)
-		}
-	}
-
-	return nil
-}
-
-func OnlyMasterDeleted(cluster *Cluster, err error, reason SyncReason) error {
-
-	if cluster.ConnectionPooler[Master] != nil &&
-		(cluster.ConnectionPooler[Master].Deployment != nil || cluster.ConnectionPooler[Master].Service != nil) {
-		return fmt.Errorf("Connection pooler master was not deleted")
-	}
-	return nil
-}
-
-func OnlyReplicaDeleted(cluster *Cluster, err error, reason SyncReason) error {
-
-	if cluster.ConnectionPooler[Replica] != nil &&
-		(cluster.ConnectionPooler[Replica].Deployment != nil || cluster.ConnectionPooler[Replica].Service != nil) {
-		return fmt.Errorf("Connection pooler replica was not deleted")
-	}
-	return nil
-}
-
-func noEmptySync(cluster *Cluster, err error, reason SyncReason) error {
-	for _, msg := range reason {
-		if strings.HasPrefix(msg, "update [] from '<nil>' to '") {
-			return fmt.Errorf("There is an empty reason, %s", msg)
-		}
-	}
-
-	return nil
-}
-
-func TestConnectionPoolerSynchronization(t *testing.T) {
-	testName := "Test connection pooler synchronization"
-	newCluster := func(client k8sutil.KubernetesClient) *Cluster {
-		return New(
-			Config{
-				OpConfig: config.Config{
-					ProtectedRoles: []string{"admin"},
-					Auth: config.Auth{
-						SuperUsername:       superUserName,
-						ReplicationUsername: replicationUserName,
-					},
-					ConnectionPooler: config.ConnectionPooler{
-						ConnectionPoolerDefaultCPURequest:    "100m",
-						ConnectionPoolerDefaultCPULimit:      "100m",
-						ConnectionPoolerDefaultMemoryRequest: "100Mi",
-						ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-						NumberOfInstances:                    int32ToPointer(1),
-					},
-				},
-			}, client, acidv1.Postgresql{}, logger, eventRecorder)
-	}
-	cluster := newCluster(k8sutil.KubernetesClient{})
-
-	cluster.Statefulset = &appsv1.StatefulSet{
+	pg := acidv1.Postgresql{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-sts",
+			Name:      "acid-fake-cluster",
+			Namespace: namespace,
 		},
+		Spec: acidv1.PostgresSpec{
+			EnableConnectionPooler:        boolToPointer(true),
+			EnableReplicaConnectionPooler: boolToPointer(true),
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
+				},
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	cluster.Name = "acid-fake-cluster"
+	cluster.Namespace = "default"
+
+	_, err := cluster.createService(Master)
+	assert.NoError(t, err)
+	_, err = cluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	reason, err := cluster.createConnectionPooler(mockInstallLookupFunction)
+
+	if err != nil {
+		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
+			testName, err, reason)
+	}
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		poolerLabels := cluster.labelsSet(false)
+		poolerLabels["application"] = "db-connection-pooler"
+		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
+
+		if cluster.ConnectionPooler[role] != nil {
+			if cluster.ConnectionPooler[role].Deployment == nil && util.MapContains(cluster.ConnectionPooler[role].Deployment.Labels, poolerLabels) {
+				t.Errorf("%s: Connection pooler deployment is empty for role %s", testName, role)
+			}
+
+			if cluster.ConnectionPooler[role].Service == nil && util.MapContains(cluster.ConnectionPooler[role].Service.Labels, poolerLabels) {
+				t.Errorf("%s: Connection pooler service is empty for role %s", testName, role)
+			}
+		}
+	}
+
+	oldSpec := &acidv1.Postgresql{
+		Spec: acidv1.PostgresSpec{
+			EnableConnectionPooler:        boolToPointer(true),
+			EnableReplicaConnectionPooler: boolToPointer(true),
+		},
+	}
+	newSpec := &acidv1.Postgresql{
+		Spec: acidv1.PostgresSpec{
+			EnableConnectionPooler:        boolToPointer(false),
+			EnableReplicaConnectionPooler: boolToPointer(false),
+		},
+	}
+
+	// Delete connection pooler via sync
+	_, err = cluster.syncConnectionPooler(oldSpec, newSpec, mockInstallLookupFunction)
+	if err != nil {
+		t.Errorf("%s: Cannot sync connection pooler, %s", testName, err)
+	}
+
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		err = cluster.deleteConnectionPooler(role)
+		if err != nil {
+			t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
+		}
+	}
+}
+
+func TestConnectionPoolerSync(t *testing.T) {
+
+	testName := "test connection pooler synchronization"
+	clientSet := fake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	namespace := "default"
+
+	client := k8sutil.KubernetesClient{
+		StatefulSetsGetter: clientSet.AppsV1(),
+		ServicesGetter:     clientSet.CoreV1(),
+		PodsGetter:         clientSet.CoreV1(),
+		DeploymentsGetter:  clientSet.AppsV1(),
+		PostgresqlsGetter:  acidClientSet.AcidV1(),
+		SecretsGetter:      clientSet.CoreV1(),
+	}
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "acid-fake-cluster",
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
+				},
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	cluster.Name = "acid-fake-cluster"
+	cluster.Namespace = "default"
+
+	_, err := cluster.createService(Master)
+	assert.NoError(t, err)
+	_, err = cluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	reason, err := cluster.createConnectionPooler(mockInstallLookupFunction)
+
+	if err != nil {
+		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
+			testName, err, reason)
 	}
 
 	tests := []struct {
@@ -358,10 +462,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          newCluster(k8sutil.ClientMissingObjects()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            MasterobjectsAreSaved,
+			check:            MasterObjectsAreSaved,
 		},
 		{
 			subTest: "create if doesn't exist",
@@ -375,10 +479,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          newCluster(k8sutil.ClientMissingObjects()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            MasterobjectsAreSaved,
+			check:            MasterObjectsAreSaved,
 		},
 		{
 			subTest: "create if doesn't exist with a flag",
@@ -390,10 +494,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					EnableConnectionPooler: boolToPointer(true),
 				},
 			},
-			cluster:          newCluster(k8sutil.ClientMissingObjects()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            MasterobjectsAreSaved,
+			check:            MasterObjectsAreSaved,
 		},
 		{
 			subTest: "create no replica with flag",
@@ -405,7 +509,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					EnableReplicaConnectionPooler: boolToPointer(false),
 				},
 			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreDeleted,
@@ -421,10 +525,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					EnableReplicaConnectionPooler: boolToPointer(true),
 				},
 			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            ReplicaobjectsAreSaved,
+			check:            ReplicaObjectsAreSaved,
 		},
 		{
 			subTest: "create both master and replica",
@@ -438,7 +542,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					EnableConnectionPooler:        boolToPointer(true),
 				},
 			},
-			cluster:          newCluster(k8sutil.ClientMissingObjects()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreSaved,
@@ -456,7 +560,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            OnlyReplicaDeleted,
@@ -474,7 +578,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					EnableReplicaConnectionPooler: boolToPointer(true),
 				},
 			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            OnlyMasterDeleted,
@@ -489,7 +593,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
 			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreDeleted,
@@ -502,52 +606,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
 			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreDeleted,
-		},
-		{
-			subTest: "update deployment",
-			oldSpec: &acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					ConnectionPooler: &acidv1.ConnectionPooler{
-						NumberOfInstances: int32ToPointer(1),
-					},
-				},
-			},
-			newSpec: &acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					ConnectionPooler: &acidv1.ConnectionPooler{
-						NumberOfInstances: int32ToPointer(2),
-					},
-				},
-			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
-			defaultImage:     "pooler:1.0",
-			defaultInstances: 1,
-			check:            deploymentUpdated,
-		},
-		{
-			subTest: "update deployment",
-			oldSpec: &acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					ConnectionPooler: &acidv1.ConnectionPooler{
-						NumberOfInstances: int32ToPointer(1),
-					},
-				},
-			},
-			newSpec: &acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					ConnectionPooler: &acidv1.ConnectionPooler{
-						NumberOfInstances: int32ToPointer(2),
-					},
-				},
-			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
-			defaultImage:     "pooler:1.0",
-			defaultInstances: 1,
-			check:            deploymentUpdated,
 		},
 		{
 			subTest: "update image from changed defaults",
@@ -561,7 +623,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
+			cluster:          cluster,
 			defaultImage:     "pooler:2.0",
 			defaultInstances: 2,
 			check:            deploymentUpdated,
@@ -580,7 +642,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler:       &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          newCluster(k8sutil.NewMockKubernetesClient()),
+			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            noEmptySync,
@@ -589,7 +651,9 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 	for _, tt := range tests {
 		tt.cluster.OpConfig.ConnectionPooler.Image = tt.defaultImage
 		tt.cluster.OpConfig.ConnectionPooler.NumberOfInstances =
-			int32ToPointer(tt.defaultInstances)
+			k8sutil.Int32ToPointer(tt.defaultInstances)
+
+		t.Logf("running test for %s [%s]", testName, tt.subTest)
 
 		reason, err := tt.cluster.syncConnectionPooler(tt.oldSpec,
 			tt.newSpec, mockInstallLookupFunction)
@@ -611,8 +675,9 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
+				PodServiceAccountName: "postgres-pod",
 				ConnectionPooler: config.ConnectionPooler{
-					MaxDBConnections:                     int32ToPointer(60),
+					MaxDBConnections:                     k8sutil.Int32ToPointer(60),
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
@@ -645,38 +710,42 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error { return nil }
 
 	tests := []struct {
-		subTest  string
-		spec     *acidv1.PostgresSpec
-		expected error
-		cluster  *Cluster
-		check    func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error
+		subTest string
+		spec    *acidv1.PostgresSpec
+		cluster *Cluster
+		check   func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error
 	}{
 		{
 			subTest: "default configuration",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    noCheck,
+			cluster: cluster,
+			check:   noCheck,
+		},
+		{
+			subTest: "pooler uses pod service account",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			},
+			cluster: cluster,
+			check:   testServiceAccount,
 		},
 		{
 			subTest: "no default resources",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: errors.New(`could not generate resource requirements: could not fill resource requests: could not parse default CPU quantity: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'`),
-			cluster:  clusterNoDefaultRes,
-			check:    noCheck,
+			cluster: clusterNoDefaultRes,
+			check:   noCheck,
 		},
 		{
 			subTest: "default resources are set",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testResources,
+			cluster: cluster,
+			check:   testResources,
 		},
 		{
 			subTest: "labels for service",
@@ -684,30 +753,23 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				ConnectionPooler:              &acidv1.ConnectionPooler{},
 				EnableReplicaConnectionPooler: boolToPointer(true),
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testLabels,
+			cluster: cluster,
+			check:   testLabels,
 		},
 		{
 			subTest: "required envs",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testEnvs,
+			cluster: cluster,
+			check:   testEnvs,
 		},
 	}
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		for _, tt := range tests {
-			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(role)
+			podSpec, _ := tt.cluster.generateConnectionPoolerPodTemplate(role)
 
-			if err != tt.expected && err.Error() != tt.expected.Error() {
-				t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
-					testName, tt.subTest, err, tt.expected)
-			}
-
-			err = tt.check(cluster, podSpec, role)
+			err := tt.check(cluster, podSpec, role)
 			if err != nil {
 				t.Errorf("%s [%s]: Pod spec is incorrect, %+v",
 					testName, tt.subTest, err)
@@ -807,6 +869,17 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 	}
 }
 
+func testServiceAccount(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
+	poolerServiceAccount := podSpec.Spec.ServiceAccountName
+
+	if poolerServiceAccount != cluster.OpConfig.PodServiceAccountName {
+		return fmt.Errorf("Pooler service account does not match, got %+v, expected %+v",
+			poolerServiceAccount, cluster.OpConfig.PodServiceAccountName)
+	}
+
+	return nil
+}
+
 func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
 	if cpuReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest {
@@ -867,6 +940,125 @@ func testServiceSelector(cluster *Cluster, service *v1.Service, role PostgresRol
 	}
 
 	return nil
+}
+
+func TestPoolerTLS(t *testing.T) {
+	client, _ := newFakeK8sPoolerTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	tlsSecretName := "my-secret"
+	spiloFSGroup := int64(103)
+	defaultMode := int32(0640)
+	mountPath := "/tls"
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			EnableConnectionPooler: util.True(),
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+			TLS: &acidv1.TLSDescription{
+				SecretName: tlsSecretName, CAFile: "ca.crt"},
+			AdditionalVolumes: []acidv1.AdditionalVolume{
+				acidv1.AdditionalVolume{
+					Name:      tlsSecretName,
+					MountPath: mountPath,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  tlsSecretName,
+							DefaultMode: &defaultMode,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+					SpiloFSGroup:         &spiloFSGroup,
+				},
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+				},
+				PodServiceAccountName: "postgres-pod",
+			},
+		}, client, pg, logger, eventRecorder)
+
+	// create a statefulset
+	_, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	// create pooler resources
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
+	cluster.ConnectionPooler[Master] = &ConnectionPoolerObjects{
+		Deployment:     nil,
+		Service:        nil,
+		Name:           cluster.connectionPoolerName(Master),
+		ClusterName:    clusterName,
+		Namespace:      namespace,
+		LookupFunction: false,
+		Role:           Master,
+	}
+
+	_, err = cluster.syncConnectionPoolerWorker(nil, &pg, Master)
+	assert.NoError(t, err)
+
+	deploy, err := client.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(Master), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	fsGroup := int64(103)
+	assert.Equal(t, &fsGroup, deploy.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
+
+	assert.Equal(t, "postgres-pod", deploy.Spec.Template.Spec.ServiceAccountName, "need to add a service account name")
+
+	volume := v1.Volume{
+		Name: "my-secret",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  "my-secret",
+				DefaultMode: &defaultMode,
+			},
+		},
+	}
+	assert.Contains(t, deploy.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
+
+	poolerContainer := deploy.Spec.Template.Spec.Containers[constants.ConnectionPoolerContainer]
+	assert.Contains(t, poolerContainer.VolumeMounts, v1.VolumeMount{
+		MountPath: "/tls",
+		Name:      "my-secret",
+	}, "the volume gets mounted in /tls")
+
+	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: "/tls/tls.crt"})
+	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: "/tls/tls.key"})
+	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_CA_FILE", Value: "/tls/ca.crt"})
 }
 
 func TestConnectionPoolerServiceSpec(t *testing.T) {

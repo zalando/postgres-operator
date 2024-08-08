@@ -59,9 +59,14 @@ spec:
           configuration:
             type: object
             properties:
+              crd_categories:
+                type: array
+                nullable: true
+                items:
+                  type: string
               docker_image:
                 type: string
-                default: "registry.opensource.zalan.do/acid/spilo-13:2.0-p2"
+                default: "ghcr.io/zalando/spilo-16:3.2-p3"
               image_pull_secrets:
                 type: array
                 nullable: true
@@ -72,8 +77,12 @@ spec:
                   properties:
                     name:
                       type: string
+              enable_crd_registration:
+                type: boolean
+                default: true
               enable_crd_validation:
                 type: boolean
+                description: deprecated
                 default: true
               enable_lazy_spilo_upgrade:
                 type: boolean
@@ -87,19 +96,26 @@ spec:
               enable_spilo_wal_path_compat:
                 type: boolean
                 default: false
+              enable_team_id_clustername_prefix:
+                type: boolean
+                default: false
               etcd_host:
                 type: string
                 default: ""
+              ignore_instance_limits_annotation_key:
+                type: string
               kubernetes_use_configmaps:
                 type: boolean
                 default: false
               max_instances:
                 type: integer
-                minimum: -1  # -1 = disabled
+                description: "-1 = disabled"
+                minimum: -1
                 default: -1
               min_instances:
                 type: integer
-                minimum: -1  # -1 = disabled
+                description: "-1 = disabled"
+                minimum: -1
                 default: -1
               resync_period:
                 type: string
@@ -127,15 +143,49 @@ spec:
               users:
                 type: object
                 properties:
+                  additional_owner_roles:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
+                  enable_password_rotation:
+                    type: boolean
+                    default: false
+                  password_rotation_interval:
+                    type: integer
+                    default: 90
+                  password_rotation_user_retention:
+                    type: integer
+                    default: 180
                   replication_username:
                      type: string
                      default: standby
                   super_username:
                      type: string
                      default: postgres
+              major_version_upgrade:
+                type: object
+                properties:
+                  major_version_upgrade_mode:
+                    type: string
+                    default: "off"
+                  major_version_upgrade_team_allow_list:
+                    type: array
+                    items:
+                      type: string
+                  minimal_major_version:
+                    type: string
+                    default: "12"
+                  target_major_version:
+                    type: string
+                    default: "16"
               kubernetes:
                 type: object
                 properties:
+                  additional_pod_capabilities:
+                    type: array
+                    items:
+                      type: string
                   cluster_domain:
                     type: string
                     default: "cluster.local"
@@ -160,7 +210,19 @@ spec:
                     type: array
                     items:
                       type: string
+                  enable_cross_namespace_secret:
+                    type: boolean
+                    default: false
+                  enable_finalizers:
+                    type: boolean
+                    default: false
                   enable_init_containers:
+                    type: boolean
+                    default: true
+                  enable_secrets_deletion:
+                    type: boolean
+                    default: true
+                  enable_persistent_volume_claim_deletion:
                     type: boolean
                     default: true
                   enable_pod_antiaffinity:
@@ -169,9 +231,16 @@ spec:
                   enable_pod_disruption_budget:
                     type: boolean
                     default: true
+                  enable_readiness_probe:
+                    type: boolean
+                    default: false
                   enable_sidecars:
                     type: boolean
                     default: true
+                  ignored_annotations:
+                    type: array
+                    items:
+                      type: string
                   infrastructure_roles_secret_name:
                     type: string
                   infrastructure_roles_secrets:
@@ -215,12 +284,36 @@ spec:
                     type: object
                     additionalProperties:
                       type: string
+                  node_readiness_label_merge:
+                    type: string
+                    enum:
+                      - "AND"
+                      - "OR"
                   oauth_token_secret_name:
                     type: string
                     default: "postgresql-operator"
+                  pdb_master_label_selector:
+                    type: boolean
+                    default: true
                   pdb_name_format:
                     type: string
                     default: "postgres-{cluster}-pdb"
+                  persistent_volume_claim_retention_policy:
+                    type: object
+                    properties:
+                      when_deleted:
+                        type: string
+                        enum:
+                          - "delete"
+                          - "retain"
+                      when_scaled:
+                        type: string
+                        enum:
+                          - "delete"
+                          - "retain"
+                  pod_antiaffinity_preferred_during_scheduling:
+                    type: boolean
+                    default: false
                   pod_antiaffinity_topology_key:
                     type: string
                     default: "kubernetes.io/hostname"
@@ -254,6 +347,12 @@ spec:
                   secret_name_template:
                     type: string
                     default: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+                  share_pgsocket_with_sidecars:
+                    type: boolean
+                    default: false
+                  spilo_allow_privilege_escalation:
+                    type: boolean
+                    default: true
                   spilo_runasuser:
                     type: integer
                   spilo_runasgroup:
@@ -267,6 +366,7 @@ spec:
                     type: string
                     enum:
                       - "ebs"
+                      - "mixed"
                       - "pvc"
                       - "off"
                     default: "pvc"
@@ -282,30 +382,36 @@ spec:
                   default_cpu_limit:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "1"
                   default_cpu_request:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "100m"
                   default_memory_limit:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "500Mi"
                   default_memory_request:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "100Mi"
+                  max_cpu_request:
+                    type: string
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                  max_memory_request:
+                    type: string
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                   min_cpu_limit:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "250m"
                   min_memory_limit:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "250Mi"
               timeouts:
                 type: object
                 properties:
+                  patroni_api_check_interval:
+                    type: string
+                    default: "1s"
+                  patroni_api_check_timeout:
+                    type: string
+                    default: "5s"
                   pod_label_wait_timeout:
                     type: string
                     default: "10m"
@@ -337,7 +443,13 @@ spec:
                   enable_master_load_balancer:
                     type: boolean
                     default: true
+                  enable_master_pooler_load_balancer:
+                    type: boolean
+                    default: false
                   enable_replica_load_balancer:
+                    type: boolean
+                    default: false
+                  enable_replica_pooler_load_balancer:
                     type: boolean
                     default: false
                   external_traffic_policy:
@@ -348,8 +460,14 @@ spec:
                     default: "Cluster"
                   master_dns_name_format:
                     type: string
+                    default: "{cluster}.{namespace}.{hostedzone}"
+                  master_legacy_dns_name_format:
+                    type: string
                     default: "{cluster}.{team}.{hostedzone}"
                   replica_dns_name_format:
+                    type: string
+                    default: "{cluster}-repl.{namespace}.{hostedzone}"
+                  replica_legacy_dns_name_format:
                     type: string
                     default: "{cluster}-repl.{team}.{hostedzone}"
               aws_or_gcp:
@@ -375,6 +493,8 @@ spec:
                     type: string
                   log_s3_bucket:
                     type: string
+                  wal_az_storage_account:
+                    type: string
                   wal_gs_bucket:
                     type: string
                   wal_s3_bucket:
@@ -382,20 +502,44 @@ spec:
               logical_backup:
                 type: object
                 properties:
+                  logical_backup_azure_storage_account_name:
+                    type: string
+                  logical_backup_azure_storage_container:
+                    type: string
+                  logical_backup_azure_storage_account_key:
+                    type: string
+                  logical_backup_cpu_limit:
+                    type: string
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                  logical_backup_cpu_request:
+                    type: string
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.0"
+                    default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
                     type: string
                     default: "logical-backup-"
+                  logical_backup_memory_limit:
+                    type: string
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                  logical_backup_memory_request:
+                    type: string
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                   logical_backup_provider:
                     type: string
+                    enum:
+                      - "az"
+                      - "gcs"
+                      - "s3"
                     default: "s3"
                   logical_backup_s3_access_key_id:
                     type: string
                   logical_backup_s3_bucket:
+                    type: string
+                  logical_backup_s3_bucket_prefix:
                     type: string
                   logical_backup_s3_endpoint:
                     type: string
@@ -405,10 +549,14 @@ spec:
                     type: string
                   logical_backup_s3_sse:
                     type: string
+                  logical_backup_s3_retention_time:
+                    type: string
                   logical_backup_schedule:
                     type: string
                     pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
                     default: "30 00 * * *"
+                  logical_backup_cronjob_environment_secret:
+                    type: string
               debug:
                 type: object
                 properties:
@@ -428,6 +576,9 @@ spec:
                     type: boolean
                     default: true
                   enable_postgres_team_crd_superusers:
+                    type: boolean
+                    default: false
+                  enable_team_member_deprecation:
                     type: boolean
                     default: false
                   enable_team_superuser:
@@ -452,6 +603,10 @@ spec:
                       type: string
                     default:
                     - admin
+                    - cron_admin
+                  role_deletion_suffix:
+                    type: string
+                    default: "_deleted"
                   team_admin_role:
                     type: string
                     default: "admin"
@@ -513,7 +668,7 @@ spec:
                     default: "pooler"
                   connection_pooler_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-12"
+                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-32"
                   connection_pooler_max_db_connections:
                     type: integer
                     default: 60
@@ -530,19 +685,21 @@ spec:
                   connection_pooler_default_cpu_limit:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "1"
                   connection_pooler_default_cpu_request:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "500m"
                   connection_pooler_default_memory_limit:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "100Mi"
                   connection_pooler_default_memory_request:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "100Mi"
+              patroni:
+                type: object
+                properties:
+                  enable_patroni_failsafe_mode:
+                    type: boolean
+                    default: false
           status:
             type: object
             additionalProperties:

@@ -33,8 +33,8 @@ status page.
 Usually, the startup should only take up to 1 minute. If you feel the process
 got stuck click on the "Logs" button to inspect the operator logs. If the logs
 look fine, but the UI seems to got stuck, check if you are have configured the
-same [cluster name label](../ui/manifests/deployment.yaml#L45) like for the
-[operator](../manifests/configmap.yaml#L13).
+same [cluster name label](https://github.com/zalando/postgres-operator/blob/master/ui/manifests/deployment.yaml#L45) like for the
+[operator](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml#L13).
 
 From the "Status" field in the top menu you can also retrieve the logs and queue
 of each worker the operator is using. The number of concurrent workers can be

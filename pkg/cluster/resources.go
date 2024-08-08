@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	rollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update-required"
+	rollingUpdatePodAnnotationKey = "zalando-postgres-operator-rolling-update-required"
 )
 
 func (c *Cluster) listResources() error {
@@ -32,11 +32,13 @@ func (c *Cluster) listResources() error {
 	}
 
 	for _, obj := range c.Secrets {
-		c.logger.Infof("found secret: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("found secret: %q (uid: %q) namesapce: %s", util.NameFromMeta(obj.ObjectMeta), obj.UID, obj.ObjectMeta.Namespace)
 	}
 
-	for role, endpoint := range c.Endpoints {
-		c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+	if !c.patroniKubernetesUseConfigMaps() {
+		for role, endpoint := range c.Endpoints {
+			c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+		}
 	}
 
 	for role, service := range c.Services {
@@ -147,98 +149,6 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 	return nil
 }
 
-// setRollingUpdateFlagForStatefulSet sets the indicator or the rolling update requirement
-// in the StatefulSet annotation.
-func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, val bool, msg string) {
-	anno := sset.GetAnnotations()
-	if anno == nil {
-		anno = make(map[string]string)
-	}
-
-	anno[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
-	sset.SetAnnotations(anno)
-	c.logger.Debugf("set statefulset's rolling update annotation to %t: caller/reason %s", val, msg)
-}
-
-// applyRollingUpdateFlagforStatefulSet sets the rolling update flag for the cluster's StatefulSet
-// and applies that setting to the actual running cluster.
-func (c *Cluster) applyRollingUpdateFlagforStatefulSet(val bool) error {
-	c.setRollingUpdateFlagForStatefulSet(c.Statefulset, val, "applyRollingUpdateFlag")
-	sset, err := c.updateStatefulSetAnnotations(c.Statefulset.GetAnnotations())
-	if err != nil {
-		return err
-	}
-	c.Statefulset = sset
-	return nil
-}
-
-// getRollingUpdateFlagFromStatefulSet returns the value of the rollingUpdate flag from the passed
-// StatefulSet, reverting to the default value in case of errors
-func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *appsv1.StatefulSet, defaultValue bool) (flag bool) {
-	anno := sset.GetAnnotations()
-	flag = defaultValue
-
-	stringFlag, exists := anno[rollingUpdateStatefulsetAnnotationKey]
-	if exists {
-		var err error
-		if flag, err = strconv.ParseBool(stringFlag); err != nil {
-			c.logger.Warnf("error when parsing %q annotation for the statefulset %q: expected boolean value, got %q\n",
-				rollingUpdateStatefulsetAnnotationKey,
-				types.NamespacedName{Namespace: sset.Namespace, Name: sset.Name},
-				stringFlag)
-			flag = defaultValue
-		}
-	}
-	return flag
-}
-
-// mergeRollingUpdateFlagUsingCache returns the value of the rollingUpdate flag from the passed
-// statefulset, however, the value can be cleared if there is a cached flag in the cluster that
-// is set to false (the discrepancy could be a result of a failed StatefulSet update)
-func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *appsv1.StatefulSet) bool {
-	var (
-		cachedStatefulsetExists, clearRollingUpdateFromCache, podsRollingUpdateRequired bool
-	)
-
-	if c.Statefulset != nil {
-		// if we reset the rolling update flag in the statefulset structure in memory but didn't manage to update
-		// the actual object in Kubernetes for some reason we want to avoid doing an unnecessary update by relying
-		// on the 'cached' in-memory flag.
-		cachedStatefulsetExists = true
-		clearRollingUpdateFromCache = !c.getRollingUpdateFlagFromStatefulSet(c.Statefulset, true)
-		c.logger.Debugf("cached StatefulSet value exists, rollingUpdate flag is %t", clearRollingUpdateFromCache)
-	}
-
-	if podsRollingUpdateRequired = c.getRollingUpdateFlagFromStatefulSet(runningStatefulSet, false); podsRollingUpdateRequired {
-		if cachedStatefulsetExists && clearRollingUpdateFromCache {
-			c.logger.Infof("clearing the rolling update flag based on the cached information")
-			podsRollingUpdateRequired = false
-		} else {
-			c.logger.Infof("found a statefulset with an unfinished rolling update of the pods")
-		}
-	}
-	return podsRollingUpdateRequired
-}
-
-func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
-	c.logger.Debugf("patching statefulset annotations")
-	patchData, err := metaAnnotationsPatch(annotations)
-	if err != nil {
-		return nil, fmt.Errorf("could not form patch for the statefulset metadata: %v", err)
-	}
-	result, err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
-		context.TODO(),
-		c.Statefulset.Name,
-		types.MergePatchType,
-		[]byte(patchData),
-		metav1.PatchOptions{},
-		"")
-	if err != nil {
-		return nil, fmt.Errorf("could not patch statefulset annotations %q: %v", patchData, err)
-	}
-	return result, nil
-
-}
 func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
@@ -268,13 +178,6 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 		"")
 	if err != nil {
 		return fmt.Errorf("could not patch statefulset spec %q: %v", statefulSetName, err)
-	}
-
-	if newStatefulSet.Annotations != nil {
-		statefulSet, err = c.updateStatefulSetAnnotations(newStatefulSet.Annotations)
-		if err != nil {
-			return err
-		}
 	}
 
 	c.Statefulset = statefulSet
@@ -340,13 +243,17 @@ func (c *Cluster) deleteStatefulSet() error {
 	c.setProcessName("deleting statefulset")
 	c.logger.Debugln("deleting statefulset")
 	if c.Statefulset == nil {
-		return fmt.Errorf("there is no statefulset in the cluster")
+		c.logger.Debug("there is no statefulset in the cluster")
+		return nil
 	}
 
 	err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Delete(context.TODO(), c.Statefulset.Name, c.deleteOptions)
-	if err != nil {
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("statefulset %q has already been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
+	} else if err != nil {
 		return err
 	}
+
 	c.logger.Infof("statefulset %q has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	c.Statefulset = nil
 
@@ -354,8 +261,12 @@ func (c *Cluster) deleteStatefulSet() error {
 		return fmt.Errorf("could not delete pods: %v", err)
 	}
 
-	if err := c.deletePersistentVolumeClaims(); err != nil {
-		return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
+	if c.OpConfig.EnablePersistentVolumeClaimDeletion != nil && *c.OpConfig.EnablePersistentVolumeClaimDeletion {
+		if err := c.deletePersistentVolumeClaims(); err != nil {
+			return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
+		}
+	} else {
+		c.logger.Info("not deleting PersistentVolumeClaims because disabled in configuration")
 	}
 
 	return nil
@@ -374,82 +285,62 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 	return service, nil
 }
 
-func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error {
-	var (
-		svc *v1.Service
-		err error
-	)
+func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newService *v1.Service) (*v1.Service, error) {
+	var err error
+	svc := oldService
 
-	c.setProcessName("updating %v service", role)
+	serviceName := util.NameFromMeta(oldService.ObjectMeta)
+	match, reason := c.compareServices(oldService, newService)
+	if !match {
+		c.logServiceChanges(role, oldService, newService, false, reason)
+		c.setProcessName("updating %v service", role)
 
-	if c.Services[role] == nil {
-		return fmt.Errorf("there is no service in the cluster")
-	}
-
-	serviceName := util.NameFromMeta(c.Services[role].ObjectMeta)
-
-	// update the service annotation in order to propagate ELB notation.
-	if len(newService.ObjectMeta.Annotations) > 0 {
-		if annotationsPatchData, err := metaAnnotationsPatch(newService.ObjectMeta.Annotations); err == nil {
-			_, err = c.KubeClient.Services(serviceName.Namespace).Patch(
-				context.TODO(),
-				serviceName.Name,
-				types.MergePatchType,
-				[]byte(annotationsPatchData),
-				metav1.PatchOptions{},
-				"")
-
-			if err != nil {
-				return fmt.Errorf("could not replace annotations for the service %q: %v", serviceName, err)
-			}
-		} else {
-			return fmt.Errorf("could not form patch for the service metadata: %v", err)
+		// now, patch the service spec, but when disabling LoadBalancers do update instead
+		// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
+		oldServiceType := oldService.Spec.Type
+		newServiceType := newService.Spec.Type
+		if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
+			newService.ResourceVersion = oldService.ResourceVersion
+			newService.Spec.ClusterIP = oldService.Spec.ClusterIP
 		}
-	}
-
-	// now, patch the service spec, but when disabling LoadBalancers do update instead
-	// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
-	oldServiceType := c.Services[role].Spec.Type
-	newServiceType := newService.Spec.Type
-	if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
-		newService.ResourceVersion = c.Services[role].ResourceVersion
-		newService.Spec.ClusterIP = c.Services[role].Spec.ClusterIP
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
 		if err != nil {
-			return fmt.Errorf("could not update service %q: %v", serviceName, err)
-		}
-	} else {
-		patchData, err := specPatch(newService.Spec)
-		if err != nil {
-			return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
-		}
-
-		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(
-			context.TODO(), serviceName.Name, types.MergePatchType, patchData, metav1.PatchOptions{}, "")
-		if err != nil {
-			return fmt.Errorf("could not patch service %q: %v", serviceName, err)
+			return nil, fmt.Errorf("could not update service %q: %v", serviceName, err)
 		}
 	}
-	c.Services[role] = svc
 
-	return nil
+	if changed, _ := c.compareAnnotations(oldService.Annotations, newService.Annotations); changed {
+		patchData, err := metaAnnotationsPatch(newService.Annotations)
+		if err != nil {
+			return nil, fmt.Errorf("could not form patch for service %q annotations: %v", oldService.Name, err)
+		}
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(context.TODO(), newService.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not patch annotations for service %q: %v", oldService.Name, err)
+		}
+	}
+
+	return svc, nil
 }
 
 func (c *Cluster) deleteService(role PostgresRole) error {
 	c.logger.Debugf("deleting service %s", role)
 
-	service, ok := c.Services[role]
-	if !ok {
+	if c.Services[role] == nil {
 		c.logger.Debugf("No service for %s role was found, nothing to delete", role)
 		return nil
 	}
 
-	if err := c.KubeClient.Services(service.Namespace).Delete(context.TODO(), service.Name, c.deleteOptions); err != nil {
-		return err
+	if err := c.KubeClient.Services(c.Services[role].Namespace).Delete(context.TODO(), c.Services[role].Name, c.deleteOptions); err != nil {
+		if k8sutil.ResourceNotFound(err) {
+			c.logger.Debugf("%s service has already been deleted", role)
+		} else if err != nil {
+			return err
+		}
 	}
 
-	c.logger.Infof("%s service %q has been deleted", role, util.NameFromMeta(service.ObjectMeta))
-	c.Services[role] = nil
+	c.logger.Infof("%s service %q has been deleted", role, util.NameFromMeta(c.Services[role].ObjectMeta))
+	delete(c.Services, role)
 
 	return nil
 }
@@ -506,7 +397,7 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	return result
 }
 
-func (c *Cluster) createPodDisruptionBudget() (*policybeta1.PodDisruptionBudget, error) {
+func (c *Cluster) createPodDisruptionBudget() (*policyv1.PodDisruptionBudget, error) {
 	podDisruptionBudgetSpec := c.generatePodDisruptionBudget()
 	podDisruptionBudget, err := c.KubeClient.
 		PodDisruptionBudgets(podDisruptionBudgetSpec.Namespace).
@@ -520,7 +411,7 @@ func (c *Cluster) createPodDisruptionBudget() (*policybeta1.PodDisruptionBudget,
 	return podDisruptionBudget, nil
 }
 
-func (c *Cluster) updatePodDisruptionBudget(pdb *policybeta1.PodDisruptionBudget) error {
+func (c *Cluster) updatePodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
 	if c.PodDisruptionBudget == nil {
 		return fmt.Errorf("there is no pod disruption budget in the cluster")
 	}
@@ -543,16 +434,20 @@ func (c *Cluster) updatePodDisruptionBudget(pdb *policybeta1.PodDisruptionBudget
 func (c *Cluster) deletePodDisruptionBudget() error {
 	c.logger.Debug("deleting pod disruption budget")
 	if c.PodDisruptionBudget == nil {
-		return fmt.Errorf("there is no pod disruption budget in the cluster")
+		c.logger.Debug("there is no pod disruption budget in the cluster")
+		return nil
 	}
 
 	pdbName := util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta)
 	err := c.KubeClient.
 		PodDisruptionBudgets(c.PodDisruptionBudget.Namespace).
 		Delete(context.TODO(), c.PodDisruptionBudget.Name, c.deleteOptions)
-	if err != nil {
-		return fmt.Errorf("could not delete pod disruption budget: %v", err)
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta))
+	} else if err != nil {
+		return fmt.Errorf("could not delete PodDisruptionBudget: %v", err)
 	}
+
 	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta))
 	c.PodDisruptionBudget = nil
 
@@ -578,35 +473,37 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	c.setProcessName("deleting endpoint")
 	c.logger.Debugln("deleting endpoint")
 	if c.Endpoints[role] == nil {
-		return fmt.Errorf("there is no %s endpoint in the cluster", role)
+		c.logger.Debugf("there is no %s endpoint in the cluster", role)
+		return nil
 	}
 
-	if err := c.KubeClient.Endpoints(c.Endpoints[role].Namespace).Delete(
-		context.TODO(), c.Endpoints[role].Name, c.deleteOptions); err != nil {
-		return fmt.Errorf("could not delete endpoint: %v", err)
+	if err := c.KubeClient.Endpoints(c.Endpoints[role].Namespace).Delete(context.TODO(), c.Endpoints[role].Name, c.deleteOptions); err != nil {
+		if k8sutil.ResourceNotFound(err) {
+			c.logger.Debugf("%s endpoint has already been deleted", role)
+		} else if err != nil {
+			return fmt.Errorf("could not delete endpoint: %v", err)
+		}
 	}
 
-	c.logger.Infof("endpoint %q has been deleted", util.NameFromMeta(c.Endpoints[role].ObjectMeta))
-
-	c.Endpoints[role] = nil
+	c.logger.Infof("%s endpoint %q has been deleted", role, util.NameFromMeta(c.Endpoints[role].ObjectMeta))
+	delete(c.Endpoints, role)
 
 	return nil
 }
 
 func (c *Cluster) deleteSecrets() error {
 	c.setProcessName("deleting secrets")
-	var errors []string
-	errorCount := 0
+	errors := make([]string, 0)
+
 	for uid, secret := range c.Secrets {
 		err := c.deleteSecret(uid, *secret)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("%v", err))
-			errorCount++
 		}
 	}
 
-	if errorCount > 0 {
-		return fmt.Errorf("could not delete all secrets: %v", errors)
+	if len(errors) > 0 {
+		return fmt.Errorf("could not delete all secrets: %v", strings.Join(errors, `', '`))
 	}
 
 	return nil
@@ -617,11 +514,13 @@ func (c *Cluster) deleteSecret(uid types.UID, secret v1.Secret) error {
 	secretName := util.NameFromMeta(secret.ObjectMeta)
 	c.logger.Debugf("deleting secret %q", secretName)
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
-	if err != nil {
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("secret %q has already been deleted", secretName)
+	} else if err != nil {
 		return fmt.Errorf("could not delete secret %q: %v", secretName, err)
 	}
 	c.logger.Infof("secret %q has been deleted", secretName)
-	c.Secrets[uid] = nil
+	delete(c.Secrets, uid)
 
 	return nil
 }
@@ -649,7 +548,7 @@ func (c *Cluster) createLogicalBackupJob() (err error) {
 	return nil
 }
 
-func (c *Cluster) patchLogicalBackupJob(newJob *batchv1beta1.CronJob) error {
+func (c *Cluster) patchLogicalBackupJob(newJob *batchv1.CronJob) error {
 	c.setProcessName("patching logical backup job")
 
 	patchData, err := specPatch(newJob.Spec)
@@ -676,7 +575,14 @@ func (c *Cluster) deleteLogicalBackupJob() error {
 
 	c.logger.Info("removing the logical backup job")
 
-	return c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(context.TODO(), c.getLogicalBackupJobName(), c.deleteOptions)
+	err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(context.TODO(), c.getLogicalBackupJobName(), c.deleteOptions)
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("logical backup cron job %q has already been deleted", c.getLogicalBackupJobName())
+	} else if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // GetServiceMaster returns cluster's kubernetes master Service
@@ -694,7 +600,7 @@ func (c *Cluster) GetEndpointMaster() *v1.Endpoints {
 	return c.Endpoints[Master]
 }
 
-// GetEndpointReplica returns cluster's kubernetes master Endpoint
+// GetEndpointReplica returns cluster's kubernetes replica Endpoint
 func (c *Cluster) GetEndpointReplica() *v1.Endpoints {
 	return c.Endpoints[Replica]
 }
@@ -705,6 +611,6 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 }
 
 // GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget
-func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
+func (c *Cluster) GetPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
 }

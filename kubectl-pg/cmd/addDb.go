@@ -23,13 +23,15 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"log"
 )
 
 // addDbCmd represents the addDb command
@@ -62,14 +64,14 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 	}
 
 	namespace := getCurrentNamespace()
-	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
+	postgresql, err := postgresConfig.Postgresqls(namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var dbOwnerExists bool
 	dbUsers := postgresql.Spec.Users
-	for key, _ := range dbUsers {
+	for key := range dbUsers {
 		if key == dbOwner {
 			dbOwnerExists = true
 		}
@@ -84,7 +86,7 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 		log.Fatal("The provided db-name is reserved by postgres")
 	}
 
-	updatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name, types.MergePatchType, patch, "")
+	updatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(context.TODO(), postgresql.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}

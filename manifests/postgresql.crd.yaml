@@ -23,7 +23,7 @@ spec:
     additionalPrinterColumns:
     - name: Team
       type: string
-      description: Team responsible for Postgres CLuster
+      description: Team responsible for Postgres cluster
       jsonPath: .spec.teamId
     - name: Version
       type: string
@@ -85,9 +85,13 @@ spec:
                     - mountPath
                     - volumeSource
                   properties:
+                    isSubPathExpr:
+                      type: boolean
                     name:
                       type: string
                     mountPath:
+                      type: string
+                    subPath:
                       type: string
                     targetContainers:
                       type: array
@@ -97,8 +101,6 @@ spec:
                     volumeSource:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-                    subPath:
-                      type: string
               allowedSourceRanges:
                 type: array
                 nullable: true
@@ -145,18 +147,12 @@ spec:
                       - "transaction"
                   numberOfInstances:
                     type: integer
-                    minimum: 2
+                    minimum: 1
                   resources:
                     type: object
-                    required:
-                      - requests
-                      - limits
                     properties:
                       limits:
                         type: object
-                        required:
-                          - cpu
-                          - memory
                         properties:
                           cpu:
                             type: string
@@ -166,9 +162,6 @@ spec:
                             pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                       requests:
                         type: object
-                        required:
-                          - cpu
-                          - memory
                         properties:
                           cpu:
                             type: string
@@ -206,12 +199,23 @@ spec:
                 type: boolean
               enableMasterLoadBalancer:
                 type: boolean
+              enableMasterPoolerLoadBalancer:
+                type: boolean
               enableReplicaLoadBalancer:
+                type: boolean
+              enableReplicaPoolerLoadBalancer:
                 type: boolean
               enableShmVolume:
                 type: boolean
-              init_containers:  # deprecated
+              env:
                 type: array
+                nullable: true
+                items:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+              init_containers:
+                type: array
+                description: deprecated
                 nullable: true
                 items:
                   type: object
@@ -222,6 +226,8 @@ spec:
                 items:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+              logicalBackupRetention:
+                type: string
               logicalBackupSchedule:
                 type: string
                 pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
@@ -230,179 +236,10 @@ spec:
                 items:
                   type: string
                   pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
-              numberOfInstances:
-                type: integer
-                minimum: 0
-              patroni:
-                type: object
-                properties:
-                  initdb:
-                    type: object
-                    additionalProperties:
-                      type: string
-                  loop_wait:
-                    type: integer
-                  maximum_lag_on_failover:
-                    type: integer
-                  pg_hba:
-                    type: array
-                    items:
-                      type: string
-                  retry_timeout:
-                    type: integer
-                  slots:
-                    type: object
-                    additionalProperties:
-                      type: object
-                      additionalProperties:
-                        type: string
-                  synchronous_mode:
-                    type: boolean
-                  synchronous_mode_strict:
-                    type: boolean
-                  ttl:
-                    type: integer
-              podAnnotations:
+              masterServiceAnnotations:
                 type: object
                 additionalProperties:
                   type: string
-              pod_priority_class_name:  # deprecated
-                type: string
-              podPriorityClassName:
-                type: string
-              postgresql:
-                type: object
-                required:
-                  - version
-                properties:
-                  version:
-                    type: string
-                    enum:
-                      - "9.3"
-                      - "9.4"
-                      - "9.5"
-                      - "9.6"
-                      - "10"
-                      - "11"
-                      - "12"
-                      - "13"
-                  parameters:
-                    type: object
-                    additionalProperties:
-                      type: string
-              preparedDatabases:
-                type: object
-                additionalProperties:
-                  type: object
-                  properties:
-                    defaultUsers:
-                      type: boolean
-                    extensions:
-                      type: object
-                      additionalProperties:
-                        type: string
-                    schemas:
-                      type: object
-                      additionalProperties:
-                        type: object
-                        properties:
-                          defaultUsers:
-                            type: boolean
-                          defaultRoles:
-                            type: boolean
-              replicaLoadBalancer:  # deprecated
-                type: boolean
-              resources:
-                type: object
-                required:
-                  - requests
-                  - limits
-                properties:
-                  limits:
-                    type: object
-                    required:
-                      - cpu
-                      - memory
-                    properties:
-                      cpu:
-                        type: string
-                        # Decimal natural followed by m, or decimal natural followed by
-                        # dot followed by up to three decimal digits.
-                        #
-                        # This is because the Kubernetes CPU resource has millis as the
-                        # maximum precision.  The actual values are checked in code
-                        # because the regular expression would be huge and horrible and
-                        # not very helpful in validation error messages; this one checks
-                        # only the format of the given number.
-                        #
-                        # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
-                        pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                        # Note: the value specified here must not be zero or be lower
-                        # than the corresponding request.
-                      memory:
-                        type: string
-                        # You can express memory as a plain integer or as a fixed-point
-                        # integer using one of these suffixes: E, P, T, G, M, k. You can
-                        # also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
-                        #
-                        # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
-                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                        # Note: the value specified here must not be zero or be higher
-                        # than the corresponding limit.
-                  requests:
-                    type: object
-                    required:
-                      - cpu
-                      - memory
-                    properties:
-                      cpu:
-                        type: string
-                        pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                      memory:
-                        type: string
-                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-              schedulerName:
-                type: string
-              serviceAnnotations:
-                type: object
-                additionalProperties:
-                  type: string
-              sidecars:
-                type: array
-                nullable: true
-                items:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
-              spiloRunAsUser:
-                type: integer
-              spiloRunAsGroup:
-                type: integer
-              spiloFSGroup:
-                type: integer
-              standby:
-                type: object
-                required:
-                  - s3_wal_path
-                properties:
-                  s3_wal_path:
-                    type: string
-              teamId:
-                type: string
-              tls:
-                type: object
-                required:
-                  - secretName
-                properties:
-                  secretName:
-                    type: string
-                  certificateFile:
-                    type: string
-                  privateKeyFile:
-                    type: string
-                  caFile:
-                    type: string
-                  caSecretName:
-                    type: string
               nodeAffinity:
                 type: object
                 properties:
@@ -411,8 +248,8 @@ spec:
                     items:
                       type: object
                       required:
-                      - weight
                       - preference
+                      - weight
                       properties:
                         preference:
                           type: object
@@ -494,14 +331,243 @@ spec:
                                     type: array
                                     items:
                                       type: string
-              tolerations:
+              numberOfInstances:
+                type: integer
+                minimum: 0
+              patroni:
+                type: object
+                properties:
+                  failsafe_mode:
+                    type: boolean
+                  initdb:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  loop_wait:
+                    type: integer
+                  maximum_lag_on_failover:
+                    type: integer
+                  pg_hba:
+                    type: array
+                    items:
+                      type: string
+                  retry_timeout:
+                    type: integer
+                  slots:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: string
+                  synchronous_mode:
+                    type: boolean
+                  synchronous_mode_strict:
+                    type: boolean
+                  synchronous_node_count:
+                    type: integer
+                  ttl:
+                    type: integer
+              podAnnotations:
+                type: object
+                additionalProperties:
+                  type: string
+              pod_priority_class_name:
+                type: string
+                description: deprecated
+              podPriorityClassName:
+                type: string
+              postgresql:
+                type: object
+                required:
+                  - version
+                properties:
+                  version:
+                    type: string
+                    enum:
+                      - "11"
+                      - "12"
+                      - "13"
+                      - "14"
+                      - "15"
+                      - "16"
+                  parameters:
+                    type: object
+                    additionalProperties:
+                      type: string
+              preparedDatabases:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    defaultUsers:
+                      type: boolean
+                    extensions:
+                      type: object
+                      additionalProperties:
+                        type: string
+                    schemas:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          defaultUsers:
+                            type: boolean
+                          defaultRoles:
+                            type: boolean
+                    secretNamespace:
+                      type: string
+              replicaLoadBalancer:
+                type: boolean
+                description: deprecated
+              replicaServiceAnnotations:
+                type: object
+                additionalProperties:
+                  type: string
+              resources:
+                type: object
+                properties:
+                  limits:
+                    type: object
+                    properties:
+                      cpu:
+                        type: string
+                        # Decimal natural followed by m, or decimal natural followed by
+                        # dot followed by up to three decimal digits.
+                        #
+                        # This is because the Kubernetes CPU resource has millis as the
+                        # maximum precision.  The actual values are checked in code
+                        # because the regular expression would be huge and horrible and
+                        # not very helpful in validation error messages; this one checks
+                        # only the format of the given number.
+                        #
+                        # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+                        pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                        # Note: the value specified here must not be zero or be lower
+                        # than the corresponding request.
+                      memory:
+                        type: string
+                        # You can express memory as a plain integer or as a fixed-point
+                        # integer using one of these suffixes: E, P, T, G, M, k. You can
+                        # also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
+                        #
+                        # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                        # Note: the value specified here must not be zero or be higher
+                        # than the corresponding limit.
+                      hugepages-2Mi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-1Gi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                  requests:
+                    type: object
+                    properties:
+                      cpu:
+                        type: string
+                        pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                      memory:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-2Mi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      hugepages-1Gi:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+              schedulerName:
+                type: string
+              serviceAnnotations:
+                type: object
+                additionalProperties:
+                  type: string
+              sidecars:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+              spiloRunAsUser:
+                type: integer
+              spiloRunAsGroup:
+                type: integer
+              spiloFSGroup:
+                type: integer
+              standby:
+                type: object
+                properties:
+                  s3_wal_path:
+                    type: string
+                  gs_wal_path:
+                    type: string
+                  standby_host:
+                    type: string
+                  standby_port:
+                    type: string
+                oneOf:
+                - required:
+                  - s3_wal_path
+                - required:
+                  - gs_wal_path
+                - required:
+                  - standby_host
+              streams:
                 type: array
                 items:
                   type: object
                   required:
-                    - key
-                    - operator
-                    - effect
+                    - applicationId
+                    - database
+                    - tables
+                  properties:
+                    applicationId:
+                      type: string
+                    batchSize:
+                      type: integer
+                    database:
+                      type: string
+                    enableRecovery:
+                      type: boolean
+                    filter:
+                      type: object
+                      additionalProperties:
+                        type: string
+                    tables:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        required:
+                          - eventType
+                        properties:
+                          eventType:
+                            type: string
+                          idColumn:
+                            type: string
+                          payloadColumn:
+                            type: string
+                          recoveryEventType:
+                            type: string
+              teamId:
+                type: string
+              tls:
+                type: object
+                required:
+                  - secretName
+                properties:
+                  secretName:
+                    type: string
+                  certificateFile:
+                    type: string
+                  privateKeyFile:
+                    type: string
+                  caFile:
+                    type: string
+                  caSecretName:
+                    type: string
+              tolerations:
+                type: array
+                items:
+                  type: object
                   properties:
                     key:
                       type: string
@@ -520,14 +586,14 @@ spec:
                         - PreferNoSchedule
                     tolerationSeconds:
                       type: integer
-              useLoadBalancer:  # deprecated
+              useLoadBalancer:
                 type: boolean
+                description: deprecated
               users:
                 type: object
                 additionalProperties:
                   type: array
                   nullable: true
-                  description: "Role flags specified here must not contradict each other"
                   items:
                     type: string
                     enum:
@@ -559,11 +625,57 @@ spec:
                     - SUPERUSER
                     - nosuperuser
                     - NOSUPERUSER
+              usersIgnoringSecretRotation:
+                type: array
+                nullable: true
+                items:
+                  type: string
+              usersWithInPlaceSecretRotation:
+                type: array
+                nullable: true
+                items:
+                  type: string
+              usersWithSecretRotation:
+                type: array
+                nullable: true
+                items:
+                  type: string
               volume:
                 type: object
                 required:
                   - size
                 properties:
+                  isSubPathExpr:
+                    type: boolean
+                  iops:
+                    type: integer
+                  selector:
+                    type: object
+                    properties:
+                      matchExpressions:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - key
+                            - operator
+                          properties:
+                            key:
+                              type: string
+                            operator:
+                              type: string
+                              enum:
+                                - DoesNotExist
+                                - Exists
+                                - In
+                                - NotIn
+                            values:
+                              type: array
+                              items:
+                                type: string
+                      matchLabels:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
                   size:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
@@ -572,6 +684,8 @@ spec:
                     type: string
                   subPath:
                     type: string
+                  throughput:
+                    type: integer
           status:
             type: object
             additionalProperties:

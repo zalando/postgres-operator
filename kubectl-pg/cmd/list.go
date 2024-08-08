@@ -23,6 +23,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -70,8 +71,7 @@ func list(allNamespaces bool, namespace string) {
 		log.Fatal(err)
 	}
 
-	var listPostgres *v1.PostgresqlList
-	listPostgres, err = postgresConfig.Postgresqls(namespace).List(metav1.ListOptions{})
+	listPostgres, err := postgresConfig.Postgresqls(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}

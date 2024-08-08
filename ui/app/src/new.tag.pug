@@ -18,7 +18,7 @@ new
         ol.breadcrumb
 
           li.breadcrumb-item
-            a(href='/#/new')
+            a(href='./#/new')
               | New PostgreSQL cluster
 
     .row.text-center(if='{ !creating }')
@@ -64,7 +64,7 @@ new
 
               a.btn.btn-small.btn-warning(
                 if='{ clusterExists }'
-                href='/#/status/{ namespace.state }/{ team }-{ name }'
+                href='./#/status/{ namespace.state }/{ name }'
               )
                 | Cluster exists (show status)
 
@@ -137,10 +137,10 @@ new
                 input.form-control(
                   ref='name'
                   type='text'
-                  placeholder='new-cluster (can be { 53 - team.length - 1 } characters long)'
+                  placeholder='new-cluster (can be 53 characters long)'
                   title='Database cluster name, must be a valid hostname component'
                   pattern='[a-z0-9]+[a-z0-9\-]+[a-z0-9]+'
-                  maxlength='{ 53 - team.length - 1 }'
+                  maxlength=53
                   required
                   value='{ name }'
                   onchange='{ nameChange }'
@@ -216,40 +216,73 @@ new
                 )
 
             tr(if='{ [undefined, true].includes(config.master_load_balancer_visible) }')
-              td Master load balancer
+              td Enable load balancer
               td
-                label
-                  input(
-                    type='checkbox'
-                    value='{ enableMasterLoadBalancer }'
-                    onchange='{ toggleEnableMasterLoadBalancer }'
-                  )
-                  |
-                  | Enable master ELB
+                ul.ips
+                  li
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableMasterLoadBalancer }'
+                        onchange='{ toggleEnableMasterLoadBalancer }'
+                      )
+                      |
+                      | Master
+                  li(if='{ [undefined, true].includes(config.replica_load_balancer_visible) && instanceCount > 1 }')
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableReplicaLoadBalancer }'
+                        onchange='{ toggleEnableReplicaLoadBalancer }'
+                      )
+                      |
+                      | Replica
 
-            tr(if='{ [undefined, true].includes(config.replica_load_balancer_visible) }')
-              td Replica load balancer
+            tr(if='{ [undefined, true].includes(config.connection_pooler_visible) }')
+              td Enable connection pooler
               td
-                label
-                  input(
-                    type='checkbox'
-                    value='{ enableReplicaLoadBalancer }'
-                    onchange='{ toggleEnableReplicaLoadBalancer }'
-                  )
-                  |
-                  | Enable replica ELB
+                ul.ips
+                  li
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableConnectionPooler }'
+                        onchange='{ toggleEnableConnectionPooler }'
+                      )
+                      |
+                      | Master
+                  li(if='{ [undefined, true].includes(config.replica_connection_pooler_visible) && instanceCount > 1 }')
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableReplicaConnectionPooler }'
+                        onchange='{ toggleEnableReplicaConnectionPooler }'
+                      )
+                      |
+                      | Replica
 
-            tr
-              td Enable Connection Pool
+            tr(if='{ [undefined, true].includes(config.master_pooler_load_balancer_visible) }')
+              td Enable connection pooler load balancer
               td
-                label
-                  input(
-                    type='checkbox'
-                    value='{ enableConnectionPooler }'
-                    onchange='{ toggleEnableConnectionPooler }'
-                  )
-                  |
-                  | Enable Connection Pool (using PGBouncer)
+                ul.ips
+                  li
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableMasterPoolerLoadBalancer }'
+                        onchange='{ toggleEnableMasterPoolerLoadBalancer }'
+                      )
+                      |
+                      | Master
+                  li(if='{ [undefined, true].includes(config.replica_pooler_load_balancer_visible) && instanceCount > 1 }')
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ enableReplicaPoolerLoadBalancer }'
+                        onchange='{ toggleEnableReplicaPoolerLoadBalancer }'
+                      )
+                      |
+                      | Replica
 
             tr
               td Volume size
@@ -266,6 +299,50 @@ new
                   )
                   .input-group-addon
                     .input-units Gi
+
+            tr
+              td storageClass
+              td
+                .input-group
+                  input.form-control(
+                    ref='volumeStorageClass'
+                    type='text'
+                    value='{ volumeStorageClass }'
+                    onchange='{ storageClassChange }'
+                    onkeyup='{ storageClassChange }'
+                  )
+
+            tr
+              td 
+              td Specify Iops and Throughput only if you need more than the default 3000 Iops and 125Mb/s EBS provides.
+
+            tr
+              td Iops
+              td
+                .input-group
+                  input.form-control(
+                    ref='iops'
+                    type='number'
+                    value='{ iops }'
+                    onchange='{ iopsChange }'
+                    onkeyup='{ iopsChange }'
+                  )
+                  .input-group-addon
+                    .input-units
+
+            tr
+              td Throughput
+              td
+                .input-group
+                  input.form-control(
+                    ref='throughput'
+                    type='number'
+                    value='{ throughput }'
+                    onchange='{ throughputChange }'
+                    onkeyup='{ throughputChange }'
+                  )
+                  .input-group-addon
+                    .input-units MB/s
 
             tr(if='{ config.users_visible }')
               td
@@ -489,7 +566,7 @@ new
       apiVersion: "acid.zalan.do/v1"
 
       metadata:
-        name: "{{ team }}-{{ name }}"
+        name: "{{ name }}"
         namespace: "{{ namespace.state }}"
         labels:
           team: {{ team }}
@@ -508,8 +585,20 @@ new
         {{#if enableConnectionPooler}}
         enableConnectionPooler: true
         {{/if}}
+        {{#if enableReplicaConnectionPooler}}
+        enableReplicaConnectionPooler: true
+        {{/if}}
+        {{#if enableMasterPoolerLoadBalancer}}
+        enableMasterPoolerLoadBalancer: true
+        {{/if}}
+        {{#if enableReplicaPoolerLoadBalancer}}
+        enableReplicaPoolerLoadBalancer: true
+        {{/if}}
         volume:
-          size: "{{ volumeSize }}Gi"
+          size: "{{ volumeSize }}Gi"{{#if volumeStorageClass}}
+          storageClass: "{{ volumeStorageClass }}"{{/if}}{{#if iops}}
+          iops: {{ iops }}{{/if}}{{#if throughput}}
+          throughput: {{ throughput }}{{/if}}
         {{#if users}}
         users:{{#each users}}
           {{ state }}: []{{/each}}{{/if}}
@@ -559,7 +648,13 @@ new
         enableMasterLoadBalancer: this.enableMasterLoadBalancer,
         enableReplicaLoadBalancer: this.enableReplicaLoadBalancer,
         enableConnectionPooler: this.enableConnectionPooler,
+        enableReplicaConnectionPooler: this.enableReplicaConnectionPooler,
+        enableMasterPoolerLoadBalancer: this.enableMasterPoolerLoadBalancer,
+        enableReplicaPoolerLoadBalancer: this.enableReplicaPoolerLoadBalancer,
         volumeSize: this.volumeSize,
+        volumeStorageClass: this.volumeStorageClass,
+        iops: this.iops,
+        throughput: this.throughput,
         users: this.users.valids,
         databases: this.databases.valids,
         ranges: this.ranges,
@@ -620,20 +715,43 @@ new
       this.enableConnectionPooler = !this.enableConnectionPooler
     }
 
+    this.toggleEnableReplicaConnectionPooler = e => {
+      this.enableReplicaConnectionPooler = !this.enableReplicaConnectionPooler
+    }
+
+    this.toggleEnableMasterPoolerLoadBalancer = e => {
+      this.enableMasterPoolerLoadBalancer = !this.enableMasterPoolerLoadBalancer
+    }
+
+    this.toggleEnableReplicaPoolerLoadBalancer = e => {
+      this.enableReplicaPoolerLoadBalancer = !this.enableReplicaPoolerLoadBalancer
+    }
+
     this.volumeChange = e => {
       this.volumeSize = +e.target.value
+    }
+
+    this.storageClassChange = e => {
+      this.volumeStorageClass = e.target.value
+    }
+
+    this.iopsChange = e => {
+      this.iops = +e.target.value
+    }
+
+    this.throughputChange = e => {
+      this.throughput = +e.target.value
     }
 
     this.updateDNSName = () => {
       this.dnsName = this.config.dns_format_string.format(
         this.name,
-        this.team,
         this.namespace.state,
       )
     }
 
     this.updateClusterName = () => {
-      this.clusterName = (this.team + '-' + this.name).toLowerCase()
+      this.clusterName = (this.name).toLowerCase()
       this.checkClusterExists()
       this.updateDNSName()
     }
@@ -650,12 +768,17 @@ new
 
     this.instanceCountChange = e => {
       this.instanceCount = +e.target.value
+      if (this.instanceCount < 2) {	
+        this.enableReplicaLoadBalancer = false
+        this.enableReplicaConnectionPooler = false
+        this.enableReplicaPoolerLoadBalancer = false
+      }
     }
 
     this.checkClusterExists = () => (
       jQuery
       .get(
-        '/postgresqls/'
+        './postgresqls/'
         + this.namespace.state
         + '/'
         + this.clusterName
@@ -670,14 +793,14 @@ new
     }
 
     this.requestCreate = e => {
-      jsonPayload = JSON.stringify(yamlParser.safeLoad(this.getYAML()))
+      jsonPayload = JSON.stringify(yamlParser.load(this.getYAML()))
 
       this.creating = true
       this.update()
 
       jQuery.ajax({
         type: 'POST',
-        url: '/create-cluster',
+        url: './create-cluster',
         contentType:'application/json',
         data: jsonPayload,
         processData: false,
@@ -907,14 +1030,18 @@ new
         this.team = ''
       }
 
-      this.clusterName = (this.name + '-' + this.team).toLowerCase()
+      this.clusterName = (this.name + '-').toLowerCase()
       this.volumeSize = 10
+      this.volumeStorageClass = ''
       this.instanceCount = 1
       this.ranges = {}
       this.odd = ''
       this.enableMasterLoadBalancer = false
       this.enableReplicaLoadBalancer = false
       this.enableConnectionPooler = false
+      this.enableReplicaConnectionPooler = false
+      this.enableMasterPoolerLoadBalancer = false
+      this.enableReplicaPoolerLoadBalancer = false
 
       this.postgresqlVersion = this.postgresqlVersion = (
         this.config.postgresql_versions[0]

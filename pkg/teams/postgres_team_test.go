@@ -9,8 +9,6 @@ import (
 )
 
 var (
-	True       = true
-	False      = false
 	pgTeamList = acidv1.PostgresTeamList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "List",
@@ -44,11 +42,57 @@ var (
 					AdditionalMembers:        map[string][]string{"acid": []string{"batman"}},
 				},
 			},
+			{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "PostgresTeam",
+					APIVersion: "acid.zalan.do/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "teamD",
+				},
+				Spec: acidv1.PostgresTeamSpec{
+					AdditionalSuperuserTeams: map[string][]string{},
+					AdditionalTeams:          map[string][]string{"teamA": []string{"teamD"}, "teamC": []string{"teamD"}, "teamD": []string{"teamA", "teamB", "teamC"}},
+					AdditionalMembers:        map[string][]string{"acid": []string{"batman"}},
+				},
+			},
+		},
+	}
+	pgTeamMap = PostgresTeamMap{
+		"teamA": {
+			AdditionalSuperuserTeams: []string{"teamB", "team24x7"},
+			AdditionalTeams:          []string{"teamC", "teamD"},
+			AdditionalMembers:        []string{},
+		},
+		"teamB": {
+			AdditionalSuperuserTeams: []string{"teamA", "teamC", "team24x7"},
+			AdditionalTeams:          []string{},
+			AdditionalMembers:        []string{"drno"},
+		},
+		"teamC": {
+			AdditionalSuperuserTeams: []string{"team24x7"},
+			AdditionalTeams:          []string{"teamA", "teamB", "teamD", "acid"},
+			AdditionalMembers:        []string{},
+		},
+		"teamD": {
+			AdditionalSuperuserTeams: []string{},
+			AdditionalTeams:          []string{"teamA", "teamB", "teamC"},
+			AdditionalMembers:        []string{},
+		},
+		"team24x7": {
+			AdditionalSuperuserTeams: []string{},
+			AdditionalTeams:          []string{},
+			AdditionalMembers:        []string{"optimusprime"},
+		},
+		"acid": {
+			AdditionalSuperuserTeams: []string{},
+			AdditionalTeams:          []string{},
+			AdditionalMembers:        []string{"batman"},
 		},
 	}
 )
 
-// PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
+// TestLoadingPostgresTeamCRD PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
 func TestLoadingPostgresTeamCRD(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -59,33 +103,7 @@ func TestLoadingPostgresTeamCRD(t *testing.T) {
 		{
 			"Check that CRD is imported correctly into the internal format",
 			pgTeamList,
-			PostgresTeamMap{
-				"teamA": {
-					AdditionalSuperuserTeams: []string{"teamB", "team24x7"},
-					AdditionalTeams:          []string{"teamC"},
-					AdditionalMembers:        []string{},
-				},
-				"teamB": {
-					AdditionalSuperuserTeams: []string{"teamA", "teamC", "team24x7"},
-					AdditionalTeams:          []string{},
-					AdditionalMembers:        []string{"drno"},
-				},
-				"teamC": {
-					AdditionalSuperuserTeams: []string{"team24x7"},
-					AdditionalTeams:          []string{"teamA", "teamB", "acid"},
-					AdditionalMembers:        []string{},
-				},
-				"team24x7": {
-					AdditionalSuperuserTeams: []string{},
-					AdditionalTeams:          []string{},
-					AdditionalMembers:        []string{"optimusprime"},
-				},
-				"acid": {
-					AdditionalSuperuserTeams: []string{},
-					AdditionalTeams:          []string{},
-					AdditionalMembers:        []string{"batman"},
-				},
-			},
+			pgTeamMap,
 			"Mismatch between PostgresTeam CRD and internal map",
 		},
 	}
@@ -120,14 +138,14 @@ func TestGetAdditionalTeams(t *testing.T) {
 			"Check that additional teams are returned",
 			"teamA",
 			false,
-			[]string{"teamC"},
+			[]string{"teamC", "teamD"},
 			"GetAdditionalTeams returns wrong list",
 		},
 		{
 			"Check that additional teams are returned incl. transitive teams",
 			"teamA",
 			true,
-			[]string{"teamC", "teamB", "acid"},
+			[]string{"teamC", "teamD", "teamB", "acid"},
 			"GetAdditionalTeams returns wrong list",
 		},
 		{

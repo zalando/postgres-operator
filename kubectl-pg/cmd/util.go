@@ -23,6 +23,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -98,9 +99,9 @@ func confirmAction(clusterName string, namespace string) {
 
 func getPodName(clusterName string, master bool, replicaNumber string) string {
 	config := getConfig()
-	client, er := kubernetes.NewForConfig(config)
-	if er != nil {
-		log.Fatal(er)
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
@@ -108,7 +109,7 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 		log.Fatal(err)
 	}
 
-	postgresCluster, err := postgresConfig.Postgresqls(getCurrentNamespace()).Get(clusterName, metav1.GetOptions{})
+	postgresCluster, err := postgresConfig.Postgresqls(getCurrentNamespace()).Get(context.TODO(), clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -119,7 +120,7 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 	replica := clusterName + "-" + replicaNumber
 
 	for ins := 0; ins < int(numOfInstances); ins++ {
-		pod, err := client.CoreV1().Pods(getCurrentNamespace()).Get(clusterName+"-"+strconv.Itoa(ins), metav1.GetOptions{})
+		pod, err := client.CoreV1().Pods(getCurrentNamespace()).Get(context.TODO(), clusterName+"-"+strconv.Itoa(ins), metav1.GetOptions{})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -143,13 +144,13 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 
 func getPostgresOperator(k8sClient *kubernetes.Clientset) *v1.Deployment {
 	var operator *v1.Deployment
-	operator, err := k8sClient.AppsV1().Deployments(getCurrentNamespace()).Get(OperatorName, metav1.GetOptions{})
+	operator, err := k8sClient.AppsV1().Deployments(getCurrentNamespace()).Get(context.TODO(), OperatorName, metav1.GetOptions{})
 	if err == nil {
 		return operator
 	}
 
 	allDeployments := k8sClient.AppsV1().Deployments("")
-	listDeployments, err := allDeployments.List(metav1.ListOptions{})
+	listDeployments, err := allDeployments.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}

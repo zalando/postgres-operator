@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
   name: {{ template "postgres-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -52,8 +53,21 @@ spec:
         - name: CONTROLLER_ID
           value: {{ template "postgres-operator.controllerID" . }}
       {{- end }}
+      {{- if .Values.extraEnvs }}
+      {{- .Values.extraEnvs | toYaml | nindent 12 }}
+      {{- end }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
+        securityContext:
+{{ toYaml .Values.securityContext | indent 10 }}
+        {{- if .Values.readinessProbe }}
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: {{ .Values.configLoggingRestApi.api_port }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+        {{- end }}
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
 {{ toYaml .Values.imagePullSecrets | indent 8 }}

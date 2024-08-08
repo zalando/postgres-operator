@@ -39,6 +39,13 @@ Create a pod service account name.
 {{- end -}}
 
 {{/*
+Create a pod priority class name.
+*/}}
+{{- define "postgres-pod.priorityClassName" -}}
+{{ default (printf "%s-%v" (include "postgres-operator.fullname" .) "pod") .Values.podPriorityClassName.name }}
+{{- end -}}
+
+{{/*
 Create a controller ID.
 */}}
 {{- define "postgres-operator.controllerID" -}}
@@ -51,3 +58,22 @@ Create chart name and version as used by the chart label.
 {{- define "postgres-operator.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+Flatten nested config options when ConfigMap is used as ConfigTarget
+*/}}
+{{- define "flattenValuesForConfigMap" }}
+{{- range $key, $value := . }}
+    {{- if kindIs "slice" $value }}
+{{ $key }}: {{ join "," $value | quote }}
+    {{- else if kindIs "map" $value }}
+        {{- $list := list }}
+        {{- range $subKey, $subValue := $value }}
+            {{- $list = append $list (printf "%s:%s" $subKey $subValue) }}
+        {{- end }}
+{{ $key }}: {{ join "," $list | quote }}
+    {{- else }}
+{{ $key }}: {{ $value | quote }}
+    {{- end }}
+{{- end }}
+{{- end }}
