@@ -1189,7 +1189,7 @@ class EndToEndTestCase(unittest.TestCase):
         """
         def check_version():
             p = k8s.patroni_rest("acid-upgrade-test-0", "")
-            version = str(p["server_version"])[0:2]
+            version = p.get("server_version", 0) // 10000
             return version
 
         k8s = self.k8s
@@ -1205,7 +1205,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.create_with_kubectl("manifests/minimal-postgres-manifest-12.yaml")
         self.eventuallyEqual(lambda: k8s.count_running_pods(labels=cluster_label), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(check_version, "12", "Version is not correct")
+        self.eventuallyEqual(check_version, 12, "Version is not correct")
 
         master_nodes, replica_nodes = k8s.get_cluster_nodes(cluster_labels=cluster_label)
         # should upgrade immediately
@@ -1224,7 +1224,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, "14", "Version should be upgraded from 12 to 14")
+        self.eventuallyEqual(check_version, 14, "Version should be upgraded from 12 to 14")
 
         # should not upgrade because current time is not in maintenanceWindow
         current_time = datetime.now()
@@ -1247,7 +1247,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, "14", "Version should not be upgraded")
+        self.eventuallyEqual(check_version, 14, "Version should not be upgraded")
 
         # change the version again to trigger operator sync
         maintenance_window_current = f"{(current_time-timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=30)).strftime('%H:%M')}"
@@ -1271,7 +1271,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, "16", "Version should be upgraded from 14 to 16")
+        self.eventuallyEqual(check_version, 16, "Version should be upgraded from 14 to 16")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_persistent_volume_claim_retention_policy(self):
