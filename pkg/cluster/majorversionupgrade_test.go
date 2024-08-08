@@ -56,7 +56,7 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 	now := time.Now()
 	futureTimeStart := now.Add(1 * time.Hour)
 	futureTimeStartFormatted := futureTimeStart.Format("15:04")
-	futureTimeEnd := now.Add(1 * time.Hour)
+	futureTimeEnd := now.Add(2 * time.Hour)
 	futureTimeEndFormatted := futureTimeEnd.Format("15:04")
 
 	cluster.Spec.MaintenanceWindows = []acidv1.MaintenanceWindow{
