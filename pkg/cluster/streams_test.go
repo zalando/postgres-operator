@@ -192,6 +192,91 @@ func TestGatherApplicationIds(t *testing.T) {
 	}
 }
 
+func TestHasSlotsInSync(t *testing.T) {
+
+	tests := []struct {
+		subTest       string
+		expectedSlots map[string]map[string]zalandov1.Slot
+		actualSlots   map[string]map[string]string
+		slotsInSync   bool
+	}{
+		{
+			subTest: "slots are in sync",
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbName: {
+					slotName: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{
+				slotName: map[string]string{
+					"databases": dbName,
+					"plugin":    constants.EventStreamSourcePluginType,
+					"type":      "logical",
+				},
+			},
+			slotsInSync: true,
+		}, {
+			subTest: "slots are not in sync",
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbName: {
+					slotName: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+				"dbnotexists": {
+					slotName: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": "dbnotexists",
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test2": acidv1.StreamTable{
+								EventType: "stream-type-b",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{
+				slotName: map[string]string{
+					"databases": dbName,
+					"plugin":    constants.EventStreamSourcePluginType,
+					"type":      "logical",
+				},
+			},
+			slotsInSync: false,
+		},
+	}
+
+	for _, tt := range tests {
+		result := hasSlotsInSync(appId, tt.expectedSlots, tt.actualSlots)
+		if !result {
+			t.Errorf("slots are not in sync, expected %#v, got %#v", tt.expectedSlots, tt.actualSlots)
+		}
+	}
+}
+
 func TestGenerateFabricEventStream(t *testing.T) {
 	client, _ := newFakeK8sStreamClient()
 

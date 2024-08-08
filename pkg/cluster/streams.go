@@ -394,18 +394,12 @@ func (c *Cluster) syncStreams() error {
 	// there will be a separate event stream resource for each ID
 	appIds := getDistinctApplicationIds(c.Spec.Streams)
 	for _, appId := range appIds {
-		slotExists := false
-		for slotName := range slotsToSync {
-			if strings.HasSuffix(slotName, strings.Replace(appId, "-", "_", -1)) {
-				slotExists = true
-				if err = c.syncStream(appId); err != nil {
-					c.logger.Warningf("could not sync event streams with applicationId %s: %v", appId, err)
-				}
-				break
+		if hasSlotsInSync(appId, databaseSlots, slotsToSync) {
+			if err = c.syncStream(appId); err != nil {
+				c.logger.Warningf("could not sync event streams with applicationId %s: %v", appId, err)
 			}
-		}
-		if !slotExists {
-			c.logger.Warningf("no replication slot for streams with applicationId %s exists, skipping event stream creation", appId)
+		} else {
+			c.logger.Warningf("database replication slots for streams with applicationId %s not in sync, skipping event stream sync", appId)
 		}
 	}
 
@@ -415,6 +409,21 @@ func (c *Cluster) syncStreams() error {
 	}
 
 	return nil
+}
+
+func hasSlotsInSync(appId string, databaseSlots map[string]map[string]zalandov1.Slot, slotsToSync map[string]map[string]string) bool {
+	allSlotsInSync := true
+	for dbName, slots := range databaseSlots {
+		for slotName := range slots {
+			if slotName == getSlotName(dbName, appId) {
+				if _, exists := slotsToSync[slotName]; !exists {
+					allSlotsInSync = false
+				}
+			}
+		}
+	}
+
+	return allSlotsInSync
 }
 
 func (c *Cluster) syncStream(appId string) error {
