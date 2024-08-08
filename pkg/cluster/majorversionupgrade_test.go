@@ -37,6 +37,11 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 			},
 		}, client, pg, logger, eventRecorder)
 
+	cluster.Spec.MaintenanceWindows = nil
+	if !cluster.isInMainternanceWindow() {
+		t.Errorf("Expected isInMainternanceWindow to return true")
+	}
+
 	cluster.Spec.MaintenanceWindows = []acidv1.MaintenanceWindow{
 		{
 			Everyday:  true,
