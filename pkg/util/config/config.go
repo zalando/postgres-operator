@@ -243,6 +243,7 @@ type Config struct {
 	EnablePgVersionEnvVar                    bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat                 bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`
+	IgnoreAutoVersionUpgradeKey              string            `name:"ignore_auto_version_upgrade_key"`
 	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"off"`
 	MajorVersionUpgradeTeamAllowList         []string          `name:"major_version_upgrade_team_allow_list" default:""`
 	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"12"`

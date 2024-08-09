@@ -158,6 +158,8 @@ spec:
               major_version_upgrade:
                 type: object
                 properties:
+                  ignore_auto_version_upgrade_key:
+                    type: string
                   major_version_upgrade_mode:
                     type: string
                     default: "off"

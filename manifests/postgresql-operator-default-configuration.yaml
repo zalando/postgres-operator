@@ -36,6 +36,7 @@ configuration:
     replication_username: standby
     super_username: postgres
   major_version_upgrade:
+    # ignore_auto_version_upgrade_key: ""
     major_version_upgrade_mode: "off"
     # major_version_upgrade_team_allow_list:
     # - acid

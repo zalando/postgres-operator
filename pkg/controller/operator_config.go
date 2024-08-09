@@ -60,6 +60,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PasswordRotationUserRetention = util.CoalesceUInt32(fromCRD.PostgresUsersConfiguration.DeepCopy().PasswordRotationUserRetention, 180)
 
 	// major version upgrade config
+	result.IgnoreAutoVersionUpgradeKey = fromCRD.MajorVersionUpgrade.IgnoreAutoVersionUpgradeKey
 	result.MajorVersionUpgradeMode = util.Coalesce(fromCRD.MajorVersionUpgrade.MajorVersionUpgradeMode, "off")
 	result.MajorVersionUpgradeTeamAllowList = fromCRD.MajorVersionUpgrade.MajorVersionUpgradeTeamAllowList
 	result.MinimalMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.MinimalMajorVersion, "12")
