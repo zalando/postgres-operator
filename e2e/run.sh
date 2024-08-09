@@ -9,13 +9,20 @@ IFS=$'\n\t'
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 readonly spilo_image="registry.opensource.zalan.do/acid/spilo-16-e2e:0.1"
-readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:0.4"
+readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:0.5"
 
 export GOPATH=${GOPATH-~/go}
 export PATH=${GOPATH}/bin:$PATH
 
 echo "Clustername: ${cluster_name}"
 echo "Kubeconfig path: ${kubeconfig_path}"
+
+# build the e2e image if it doesn't exist
+function pull_or_build_e2e(){
+ if ! docker manifest inspect "${e2e_test_runner_image}" >/dev/null 2>&1; then
+  IMAGE=${e2e_test_runner_image%:*} TAG=${e2e_test_runner_image#*:} make docker
+ fi
+}
 
 function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
@@ -47,12 +54,15 @@ function load_operator_image() {
 }
 
 function set_kind_api_server_ip(){
+  local tmpfile=$(mktemp)
   echo "Setting up kind API server ip"
   # use the actual kubeconfig to connect to the 'kind' API server
   # but update the IP address of the API server to the one from the Docker 'bridge' network
   readonly local kind_api_server_port=6443 # well-known in the 'kind' codebase
   readonly local kind_api_server=$(docker inspect --format "{{ .NetworkSettings.Networks.kind.IPAddress }}:${kind_api_server_port}" "${cluster_name}"-control-plane)
-  sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}"
+  # support older sed versions (darwin)
+  sed "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}" > "${tmpfile}"
+  mv "${tmpfile}" "${kubeconfig_path}"
 }
 
 function generate_certificate(){
@@ -84,6 +94,7 @@ function main(){
   echo "Entering main function..."
   [[ -z ${NOCLEANUP-} ]] && trap "cleanup" QUIT TERM EXIT
   pull_images
+  pull_or_build_e2e
   [[ ! -f ${kubeconfig_path} ]] && start_kind
   load_operator_image
   set_kind_api_server_ip

@@ -425,7 +425,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             def compare_config():
-                effective_config = k8s.patroni_rest(leader.metadata.name, "config")
+                effective_config = k8s.patroni_rest(leader.metadata.name, "/config")
                 desired_config = pg_patch_config["spec"]["patroni"]
                 desired_parameters = pg_patch_config["spec"]["postgresql"]["parameters"]
                 effective_parameters = effective_config["postgresql"]["parameters"]
@@ -981,16 +981,14 @@ class EndToEndTestCase(unittest.TestCase):
             def verify_role():
                 try:
                     operator_pod = k8s.get_operator_pod()
-                    get_config_cmd = "wget --quiet -O - localhost:8080/config"
-                    result = k8s.exec_with_kubectl(operator_pod.metadata.name,
-                                                   get_config_cmd)
+                    config_path = "/config"
+                    result = k8s.portforward_req(operator_pod.metadata.name,
+                                                "8080", config_path)
                     try:
-                        roles_dict = (json.loads(result.stdout)
-                                          .get("controller", {})
-                                          .get("InfrastructureRoles"))
+                        roles_dict = (result.get("controller", {})
+                                        .get("InfrastructureRoles"))
                     except:
                         return False
-
                     if "robot_zmon_acid_monitoring_new" in roles_dict:
                         role = roles_dict["robot_zmon_acid_monitoring_new"]
                         role.pop("Password", None)
