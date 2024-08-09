@@ -214,6 +214,29 @@ func (c *Cluster) syncPatroniConfigMap(suffix string) error {
 
 	if cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
 		c.PatroniConfigMaps[suffix] = cm
+		desiredOwnerRefs := c.ownerReferences()
+		if !reflect.DeepEqual(cm.ObjectMeta.OwnerReferences, desiredOwnerRefs) {
+			c.logger.Infof("new %s config map's owner references do not match the current ones", suffix)
+			cm.ObjectMeta.OwnerReferences = desiredOwnerRefs
+			c.setProcessName("updating %v config map", suffix)
+			cm, err = c.KubeClient.ConfigMaps(c.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update %s config map: %v", suffix, err)
+			}
+			c.PatroniConfigMaps[suffix] = cm
+		}
+		desiredAnnotations := c.annotationsSet(cm.Annotations)
+		if changed, _ := c.compareAnnotations(cm.Annotations, desiredAnnotations); changed {
+			patchData, err := metaAnnotationsPatch(desiredAnnotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s config map: %v", suffix, err)
+			}
+			cm, err = c.KubeClient.ConfigMaps(c.Namespace).Patch(context.TODO(), name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of %s config map: %v", suffix, err)
+			}
+			c.PatroniConfigMaps[suffix] = cm
+		}
 	}
 	if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s Patroni config map: %v", suffix, err)
@@ -233,6 +256,29 @@ func (c *Cluster) syncPatroniEndpoint(suffix string) error {
 
 	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
 		c.PatroniEndpoints[suffix] = ep
+		desiredOwnerRefs := c.ownerReferences()
+		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredOwnerRefs) {
+			c.logger.Infof("new %s endpoints's owner references do not match the current ones", suffix)
+			ep.ObjectMeta.OwnerReferences = desiredOwnerRefs
+			c.setProcessName("updating %v endpoint", suffix)
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Update(context.TODO(), ep, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update %s endpoint: %v", suffix, err)
+			}
+			c.PatroniEndpoints[suffix] = ep
+		}
+		desiredAnnotations := c.annotationsSet(ep.Annotations)
+		if changed, _ := c.compareAnnotations(ep.Annotations, desiredAnnotations); changed {
+			patchData, err := metaAnnotationsPatch(desiredAnnotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s endpoint: %v", suffix, err)
+			}
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of %s endpoint: %v", suffix, err)
+			}
+			c.PatroniEndpoints[suffix] = ep
+		}
 	}
 	if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s Patroni endpoint: %v", suffix, err)
