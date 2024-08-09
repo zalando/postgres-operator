@@ -96,7 +96,7 @@ class EndToEndTestCase(unittest.TestCase):
             print("Failed to delete the 'standard' storage class: {0}".format(e))
 
         # operator deploys pod service account there on start up
-        # needed for test_multi_namespace_support()
+        # needed for test_multi_namespace_support and test_owner_references
         cls.test_namespace = "test"
         try:
             v1_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=cls.test_namespace))
@@ -1419,17 +1419,11 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.wait_for_pod_start("spilo-role=master", self.test_namespace)
             k8s.wait_for_pod_start("spilo-role=replica", self.test_namespace)
             self.assert_master_is_unique(self.test_namespace, "acid-test-cluster")
+            # acid-test-cluster will be deleted in test_owner_references test
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
-        finally:
-            # delete the new cluster so that the k8s_api.get_operator_state works correctly in subsequent tests
-            # ideally we should delete the 'test' namespace here but
-            # the pods inside the namespace stuck in the Terminating state making the test time out
-            k8s.api.custom_objects_api.delete_namespaced_custom_object(
-                "acid.zalan.do", "v1", self.test_namespace, "postgresqls", "acid-test-cluster")
-            time.sleep(5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     @unittest.skip("Skipping this test until fixed")
@@ -1641,6 +1635,71 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler pods not scaled down")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_owner_references(self):
+        '''
+           Enable owner references, test if resources get updated and test cascade deletion of test cluster.
+        '''
+        k8s = self.k8s
+        cluster_name = 'acid-test-cluster'
+        cluster_label = 'application=spilo,cluster-name={}'.format(cluster_name)
+        default_test_cluster = 'acid-minimal-cluster'
+
+        try:
+            # enable owner references in config
+            enable_owner_refs = {
+                "data": {
+                    "enable_owner_references": "true"
+                }
+            }
+            k8s.update_config(enable_owner_refs)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            time.sleep(5)  # wait for the operator to sync the cluster and update resources
+
+            # check if child resources were updated with owner references
+            self.assertTrue(self.check_cluster_child_resources_owner_references(cluster_name, self.test_namespace), "Owner references not set on all child resources of {}".format(cluster_name))
+            self.assertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster), "Owner references not set on all child resources of {}".format(default_test_cluster))
+
+            # delete the new cluster to test owner references
+            # and also to make k8s_api.get_operator_state work better in subsequent tests
+            # ideally we should delete the 'test' namespace here but the pods
+            # inside the namespace stuck in the Terminating state making the test time out
+            k8s.api.custom_objects_api.delete_namespaced_custom_object(
+                "acid.zalan.do", "v1", self.test_namespace, "postgresqls", cluster_name)
+
+            # statefulset, pod disruption budget and secrets should be deleted via owner reference
+            self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_label), 0, "Pods not deleted")
+            self.eventuallyEqual(lambda: k8s.count_statefulsets_with_label(cluster_label), 0, "Statefulset not deleted")
+            self.eventuallyEqual(lambda: k8s.count_pdbs_with_label(cluster_label), 0, "Pod disruption budget not deleted")
+            self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 0, "Secrets were not deleted")
+
+            time.sleep(5)  # wait for the operator to also delete the leftovers
+
+            # pvcs and Patroni config service/endpoint should not be affected by owner reference
+            # but deleted by the operator almost immediately
+            self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 0, "PVCs not deleted")
+            self.eventuallyEqual(lambda: k8s.count_services_with_label(cluster_label), 0, "Patroni config service not deleted")
+            self.eventuallyEqual(lambda: k8s.count_endpoints_with_label(cluster_label), 0, "Patroni config endpoint not deleted")
+
+            # disable owner references in config
+            disable_owner_refs = {
+                "data": {
+                    "enable_owner_references": "false"
+                }
+            }
+            k8s.update_config(disable_owner_refs)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            time.sleep(5)  # wait for the operator to remove owner references
+
+            # check if child resources were updated without Postgresql owner references
+            self.assertTrue(self.check_cluster_child_resources_owner_references(default_test_cluster, "default", True), "Owner references still present on some child resources of {}".format(default_test_cluster))
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_password_rotation(self):
         '''
            Test password rotation and removal of users due to retention policy
@@ -1837,7 +1896,6 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
             replica = k8s.get_cluster_replica_pod()
             self.assertTrue(replica.metadata.creation_timestamp > old_creation_timestamp, "Old master pod was not recreated")
-
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -2411,6 +2469,39 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
         return True
+
+    def check_cluster_child_resources_owner_references(self, cluster_name, cluster_namespace='default', inverse=False):
+        k8s = self.k8s
+
+        # check if child resources were updated with owner references
+        sset = k8s.api.apps_v1.read_namespaced_stateful_set(cluster_name, cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(sset.metadata.owner_references, inverse), "statefulset owner reference check failed")
+
+        svc = k8s.api.core_v1.read_namespaced_service(cluster_name, cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(svc.metadata.owner_references, inverse), "primary service owner reference check failed")
+        replica_svc = k8s.api.core_v1.read_namespaced_service(cluster_name + "-repl", cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(replica_svc.metadata.owner_references, inverse), "replica service owner reference check failed")
+
+        ep = k8s.api.core_v1.read_namespaced_endpoints(cluster_name, cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(ep.metadata.owner_references, inverse), "primary endpoint owner reference check failed")
+        replica_ep = k8s.api.core_v1.read_namespaced_endpoints(cluster_name + "-repl", cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(replica_ep.metadata.owner_references, inverse), "replica owner reference check failed")
+
+        pdb = k8s.api.policy_v1.read_namespaced_pod_disruption_budget("postgres-{}-pdb".format(cluster_name), cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(pdb.metadata.owner_references, inverse), "pod disruption owner reference check failed")
+
+        pg_secret = k8s.api.core_v1.read_namespaced_secret("postgres.{}.credentials.postgresql.acid.zalan.do".format(cluster_name), cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(pg_secret.metadata.owner_references, inverse), "postgres secret owner reference check failed")
+        standby_secret = k8s.api.core_v1.read_namespaced_secret("standby.{}.credentials.postgresql.acid.zalan.do".format(cluster_name), cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(standby_secret.metadata.owner_references, inverse), "standby secret owner reference check failed")
+
+        return True
+
+    def has_postgresql_owner_reference(self, owner_references, inverse):
+        if inverse:
+            return owner_references is None or owner_references[0].kind != 'postgresql'
+
+        return owner_references is not None and owner_references[0].kind == 'postgresql' and owner_references[0].controller
 
     def list_databases(self, pod_name):
         '''

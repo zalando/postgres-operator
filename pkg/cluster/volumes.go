@@ -186,7 +186,6 @@ func (c *Cluster) syncVolumeClaims() error {
 	if c.OpConfig.StorageResizeMode == "off" || c.OpConfig.StorageResizeMode == "ebs" {
 		ignoreResize = true
 		c.logger.Debugf("Storage resize mode is set to %q. Skipping volume size sync of PVCs.", c.OpConfig.StorageResizeMode)
-		
 	}
 
 	newSize, err := resource.ParseQuantity(c.Spec.Volume.Size)

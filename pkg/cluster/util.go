@@ -176,6 +176,10 @@ func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate
 	}
 
 	logNiceDiff(c.logger, old.Spec, new.Spec)
+
+	if reason != "" {
+		c.logger.Infof("reason: %s", reason)
+	}
 }
 
 func logNiceDiff(log *logrus.Entry, old, new interface{}) {

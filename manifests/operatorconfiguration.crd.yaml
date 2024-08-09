@@ -209,9 +209,9 @@ spec:
                   enable_init_containers:
                     type: boolean
                     default: true
-                  enable_secrets_deletion:
+                  enable_owner_references:
                     type: boolean
-                    default: true
+                    default: false
                   enable_persistent_volume_claim_deletion:
                     type: boolean
                     default: true
@@ -224,6 +224,9 @@ spec:
                   enable_readiness_probe:
                     type: boolean
                     default: false
+                  enable_secrets_deletion:
+                    type: boolean
+                    default: true
                   enable_sidecars:
                     type: boolean
                     default: true

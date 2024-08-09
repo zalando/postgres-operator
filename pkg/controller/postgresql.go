@@ -446,19 +446,22 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		clusterError = informerNewSpec.Error
 	}
 
-	// only allow deletion if delete annotations are set and conditions are met
 	if eventType == EventDelete {
-		if err := c.meetsClusterDeleteAnnotations(informerOldSpec); err != nil {
-			c.logger.WithField("cluster-name", clusterName).Warnf(
-				"ignoring %q event for cluster %q - manifest does not fulfill delete requirements: %s", eventType, clusterName, err)
-			c.logger.WithField("cluster-name", clusterName).Warnf(
-				"please, recreate Postgresql resource %q and set annotations to delete properly", clusterName)
-			if currentManifest, marshalErr := json.Marshal(informerOldSpec); marshalErr != nil {
-				c.logger.WithField("cluster-name", clusterName).Warnf("could not marshal current manifest:\n%+v", informerOldSpec)
-			} else {
-				c.logger.WithField("cluster-name", clusterName).Warnf("%s\n", string(currentManifest))
+		// when owner references are used operator cannot block deletion
+		if c.opConfig.EnableOwnerReferences == nil || !*c.opConfig.EnableOwnerReferences {
+			// only allow deletion if delete annotations are set and conditions are met
+			if err := c.meetsClusterDeleteAnnotations(informerOldSpec); err != nil {
+				c.logger.WithField("cluster-name", clusterName).Warnf(
+					"ignoring %q event for cluster %q - manifest does not fulfill delete requirements: %s", eventType, clusterName, err)
+				c.logger.WithField("cluster-name", clusterName).Warnf(
+					"please, recreate Postgresql resource %q and set annotations to delete properly", clusterName)
+				if currentManifest, marshalErr := json.Marshal(informerOldSpec); marshalErr != nil {
+					c.logger.WithField("cluster-name", clusterName).Warnf("could not marshal current manifest:\n%+v", informerOldSpec)
+				} else {
+					c.logger.WithField("cluster-name", clusterName).Warnf("%s\n", string(currentManifest))
+				}
+				return
 			}
-			return
 		}
 	}
 
