@@ -80,6 +80,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
+	if err = c.syncPatroniResources(); err != nil {
+		c.logger.Errorf("could not sync Patroni resources: %v", err)
+	}
+
 	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
 	if err = c.syncVolumes(); err != nil {
 		return err
@@ -173,6 +177,116 @@ func (c *Cluster) syncFinalizer() error {
 	return nil
 }
 
+func (c *Cluster) syncPatroniResources() error {
+	errors := make([]string, 0)
+
+	if err := c.syncService(Patroni); err != nil {
+		errors = append(errors, fmt.Sprintf("could not sync %s service: %v", Patroni, err))
+	}
+
+	for _, suffix := range patroniObjectSuffixes {
+		if c.patroniKubernetesUseConfigMaps() {
+			if err := c.syncPatroniConfigMap(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("could not sync %s Patroni config map: %v", suffix, err))
+			}
+		} else {
+			if err := c.syncPatroniEndpoint(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("could not sync %s Patroni endpoint: %v", suffix, err))
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPatroniConfigMap(suffix string) error {
+	var (
+		cm  *v1.ConfigMap
+		err error
+	)
+	name := fmt.Sprintf("%s-%s", c.Name, suffix)
+	c.logger.Debugf("syncing %s Patroni config map", name)
+	c.setProcessName("syncing %s Patroni config map", name)
+
+	if cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+		c.PatroniConfigMaps[suffix] = cm
+		desiredOwnerRefs := c.ownerReferences()
+		if !reflect.DeepEqual(cm.ObjectMeta.OwnerReferences, desiredOwnerRefs) {
+			c.logger.Infof("new %s config map's owner references do not match the current ones", suffix)
+			cm.ObjectMeta.OwnerReferences = desiredOwnerRefs
+			c.setProcessName("updating %v config map", suffix)
+			cm, err = c.KubeClient.ConfigMaps(c.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update %s config map: %v", suffix, err)
+			}
+			c.PatroniConfigMaps[suffix] = cm
+		}
+		desiredAnnotations := c.annotationsSet(cm.Annotations)
+		if changed, _ := c.compareAnnotations(cm.Annotations, desiredAnnotations); changed {
+			patchData, err := metaAnnotationsPatch(desiredAnnotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s config map: %v", suffix, err)
+			}
+			cm, err = c.KubeClient.ConfigMaps(c.Namespace).Patch(context.TODO(), name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of %s config map: %v", suffix, err)
+			}
+			c.PatroniConfigMaps[suffix] = cm
+		}
+	}
+	if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get %s Patroni config map: %v", suffix, err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPatroniEndpoint(suffix string) error {
+	var (
+		ep  *v1.Endpoints
+		err error
+	)
+	name := fmt.Sprintf("%s-%s", c.Name, suffix)
+	c.logger.Debugf("syncing %s Patroni endpoint", name)
+	c.setProcessName("syncing %s Patroni endpoint", name)
+
+	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+		c.PatroniEndpoints[suffix] = ep
+		desiredOwnerRefs := c.ownerReferences()
+		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredOwnerRefs) {
+			c.logger.Infof("new %s endpoints's owner references do not match the current ones", suffix)
+			ep.ObjectMeta.OwnerReferences = desiredOwnerRefs
+			c.setProcessName("updating %v endpoint", suffix)
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Update(context.TODO(), ep, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update %s endpoint: %v", suffix, err)
+			}
+			c.PatroniEndpoints[suffix] = ep
+		}
+		desiredAnnotations := c.annotationsSet(ep.Annotations)
+		if changed, _ := c.compareAnnotations(ep.Annotations, desiredAnnotations); changed {
+			patchData, err := metaAnnotationsPatch(desiredAnnotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s endpoint: %v", suffix, err)
+			}
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of %s endpoint: %v", suffix, err)
+			}
+			c.PatroniEndpoints[suffix] = ep
+		}
+	}
+	if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get %s Patroni endpoint: %v", suffix, err)
+	}
+
+	return nil
+}
+
 func (c *Cluster) syncServices() error {
 	for _, role := range []PostgresRole{Master, Replica} {
 		c.logger.Debugf("syncing %s service", role)
@@ -210,8 +324,11 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s service: %v", role, err)
 	}
+	// if config service does not exist Patroni will create it
+	if role == Patroni {
+		return nil
+	}
 	// no existing service, create new one
-	c.Services[role] = nil
 	c.logger.Infof("could not find the cluster's %s service", role)
 
 	if svc, err = c.createService(role); err == nil {
@@ -236,7 +353,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	)
 	c.setProcessName("syncing %s endpoint", role)
 
-	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.endpointName(role), metav1.GetOptions{}); err == nil {
+	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		desiredEp := c.generateEndpoint(role, ep.Subsets)
 		// if owner references differ we update which would also change annotations
 		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredEp.ObjectMeta.OwnerReferences) {
@@ -252,7 +369,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 				if err != nil {
 					return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
 				}
-				ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), c.endpointName(role), types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+				ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), c.serviceName(role), types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 				if err != nil {
 					return fmt.Errorf("could not patch annotations of %s endpoint: %v", role, err)
 				}
@@ -265,7 +382,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 		return fmt.Errorf("could not get %s endpoint: %v", role, err)
 	}
 	// no existing endpoint, create new one
-	c.Endpoints[role] = nil
 	c.logger.Infof("could not find the cluster's %s endpoint", role)
 
 	if ep, err = c.createEndpoint(role); err == nil {
@@ -275,7 +391,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 			return fmt.Errorf("could not create missing %s endpoint: %v", role, err)
 		}
 		c.logger.Infof("%s endpoint %q already exists", role, util.NameFromMeta(ep.ObjectMeta))
-		if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.endpointName(role), metav1.GetOptions{}); err != nil {
+		if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing %s endpoint: %v", role, err)
 		}
 	}
@@ -307,7 +423,6 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 		return fmt.Errorf("could not get pod disruption budget: %v", err)
 	}
 	// no existing pod disruption budget, create new one
-	c.PodDisruptionBudget = nil
 	c.logger.Infof("could not find the cluster's pod disruption budget")
 
 	if pdb, err = c.createPodDisruptionBudget(); err != nil {
@@ -349,7 +464,6 @@ func (c *Cluster) syncStatefulSet() error {
 
 	if err != nil {
 		// statefulset does not exist, try to re-create it
-		c.Statefulset = nil
 		c.logger.Infof("cluster's statefulset does not exist")
 
 		sset, err = c.createStatefulSet()
@@ -714,7 +828,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	// check if specified slots exist in config and if they differ
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
 		// only add slots specified in manifest to c.replicationSlots
-		for manifestSlotName, _ := range c.Spec.Patroni.Slots {
+		for manifestSlotName := range c.Spec.Patroni.Slots {
 			if manifestSlotName == slotName {
 				c.replicationSlots[slotName] = desiredSlot
 			}
@@ -1447,6 +1561,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 				return fmt.Errorf("could not patch annotations of the logical backup job %q: %v", jobName, err)
 			}
 		}
+		c.LogicalBackupJob = desiredJob
 		return nil
 	}
 	if !k8sutil.ResourceNotFound(err) {
