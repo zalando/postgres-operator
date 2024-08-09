@@ -316,7 +316,7 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 
 	serviceName := util.NameFromMeta(oldService.ObjectMeta)
 	match, reason := c.compareServices(oldService, newService)
-	if !match && role != Patroni {
+	if !match {
 		c.logServiceChanges(role, oldService, newService, false, reason)
 		c.setProcessName("updating %v service", role)
 
