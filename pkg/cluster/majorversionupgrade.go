@@ -74,6 +74,11 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
+	if !c.isInMainternanceWindow() {
+		c.logger.Infof("skipping major version upgrade, not in maintenance window")
+		return nil
+	}
+
 	pods, err := c.listPods()
 	if err != nil {
 		return err
