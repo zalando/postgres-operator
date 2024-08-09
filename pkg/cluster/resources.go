@@ -633,7 +633,6 @@ func (c *Cluster) createLogicalBackupJob() (err error) {
 	if err != nil {
 		return fmt.Errorf("could not generate k8s cron job spec: %v", err)
 	}
-	c.logger.Debugf("Generated cronJobSpec: %v", logicalBackupJobSpec)
 
 	cronJob, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(context.TODO(), logicalBackupJobSpec, metav1.CreateOptions{})
 	if err != nil {

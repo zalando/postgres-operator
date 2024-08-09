@@ -263,6 +263,31 @@ Parameters to configure cluster-related Kubernetes objects created by the
 operator, as well as some timeouts associated with them. In a CRD-based
 configuration they are grouped under the `kubernetes` key.
 
+* **enable_finalizers**
+  By default, a deletion of the Postgresql resource will trigger an event
+  that leads to a cleanup of all child resources. However, if the database
+  cluster is in a broken state (e.g. failed initialization) and the operator
+  cannot fully sync it, there can be leftovers. By enabling finalizers the
+  operator will ensure all managed resources are deleted prior to the
+  Postgresql resource. See also [admin docs](../administrator.md#owner-references-and-finalizers)
+  for more information The default is `false`.
+
+* **enable_owner_references**
+  The operator can set owner references on its child resources (except PVCs,
+  Patroni config service/endpoint, cross-namespace secrets) to improve cluster
+  monitoring and enable cascading deletion. The default is `false`. Warning,
+  enabling this option disables configured delete protection checks (see below).
+
+* **delete_annotation_date_key**
+  key name for annotation that compares manifest value with current date in the
+  YYYY-MM-DD format. Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`.
+  The default is empty which also disables this delete protection check.
+
+* **delete_annotation_name_key**
+  key name for annotation that compares manifest value with Postgres cluster name.
+  Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`. The default is
+  empty which also disables this delete protection check.
+
 * **pod_service_account_name**
   service account used by Patroni running on individual Pods to communicate
   with the operator. Required even if native Kubernetes support in Patroni is
@@ -293,16 +318,6 @@ configuration they are grouped under the `kubernetes` key.
   of a database created by the operator. If the annotation key is also provided
   by the database definition, the database definition value is used.
 
-* **delete_annotation_date_key**
-  key name for annotation that compares manifest value with current date in the
-  YYYY-MM-DD format. Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`.
-  The default is empty which also disables this delete protection check.
-
-* **delete_annotation_name_key**
-  key name for annotation that compares manifest value with Postgres cluster name.
-  Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`. The default is
-  empty which also disables this delete protection check.
-
 * **downscaler_annotations**
   An array of annotations that should be passed from Postgres CRD on to the
   statefulset and, if exists, to the connection pooler deployment as well.
@@ -331,20 +346,6 @@ configuration they are grouped under the `kubernetes` key.
   By default the PDB will match the master role hence preventing nodes to be
   drained if the node_readiness_label is not used. If this option if set to
   `false` the `spilo-role=master` selector will not be added to the PDB.
-
-* **enable_finalizers**
-  By default, a deletion of the Postgresql resource will trigger an event
-  that leads to a cleanup of all child resources. However, if the database
-  cluster is in a broken state (e.g. failed initialization) and the operator
-  cannot fully sync it, there can be leftovers. By enabling finalizers the
-  operator will ensure all managed resources are deleted prior to the
-  Postgresql resource. There is a trade-off though: The deletion is only
-  performed after the next two SYNC cycles with the first one updating the
-  internal spec and the latter reacting on the `deletionTimestamp` while
-  processing the SYNC event. The final removal of the custom resource will
-  add a DELETE event to the worker queue but the child resources are already
-  gone at this point.
-  The default is `false`.
 
 * **persistent_volume_claim_retention_policy**
   The operator tries to protect volumes as much as possible. If somebody

@@ -218,7 +218,6 @@ class K8s:
         pod_phase = 'Failing over'
         new_pod_node = ''
         pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
-
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
@@ -525,7 +524,6 @@ class K8sBase:
         pod_phase = 'Failing over'
         new_pod_node = ''
         pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
-
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:

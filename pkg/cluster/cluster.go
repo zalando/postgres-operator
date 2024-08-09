@@ -434,6 +434,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		match = false
 		reasons = append(reasons, "new statefulset's number of replicas does not match the current one")
 	}
+	if !reflect.DeepEqual(c.Statefulset.OwnerReferences, statefulSet.OwnerReferences) {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's ownerReferences do not match")
+	}
 	if changed, reason := c.compareAnnotations(c.Statefulset.Annotations, statefulSet.Annotations); changed {
 		match = false
 		needsReplace = true
@@ -532,7 +537,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 			}
 			if changed, reason := c.compareAnnotations(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations); changed {
 				needsReplace = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one: %s", name, reason))
+				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q do not match the current ones: %s", name, reason))
 			}
 			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
 				name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
@@ -818,6 +823,10 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		}
 	}
 
+	if !reflect.DeepEqual(old.ObjectMeta.OwnerReferences, new.ObjectMeta.OwnerReferences) {
+		return false, "new service's owner references do not match the current ones"
+	}
+
 	return true, ""
 }
 
@@ -860,11 +869,14 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool
 
 func (c *Cluster) comparePodDisruptionBudget(cur, new *policyv1.PodDisruptionBudget) (bool, string) {
 	//TODO: improve comparison
-	if match := reflect.DeepEqual(new.Spec, cur.Spec); !match {
-		return false, "new PDB spec does not match the current one"
+	if !reflect.DeepEqual(new.Spec, cur.Spec) {
+		return false, "new PDB's spec does not match the current one"
+	}
+	if !reflect.DeepEqual(new.ObjectMeta.OwnerReferences, cur.ObjectMeta.OwnerReferences) {
+		return false, "new PDB's owner references do not match the current ones"
 	}
 	if changed, reason := c.compareAnnotations(cur.Annotations, new.Annotations); changed {
-		return false, "new PDB's annotations does not match the current one:" + reason
+		return false, "new PDB's annotations do not match the current ones:" + reason
 	}
 	return true, ""
 }

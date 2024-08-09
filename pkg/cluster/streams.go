@@ -196,11 +196,10 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			// max length for cluster name is 58 so we can only add 5 more characters / numbers
-			Name:        fmt.Sprintf("%s-%s", c.Name, strings.ToLower(util.RandomPassword(5))),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
-			// make cluster StatefulSet the owner (like with connection pooler objects)
+			Name:            fmt.Sprintf("%s-%s", c.Name, strings.ToLower(util.RandomPassword(5))),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.AnnotationsToPropagate(c.annotationsSet(nil)),
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: zalandov1.FabricEventStreamSpec{

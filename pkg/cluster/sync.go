@@ -273,7 +273,6 @@ func (c *Cluster) syncService(role PostgresRole) error {
 			return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
 		c.Services[role] = updatedSvc
-		c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 		return nil
 	}
 	if !k8sutil.ResourceNotFound(err) {
@@ -310,14 +309,24 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 
 	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		desiredEp := c.generateEndpoint(role, ep.Subsets)
-		if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations); changed {
-			patchData, err := metaAnnotationsPatch(desiredEp.Annotations)
+		// if owner references differ we update which would also change annotations
+		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredEp.ObjectMeta.OwnerReferences) {
+			c.logger.Infof("new %s endpoints's owner references do not match the current ones", role)
+			c.setProcessName("updating %v endpoint", role)
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Update(context.TODO(), desiredEp, metav1.UpdateOptions{})
 			if err != nil {
-				return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
+				return fmt.Errorf("could not update %s endpoint: %v", role, err)
 			}
-			ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), c.serviceName(role), types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
-			if err != nil {
-				return fmt.Errorf("could not patch annotations of %s endpoint: %v", role, err)
+		} else {
+			if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations); changed {
+				patchData, err := metaAnnotationsPatch(desiredEp.Annotations)
+				if err != nil {
+					return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
+				}
+				ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), c.serviceName(role), types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+				if err != nil {
+					return fmt.Errorf("could not patch annotations of %s endpoint: %v", role, err)
+				}
 			}
 		}
 		c.Endpoints[role] = ep
@@ -1025,6 +1034,12 @@ func (c *Cluster) updateSecret(
 		userMap[userKey] = pwdUser
 	}
 
+	if !reflect.DeepEqual(secret.ObjectMeta.OwnerReferences, generatedSecret.ObjectMeta.OwnerReferences) {
+		updateSecret = true
+		updateSecretMsg = fmt.Sprintf("secret %s owner references do not match the current ones", secretName)
+		secret.ObjectMeta.OwnerReferences = generatedSecret.ObjectMeta.OwnerReferences
+	}
+
 	if updateSecret {
 		c.logger.Debugln(updateSecretMsg)
 		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
@@ -1469,6 +1484,14 @@ func (c *Cluster) syncLogicalBackupJob() error {
 		desiredJob, err = c.generateLogicalBackupJob()
 		if err != nil {
 			return fmt.Errorf("could not generate the desired logical backup job state: %v", err)
+		}
+		if !reflect.DeepEqual(job.ObjectMeta.OwnerReferences, desiredJob.ObjectMeta.OwnerReferences) {
+			c.logger.Info("new logical backup job's owner references do not match the current ones")
+			job, err = c.KubeClient.CronJobs(job.Namespace).Update(context.TODO(), desiredJob, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update owner references for logical backup job %q: %v", job.Name, err)
+			}
+			c.logger.Infof("logical backup job %s updated", c.getLogicalBackupJobName())
 		}
 		if match, reason := c.compareLogicalBackupJob(job, desiredJob); !match {
 			c.logger.Infof("logical job %s is not in the desired state and needs to be updated",
