@@ -214,7 +214,6 @@ func (c *Cluster) syncPatroniConfigMap(suffix string) error {
 
 	if cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
 		c.PatroniConfigMaps[suffix] = cm
-		return nil
 	}
 	if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s Patroni config map: %v", suffix, err)
@@ -234,7 +233,6 @@ func (c *Cluster) syncPatroniEndpoint(suffix string) error {
 
 	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
 		c.PatroniEndpoints[suffix] = ep
-		return nil
 	}
 	if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s Patroni endpoint: %v", suffix, err)
@@ -269,10 +267,6 @@ func (c *Cluster) syncService(role PostgresRole) error {
 
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
-		// do not touch config service managed by Patroni
-		if role == Patroni {
-			return nil
-		}
 		desiredSvc := c.generateService(role, &c.Spec)
 		updatedSvc, err := c.updateService(role, svc, desiredSvc)
 		if err != nil {

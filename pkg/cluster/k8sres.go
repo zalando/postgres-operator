@@ -1962,6 +1962,9 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 
 		return c.OpConfig.EnableMasterLoadBalancer
 
+	case Patroni:
+		return false
+
 	default:
 		panic(fmt.Sprintf("Unknown role %v", role))
 	}
