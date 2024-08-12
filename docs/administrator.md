@@ -252,17 +252,16 @@ will differ and trigger a rolling update of the pods.
 ## Owner References and Finalizers
 
 The Postgres Operator can set [owner references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/) to most of a cluster's child resources to improve
-monitoring with GitOps tools and enable cascading deletes. There are three
+monitoring with GitOps tools and enable cascading deletes. There are two
 exceptions:
 
 * Persistent Volume Claims, because they are handled by the [PV Reclaim Policy]https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/ of the Stateful Set
-* The config endpoint + headless service resource because it is managed by Patroni
 * Cross-namespace secrets, because owner references are not allowed across namespaces by design
 
 The operator would clean these resources up with its regular delete loop
 unless they got synced correctly. If for some reason the initial cluster sync
 fails, e.g. after a cluster creation or operator restart, a deletion of the
-cluster manifest would leave orphaned resources behind which the user has to
+cluster manifest might leave orphaned resources behind which the user has to
 clean up manually.
 
 Another option is to enable finalizers which first ensures the deletion of all
