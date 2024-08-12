@@ -51,6 +51,7 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset
 		EndpointsGetter:              clientSet.CoreV1(),
 		PodsGetter:                   clientSet.CoreV1(),
 		DeploymentsGetter:            clientSet.AppsV1(),
+		CronJobsGetter:               clientSet.BatchV1(),
 	}, clientSet
 }
 
@@ -176,6 +177,22 @@ func checkResourcesInheritedAnnotations(cluster *Cluster, resultAnnotations map[
 		return nil
 	}
 
+	checkCronJob := func(annotations map[string]string) error {
+		cronJobList, err := cluster.KubeClient.CronJobs(namespace).List(context.TODO(), clusterOptions)
+		if err != nil {
+			return err
+		}
+		for _, cronJob := range cronJobList.Items {
+			if err := containsAnnotations(updateAnnotations(annotations), cronJob.Annotations, cronJob.ObjectMeta.Name, "Logical backup cron job"); err != nil {
+				return err
+			}
+			if err := containsAnnotations(updateAnnotations(annotations), cronJob.Spec.JobTemplate.Spec.Template.Annotations, cronJob.Name, "Logical backup cron job pod template"); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	checkSecrets := func(annotations map[string]string) error {
 		secretList, err := cluster.KubeClient.Secrets(namespace).List(context.TODO(), clusterOptions)
 		if err != nil {
@@ -203,7 +220,7 @@ func checkResourcesInheritedAnnotations(cluster *Cluster, resultAnnotations map[
 	}
 
 	checkFuncs := []func(map[string]string) error{
-		checkSts, checkPods, checkSvc, checkPdb, checkPooler, checkPvc, checkSecrets, checkEndpoints,
+		checkSts, checkPods, checkSvc, checkPdb, checkPooler, checkCronJob, checkPvc, checkSecrets, checkEndpoints,
 	}
 	for _, f := range checkFuncs {
 		if err := f(resultAnnotations); err != nil {
@@ -251,6 +268,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		Spec: acidv1.PostgresSpec{
 			EnableConnectionPooler:        boolToPointer(true),
 			EnableReplicaConnectionPooler: boolToPointer(true),
+			EnableLogicalBackup:           true,
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
@@ -306,6 +324,10 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 	if err != nil {
 		return nil, err
 	}
+	err = cluster.createLogicalBackupJob()
+	if err != nil {
+		return nil, err
+	}
 	pvcList := CreatePVCs(namespace, clusterName, cluster.labelsSet(false), 2, "1Gi")
 	for _, pvc := range pvcList.Items {
 		_, err = cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
@@ -320,6 +342,8 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 			return nil, err
 		}
 	}
+
+	//
 
 	return cluster, nil
 }

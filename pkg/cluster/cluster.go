@@ -1067,15 +1067,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		}
 
-		// apply schedule changes
-		// this is the only parameter of logical backups a user can overwrite in the cluster manifest
-		if (oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup) &&
-			(newSpec.Spec.LogicalBackupSchedule != oldSpec.Spec.LogicalBackupSchedule) {
-			c.logger.Debugf("updating schedule of the backup cron job")
-			if err := c.syncLogicalBackupJob(); err != nil {
-				c.logger.Errorf("could not sync logical backup jobs: %v", err)
-				updateFailed = true
-			}
+		if err := c.syncLogicalBackupJob(); err != nil {
+			c.logger.Errorf("could not sync logical backup jobs: %v", err)
+			updateFailed = true
 		}
 
 	}()
