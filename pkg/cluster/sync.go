@@ -15,6 +15,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -225,8 +226,10 @@ func (c *Cluster) syncPatroniConfigMap(suffix string) error {
 			}
 			c.PatroniConfigMaps[suffix] = cm
 		}
+		annotations := make(map[string]string)
+		maps.Copy(annotations, cm.Annotations)
 		desiredAnnotations := c.annotationsSet(cm.Annotations)
-		if changed, _ := c.compareAnnotations(cm.Annotations, desiredAnnotations); changed {
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for %s config map: %v", configMapName, err)
@@ -238,7 +241,8 @@ func (c *Cluster) syncPatroniConfigMap(suffix string) error {
 			c.PatroniConfigMaps[suffix] = cm
 		}
 	}
-	if !k8sutil.ResourceNotFound(err) {
+	// if config map does not exist yet, Patroni should create it
+	if err != nil && !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s config map: %v", configMapName, err)
 	}
 
@@ -267,8 +271,10 @@ func (c *Cluster) syncPatroniEndpoint(suffix string) error {
 			}
 			c.PatroniEndpoints[suffix] = ep
 		}
+		annotations := make(map[string]string)
+		maps.Copy(annotations, ep.Annotations)
 		desiredAnnotations := c.annotationsSet(ep.Annotations)
-		if changed, _ := c.compareAnnotations(ep.Annotations, desiredAnnotations); changed {
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for %s endpoint: %v", endpointName, err)
@@ -280,7 +286,8 @@ func (c *Cluster) syncPatroniEndpoint(suffix string) error {
 			c.PatroniEndpoints[suffix] = ep
 		}
 	}
-	if !k8sutil.ResourceNotFound(err) {
+	// if endpoint does not exist yet, Patroni should create it
+	if err != nil && !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s endpoint: %v", endpointName, err)
 	}
 
@@ -308,8 +315,10 @@ func (c *Cluster) syncPatroniService() error {
 			}
 			c.Services[Patroni] = svc
 		}
+		annotations := make(map[string]string)
+		maps.Copy(annotations, svc.Annotations)
 		desiredAnnotations := c.annotationsSet(svc.Annotations)
-		if changed, _ := c.compareAnnotations(svc.Annotations, desiredAnnotations); changed {
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for %s service: %v", serviceName, err)
@@ -321,7 +330,8 @@ func (c *Cluster) syncPatroniService() error {
 			c.Services[Patroni] = svc
 		}
 	}
-	if !k8sutil.ResourceNotFound(err) {
+	// if config service does not exist yet, Patroni should create it
+	if err != nil && !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s service: %v", serviceName, err)
 	}
 
