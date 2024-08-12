@@ -38,7 +38,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: ghcr.io/zalando/spilo-16:3.2-p3
+  docker_image: ghcr.io/zalando/spilo-16:3.3-p1
   # Optionally specify an array of imagePullSecrets for the spilo pod
   # image_pull_secrets:
   # - myRegistryKeySecretName
@@ -132,8 +132,8 @@ configKubernetes:
   enable_finalizers: false
   # enables initContainers to run actions before Spilo is started
   enable_init_containers: true
-  # toggles if operator should delete secrets on cluster deletion
-  enable_secrets_deletion: true
+  # toggles if child resources should have an owner reference to the postgresql CR
+  enable_owner_references: false
   # toggles if operator should delete PVCs on cluster deletion
   enable_persistent_volume_claim_deletion: true
   # toggles pod anti affinity on the Postgres pods
@@ -142,6 +142,8 @@ configKubernetes:
   enable_pod_disruption_budget: true
   # toogles readiness probe for database pods
   enable_readiness_probe: false
+  # toggles if operator should delete secrets on cluster deletion
+  enable_secrets_deletion: true
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
 

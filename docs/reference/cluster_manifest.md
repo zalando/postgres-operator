@@ -118,6 +118,12 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   this parameter. Optional, when empty the load balancer service becomes
   inaccessible from outside of the Kubernetes cluster.
 
+* **maintenanceWindows**
+  a list defines specific time frames when major version upgrades are permitted
+  to occur, restricting major version upgrades to these designated periods only.
+  Accepted formats include "01:00-06:00" for daily maintenance windows or 
+  "Sat:00:00-04:00" for specific days, with all times in UTC.
+
 * **users**
   a map of usernames to user flags for the users that should be created in the
   cluster by the operator. User flags are a list, allowed elements are

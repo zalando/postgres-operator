@@ -1363,6 +1363,23 @@ func TestCompareServices(t *testing.T) {
 		},
 	}
 
+	serviceWithOwnerReference := newService(
+		map[string]string{
+			constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
+			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+		},
+		v1.ServiceTypeClusterIP,
+		[]string{"128.141.0.0/16", "137.138.0.0/16"})
+
+	ownerRef := metav1.OwnerReference{
+		APIVersion: "acid.zalan.do/v1",
+		Controller: boolToPointer(true),
+		Kind:       "Postgresql",
+		Name:       "clstr",
+	}
+
+	serviceWithOwnerReference.ObjectMeta.OwnerReferences = append(serviceWithOwnerReference.ObjectMeta.OwnerReferences, ownerRef)
+
 	tests := []struct {
 		about   string
 		current *v1.Service
@@ -1444,6 +1461,18 @@ func TestCompareServices(t *testing.T) {
 				[]string{}),
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
+		},
+		{
+			about: "new service doesn't have owner references",
+			current: newService(
+				map[string]string{
+					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
+					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+				},
+				v1.ServiceTypeClusterIP,
+				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+			new:   serviceWithOwnerReference,
+			match: false,
 		},
 	}
 

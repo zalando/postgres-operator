@@ -176,6 +176,10 @@ func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate
 	}
 
 	logNiceDiff(c.logger, old.Spec, new.Spec)
+
+	if reason != "" {
+		c.logger.Infof("reason: %s", reason)
+	}
 }
 
 func logNiceDiff(log *logrus.Entry, old, new interface{}) {
@@ -661,4 +665,25 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 		return acidv1.Resources{}, fmt.Errorf("could not unmarshal K8s resources requirements into acidv1.Resources struct")
 	}
 	return resources, nil
+}
+
+func (c *Cluster) isInMainternanceWindow() bool {
+	if c.Spec.MaintenanceWindows == nil {
+		return true
+	}
+	now := time.Now()
+	currentDay := now.Weekday()
+	currentTime := now.Format("15:04")
+
+	for _, window := range c.Spec.MaintenanceWindows {
+		startTime := window.StartTime.Format("15:04")
+		endTime := window.EndTime.Format("15:04")
+
+		if window.Everyday || window.Weekday == currentDay {
+			if currentTime >= startTime && currentTime <= endTime {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -384,7 +384,6 @@ spec:
                   version:
                     type: string
                     enum:
-                      - "11"
                       - "12"
                       - "13"
                       - "14"
