@@ -407,6 +407,9 @@ func createPatroniResources(cluster *Cluster) error {
 func annotateResources(cluster *Cluster) error {
 	clusterOptions := clusterLabelsOptions(cluster)
 	patchData, err := metaAnnotationsPatch(externalAnnotations)
+	if err != nil {
+		return err
+	}
 
 	stsList, err := cluster.KubeClient.StatefulSets(namespace).List(context.TODO(), clusterOptions)
 	if err != nil {
