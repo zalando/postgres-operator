@@ -240,9 +240,8 @@ func (c *Cluster) syncPatroniConfigMap(suffix string) error {
 			}
 			c.PatroniConfigMaps[suffix] = cm
 		}
-	}
-	// if config map does not exist yet, Patroni should create it
-	if err != nil && !k8sutil.ResourceNotFound(err) {
+	} else if !k8sutil.ResourceNotFound(err) {
+		// if config map does not exist yet, Patroni should create it
 		return fmt.Errorf("could not get %s config map: %v", configMapName, err)
 	}
 
@@ -285,9 +284,8 @@ func (c *Cluster) syncPatroniEndpoint(suffix string) error {
 			}
 			c.PatroniEndpoints[suffix] = ep
 		}
-	}
-	// if endpoint does not exist yet, Patroni should create it
-	if err != nil && !k8sutil.ResourceNotFound(err) {
+	} else if !k8sutil.ResourceNotFound(err) {
+		// if endpoint does not exist yet, Patroni should create it
 		return fmt.Errorf("could not get %s endpoint: %v", endpointName, err)
 	}
 
@@ -329,9 +327,8 @@ func (c *Cluster) syncPatroniService() error {
 			}
 			c.Services[Patroni] = svc
 		}
-	}
-	// if config service does not exist yet, Patroni should create it
-	if err != nil && !k8sutil.ResourceNotFound(err) {
+	} else if !k8sutil.ResourceNotFound(err) {
+		// if config service does not exist yet, Patroni should create it
 		return fmt.Errorf("could not get %s service: %v", serviceName, err)
 	}
 

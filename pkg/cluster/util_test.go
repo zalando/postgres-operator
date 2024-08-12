@@ -70,7 +70,7 @@ func checkResourcesInheritedAnnotations(cluster *Cluster, resultAnnotations map[
 	// helper functions
 	containsAnnotations := func(expected map[string]string, actual map[string]string, objName string, objType string) error {
 		if !util.MapContains(actual, expected) {
-			return fmt.Errorf("%s %v expected annotations: %#v, got: %#v", objType, objName, expected, actual)
+			return fmt.Errorf("%s %v expected annotations %#v to be contained in %#v", objType, objName, expected, actual)
 		}
 		return nil
 	}

@@ -1667,19 +1667,18 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", self.test_namespace, "postgresqls", cluster_name)
 
-            # statefulset, pod disruption budget and secrets should be deleted via owner reference
+            # child resources with owner references should be deleted via owner references
             self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_label), 0, "Pods not deleted")
             self.eventuallyEqual(lambda: k8s.count_statefulsets_with_label(cluster_label), 0, "Statefulset not deleted")
+            self.eventuallyEqual(lambda: k8s.count_services_with_label(cluster_label), 0, "Services not deleted")
+            self.eventuallyEqual(lambda: k8s.count_endpoints_with_label(cluster_label), 0, "Endpoints not deleted")
             self.eventuallyEqual(lambda: k8s.count_pdbs_with_label(cluster_label), 0, "Pod disruption budget not deleted")
             self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 0, "Secrets were not deleted")
 
-            time.sleep(5)  # wait for the operator to also delete the leftovers
+            time.sleep(5)  # wait for the operator to also delete the PVCs
 
-            # pvcs and Patroni config service/endpoint should not be affected by owner reference
-            # but deleted by the operator almost immediately
+            # pvcs do not have an owner reference but will deleted by the operator almost immediately
             self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 0, "PVCs not deleted")
-            self.eventuallyEqual(lambda: k8s.count_services_with_label(cluster_label), 0, "Patroni config service not deleted")
-            self.eventuallyEqual(lambda: k8s.count_endpoints_with_label(cluster_label), 0, "Patroni config endpoint not deleted")
 
             # disable owner references in config
             disable_owner_refs = {
