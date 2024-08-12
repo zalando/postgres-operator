@@ -988,6 +988,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		updateFailed = true
 	}
 
+	// Patroni service and endpoints / config maps
+	if err := c.syncPatroniResources(); err != nil {
+		c.logger.Errorf("could not sync services: %v", err)
+		updateFailed = true
+	}
+
 	// Users
 	func() {
 		// check if users need to be synced during update
