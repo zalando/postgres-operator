@@ -1067,9 +1067,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		}
 
-		if err := c.syncLogicalBackupJob(); err != nil {
-			c.logger.Errorf("could not sync logical backup jobs: %v", err)
-			updateFailed = true
+		if oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup {
+			if err := c.syncLogicalBackupJob(); err != nil {
+				c.logger.Errorf("could not sync logical backup jobs: %v", err)
+				updateFailed = true
+			}
 		}
 
 	}()
