@@ -343,8 +343,6 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		}
 	}
 
-	//
-
 	return cluster, nil
 }
 
