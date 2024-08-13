@@ -1224,7 +1224,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 14, "Version should be upgraded from 12 to 13")
+        self.eventuallyEqual(check_version, 13, "Version should be upgraded from 12 to 13")
 
         # should not upgrade because current time is not in maintenanceWindow
         current_time = datetime.now()
@@ -1247,7 +1247,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 14, "Version should not be upgraded")
+        self.eventuallyEqual(check_version, 13, "Version should not be upgraded")
 
         # change the version again to trigger operator sync
         maintenance_window_current = f"{(current_time-timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=30)).strftime('%H:%M')}"
@@ -1270,7 +1270,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 16, "Version should be upgraded from 14 to 16")
+        self.eventuallyEqual(check_version, 15, "Version should be upgraded from 13 to 15")
 
         # test annotation with failed upgrade
         pg_patch_version_16 = {
@@ -1294,7 +1294,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 16, "Version should not be upgraded because annotation for last upgrade's success is set to false")
+        self.eventuallyEqual(check_version, 15, "Version should not be upgraded because annotation for last upgrade's success is set to false")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_persistent_volume_claim_retention_policy(self):
