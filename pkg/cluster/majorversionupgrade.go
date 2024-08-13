@@ -1,12 +1,16 @@
 package cluster
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // VersionMap Map of version numbers
@@ -54,6 +58,52 @@ func (c *Cluster) isUpgradeAllowedForTeam(owningTeam string) bool {
 	return util.SliceContains(allowedTeams, owningTeam)
 }
 
+func (c *Cluster) PatchAnnotations(patchBytesAnnotation []byte) error {
+	resourceName := c.Name
+	_, err := c.KubeClient.Postgresqls(c.Namespace).Patch(context.Background(), resourceName, types.MergePatchType, patchBytesAnnotation, metav1.PatchOptions{})
+	if err != nil {
+		c.logger.Errorf("failed to patch annotations: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (c *Cluster) annotatePostgresResource(isSuccess bool) error {
+	annotations := make(map[string]string)
+	if isSuccess {
+		annotations["last-major-upgrade-succeeded"] = "true"
+	} else {
+		annotations["last-major-upgrade-succeeded"] = "false"
+	}
+	annotations["last-major-upgrade-timestamp"] = metav1.Now().Format("2006-01-02T15:04:05Z")
+
+	patchAnnotation := map[string]map[string]map[string]string{
+		"metadata": {
+			"annotations": annotations,
+		},
+	}
+	patchBytes, err := json.Marshal(patchAnnotation)
+	if err != nil {
+		c.logger.Errorf("failed to marshal annotations: %v", err)
+		return err
+	}
+
+	err = c.PatchAnnotations(patchBytes)
+	if err != nil {
+		c.logger.Errorf("failed to patch annotations to Postgres resource: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (c *Cluster) getLastMajorUpgradeSucceededAnnotation() string {
+	annotations := c.ObjectMeta.GetAnnotations()
+	if val, ok := annotations["last-major-upgrade-succeeded"]; ok {
+		return val
+	}
+	return ""
+}
+
 /*
 Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
 
@@ -67,9 +117,20 @@ func (c *Cluster) majorVersionUpgrade() error {
 	}
 
 	desiredVersion := c.GetDesiredMajorVersionAsInt()
+	isUpgradeSuccess := true
+	lastMajorUpgradeSucceeded := c.getLastMajorUpgradeSucceededAnnotation()
 
 	if c.currentMajorVersion >= desiredVersion {
+		if lastMajorUpgradeSucceeded == "false" {
+			c.annotatePostgresResource(isUpgradeSuccess)
+			c.logger.Info("update last major upgrade succeeded annotation to true")
+		}
 		c.logger.Infof("cluster version up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
+		return nil
+	}
+
+	if lastMajorUpgradeSucceeded == "false" {
+		c.logger.Infof("last major upgrade failed, skipping upgrade")
 		return nil
 	}
 
@@ -103,6 +164,10 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	// Recheck version with newest data from Patroni
 	if c.currentMajorVersion >= desiredVersion {
+		if lastMajorUpgradeSucceeded == "false" {
+			c.annotatePostgresResource(isUpgradeSuccess)
+			c.logger.Info("update last major upgrade succeeded annotation to true")
+		}
 		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
 		return nil
 	}
@@ -132,11 +197,14 @@ func (c *Cluster) majorVersionUpgrade() error {
 				result, err = c.ExecCommand(podName, "/bin/su", "postgres", "-c", upgradeCommand)
 			}
 			if err != nil {
+				isUpgradeSuccess = false
+				c.annotatePostgresResource(isUpgradeSuccess)
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
 				return err
 			}
-			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
 
+			c.annotatePostgresResource(isUpgradeSuccess)
+			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "upgrade from %d to %d finished", c.currentMajorVersion, desiredVersion)
 		}
 	}
