@@ -193,15 +193,44 @@ func TestGatherApplicationIds(t *testing.T) {
 }
 
 func TestHasSlotsInSync(t *testing.T) {
+	client, _ := newFakeK8sStreamClient()
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				Auth: config.Auth{
+					SecretNameTemplate: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}",
+				},
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+
+	appId2 := fmt.Sprintf("%s-2", appId)
+	dbNotExists := "dbnotexists"
+	slotNotExists := fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbNotExists, strings.Replace(appId, "-", "_", -1))
+	slotNotExistsAppId2 := fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbNotExists, strings.Replace(appId2, "-", "_", -1))
 
 	tests := []struct {
 		subTest       string
+		applicationId string
 		expectedSlots map[string]map[string]zalandov1.Slot
 		actualSlots   map[string]map[string]string
 		slotsInSync   bool
 	}{
 		{
-			subTest: "slots are in sync",
+			subTest:       fmt.Sprintf("slots in sync for applicationId %s", appId),
+			applicationId: appId,
 			expectedSlots: map[string]map[string]zalandov1.Slot{
 				dbName: {
 					slotName: zalandov1.Slot{
@@ -227,7 +256,29 @@ func TestHasSlotsInSync(t *testing.T) {
 			},
 			slotsInSync: true,
 		}, {
-			subTest: "slots are not in sync",
+			subTest:       fmt.Sprintf("slots empty for applicationId %s", appId),
+			applicationId: appId,
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbNotExists: {
+					slotNotExists: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{},
+			slotsInSync: false,
+		}, {
+			subTest:       fmt.Sprintf("one slot not in sync for applicationId %s", appId),
+			applicationId: appId,
 			expectedSlots: map[string]map[string]zalandov1.Slot{
 				dbName: {
 					slotName: zalandov1.Slot{
@@ -243,8 +294,90 @@ func TestHasSlotsInSync(t *testing.T) {
 						},
 					},
 				},
-				"dbnotexists": {
+				dbNotExists: {
+					slotNotExists: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": "dbnotexists",
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test2": acidv1.StreamTable{
+								EventType: "stream-type-b",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{
+				slotName: map[string]string{
+					"databases": dbName,
+					"plugin":    constants.EventStreamSourcePluginType,
+					"type":      "logical",
+				},
+			},
+			slotsInSync: false,
+		}, {
+			subTest:       fmt.Sprintf("slots in sync for applicationId %s, but not for for %s - checking %s", appId, appId2, appId),
+			applicationId: appId,
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbName: {
 					slotName: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+				dbNotExists: {
+					slotNotExistsAppId2: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": "dbnotexists",
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test2": acidv1.StreamTable{
+								EventType: "stream-type-b",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{
+				slotName: map[string]string{
+					"databases": dbName,
+					"plugin":    constants.EventStreamSourcePluginType,
+					"type":      "logical",
+				},
+			},
+			slotsInSync: true,
+		}, {
+			subTest:       fmt.Sprintf("slots in sync for applicationId %s, but not for for %s - checking %s", appId, appId2, appId2),
+			applicationId: appId2,
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbName: {
+					slotName: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+				dbNotExists: {
+					slotNotExistsAppId2: zalandov1.Slot{
 						Slot: map[string]string{
 							"databases": "dbnotexists",
 							"plugin":    constants.EventStreamSourcePluginType,
@@ -270,9 +403,9 @@ func TestHasSlotsInSync(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := hasSlotsInSync(appId, tt.expectedSlots, tt.actualSlots)
-		if !result {
-			t.Errorf("slots are not in sync, expected %#v, got %#v", tt.expectedSlots, tt.actualSlots)
+		result := cluster.hasSlotsInSync(tt.applicationId, tt.expectedSlots, tt.actualSlots)
+		if result != tt.slotsInSync {
+			t.Errorf("%s: unexpected result for slot test of applicationId: %v, expected slots %#v, actual slots %#v", tt.subTest, tt.applicationId, tt.expectedSlots, tt.actualSlots)
 		}
 	}
 }
