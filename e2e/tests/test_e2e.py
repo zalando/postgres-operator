@@ -402,8 +402,8 @@ class EndToEndTestCase(unittest.TestCase):
                         "max_connections": new_max_connections_value,
                         "wal_level": "logical"
                      }
-                 },
-                 "patroni": {
+                },
+                "patroni": {
                     "slots": {
                         "first_slot": {
                             "type": "physical"
@@ -414,7 +414,7 @@ class EndToEndTestCase(unittest.TestCase):
                     "retry_timeout": 9,
                     "synchronous_mode": True,
                     "failsafe_mode": True,
-                 }
+                }
             }
         }
 
@@ -517,7 +517,7 @@ class EndToEndTestCase(unittest.TestCase):
             pg_add_new_slots_patch = {
                 "spec": {
                     "patroni": {
-                         "slots": {
+                        "slots": {
                             "test_slot": {
                                 "type": "logical",
                                 "database": "foo",
@@ -1667,19 +1667,18 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", self.test_namespace, "postgresqls", cluster_name)
 
-            # statefulset, pod disruption budget and secrets should be deleted via owner reference
+            # child resources with owner references should be deleted via owner references
             self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_label), 0, "Pods not deleted")
             self.eventuallyEqual(lambda: k8s.count_statefulsets_with_label(cluster_label), 0, "Statefulset not deleted")
+            self.eventuallyEqual(lambda: k8s.count_services_with_label(cluster_label), 0, "Services not deleted")
+            self.eventuallyEqual(lambda: k8s.count_endpoints_with_label(cluster_label), 0, "Endpoints not deleted")
             self.eventuallyEqual(lambda: k8s.count_pdbs_with_label(cluster_label), 0, "Pod disruption budget not deleted")
             self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 0, "Secrets were not deleted")
 
-            time.sleep(5)  # wait for the operator to also delete the leftovers
+            time.sleep(5)  # wait for the operator to also delete the PVCs
 
-            # pvcs and Patroni config service/endpoint should not be affected by owner reference
-            # but deleted by the operator almost immediately
+            # pvcs do not have an owner reference but will deleted by the operator almost immediately
             self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 0, "PVCs not deleted")
-            self.eventuallyEqual(lambda: k8s.count_services_with_label(cluster_label), 0, "Patroni config service not deleted")
-            self.eventuallyEqual(lambda: k8s.count_endpoints_with_label(cluster_label), 0, "Patroni config endpoint not deleted")
 
             # disable owner references in config
             disable_owner_refs = {
@@ -2143,13 +2142,13 @@ class EndToEndTestCase(unittest.TestCase):
         # update the manifest with the streams section
         patch_streaming_config = {
             "spec": {
-                 "patroni": {
+                "patroni": {
                     "slots": {
                         "manual_slot": {
                             "type": "physical"
                         }
                     }
-                 },
+                },
                 "streams": [
                     {
                         "applicationId": "test-app",
@@ -2481,11 +2480,15 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertTrue(self.has_postgresql_owner_reference(svc.metadata.owner_references, inverse), "primary service owner reference check failed")
         replica_svc = k8s.api.core_v1.read_namespaced_service(cluster_name + "-repl", cluster_namespace)
         self.assertTrue(self.has_postgresql_owner_reference(replica_svc.metadata.owner_references, inverse), "replica service owner reference check failed")
+        config_svc = k8s.api.core_v1.read_namespaced_service(cluster_name + "-config", cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(config_svc.metadata.owner_references, inverse), "config service owner reference check failed")
 
         ep = k8s.api.core_v1.read_namespaced_endpoints(cluster_name, cluster_namespace)
         self.assertTrue(self.has_postgresql_owner_reference(ep.metadata.owner_references, inverse), "primary endpoint owner reference check failed")
         replica_ep = k8s.api.core_v1.read_namespaced_endpoints(cluster_name + "-repl", cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(replica_ep.metadata.owner_references, inverse), "replica owner reference check failed")
+        self.assertTrue(self.has_postgresql_owner_reference(replica_ep.metadata.owner_references, inverse), "replica endpoint owner reference check failed")
+        config_ep = k8s.api.core_v1.read_namespaced_endpoints(cluster_name + "-config", cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(config_ep.metadata.owner_references, inverse), "config endpoint owner reference check failed")
 
         pdb = k8s.api.policy_v1.read_namespaced_pod_disruption_budget("postgres-{}-pdb".format(cluster_name), cluster_namespace)
         self.assertTrue(self.has_postgresql_owner_reference(pdb.metadata.owner_references, inverse), "pod disruption owner reference check failed")
