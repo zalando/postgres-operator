@@ -251,7 +251,7 @@ func TestHasSlotsInSync(t *testing.T) {
 			},
 			slotsInSync: true,
 		}, {
-			subTest:       fmt.Sprintf("slots empty for applicationId %s", appId),
+			subTest:       fmt.Sprintf("slots empty for applicationId %s after create or update of publication failed", appId),
 			applicationId: appId,
 			expectedSlots: map[string]map[string]zalandov1.Slot{
 				dbNotExists: {
@@ -272,7 +272,30 @@ func TestHasSlotsInSync(t *testing.T) {
 			actualSlots: map[string]map[string]string{},
 			slotsInSync: false,
 		}, {
-			subTest:       fmt.Sprintf("one slot not in sync for applicationId %s", appId),
+			subTest:       fmt.Sprintf("slot with empty definition for applicationId %s after publication git deleted", appId),
+			applicationId: appId,
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbNotExists: {
+					slotNotExists: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{
+				slotName: nil,
+			},
+			slotsInSync: false,
+		}, {
+			subTest:       fmt.Sprintf("one slot not in sync for applicationId %s because database does not exist", appId),
 			applicationId: appId,
 			expectedSlots: map[string]map[string]zalandov1.Slot{
 				dbName: {
@@ -313,7 +336,7 @@ func TestHasSlotsInSync(t *testing.T) {
 			},
 			slotsInSync: false,
 		}, {
-			subTest:       fmt.Sprintf("slots in sync for applicationId %s, but not for for %s - checking %s", appId, appId2, appId),
+			subTest:       fmt.Sprintf("slots in sync for applicationId %s, but not for %s - checking %s should return true", appId, appId2, appId),
 			applicationId: appId,
 			expectedSlots: map[string]map[string]zalandov1.Slot{
 				dbName: {
@@ -354,7 +377,7 @@ func TestHasSlotsInSync(t *testing.T) {
 			},
 			slotsInSync: true,
 		}, {
-			subTest:       fmt.Sprintf("slots in sync for applicationId %s, but not for for %s - checking %s", appId, appId2, appId2),
+			subTest:       fmt.Sprintf("slots in sync for applicationId %s, but not for %s - checking %s should return false", appId, appId2, appId2),
 			applicationId: appId2,
 			expectedSlots: map[string]map[string]zalandov1.Slot{
 				dbName: {
