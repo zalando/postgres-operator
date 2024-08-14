@@ -29,51 +29,46 @@ func (c *Cluster) createStreams(appId string) (*zalandov1.FabricEventStream, err
 	return streamCRD, nil
 }
 
-func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) error {
+func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) (patchedStream *zalandov1.FabricEventStream, err error) {
 	c.setProcessName("updating event streams")
+
 	patch, err := json.Marshal(newEventStreams)
 	if err != nil {
-		return fmt.Errorf("could not marshal new event stream CRD %q: %v", newEventStreams.Name, err)
+		return nil, fmt.Errorf("could not marshal new event stream CRD %q: %v", newEventStreams.Name, err)
 	}
-	if _, err := c.KubeClient.FabricEventStreams(newEventStreams.Namespace).Patch(
+	if patchedStream, err = c.KubeClient.FabricEventStreams(newEventStreams.Namespace).Patch(
 		context.TODO(), newEventStreams.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return patchedStream, nil
 }
 
-func (c *Cluster) deleteStream(stream *zalandov1.FabricEventStream) error {
+func (c *Cluster) deleteStream(appId string) error {
 	c.setProcessName("deleting event stream")
 
-	err := c.KubeClient.FabricEventStreams(stream.Namespace).Delete(context.TODO(), stream.Name, metav1.DeleteOptions{})
+	err := c.KubeClient.FabricEventStreams(c.Streams[appId].Namespace).Delete(context.TODO(), c.Streams[appId].Name, metav1.DeleteOptions{})
 	if err != nil {
-		return fmt.Errorf("could not delete event stream %q: %v", stream.Name, err)
+		return fmt.Errorf("could not delete event stream %q with applicationId %s: %v", c.Streams[appId].Name, appId, err)
 	}
+	delete(c.Streams, appId)
+
 	return nil
 }
 
 func (c *Cluster) deleteStreams() error {
-	c.setProcessName("deleting event streams")
-
 	// check if stream CRD is installed before trying a delete
 	_, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), constants.EventStreamCRDName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 		return nil
 	}
-
+	c.setProcessName("deleting event streams")
 	errors := make([]string, 0)
-	listOptions := metav1.ListOptions{
-		LabelSelector: c.labelsSet(true).String(),
-	}
-	streams, err := c.KubeClient.FabricEventStreams(c.Namespace).List(context.TODO(), listOptions)
-	if err != nil {
-		return fmt.Errorf("could not list of FabricEventStreams: %v", err)
-	}
-	for _, stream := range streams.Items {
-		err := c.deleteStream(&stream)
+
+	for appId := range c.Streams {
+		err := c.deleteStream(appId)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("could not delete event stream %q: %v", stream.Name, err))
+			errors = append(errors, fmt.Sprintf("%v", err))
 		}
 	}
 
@@ -84,7 +79,7 @@ func (c *Cluster) deleteStreams() error {
 	return nil
 }
 
-func gatherApplicationIds(streams []acidv1.Stream) []string {
+func getDistinctApplicationIds(streams []acidv1.Stream) []string {
 	appIds := make([]string, 0)
 	for _, stream := range streams {
 		if !util.SliceContains(appIds, stream.ApplicationId) {
@@ -133,11 +128,13 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 			createPublications[slotName] = tableList
 		} else if currentTables != tableList {
 			alterPublications[slotName] = tableList
+		} else {
+			(*slotsToSync)[slotName] = slotAndPublication.Slot
 		}
 	}
 
 	// check if there is any deletion
-	for slotName, _ := range currentPublications {
+	for slotName := range currentPublications {
 		if _, exists := databaseSlotsList[slotName]; !exists {
 			deletePublications = append(deletePublications, slotName)
 		}
@@ -147,30 +144,34 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 		return nil
 	}
 
-	var errorMessage error = nil
+	errors := make([]string, 0)
 	for publicationName, tables := range createPublications {
 		if err = c.executeCreatePublication(publicationName, tables); err != nil {
-			errorMessage = fmt.Errorf("creation of publication %q failed: %v", publicationName, err)
+			errors = append(errors, fmt.Sprintf("creation of publication %q failed: %v", publicationName, err))
 			continue
 		}
 		(*slotsToSync)[publicationName] = databaseSlotsList[publicationName].Slot
 	}
 	for publicationName, tables := range alterPublications {
 		if err = c.executeAlterPublication(publicationName, tables); err != nil {
-			errorMessage = fmt.Errorf("update of publication %q failed: %v", publicationName, err)
+			errors = append(errors, fmt.Sprintf("update of publication %q failed: %v", publicationName, err))
 			continue
 		}
 		(*slotsToSync)[publicationName] = databaseSlotsList[publicationName].Slot
 	}
 	for _, publicationName := range deletePublications {
 		if err = c.executeDropPublication(publicationName); err != nil {
-			errorMessage = fmt.Errorf("deletion of publication %q failed: %v", publicationName, err)
+			errors = append(errors, fmt.Sprintf("deletion of publication %q failed: %v", publicationName, err))
 			continue
 		}
 		(*slotsToSync)[publicationName] = nil
 	}
 
-	return errorMessage
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
+
+	return nil
 }
 
 func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEventStream {
@@ -334,13 +335,13 @@ func (c *Cluster) syncStreams() error {
 		return fmt.Errorf("could not get list of databases: %v", err)
 	}
 	// get database name with empty list of slot, except template0 and template1
-	for dbName, _ := range listDatabases {
+	for dbName := range listDatabases {
 		if dbName != "template0" && dbName != "template1" {
 			databaseSlots[dbName] = map[string]zalandov1.Slot{}
 		}
 	}
 
-	// gather list of required slots and publications, group by database
+	// get list of required slots and publications, group by database
 	for _, stream := range c.Spec.Streams {
 		if _, exists := databaseSlots[stream.Database]; !exists {
 			c.logger.Warningf("database %q does not exist in the cluster", stream.Database)
@@ -375,7 +376,7 @@ func (c *Cluster) syncStreams() error {
 	for dbName, databaseSlotsList := range databaseSlots {
 		err := c.syncPublication(dbName, databaseSlotsList, &slotsToSync)
 		if err != nil {
-			c.logger.Warningf("could not sync publications in database %q: %v", dbName, err)
+			c.logger.Warningf("could not sync all publications in database %q: %v", dbName, err)
 			continue
 		}
 	}
@@ -394,82 +395,107 @@ func (c *Cluster) syncStreams() error {
 	}
 
 	// finally sync stream CRDs
-	err = c.createOrUpdateStreams(slotsToSync)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *Cluster) createOrUpdateStreams(createdSlots map[string]map[string]string) error {
-
-	// fetch different application IDs from streams section
+	// get distinct application IDs from streams section
 	// there will be a separate event stream resource for each ID
-	appIds := gatherApplicationIds(c.Spec.Streams)
-
-	// list all existing stream CRDs
-	listOptions := metav1.ListOptions{
-		LabelSelector: c.labelsSet(true).String(),
-	}
-	streams, err := c.KubeClient.FabricEventStreams(c.Namespace).List(context.TODO(), listOptions)
-	if err != nil {
-		return fmt.Errorf("could not list of FabricEventStreams: %v", err)
-	}
-
-	for idx, appId := range appIds {
-		streamExists := false
-
-		// update stream when it exists and EventStreams array differs
-		for _, stream := range streams.Items {
-			if appId == stream.Spec.ApplicationId {
-				streamExists = true
-				desiredStreams := c.generateFabricEventStream(appId)
-				if match, reason := sameStreams(stream.Spec.EventStreams, desiredStreams.Spec.EventStreams); !match {
-					c.logger.Debugf("updating event streams: %s", reason)
-					desiredStreams.ObjectMeta = stream.ObjectMeta
-					err = c.updateStreams(desiredStreams)
-					if err != nil {
-						return fmt.Errorf("failed updating event stream %s: %v", stream.Name, err)
-					}
-					c.logger.Infof("event stream %q has been successfully updated", stream.Name)
-				}
-				continue
+	appIds := getDistinctApplicationIds(c.Spec.Streams)
+	for _, appId := range appIds {
+		if hasSlotsInSync(appId, databaseSlots, slotsToSync) {
+			if err = c.syncStream(appId); err != nil {
+				c.logger.Warningf("could not sync event streams with applicationId %s: %v", appId, err)
 			}
-		}
-
-		if !streamExists {
-			// check if there is any slot with the applicationId
-			slotName := getSlotName(c.Spec.Streams[idx].Database, appId)
-			if _, exists := createdSlots[slotName]; !exists {
-				c.logger.Warningf("no slot %s with applicationId %s exists, skipping event stream creation", slotName, appId)
-				continue
-			}
-			c.logger.Infof("event streams with applicationId %s do not exist, create it", appId)
-			streamCRD, err := c.createStreams(appId)
-			if err != nil {
-				return fmt.Errorf("failed creating event streams with applicationId %s: %v", appId, err)
-			}
-			c.logger.Infof("event streams %q have been successfully created", streamCRD.Name)
+		} else {
+			c.logger.Warningf("database replication slots %#v for streams with applicationId %s not in sync, skipping event stream sync", slotsToSync, appId)
 		}
 	}
 
 	// check if there is any deletion
-	for _, stream := range streams.Items {
-		if !util.SliceContains(appIds, stream.Spec.ApplicationId) {
-			c.logger.Infof("event streams with applicationId %s do not exist in the manifest, delete it", stream.Spec.ApplicationId)
-			err := c.deleteStream(&stream)
-			if err != nil {
-				return fmt.Errorf("failed deleting event streams with applicationId %s: %v", stream.Spec.ApplicationId, err)
-			}
-			c.logger.Infof("event streams %q have been successfully deleted", stream.Name)
-		}
+	if err = c.cleanupRemovedStreams(appIds); err != nil {
+		return fmt.Errorf("%v", err)
 	}
 
 	return nil
 }
 
-func sameStreams(curEventStreams, newEventStreams []zalandov1.EventStream) (match bool, reason string) {
+func hasSlotsInSync(appId string, databaseSlots map[string]map[string]zalandov1.Slot, slotsToSync map[string]map[string]string) bool {
+	allSlotsInSync := true
+	for dbName, slots := range databaseSlots {
+		for slotName := range slots {
+			if slotName == getSlotName(dbName, appId) {
+				if slot, exists := slotsToSync[slotName]; !exists || slot == nil {
+					allSlotsInSync = false
+					continue
+				}
+			}
+		}
+	}
+
+	return allSlotsInSync
+}
+
+func (c *Cluster) syncStream(appId string) error {
+	streamExists := false
+	// update stream when it exists and EventStreams array differs
+	for _, stream := range c.Streams {
+		if appId == stream.Spec.ApplicationId {
+			streamExists = true
+			desiredStreams := c.generateFabricEventStream(appId)
+			if !reflect.DeepEqual(stream.ObjectMeta.OwnerReferences, desiredStreams.ObjectMeta.OwnerReferences) {
+				c.logger.Infof("owner references of event streams with applicationId %s do not match the current ones", appId)
+				stream.ObjectMeta.OwnerReferences = desiredStreams.ObjectMeta.OwnerReferences
+				c.setProcessName("updating event streams with applicationId %s", appId)
+				stream, err := c.KubeClient.FabricEventStreams(stream.Namespace).Update(context.TODO(), stream, metav1.UpdateOptions{})
+				if err != nil {
+					return fmt.Errorf("could not update event streams with applicationId %s: %v", appId, err)
+				}
+				c.Streams[appId] = stream
+			}
+			if match, reason := c.compareStreams(stream, desiredStreams); !match {
+				c.logger.Debugf("updating event streams with applicationId %s: %s", appId, reason)
+				desiredStreams.ObjectMeta = stream.ObjectMeta
+				updatedStream, err := c.updateStreams(desiredStreams)
+				if err != nil {
+					return fmt.Errorf("failed updating event streams %s with applicationId %s: %v", stream.Name, appId, err)
+				}
+				c.Streams[appId] = updatedStream
+				c.logger.Infof("event streams %q with applicationId %s have been successfully updated", updatedStream.Name, appId)
+			}
+			continue
+		}
+	}
+
+	if !streamExists {
+		c.logger.Infof("event streams with applicationId %s do not exist, create it", appId)
+		createdStream, err := c.createStreams(appId)
+		if err != nil {
+			return fmt.Errorf("failed creating event streams with applicationId %s: %v", appId, err)
+		}
+		c.logger.Infof("event streams %q have been successfully created", createdStream.Name)
+		c.Streams[appId] = createdStream
+	}
+
+	return nil
+}
+
+func (c *Cluster) compareStreams(curEventStreams, newEventStreams *zalandov1.FabricEventStream) (match bool, reason string) {
+	reasons := make([]string, 0)
+	match = true
+
+	// stream operator can add extra annotations so incl. current annotations in desired annotations
+	desiredAnnotations := c.annotationsSet(curEventStreams.Annotations)
+	if changed, reason := c.compareAnnotations(curEventStreams.ObjectMeta.Annotations, desiredAnnotations); changed {
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new streams annotations do not match: %s", reason))
+	}
+
+	if changed, reason := sameEventStreams(curEventStreams.Spec.EventStreams, newEventStreams.Spec.EventStreams); !changed {
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new streams EventStreams array does not match : %s", reason))
+	}
+
+	return match, strings.Join(reasons, ", ")
+}
+
+func sameEventStreams(curEventStreams, newEventStreams []zalandov1.EventStream) (match bool, reason string) {
 	if len(newEventStreams) != len(curEventStreams) {
 		return false, "number of defined streams is different"
 	}
@@ -492,4 +518,24 @@ func sameStreams(curEventStreams, newEventStreams []zalandov1.EventStream) (matc
 	}
 
 	return true, ""
+}
+
+func (c *Cluster) cleanupRemovedStreams(appIds []string) error {
+	errors := make([]string, 0)
+	for appId := range c.Streams {
+		if !util.SliceContains(appIds, appId) {
+			c.logger.Infof("event streams with applicationId %s do not exist in the manifest, delete it", appId)
+			err := c.deleteStream(appId)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("failed deleting event streams with applicationId %s: %v", appId, err))
+			}
+			c.logger.Infof("event streams with applicationId %s have been successfully deleted", appId)
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("could not delete all removed event streams: %v", strings.Join(errors, `', '`))
+	}
+
+	return nil
 }

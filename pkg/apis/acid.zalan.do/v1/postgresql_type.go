@@ -134,7 +134,7 @@ type Volume struct {
 	Size          string                `json:"size"`
 	StorageClass  string                `json:"storageClass,omitempty"`
 	SubPath       string                `json:"subPath,omitempty"`
-	IsSubPathExpr *bool                 `json:"isSubPathExpr,omitemtpy"`
+	IsSubPathExpr *bool                 `json:"isSubPathExpr,omitempty"`
 	Iops          *int64                `json:"iops,omitempty"`
 	Throughput    *int64                `json:"throughput,omitempty"`
 	VolumeType    string                `json:"type,omitempty"`
@@ -145,7 +145,7 @@ type AdditionalVolume struct {
 	Name             string          `json:"name"`
 	MountPath        string          `json:"mountPath"`
 	SubPath          string          `json:"subPath,omitempty"`
-	IsSubPathExpr    *bool           `json:"isSubPathExpr,omitemtpy"`
+	IsSubPathExpr    *bool           `json:"isSubPathExpr,omitempty"`
 	TargetContainers []string        `json:"targetContainers"`
 	VolumeSource     v1.VolumeSource `json:"volumeSource"`
 }
