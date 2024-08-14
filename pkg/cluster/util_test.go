@@ -651,24 +651,6 @@ func Test_trimCronjobName(t *testing.T) {
 }
 
 func TestIsInMaintenanceWindow(t *testing.T) {
-	client, _ := newFakeK8sStreamClient()
-
-	var cluster = New(
-		Config{
-			OpConfig: config.Config{
-				PodManagementPolicy: "ordered_ready",
-				Resources: config.Resources{
-					ClusterLabels:        map[string]string{"application": "spilo"},
-					ClusterNameLabel:     "cluster-name",
-					DefaultCPURequest:    "300m",
-					DefaultCPULimit:      "300m",
-					DefaultMemoryRequest: "300Mi",
-					DefaultMemoryLimit:   "300Mi",
-					PodRoleLabel:         "spilo-role",
-				},
-			},
-		}, client, pg, logger, eventRecorder)
-
 	now := time.Now()
 	futureTimeStart := now.Add(1 * time.Hour)
 	futureTimeStartFormatted := futureTimeStart.Format("15:04")
@@ -723,7 +705,7 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster.Spec.MaintenanceWindows = tt.windows
-			if cluster.isInMainternanceWindow() != tt.expected {
+			if isInMainternanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
 				t.Errorf("Expected isInMainternanceWindow to return %t", tt.expected)
 			}
 		})
