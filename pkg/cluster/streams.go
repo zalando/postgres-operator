@@ -480,7 +480,9 @@ func (c *Cluster) compareStreams(curEventStreams, newEventStreams *zalandov1.Fab
 	reasons := make([]string, 0)
 	match = true
 
-	if changed, reason := c.compareAnnotations(curEventStreams.ObjectMeta.Annotations, newEventStreams.ObjectMeta.Annotations); changed {
+	// stream operator can add extra annotations so incl. current annotations in desired annotations
+	desiredAnnotations := c.annotationsSet(curEventStreams.Annotations)
+	if changed, reason := c.compareAnnotations(curEventStreams.ObjectMeta.Annotations, desiredAnnotations); changed {
 		match = false
 		reasons = append(reasons, fmt.Sprintf("new streams annotations do not match: %s", reason))
 	}
