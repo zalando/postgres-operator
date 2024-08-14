@@ -449,10 +449,6 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 	return err
 }
 
-func (c *Cluster) waitForAnyReplicaLabelReady() error {
-	return c._waitPodLabelsReady(true)
-}
-
 func (c *Cluster) waitForAllPodsLabelReady() error {
 	return c._waitPodLabelsReady(false)
 }
