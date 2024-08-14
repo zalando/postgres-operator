@@ -228,6 +228,7 @@ func (c *Cluster) syncPatroniConfigMap(suffix string) error {
 		}
 		annotations := make(map[string]string)
 		maps.Copy(annotations, cm.Annotations)
+		// Patroni can add extra annotations so incl. current annotations in desired annotations
 		desiredAnnotations := c.annotationsSet(cm.Annotations)
 		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
@@ -272,6 +273,7 @@ func (c *Cluster) syncPatroniEndpoint(suffix string) error {
 		}
 		annotations := make(map[string]string)
 		maps.Copy(annotations, ep.Annotations)
+		// Patroni can add extra annotations so incl. current annotations in desired annotations
 		desiredAnnotations := c.annotationsSet(ep.Annotations)
 		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
@@ -315,6 +317,7 @@ func (c *Cluster) syncPatroniService() error {
 		}
 		annotations := make(map[string]string)
 		maps.Copy(annotations, svc.Annotations)
+		// Patroni can add extra annotations so incl. current annotations in desired annotations
 		desiredAnnotations := c.annotationsSet(svc.Annotations)
 		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)

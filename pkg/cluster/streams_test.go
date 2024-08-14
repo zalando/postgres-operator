@@ -18,28 +18,24 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
-func newFakeK8sStreamClient() (k8sutil.KubernetesClient, *fake.Clientset) {
-	zalandoClientSet := fakezalandov1.NewSimpleClientset()
-	clientSet := fake.NewSimpleClientset()
-
-	return k8sutil.KubernetesClient{
-		FabricEventStreamsGetter: zalandoClientSet.ZalandoV1(),
-		PostgresqlsGetter:        zalandoClientSet.AcidV1(),
-		PodsGetter:               clientSet.CoreV1(),
-		StatefulSetsGetter:       clientSet.AppsV1(),
-	}, clientSet
-}
-
 var (
-	clusterName string = "acid-test-cluster"
+	clusterName string = "acid-stream-cluster"
 	namespace   string = "default"
 	appId       string = "test-app"
 	dbName      string = "foo"
 	fesUser     string = fmt.Sprintf("%s%s", constants.EventStreamSourceSlotPrefix, constants.UserRoleNameSuffix)
 	slotName    string = fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
+
+	zalandoClientSet = fakezalandov1.NewSimpleClientset()
+
+	client = k8sutil.KubernetesClient{
+		FabricEventStreamsGetter: zalandoClientSet.ZalandoV1(),
+		PostgresqlsGetter:        zalandoClientSet.AcidV1(),
+		PodsGetter:               clientSet.CoreV1(),
+		StatefulSetsGetter:       clientSet.AppsV1(),
+	}
 
 	pg = acidv1.Postgresql{
 		TypeMeta: metav1.TypeMeta{
@@ -181,6 +177,25 @@ var (
 			},
 		},
 	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				Auth: config.Auth{
+					SecretNameTemplate: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}",
+				},
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
 )
 
 func TestGatherApplicationIds(t *testing.T) {
@@ -193,15 +208,24 @@ func TestGatherApplicationIds(t *testing.T) {
 }
 
 func TestHasSlotsInSync(t *testing.T) {
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+
+	appId2 := fmt.Sprintf("%s-2", appId)
+	dbNotExists := "dbnotexists"
+	slotNotExists := fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbNotExists, strings.Replace(appId, "-", "_", -1))
+	slotNotExistsAppId2 := fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbNotExists, strings.Replace(appId2, "-", "_", -1))
 
 	tests := []struct {
 		subTest       string
+		applicationId string
 		expectedSlots map[string]map[string]zalandov1.Slot
 		actualSlots   map[string]map[string]string
 		slotsInSync   bool
 	}{
 		{
-			subTest: "slots are in sync",
+			subTest:       fmt.Sprintf("slots in sync for applicationId %s", appId),
+			applicationId: appId,
 			expectedSlots: map[string]map[string]zalandov1.Slot{
 				dbName: {
 					slotName: zalandov1.Slot{
@@ -227,7 +251,52 @@ func TestHasSlotsInSync(t *testing.T) {
 			},
 			slotsInSync: true,
 		}, {
-			subTest: "slots are not in sync",
+			subTest:       fmt.Sprintf("slots empty for applicationId %s after create or update of publication failed", appId),
+			applicationId: appId,
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbNotExists: {
+					slotNotExists: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{},
+			slotsInSync: false,
+		}, {
+			subTest:       fmt.Sprintf("slot with empty definition for applicationId %s after publication git deleted", appId),
+			applicationId: appId,
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbNotExists: {
+					slotNotExists: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{
+				slotName: nil,
+			},
+			slotsInSync: false,
+		}, {
+			subTest:       fmt.Sprintf("one slot not in sync for applicationId %s because database does not exist", appId),
+			applicationId: appId,
 			expectedSlots: map[string]map[string]zalandov1.Slot{
 				dbName: {
 					slotName: zalandov1.Slot{
@@ -243,8 +312,90 @@ func TestHasSlotsInSync(t *testing.T) {
 						},
 					},
 				},
-				"dbnotexists": {
+				dbNotExists: {
+					slotNotExists: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": "dbnotexists",
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test2": acidv1.StreamTable{
+								EventType: "stream-type-b",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{
+				slotName: map[string]string{
+					"databases": dbName,
+					"plugin":    constants.EventStreamSourcePluginType,
+					"type":      "logical",
+				},
+			},
+			slotsInSync: false,
+		}, {
+			subTest:       fmt.Sprintf("slots in sync for applicationId %s, but not for %s - checking %s should return true", appId, appId2, appId),
+			applicationId: appId,
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbName: {
 					slotName: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+				dbNotExists: {
+					slotNotExistsAppId2: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": "dbnotexists",
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test2": acidv1.StreamTable{
+								EventType: "stream-type-b",
+							},
+						},
+					},
+				},
+			},
+			actualSlots: map[string]map[string]string{
+				slotName: map[string]string{
+					"databases": dbName,
+					"plugin":    constants.EventStreamSourcePluginType,
+					"type":      "logical",
+				},
+			},
+			slotsInSync: true,
+		}, {
+			subTest:       fmt.Sprintf("slots in sync for applicationId %s, but not for %s - checking %s should return false", appId, appId2, appId2),
+			applicationId: appId2,
+			expectedSlots: map[string]map[string]zalandov1.Slot{
+				dbName: {
+					slotName: zalandov1.Slot{
+						Slot: map[string]string{
+							"databases": dbName,
+							"plugin":    constants.EventStreamSourcePluginType,
+							"type":      "logical",
+						},
+						Publication: map[string]acidv1.StreamTable{
+							"test1": acidv1.StreamTable{
+								EventType: "stream-type-a",
+							},
+						},
+					},
+				},
+				dbNotExists: {
+					slotNotExistsAppId2: zalandov1.Slot{
 						Slot: map[string]string{
 							"databases": "dbnotexists",
 							"plugin":    constants.EventStreamSourcePluginType,
@@ -270,35 +421,14 @@ func TestHasSlotsInSync(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := hasSlotsInSync(appId, tt.expectedSlots, tt.actualSlots)
-		if !result {
-			t.Errorf("slots are not in sync, expected %#v, got %#v", tt.expectedSlots, tt.actualSlots)
+		result := hasSlotsInSync(tt.applicationId, tt.expectedSlots, tt.actualSlots)
+		if result != tt.slotsInSync {
+			t.Errorf("%s: unexpected result for slot test of applicationId: %v, expected slots %#v, actual slots %#v", tt.subTest, tt.applicationId, tt.expectedSlots, tt.actualSlots)
 		}
 	}
 }
 
 func TestGenerateFabricEventStream(t *testing.T) {
-	client, _ := newFakeK8sStreamClient()
-
-	var cluster = New(
-		Config{
-			OpConfig: config.Config{
-				Auth: config.Auth{
-					SecretNameTemplate: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}",
-				},
-				PodManagementPolicy: "ordered_ready",
-				Resources: config.Resources{
-					ClusterLabels:        map[string]string{"application": "spilo"},
-					ClusterNameLabel:     "cluster-name",
-					DefaultCPURequest:    "300m",
-					DefaultCPULimit:      "300m",
-					DefaultMemoryRequest: "300Mi",
-					DefaultMemoryLimit:   "300Mi",
-					PodRoleLabel:         "spilo-role",
-				},
-			},
-		}, client, pg, logger, eventRecorder)
-
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
 
@@ -312,7 +442,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 
 	// compare generated stream with expected stream
 	result := cluster.generateFabricEventStream(appId)
-	if match, _ := sameStreams(result.Spec.EventStreams, fes.Spec.EventStreams); !match {
+	if match, _ := cluster.compareStreams(result, fes); !match {
 		t.Errorf("malformed FabricEventStream, expected %#v, got %#v", fes, result)
 	}
 
@@ -328,7 +458,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	}
 
 	// compare stream returned from API with expected stream
-	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, fes.Spec.EventStreams); !match {
+	if match, _ := cluster.compareStreams(&streams.Items[0], fes); !match {
 		t.Errorf("malformed FabricEventStream returned from API, expected %#v, got %#v", fes, streams.Items[0])
 	}
 
@@ -345,13 +475,28 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	}
 
 	// compare stream resturned from API with generated stream
-	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
+	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
 		t.Errorf("returned FabricEventStream differs from generated one, expected %#v, got %#v", result, streams.Items[0])
+	}
+}
+
+func newFabricEventStream(streams []zalandov1.EventStream, annotations map[string]string) *zalandov1.FabricEventStream {
+	return &zalandov1.FabricEventStream{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        fmt.Sprintf("%s-12345", clusterName),
+			Annotations: annotations,
+		},
+		Spec: zalandov1.FabricEventStreamSpec{
+			ApplicationId: appId,
+			EventStreams:  streams,
+		},
 	}
 }
 
 func TestSameStreams(t *testing.T) {
 	testName := "TestSameStreams"
+	annotationsA := map[string]string{"owned-by": "acid"}
+	annotationsB := map[string]string{"owned-by": "foo"}
 
 	stream1 := zalandov1.EventStream{
 		EventStreamFlow:     zalandov1.EventStreamFlow{},
@@ -396,57 +541,64 @@ func TestSameStreams(t *testing.T) {
 
 	tests := []struct {
 		subTest  string
-		streamsA []zalandov1.EventStream
-		streamsB []zalandov1.EventStream
+		streamsA *zalandov1.FabricEventStream
+		streamsB *zalandov1.FabricEventStream
 		match    bool
 		reason   string
 	}{
 		{
 			subTest:  "identical streams",
-			streamsA: []zalandov1.EventStream{stream1, stream2},
-			streamsB: []zalandov1.EventStream{stream1, stream2},
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, annotationsA),
+			streamsB: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, annotationsA),
 			match:    true,
 			reason:   "",
 		},
 		{
 			subTest:  "same streams different order",
-			streamsA: []zalandov1.EventStream{stream1, stream2},
-			streamsB: []zalandov1.EventStream{stream2, stream1},
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
+			streamsB: newFabricEventStream([]zalandov1.EventStream{stream2, stream1}, nil),
 			match:    true,
 			reason:   "",
 		},
 		{
 			subTest:  "same streams different order",
-			streamsA: []zalandov1.EventStream{stream1},
-			streamsB: []zalandov1.EventStream{stream1, stream2},
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1}, nil),
+			streamsB: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
 			match:    false,
 			reason:   "number of defined streams is different",
 		},
 		{
 			subTest:  "different number of streams",
-			streamsA: []zalandov1.EventStream{stream1},
-			streamsB: []zalandov1.EventStream{stream1, stream2},
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1}, nil),
+			streamsB: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
 			match:    false,
 			reason:   "number of defined streams is different",
 		},
 		{
 			subTest:  "event stream specs differ",
-			streamsA: []zalandov1.EventStream{stream1, stream2},
-			streamsB: fes.Spec.EventStreams,
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
+			streamsB: fes,
 			match:    false,
 			reason:   "number of defined streams is different",
 		},
 		{
 			subTest:  "event stream recovery specs differ",
-			streamsA: []zalandov1.EventStream{stream2},
-			streamsB: []zalandov1.EventStream{stream3},
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, nil),
+			streamsB: newFabricEventStream([]zalandov1.EventStream{stream3}, nil),
+			match:    false,
+			reason:   "event stream specs differ",
+		},
+		{
+			subTest:  "event stream annotations differ",
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, annotationsA),
+			streamsB: newFabricEventStream([]zalandov1.EventStream{stream3}, annotationsB),
 			match:    false,
 			reason:   "event stream specs differ",
 		},
 	}
 
 	for _, tt := range tests {
-		streamsMatch, matchReason := sameStreams(tt.streamsA, tt.streamsB)
+		streamsMatch, matchReason := cluster.compareStreams(tt.streamsA, tt.streamsB)
 		if streamsMatch != tt.match {
 			t.Errorf("%s %s: unexpected match result when comparing streams: got %s, epxected %s",
 				testName, tt.subTest, matchReason, tt.reason)
@@ -455,8 +607,7 @@ func TestSameStreams(t *testing.T) {
 }
 
 func TestUpdateFabricEventStream(t *testing.T) {
-	client, _ := newFakeK8sStreamClient()
-
+	pg.Name = fmt.Sprintf("%s-2", pg.Name)
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -502,7 +653,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	}
 	streams := patchPostgresqlStreams(t, cluster, &pg.Spec, listOptions)
 	result := cluster.generateFabricEventStream(appId)
-	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
+	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
 		t.Errorf("Malformed FabricEventStream after updating manifest, expected %#v, got %#v", streams.Items[0], result)
 	}
 
@@ -516,7 +667,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 
 	streams = patchPostgresqlStreams(t, cluster, &pg.Spec, listOptions)
 	result = cluster.generateFabricEventStream(appId)
-	if match, _ := sameStreams(streams.Items[0].Spec.EventStreams, result.Spec.EventStreams); !match {
+	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
 		t.Errorf("Malformed FabricEventStream after disabling event recovery, expected %#v, got %#v", streams.Items[0], result)
 	}
 
