@@ -1276,8 +1276,9 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(check_version, 15, "Version should be upgraded from 13 to 15")
 
         # check if annotation for last upgrade's success is set
-        annotation = get_annotation()
-        self.assertEqual(annotation.get("last-major-upgrade-succeeded"), "true", "Annotation for last upgrade's success is not set")
+        previous_annotation = get_annotation()
+        self.assertEqual(previous_annotation.get("last-major-upgrade-succeeded"), "true", "Annotation for last upgrade's success is not set")
+        self.assertNotEqual(previous_annotation.get("last-major-upgrade-timestamp"), None, "Annotation for last upgrade is not set")
 
         # test annotation with failed upgrade annotation
         pg_patch_version_16 = {
@@ -1309,8 +1310,9 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        annotation = get_annotation()
-        self.assertEqual(annotation.get("last-major-upgrade-succeeded"), "true", "Annotation for last upgrade's success is not True")
+        new_annotation = get_annotation()
+        self.assertEqual(new_annotation.get("last-major-upgrade-succeeded"), "true", "Annotation for last upgrade's success is not True")
+        self.assertNotEqual(new_annotation.get("last-major-upgrade-timestamp"), previous_annotation.get("last-major-upgrade-timestamp"), "Annotation for last upgrade is not set")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_persistent_volume_claim_retention_policy(self):
