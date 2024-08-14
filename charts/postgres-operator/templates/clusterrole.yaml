@@ -120,6 +120,7 @@ rules:
   - create
   - delete
   - get
+  - patch
   - update
 # to check nodes for node readiness label
 - apiGroups:
@@ -196,6 +197,7 @@ rules:
   - get
   - list
   - patch
+  - update
 # to CRUD cron jobs for logical backups
 - apiGroups:
   - batch

@@ -465,6 +465,7 @@ def get_postgresqls():
             'status': status,
             'num_elb': spec.get('enableMasterLoadBalancer', 0) + spec.get('enableReplicaLoadBalancer', 0) + \
                        spec.get('enableMasterPoolerLoadBalancer', 0) + spec.get('enableReplicaPoolerLoadBalancer', 0),
+            'maintenance_windows': spec.get('maintenanceWindows', []),
         }
         for cluster in these(
             read_postgresqls(
@@ -565,6 +566,11 @@ def update_postgresql(namespace: str, cluster: str):
         if not isinstance(postgresql['spec']['allowedSourceRanges'], list):
             return fail('allowedSourceRanges invalid')
         spec['allowedSourceRanges'] = postgresql['spec']['allowedSourceRanges']
+
+    if 'maintenanceWindows' in postgresql['spec']:
+        if not isinstance(postgresql['spec']['maintenanceWindows'], list):
+            return fail('maintenanceWindows invalid')
+        spec['maintenanceWindows'] = postgresql['spec']['maintenanceWindows']
 
     if 'numberOfInstances' in postgresql['spec']:
         if not isinstance(postgresql['spec']['numberOfInstances'], int):
