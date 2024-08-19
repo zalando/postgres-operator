@@ -1077,6 +1077,9 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
+				Resources: config.Resources{
+					EnableOwnerReferences: util.True(),
+				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 	cluster.Statefulset = &appsv1.StatefulSet{

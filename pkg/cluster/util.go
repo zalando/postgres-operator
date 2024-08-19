@@ -176,6 +176,10 @@ func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate
 	}
 
 	logNiceDiff(c.logger, old.Spec, new.Spec)
+
+	if reason != "" {
+		c.logger.Infof("reason: %s", reason)
+	}
 }
 
 func logNiceDiff(log *logrus.Entry, old, new interface{}) {
@@ -445,10 +449,6 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 	return err
 }
 
-func (c *Cluster) waitForAnyReplicaLabelReady() error {
-	return c._waitPodLabelsReady(true)
-}
-
 func (c *Cluster) waitForAllPodsLabelReady() error {
 	return c._waitPodLabelsReady(false)
 }
@@ -663,15 +663,15 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 	return resources, nil
 }
 
-func (c *Cluster) isInMainternanceWindow() bool {
-	if c.Spec.MaintenanceWindows == nil {
+func isInMainternanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
+	if len(specMaintenanceWindows) == 0 {
 		return true
 	}
 	now := time.Now()
 	currentDay := now.Weekday()
 	currentTime := now.Format("15:04")
 
-	for _, window := range c.Spec.MaintenanceWindows {
+	for _, window := range specMaintenanceWindows {
 		startTime := window.StartTime.Format("15:04")
 		endTime := window.EndTime.Format("15:04")
 

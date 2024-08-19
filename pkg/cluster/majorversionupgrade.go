@@ -11,7 +11,6 @@ import (
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"11": 110000,
 	"12": 120000,
 	"13": 130000,
 	"14": 140000,
@@ -74,7 +73,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
-	if !c.isInMainternanceWindow() {
+	if !isInMainternanceWindow(c.Spec.MaintenanceWindows) {
 		c.logger.Infof("skipping major version upgrade, not in maintenance window")
 		return nil
 	}

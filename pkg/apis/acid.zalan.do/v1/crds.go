@@ -596,9 +596,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 								Enum: []apiextv1.JSON{
 									{
-										Raw: []byte(`"11"`),
-									},
-									{
 										Raw: []byte(`"12"`),
 									},
 									{
@@ -1329,7 +1326,7 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_init_containers": {
 								Type: "boolean",
 							},
-							"enable_secrets_deletion": {
+							"enable_owner_references": {
 								Type: "boolean",
 							},
 							"enable_persistent_volume_claim_deletion": {
@@ -1342,6 +1339,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "boolean",
 							},
 							"enable_readiness_probe": {
+								Type: "boolean",
+							},
+							"enable_secrets_deletion": {
 								Type: "boolean",
 							},
 							"enable_sidecars": {
