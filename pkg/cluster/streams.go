@@ -440,10 +440,7 @@ func (c *Cluster) syncStream(appId string) error {
 	c.setProcessName("syncing stream with applicationId %s", appId)
 	c.logger.Debugf("syncing stream with applicationId %s", appId)
 
-	listOptions := metav1.ListOptions{
-		LabelSelector: c.labelsSet(true).String(),
-		FieldSelector: fmt.Sprintf("spec.applicationId=%s", appId),
-	}
+	listOptions := metav1.ListOptions{LabelSelector: c.labelsSet(true).String()}
 	streams, err = c.KubeClient.FabricEventStreams(c.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("could not list of FabricEventStreams for applicationId %s: %v", appId, err)
@@ -451,6 +448,9 @@ func (c *Cluster) syncStream(appId string) error {
 
 	streamExists := false
 	for _, stream := range streams.Items {
+		if stream.Spec.ApplicationId != appId {
+			continue
+		}
 		if streamExists {
 			c.logger.Warningf("more than one event stream with applicationId %s found, delete it", appId)
 			if err = c.KubeClient.FabricEventStreams(stream.ObjectMeta.Namespace).Delete(context.TODO(), stream.ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {

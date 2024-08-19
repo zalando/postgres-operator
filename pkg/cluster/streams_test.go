@@ -450,7 +450,6 @@ func TestGenerateFabricEventStream(t *testing.T) {
 
 	listOptions := metav1.ListOptions{
 		LabelSelector: cluster.labelsSet(true).String(),
-		FieldSelector: fmt.Sprintf("spec.applicationId=%s", appId),
 	}
 	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
@@ -524,7 +523,6 @@ func TestSyncStreams(t *testing.T) {
 	// check that two streams exist
 	listOptions := metav1.ListOptions{
 		LabelSelector: cluster.labelsSet(true).String(),
-		FieldSelector: fmt.Sprintf("spec.applicationId=%s", appId),
 	}
 	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
@@ -698,7 +696,6 @@ func TestUpdateStreams(t *testing.T) {
 	// compare stream returned from API with expected stream
 	listOptions := metav1.ListOptions{
 		LabelSelector: cluster.labelsSet(true).String(),
-		FieldSelector: fmt.Sprintf("spec.applicationId=%s", appId),
 	}
 	streams := patchPostgresqlStreams(t, cluster, &pg.Spec, listOptions)
 	result := cluster.generateFabricEventStream(appId)

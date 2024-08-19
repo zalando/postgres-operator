@@ -2131,131 +2131,136 @@ class EndToEndTestCase(unittest.TestCase):
             verbs=["create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"]
         )
         cluster_role.rules.append(fes_cluster_role_rule)
-        k8s.api.rbac_api.patch_cluster_role("postgres-operator", cluster_role)
 
-        # create a table in one of the database of acid-minimal-cluster
-        create_stream_table = """
-            CREATE TABLE test_table (id int, payload jsonb);
-        """
-        self.query_database(leader.metadata.name, "foo", create_stream_table)
+        try:
+            k8s.api.rbac_api.patch_cluster_role("postgres-operator", cluster_role)
 
-        # update the manifest with the streams section
-        patch_streaming_config = {
-            "spec": {
-                "patroni": {
-                    "slots": {
-                        "manual_slot": {
-                            "type": "physical"
-                        }
-                    }
-                },
-                "streams": [
-                    {
-                        "applicationId": "test-app",
-                        "batchSize": 100,
-                        "database": "foo",
-                        "enableRecovery": True,
-                        "tables": {
-                            "test_table": {
-                                "eventType": "test-event",
-                                "idColumn": "id",
-                                "payloadColumn": "payload",
-                                "recoveryEventType": "test-event-dlq"
+            # create a table in one of the database of acid-minimal-cluster
+            create_stream_table = """
+                CREATE TABLE test_table (id int, payload jsonb);
+            """
+            self.query_database(leader.metadata.name, "foo", create_stream_table)
+
+            # update the manifest with the streams section
+            patch_streaming_config = {
+                "spec": {
+                    "patroni": {
+                        "slots": {
+                            "manual_slot": {
+                                "type": "physical"
                             }
                         }
                     },
-                    {
-                        "applicationId": "test-app2",
-                        "batchSize": 100,
-                        "database": "foo",
-                        "enableRecovery": True,
-                        "tables": {
-                            "test_non_exist_table": {
-                                "eventType": "test-event",
-                                "idColumn": "id",
-                                "payloadColumn": "payload",
-                                "recoveryEventType": "test-event-dlq"
+                    "streams": [
+                        {
+                            "applicationId": "test-app",
+                            "batchSize": 100,
+                            "database": "foo",
+                            "enableRecovery": True,
+                            "tables": {
+                                "test_table": {
+                                    "eventType": "test-event",
+                                    "idColumn": "id",
+                                    "payloadColumn": "payload",
+                                    "recoveryEventType": "test-event-dlq"
+                                }
+                            }
+                        },
+                        {
+                            "applicationId": "test-app2",
+                            "batchSize": 100,
+                            "database": "foo",
+                            "enableRecovery": True,
+                            "tables": {
+                                "test_non_exist_table": {
+                                    "eventType": "test-event",
+                                    "idColumn": "id",
+                                    "payloadColumn": "payload",
+                                    "recoveryEventType": "test-event-dlq"
+                                }
                             }
                         }
-                    }
-                ]
+                    ]
+                }
             }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        # check if publication, slot, and fes resource are created
-        get_publication_query = """
-            SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app';
-        """
-        get_slot_query = """
-            SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app';
-        """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 1,
-            "Publication is not created", 10, 5)
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 1,
-            "Replication slot is not created", 10, 5)
-        print('Operator log: {}'.format(k8s.get_operator_log()))
-        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
+            # check if publication, slot, and fes resource are created
+            get_publication_query = """
+                SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app';
+            """
+            get_slot_query = """
+                SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app';
+            """
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 1,
+                "Publication is not created", 10, 5)
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 1,
+                "Replication slot is not created", 10, 5)
+            self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
                 "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 1,
                 "Could not find Fabric Event Stream resource", 10, 5)
 
-        # check if the non-existing table in the stream section does not create a publication and slot
-        get_publication_query_not_exist_table = """
-            SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app2';
-        """
-        get_slot_query_not_exist_table = """
-            SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app2';
-        """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query_not_exist_table)), 0,
-            "Publication is created for non-existing tables", 10, 5)
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query_not_exist_table)), 0,
-            "Replication slot is created for non-existing tables", 10, 5)
+            # check if the non-existing table in the stream section does not create a publication and slot
+            get_publication_query_not_exist_table = """
+                SELECT * FROM pg_publication WHERE pubname = 'fes_foo_test_app2';
+            """
+            get_slot_query_not_exist_table = """
+                SELECT * FROM pg_replication_slots WHERE slot_name = 'fes_foo_test_app2';
+            """
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query_not_exist_table)), 0,
+                "Publication is created for non-existing tables", 10, 5)
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query_not_exist_table)), 0,
+                "Replication slot is created for non-existing tables", 10, 5)
 
-        # grant create and ownership of test_table to foo_user, reset search path to default
-        grant_permission_foo_user = """
-            GRANT CREATE ON DATABASE foo TO foo_user;
-            ALTER TABLE test_table OWNER TO foo_user;
-            ALTER ROLE foo_user RESET search_path;
-        """
-        self.query_database(leader.metadata.name, "foo", grant_permission_foo_user)
-        # non-postgres user creates a publication
-        create_nonstream_publication = """
-            CREATE PUBLICATION mypublication FOR TABLE test_table;
-        """
-        self.query_database_with_user(leader.metadata.name, "foo", create_nonstream_publication, "foo_user")
+            # grant create and ownership of test_table to foo_user, reset search path to default
+            grant_permission_foo_user = """
+                GRANT CREATE ON DATABASE foo TO foo_user;
+                ALTER TABLE test_table OWNER TO foo_user;
+                ALTER ROLE foo_user RESET search_path;
+            """
+            self.query_database(leader.metadata.name, "foo", grant_permission_foo_user)
+            # non-postgres user creates a publication
+            create_nonstream_publication = """
+                CREATE PUBLICATION mypublication FOR TABLE test_table;
+            """
+            self.query_database_with_user(leader.metadata.name, "foo", create_nonstream_publication, "foo_user")
 
-        # remove the streams section from the manifest
-        patch_streaming_config_removal = {
-            "spec": {
-                "streams": []
+            # remove the streams section from the manifest
+            patch_streaming_config_removal = {
+                "spec": {
+                    "streams": []
+                }
             }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config_removal)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', patch_streaming_config_removal)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        # check if publication, slot, and fes resource are removed
-        self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
+            # check if publication, slot, and fes resource are removed
+            self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
                 "zalando.org", "v1", "default", "fabriceventstreams", label_selector="cluster-name=acid-minimal-cluster")["items"]), 0,
                 'Could not delete Fabric Event Stream resource', 10, 5)
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 0,
-            "Publication is not deleted", 10, 5)
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 0,
-            "Replication slot is not deleted", 10, 5)
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_publication_query)), 0,
+                "Publication is not deleted", 10, 5)
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_slot_query)), 0,
+                "Replication slot is not deleted", 10, 5)
 
-        # check the manual_slot and mypublication should not get deleted
-        get_manual_slot_query = """
-            SELECT * FROM pg_replication_slots WHERE slot_name = 'manual_slot';
-        """
-        get_nonstream_publication_query = """
-            SELECT * FROM pg_publication WHERE pubname = 'mypublication';
-        """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_manual_slot_query)), 1,
-            "Slot defined in patroni config is deleted", 10, 5)
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_nonstream_publication_query)), 1,
-            "Publication defined not in stream section is deleted", 10, 5)
+            # check the manual_slot and mypublication should not get deleted
+            get_manual_slot_query = """
+                SELECT * FROM pg_replication_slots WHERE slot_name = 'manual_slot';
+            """
+            get_nonstream_publication_query = """
+                SELECT * FROM pg_publication WHERE pubname = 'mypublication';
+            """
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_manual_slot_query)), 1,
+                "Slot defined in patroni config is deleted", 10, 5)
+            self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "foo", get_nonstream_publication_query)), 1,
+                "Publication defined not in stream section is deleted", 10, 5)
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
