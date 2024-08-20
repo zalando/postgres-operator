@@ -2481,9 +2481,9 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		}
 
 	case "gcs":
-        if c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials != "" {
-          envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
-        }
+		if c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+		}
 
 	case "az":
 		envVars = appendEnvVars(envVars, []v1.EnvVar{
