@@ -331,6 +331,9 @@ spec:
                   pod_service_account_name:
                     type: string
                     default: "postgres-pod"
+                  pod_service_account_create:
+                    type: boolean
+                    default: true
                   pod_service_account_role_binding_definition:
                     type: string
                     default: ""

@@ -179,6 +179,7 @@ type Config struct {
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
+	PodServiceAccountCreate   bool            `name:"pod_service_account_create" default:"false"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition              string            `name:"pod_service_account_definition" default:""`
 	PodServiceAccountRoleBindingDefinition   string            `name:"pod_service_account_role_binding_definition" default:""`

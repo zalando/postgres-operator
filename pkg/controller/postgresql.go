@@ -592,7 +592,9 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 }
 
 func (c *Controller) createPodServiceAccount(namespace string) error {
-
+	if !c.opConfig.PodServiceAccountCreate {
+		return nil
+	}
 	podServiceAccountName := c.opConfig.PodServiceAccountName
 	_, err := c.KubeClient.ServiceAccounts(namespace).Get(context.TODO(), podServiceAccountName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {

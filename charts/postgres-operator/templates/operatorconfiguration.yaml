@@ -20,6 +20,7 @@ configuration:
     pod_priority_class_name: {{ .Values.podPriorityClassName.name }}
     {{- end }}
     pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
+    pod_service_account_create: {{ .Values.serviceAccount.create }}
     oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}
 {{ tpl (toYaml .Values.configKubernetes) . | indent 4 }}
   postgres_pod_resources:
