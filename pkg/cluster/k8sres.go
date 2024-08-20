@@ -157,43 +157,47 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 	// setting limits too low can cause unnecessary evictions / OOM kills
 	cpuLimit := resources.Limits[v1.ResourceCPU]
 	minCPULimit := c.OpConfig.MinCPULimit
-	minCPU, err := resource.ParseQuantity(minCPULimit)
-	if err != nil {
-		return fmt.Errorf("could not parse min CPU limit %s: %v", minCPULimit, err)
-	}
-	if !minCPU.IsZero() {
-		isSmaller, err = util.IsSmallerQuantity(cpuLimit.String(), minCPULimit)
+	if minCPULimit != "" {
+		minCPU, err := resource.ParseQuantity(minCPULimit)
 		if err != nil {
-			return fmt.Errorf("could not compare defined CPU limit %s for %q container with configured minimum value %s: %v",
-				cpuLimit.String(), constants.PostgresContainerName, minCPULimit, err)
+			return fmt.Errorf("could not parse min CPU limit %s: %v", minCPULimit, err)
 		}
-		if isSmaller {
-			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required minimum %s and will be increased",
-				cpuLimit.String(), constants.PostgresContainerName, minCPULimit)
-			c.logger.Warningf(msg)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
-			resources.Limits[v1.ResourceCPU] = minCPU
+		if !minCPU.IsZero() {
+			isSmaller, err = util.IsSmallerQuantity(cpuLimit.String(), minCPULimit)
+			if err != nil {
+				return fmt.Errorf("could not compare defined CPU limit %s for %q container with configured minimum value %s: %v",
+					cpuLimit.String(), constants.PostgresContainerName, minCPULimit, err)
+			}
+			if isSmaller {
+				msg = fmt.Sprintf("defined CPU limit %s for %q container is below required minimum %s and will be increased",
+					cpuLimit.String(), constants.PostgresContainerName, minCPULimit)
+				c.logger.Warningf(msg)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+				resources.Limits[v1.ResourceCPU] = minCPU
+			}
 		}
 	}
 
 	memoryLimit := resources.Limits[v1.ResourceMemory]
 	minMemoryLimit := c.OpConfig.MinMemoryLimit
-	minMemory, err := resource.ParseQuantity(minMemoryLimit)
-	if err != nil {
-		return fmt.Errorf("could not parse min memory limit %s: %v", minMemoryLimit, err)
-	}
-	if !minMemory.IsZero() {
-		isSmaller, err = util.IsSmallerQuantity(memoryLimit.String(), minMemoryLimit)
+	if minMemoryLimit != "" {
+		minMemory, err := resource.ParseQuantity(minMemoryLimit)
 		if err != nil {
-			return fmt.Errorf("could not compare defined memory limit %s for %q container with configured minimum value %s: %v",
-				memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit, err)
+			return fmt.Errorf("could not parse min memory limit %s: %v", minMemoryLimit, err)
 		}
-		if isSmaller {
-			msg = fmt.Sprintf("defined memory limit %s for %q container is below required minimum %s and will be increased",
-				memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit)
-			c.logger.Warningf(msg)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
-			resources.Limits[v1.ResourceMemory] = minMemory
+		if !minMemory.IsZero() {
+			isSmaller, err = util.IsSmallerQuantity(memoryLimit.String(), minMemoryLimit)
+			if err != nil {
+				return fmt.Errorf("could not compare defined memory limit %s for %q container with configured minimum value %s: %v",
+					memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit, err)
+			}
+			if isSmaller {
+				msg = fmt.Sprintf("defined memory limit %s for %q container is below required minimum %s and will be increased",
+					memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit)
+				c.logger.Warningf(msg)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+				resources.Limits[v1.ResourceMemory] = minMemory
+			}
 		}
 	}
 
