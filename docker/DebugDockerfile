@@ -1,8 +1,10 @@
-FROM golang:1.22-alpine
+FROM golang:1.22
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 # We need root certificates to deal with teams api over https
-RUN apk -U add --no-cache ca-certificates delve
+RUN apt update && apt install -y ca-certificates delve
 
 COPY build/* /
 

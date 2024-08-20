@@ -2,6 +2,9 @@ import json
 import time
 import subprocess
 import warnings
+import socket
+import requests
+from kr8s.objects import Pod
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -9,7 +12,6 @@ from kubernetes.client.rest import ApiException
 
 def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
-
 
 class K8sApi:
 
@@ -284,15 +286,25 @@ class K8s:
 
     def exec_with_kubectl(self, pod, cmd):
         return subprocess.run(["./exec.sh", pod, cmd],
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE)
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+
+    def portforward_req(self, pod, port, path):
+        pod = Pod.get(pod)
+        with pod.portforward(remote_port=port) as local_port:
+            # Make an API request
+            try:
+                resp = requests.get(f"http://localhost:{local_port}{path}")
+                if resp.status_code == 200:
+                    return resp.json()
+                else:
+                    return {"fail"}
+            except:
+                # ignore connection closed from requests
+                pass
 
     def patroni_rest(self, pod, path):
-        r = self.exec_with_kubectl(pod, "curl localhost:8008/" + path)
-        if not r.returncode == 0 or not r.stdout.decode()[0:1] == "{":
-            return None
-
-        return json.loads(r.stdout.decode())
+        return self.portforward_req(pod, "8008", path)
 
     def get_patroni_state(self, pod):
         r = self.exec_with_kubectl(pod, "patronictl list -f json")
@@ -306,11 +318,7 @@ class K8s:
             return None
         pod = pod.metadata.name
 
-        r = self.exec_with_kubectl(pod, "curl localhost:8080/workers/all/status/")
-        if not r.returncode == 0 or not r.stdout.decode()[0:1] == "{":
-            return None
-
-        return json.loads(r.stdout.decode())
+        return self.portforward_req(pod, "8080", "/workers/all/status/")
 
     def get_patroni_running_members(self, pod="acid-minimal-cluster-0"):
         result = self.get_patroni_state(pod)
@@ -564,15 +572,25 @@ class K8sBase:
 
     def exec_with_kubectl(self, pod, cmd):
         return subprocess.run(["./exec.sh", pod, cmd],
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE)
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+
+    def portforward_req(self, pod, port, path):
+        pod = Pod.get(pod)
+        with pod.portforward(remote_port=port) as local_port:
+            # Make an API request
+            try:
+                resp = requests.get(f"http://localhost:{local_port}{path}")
+                if resp.status_code == 200:
+                    return resp.json()
+                else:
+                    return {"fail"}
+            except:
+                # ignore connection closed from requests
+                pass
 
     def patroni_rest(self, pod, path):
-        r = self.exec_with_kubectl(pod, "curl localhost:8008/" + path)
-        if not r.returncode == 0 or not r.stdout.decode()[0:1] == "{":
-            return None
-
-        return json.loads(r.stdout.decode())
+        return self.portforward_req(pod, "8008", path)
 
     def get_patroni_state(self, pod):
         r = self.exec_with_kubectl(pod, "patronictl list -f json")
