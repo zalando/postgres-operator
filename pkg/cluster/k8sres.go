@@ -150,7 +150,6 @@ func makeLogicalBackupResources(config *config.Config) acidv1.Resources {
 func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) error {
 	var (
 		isSmaller bool
-		err       error
 		msg       string
 	)
 
