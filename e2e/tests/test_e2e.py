@@ -1277,8 +1277,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         # check if annotation for last upgrade's success is set
         previous_annotations = get_annotations()
-        self.assertEqual(previous_annotations.get("last-major-upgrade-succeeded"), "true", "Annotation for last upgrade's success is not set")
-        self.assertIsNotNone(previous_annotations.get("last-major-upgrade-timestamp"), "Annotation for upgrade timestamp is not set")
+        self.assertIsNotNone(previous_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not set")
 
         # test annotation with failed upgrade annotation
         pg_patch_version_16 = {
@@ -1311,7 +1310,8 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         new_annotations = get_annotations()
-        self.assertNotEqual(new_annotations.get("last-major-upgrade-success", ""), "", "Annotation for last upgrade's success is not set")
+        self.assertIsNotNone(new_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not set")
+        self.assertNotEqual(previous_annotations.get("last-major-upgrade-success"), new_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not updated")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_persistent_volume_claim_retention_policy(self):
