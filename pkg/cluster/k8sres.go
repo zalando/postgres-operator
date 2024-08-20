@@ -157,7 +157,11 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 	// setting limits too low can cause unnecessary evictions / OOM kills
 	cpuLimit := resources.Limits[v1.ResourceCPU]
 	minCPULimit := c.OpConfig.MinCPULimit
-	if minCPULimit != "" {
+	minCPU, err := resource.ParseQuantity(minCPULimit)
+	if err != nil {
+		return fmt.Errorf("could not parse min CPU limit %s: %v", minCPULimit, err)
+	}
+	if !minCPU.IsZero() {
 		isSmaller, err = util.IsSmallerQuantity(cpuLimit.String(), minCPULimit)
 		if err != nil {
 			return fmt.Errorf("could not compare defined CPU limit %s for %q container with configured minimum value %s: %v",
@@ -168,13 +172,17 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 				cpuLimit.String(), constants.PostgresContainerName, minCPULimit)
 			c.logger.Warningf(msg)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
-			resources.Limits[v1.ResourceCPU], _ = resource.ParseQuantity(minCPULimit)
+			resources.Limits[v1.ResourceCPU] = minCPU
 		}
 	}
 
 	memoryLimit := resources.Limits[v1.ResourceMemory]
 	minMemoryLimit := c.OpConfig.MinMemoryLimit
-	if minMemoryLimit != "" {
+	minMemory, err := resource.ParseQuantity(minMemoryLimit)
+	if err != nil {
+		return fmt.Errorf("could not parse min memory limit %s: %v", minMemoryLimit, err)
+	}
+	if !minMemory.IsZero() {
 		isSmaller, err = util.IsSmallerQuantity(memoryLimit.String(), minMemoryLimit)
 		if err != nil {
 			return fmt.Errorf("could not compare defined memory limit %s for %q container with configured minimum value %s: %v",
@@ -185,7 +193,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 				memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit)
 			c.logger.Warningf(msg)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
-			resources.Limits[v1.ResourceMemory], _ = resource.ParseQuantity(minMemoryLimit)
+			resources.Limits[v1.ResourceMemory] = minMemory
 		}
 	}
 
