@@ -1284,7 +1284,7 @@ class EndToEndTestCase(unittest.TestCase):
         pg_patch_version_16 = {
             "metadata": {
                 "annotations": {
-                    "last-major-upgrade-succeeded": "false"
+                    "last-major-upgrade-failure": "2024-01-02T15:04:05Z"
                 },
             },
             "spec": {
@@ -1300,9 +1300,9 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 15, "Version should not be upgraded because annotation for last upgrade's success is set to false")
+        self.eventuallyEqual(check_version, 15, "Version should not be upgraded because annotation for last upgrade's failure is set")
 
-        # if we change the version to the current one, last upgrade's success annotation is set to true
+        # if we change the version to the current one, last upgrade's success annotation is set to a timestamp
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
@@ -1311,8 +1311,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         new_annotations = get_annotations()
-        self.assertEqual(new_annotations.get("last-major-upgrade-succeeded"), "true", "Annotation for last upgrade's success is not True")
-        self.assertNotEqual(new_annotations.get("last-major-upgrade-timestamp"), previous_annotations.get("last-major-upgrade-timestamp"), "Annotation for upgrade timestamp is not updated")
+        self.assertNotEqual(new_annotations.get("last-major-upgrade-success", ""), "", "Annotation for last upgrade's success is not set")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_persistent_volume_claim_retention_policy(self):
