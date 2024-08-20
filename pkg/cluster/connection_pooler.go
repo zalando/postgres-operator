@@ -395,6 +395,10 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		securityContext.FSGroup = effectiveFSGroup
 	}
 
+	effectivePriorityClassName := util.Coalesce(
+		connectionPoolerSpec.PriorityClassName,
+		c.OpConfig.ConnectionPooler.ConnectionPoolerPriorityClassName)
+
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      c.connectionPoolerLabels(role, true).MatchLabels,
@@ -408,6 +412,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			Volumes:                       poolerVolumes,
 			SecurityContext:               &securityContext,
 			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
+			PriorityClassName:             effectivePriorityClassName,
 		},
 	}
 

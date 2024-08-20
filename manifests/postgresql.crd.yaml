@@ -148,6 +148,8 @@ spec:
                   numberOfInstances:
                     type: integer
                     minimum: 1
+                  priorityClassName:
+                    type: string
                   resources:
                     type: object
                     properties:

@@ -241,6 +241,10 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type:    "integer",
 								Minimum: &min1,
 							},
+
+							"priorityClassName": {
+								Type: "string",
+							},
 							"resources": {
 								Type: "object",
 								Properties: map[string]apiextv1.JSONSchemaProps{

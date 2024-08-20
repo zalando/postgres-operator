@@ -177,6 +177,7 @@ spec:
 #    schema: "pooler"
 #    user: "pooler"
 #    maxDBConnections: 60
+#    priorityClassName: ""
 #    resources:
 #      requests:
 #        cpu: 300m
