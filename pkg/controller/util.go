@@ -80,7 +80,7 @@ func (c *Controller) createOperatorCRD(desiredCrd *apiextv1.CustomResourceDefini
 		c.logger.Infof("customResourceDefinition %q has been registered", crd.Name)
 	}
 
-	return wait.Poll(c.config.CRDReadyWaitInterval, c.config.CRDReadyWaitTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.TODO(), c.config.CRDReadyWaitInterval, c.config.CRDReadyWaitTimeout, false, func(ctx context.Context) (bool, error) {
 		c, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), desiredCrd.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

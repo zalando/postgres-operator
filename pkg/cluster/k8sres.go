@@ -47,11 +47,6 @@ const (
 	operatorPort                   = 8080
 )
 
-type pgUser struct {
-	Password string   `json:"password"`
-	Options  []string `json:"options"`
-}
-
 type patroniDCS struct {
 	TTL                      uint32                       `json:"ttl,omitempty"`
 	LoopWait                 uint32                       `json:"loop_wait,omitempty"`
@@ -2486,7 +2481,9 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		}
 
 	case "gcs":
-		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+		if c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+		}
 
 	case "az":
 		envVars = appendEnvVars(envVars, []v1.EnvVar{
@@ -2497,11 +2494,11 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			{
 				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
 				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageContainer,
-			},
-			{
-				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
-				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey,
 			}}...)
+
+		if c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey})
+		}
 	}
 
 	return envVars

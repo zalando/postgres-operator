@@ -123,6 +123,8 @@ var maintenanceWindows = []struct {
 	{"expect error as weekday is empty", []byte(`":00:00-10:00"`), MaintenanceWindow{}, errors.New(`could not parse weekday: incorrect weekday`)},
 	{"expect error as maintenance window set seconds", []byte(`"Mon:00:00:00-10:00:00"`), MaintenanceWindow{}, errors.New(`incorrect maintenance window format`)},
 	{"expect error as 'To' time set seconds", []byte(`"Mon:00:00-00:00:00"`), MaintenanceWindow{}, errors.New("could not parse end time: incorrect time format")},
+	// ideally, should be implemented
+	{"expect error as 'To' has a weekday", []byte(`"Mon:00:00-Fri:00:00"`), MaintenanceWindow{}, errors.New("could not parse end time: incorrect time format")},
 	{"expect error as 'To' time is missing", []byte(`"Mon:00:00"`), MaintenanceWindow{}, errors.New("incorrect maintenance window format")}}
 
 var postgresStatus = []struct {
