@@ -3,10 +3,10 @@ entries:
   postgres-operator-ui:
   - apiVersion: v2
     appVersion: 1.13.0
-    created: "2024-08-14T14:02:17.144914554+02:00"
+    created: "2024-08-21T18:55:36.524305158+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
-    digest: 5a14bbe8e7201ed1e24ef3d8239819342dad732d548f46f7d941a31ebf88abd7
+    digest: e0444e516b50f82002d1a733527813c51759a627cefdd1005cea73659f824ea8
     home: https://github.com/zalando/postgres-operator
     keywords:
     - postgres
@@ -26,7 +26,7 @@ entries:
     version: 1.13.0
   - apiVersion: v2
     appVersion: 1.12.2
-    created: "2024-08-14T14:02:17.144354843+02:00"
+    created: "2024-08-21T18:55:36.521875733+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: cbcef400c23ccece27d97369ad629278265c013e0a45c0b7f33e7568a082fedd
@@ -49,7 +49,7 @@ entries:
     version: 1.12.2
   - apiVersion: v2
     appVersion: 1.11.0
-    created: "2024-08-14T14:02:17.143700797+02:00"
+    created: "2024-08-21T18:55:36.51959105+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: a45f2284045c2a9a79750a36997386444f39b01ac722b17c84b431457577a3a2
@@ -72,7 +72,7 @@ entries:
     version: 1.11.0
   - apiVersion: v2
     appVersion: 1.10.1
-    created: "2024-08-14T14:02:17.143111215+02:00"
+    created: "2024-08-21T18:55:36.516518177+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: 2e5e7a82aebee519ec57c6243eb8735124aa4585a3a19c66ffd69638fbeb11ce
@@ -95,7 +95,7 @@ entries:
     version: 1.10.1
   - apiVersion: v2
     appVersion: 1.9.0
-    created: "2024-08-14T14:02:17.145472028+02:00"
+    created: "2024-08-21T18:55:36.52712908+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: df434af6c8b697fe0631017ecc25e3c79e125361ae6622347cea41a545153bdc
@@ -116,4 +116,4 @@ entries:
     urls:
     - postgres-operator-ui-1.9.0.tgz
     version: 1.9.0
-generated: "2024-08-14T14:02:17.142392976+02:00"
+generated: "2024-08-21T18:55:36.512456099+02:00"

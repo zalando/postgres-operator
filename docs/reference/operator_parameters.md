@@ -242,7 +242,7 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
   `"manual"` = manifest triggers action,
   `"full"` = manifest and minimal version violation trigger upgrade.
   Note, that with all three modes increasing the version in the manifest will
-  trigger a rolling update of the pods. The default is `"off"`.
+  trigger a rolling update of the pods. The default is `"manual"`.
 
 * **major_version_upgrade_team_allow_list**
   Upgrades will only be carried out for clusters of listed teams when mode is

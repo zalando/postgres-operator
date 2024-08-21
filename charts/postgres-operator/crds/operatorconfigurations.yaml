@@ -160,7 +160,7 @@ spec:
                 properties:
                   major_version_upgrade_mode:
                     type: string
-                    default: "off"
+                    default: "manual"
                   major_version_upgrade_team_allow_list:
                     type: array
                     items:
@@ -472,7 +472,6 @@ spec:
                     type: string
                   additional_secret_mount_path:
                     type: string
-                    default: "/meta/credentials"
                   aws_region:
                     type: string
                     default: "eu-central-1"

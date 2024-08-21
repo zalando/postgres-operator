@@ -83,7 +83,7 @@ configUsers:
 
 configMajorVersionUpgrade:
   # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
-  major_version_upgrade_mode: "off"
+  major_version_upgrade_mode: "manual"
   # upgrades will only be carried out for clusters of listed teams when mode is "off"
   # major_version_upgrade_team_allow_list:
   # - acid

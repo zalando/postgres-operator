@@ -36,7 +36,7 @@ configuration:
     replication_username: standby
     super_username: postgres
   major_version_upgrade:
-    major_version_upgrade_mode: "off"
+    major_version_upgrade_mode: "manual"
     # major_version_upgrade_team_allow_list:
     # - acid
     minimal_major_version: "12"
