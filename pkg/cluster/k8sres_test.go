@@ -3028,7 +3028,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 			},
 			expectedResources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
+				ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
 			},
 		},
 		{
