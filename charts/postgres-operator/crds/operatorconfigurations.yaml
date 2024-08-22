@@ -68,7 +68,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "ghcr.io/zalando/spilo-16:3.2-p3"
+                default: "ghcr.io/zalando/spilo-16:3.3-p1"
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -160,7 +160,7 @@ spec:
                 properties:
                   major_version_upgrade_mode:
                     type: string
-                    default: "off"
+                    default: "manual"
                   major_version_upgrade_team_allow_list:
                     type: array
                     items:
@@ -211,9 +211,9 @@ spec:
                   enable_init_containers:
                     type: boolean
                     default: true
-                  enable_secrets_deletion:
+                  enable_owner_references:
                     type: boolean
-                    default: true
+                    default: false
                   enable_persistent_volume_claim_deletion:
                     type: boolean
                     default: true
@@ -226,6 +226,9 @@ spec:
                   enable_readiness_probe:
                     type: boolean
                     default: false
+                  enable_secrets_deletion:
+                    type: boolean
+                    default: true
                   enable_sidecars:
                     type: boolean
                     default: true
@@ -469,7 +472,6 @@ spec:
                     type: string
                   additional_secret_mount_path:
                     type: string
-                    default: "/meta/credentials"
                   aws_region:
                     type: string
                     default: "eu-central-1"
@@ -508,7 +510,7 @@ spec:
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                   logical_backup_docker_image:
                     type: string
-                    default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"
+                    default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:

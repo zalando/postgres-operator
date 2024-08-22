@@ -70,7 +70,7 @@ the manifest. Still, a rolling update would be triggered updating the
 script will notice the version mismatch and start the old version again.
 
 In this scenario the major version could then be run by a user from within the
-master pod. Exec into the container and run:
+primary pod. Exec into the container and run:
 ```bash
 python3 /scripts/inplace_upgrade.py N
 ```
@@ -81,6 +81,9 @@ upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/z
 
 When `major_version_upgrade_mode` is set to `manual` the operator will run
 the upgrade script for you after the manifest is updated and pods are rotated.
+It is also possible to define `maintenanceWindows` in the Postgres manifest to
+better control when such automated upgrades should take place after increasing
+the version.
 
 ## Non-default cluster domain
 
@@ -223,9 +226,9 @@ configuration:
 
 Now, every cluster manifest must contain the configured annotation keys to
 trigger the delete process when running `kubectl delete pg`. Note, that the
-`Postgresql` resource would still get deleted as K8s' API server does not
-block it. Only the operator logs will tell, that the delete criteria wasn't
-met.
+`Postgresql` resource would still get deleted because the operator does not
+instruct K8s' API server to block it. Only the operator logs will tell, that
+the delete criteria was not met.
 
 **cluster manifest**
 
@@ -243,11 +246,64 @@ spec:
 
 In case, the resource has been deleted accidentally or the annotations were
 simply forgotten, it's safe to recreate the cluster with `kubectl create`.
-Existing Postgres cluster are not replaced by the operator. But, as the
-original cluster still exists the status will show `CreateFailed` at first.
-On the next sync event it should change to `Running`. However, as it is in
-fact a new resource for K8s, the UID will differ which can trigger a rolling
-update of the pods because the UID is used as part of backup path to S3.
+Existing Postgres cluster are not replaced by the operator. But, when the
+original cluster still exists the status will be `CreateFailed` at first. On
+the next sync event it should change to `Running`. However, because it is in
+fact a new resource for K8s, the UID and therefore, the backup path to S3,
+will differ and trigger a rolling update of the pods.
+
+## Owner References and Finalizers
+
+The Postgres Operator can set [owner references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/) to most of a cluster's child resources to improve
+monitoring with GitOps tools and enable cascading deletes. There are two
+exceptions:
+
+* Persistent Volume Claims, because they are handled by the [PV Reclaim Policy]https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/ of the Stateful Set
+* Cross-namespace secrets, because owner references are not allowed across namespaces by design
+
+The operator would clean these resources up with its regular delete loop
+unless they got synced correctly. If for some reason the initial cluster sync
+fails, e.g. after a cluster creation or operator restart, a deletion of the
+cluster manifest might leave orphaned resources behind which the user has to
+clean up manually.
+
+Another option is to enable finalizers which first ensures the deletion of all
+child resources before the cluster manifest gets removed. There is a trade-off
+though: The deletion is only performed after the next two operator SYNC cycles
+with the first one setting a `deletionTimestamp` and the latter reacting to it.
+The final removal of the custom resource will add a DELETE event to the worker
+queue but the child resources are already gone at this point. If you do not
+desire this behavior consider enabling owner references instead.
+
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  enable_finalizers: "false"
+  enable_owner_references: "true"
+```
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    enable_finalizers: false
+    enable_owner_references: true
+```
+
+:warning: Please note, both options are disabled by default. When enabling owner
+references the operator cannot block cascading deletes, even when the [delete protection annotations](administrator.md#delete-protection-via-annotations)
+are in place. You would need an K8s admission controller that blocks the actual
+`kubectl delete` API call e.g. based on existing annotations.
 
 ## Role-based access control for the operator
 
@@ -1399,7 +1455,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t ghcr.io/zalando/postgres-operator-ui:v1.12.2 .
+docker build -t ghcr.io/zalando/postgres-operator-ui:v1.13.0 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/
