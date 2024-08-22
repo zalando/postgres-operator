@@ -242,7 +242,7 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
   `"manual"` = manifest triggers action,
   `"full"` = manifest and minimal version violation trigger upgrade.
   Note, that with all three modes increasing the version in the manifest will
-  trigger a rolling update of the pods. The default is `"off"`.
+  trigger a rolling update of the pods. The default is `"manual"`.
 
 * **major_version_upgrade_team_allow_list**
   Upgrades will only be carried out for clusters of listed teams when mode is
@@ -822,7 +822,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
