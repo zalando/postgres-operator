@@ -869,6 +869,65 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 	}
 }
 
+func TestConnectionPoolerSidecars (t *testing.T) {
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+	cluster.Statefulset = &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sts",
+		},
+	}
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+		Master: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: true,
+			Name:           "",
+			Role:           Master,
+		},
+	}
+	cluster.Spec = acidv1.PostgresSpec{
+		ConnectionPooler: &acidv1.ConnectionPooler{
+			Sidecars: []acidv1.Sidecar{
+				acidv1.Sidecar{
+					Name:        "sidecar",
+					DockerImage: "image",
+					Env: []v1.EnvVar{
+						{
+							Name:  "SOME_VAR",
+							Value: "some-value",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	deployment, err := cluster.generateConnectionPoolerDeployment(cluster.ConnectionPooler[Master]) 
+	assert.NoError(t, err)
+
+	containers := deployment.Spec.Template.Spec.Containers
+	assert.Equal(t, 2, len(containers), "wrong number of containers")
+	assert.Equal(t, "sidecar", containers[1].Name, "wrong name of sidecar")
+	assert.Equal(t, "image", containers[1].Image, "wrong image of sidecar")
+	assert.Equal(t, "SOME_VAR", containers[1].Env[0].Name, "wrong name of env var in sidecar")
+	assert.Equal(t, "some-value", containers[1].Env[0].Value, "wrong value of env var in sidecar")
+}
+
 func testServiceAccount(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	poolerServiceAccount := podSpec.Spec.ServiceAccountName
 
