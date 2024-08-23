@@ -603,7 +603,7 @@ for both master and replica pooler services (if `enableReplicaConnectionPooler`
   Resource configuration for connection pooler deployment.
 
 * **sidecars**
-  Extra containers to run alongside with PGBouncer container. 
+  Extra containers to run alongside with PGBouncer container in the same pod. 
 
 ## Custom TLS certificates
 
