@@ -373,7 +373,7 @@ func (mock *mockDeployment) Get(ctx context.Context, name string, opts metav1.Ge
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
-						v1.Container{
+						{
 							Image: "pooler:1.0",
 						},
 					},

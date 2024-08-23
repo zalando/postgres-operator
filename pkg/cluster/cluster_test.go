@@ -71,11 +71,11 @@ var cl = New(
 		Spec: acidv1.PostgresSpec{
 			EnableConnectionPooler: util.True(),
 			Streams: []acidv1.Stream{
-				acidv1.Stream{
+				{
 					ApplicationId: "test-app",
 					Database:      "test_db",
 					Tables: map[string]acidv1.StreamTable{
-						"test_table": acidv1.StreamTable{
+						"test_table": {
 							EventType: "test-app.test",
 						},
 					},
@@ -1504,7 +1504,7 @@ func newCronJob(image, schedule string, vars []v1.EnvVar, mounts []v1.VolumeMoun
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
-								v1.Container{
+								{
 									Name:  "logical-backup",
 									Image: image,
 									Env:   vars,

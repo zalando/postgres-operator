@@ -183,7 +183,7 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 		}
 		for tableName, table := range stream.Tables {
 			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
-			streamFlow := getEventStreamFlow(stream, table.PayloadColumn)
+			streamFlow := getEventStreamFlow(table.PayloadColumn)
 			streamSink := getEventStreamSink(stream, table.EventType)
 			streamRecovery := getEventStreamRecovery(stream, table.RecoveryEventType, table.EventType)
 
@@ -230,7 +230,7 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName string, i
 	}
 }
 
-func getEventStreamFlow(stream acidv1.Stream, payloadColumn *string) zalandov1.EventStreamFlow {
+func getEventStreamFlow(payloadColumn *string) zalandov1.EventStreamFlow {
 	return zalandov1.EventStreamFlow{
 		Type:          constants.EventStreamFlowPgGenericType,
 		PayloadColumn: payloadColumn,
