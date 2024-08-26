@@ -127,7 +127,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
 	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
@@ -193,7 +193,7 @@ type Config struct {
 	GCPCredentials                           string            `name:"gcp_credentials"`
 	WALAZStorageAccount                      string            `name:"wal_az_storage_account"`
 	AdditionalSecretMount                    string            `name:"additional_secret_mount"`
-	AdditionalSecretMountPath                string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
+	AdditionalSecretMountPath                string            `name:"additional_secret_mount_path"`
 	EnableEBSGp3Migration                    bool              `name:"enable_ebs_gp3_migration" default:"false"`
 	EnableEBSGp3MigrationMaxSize             int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
 	DebugLogging                             bool              `name:"debug_logging" default:"true"`
@@ -245,7 +245,7 @@ type Config struct {
 	EnablePgVersionEnvVar                    bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat                 bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`
-	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"off"`
+	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"manual"`
 	MajorVersionUpgradeTeamAllowList         []string          `name:"major_version_upgrade_team_allow_list" default:""`
 	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"12"`
 	TargetMajorVersion                       string            `name:"target_major_version" default:"16"`

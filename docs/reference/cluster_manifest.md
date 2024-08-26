@@ -119,9 +119,9 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   inaccessible from outside of the Kubernetes cluster.
 
 * **maintenanceWindows**
-  a list defines specific time frames when major version upgrades are permitted
-  to occur, restricting major version upgrades to these designated periods only.
-  Accepted formats include "01:00-06:00" for daily maintenance windows or 
+  a list which defines specific time frames when certain maintenance operations
+  are allowed. So far, it is only implemented for automatic major version
+  upgrades. Accepted formats are "01:00-06:00" for daily maintenance windows or 
   "Sat:00:00-04:00" for specific days, with all times in UTC.
 
 * **users**

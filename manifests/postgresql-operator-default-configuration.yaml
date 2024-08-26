@@ -38,7 +38,7 @@ configuration:
     replication_username: standby
     super_username: postgres
   major_version_upgrade:
-    major_version_upgrade_mode: "off"
+    major_version_upgrade_mode: "manual"
     # major_version_upgrade_team_allow_list:
     # - acid
     minimal_major_version: "12"
@@ -170,7 +170,7 @@ configuration:
     # logical_backup_cpu_request: ""
     # logical_backup_memory_limit: ""
     # logical_backup_memory_request: ""
-    logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"
+    logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
     # logical_backup_google_application_credentials: ""
     logical_backup_job_prefix: "logical-backup-"
     logical_backup_provider: "s3"
