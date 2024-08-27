@@ -57,14 +57,12 @@ production for over five years.
 
 | Release   | Postgres versions | K8s versions      | Golang  |
 | :-------- | :---------------: | :---------------: | :-----: |
-| v1.13.0*  | 12 &rarr; 16      | 1.27+             | 1.22.5  |
-| v1.12.2   | 11 &rarr; 16      | 1.27+             | 1.22.3  |
+| v1.13.0   | 12 &rarr; 16      | 1.27+             | 1.22.5  |
+| v1.12.0   | 11 &rarr; 16      | 1.27+             | 1.22.3  |
 | v1.11.0   | 11 &rarr; 16      | 1.27+             | 1.21.7  |
 | v1.10.1   | 10 &rarr; 15      | 1.21+             | 1.19.8  |
 | v1.9.0    | 10 &rarr; 15      | 1.21+             | 1.18.9  |
 | v1.8.2    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
-
-*not yet released
 
 ## Getting started
 

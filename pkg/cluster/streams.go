@@ -46,11 +46,13 @@ func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) (p
 
 func (c *Cluster) deleteStream(appId string) error {
 	c.setProcessName("deleting event stream")
+	c.logger.Debugf("deleting event stream with applicationId %s", appId)
 
 	err := c.KubeClient.FabricEventStreams(c.Streams[appId].Namespace).Delete(context.TODO(), c.Streams[appId].Name, metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("could not delete event stream %q with applicationId %s: %v", c.Streams[appId].Name, appId, err)
 	}
+	c.logger.Infof("event stream %q with applicationId %s has been successfully deleted", c.Streams[appId].Name, appId)
 	delete(c.Streams, appId)
 
 	return nil
@@ -183,7 +185,7 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 		}
 		for tableName, table := range stream.Tables {
 			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
-			streamFlow := getEventStreamFlow(stream, table.PayloadColumn)
+			streamFlow := getEventStreamFlow(table.PayloadColumn)
 			streamSink := getEventStreamSink(stream, table.EventType)
 			streamRecovery := getEventStreamRecovery(stream, table.RecoveryEventType, table.EventType)
 
@@ -230,7 +232,7 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName string, i
 	}
 }
 
-func getEventStreamFlow(stream acidv1.Stream, payloadColumn *string) zalandov1.EventStreamFlow {
+func getEventStreamFlow(payloadColumn *string) zalandov1.EventStreamFlow {
 	return zalandov1.EventStreamFlow{
 		Type:          constants.EventStreamFlowPgGenericType,
 		PayloadColumn: payloadColumn,
@@ -308,7 +310,7 @@ func (c *Cluster) syncStreams() error {
 
 	_, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), constants.EventStreamCRDName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("event stream CRD not installed, skipping")
+		c.logger.Debug("event stream CRD not installed, skipping")
 		return nil
 	}
 
@@ -433,33 +435,54 @@ func hasSlotsInSync(appId string, databaseSlots map[string]map[string]zalandov1.
 }
 
 func (c *Cluster) syncStream(appId string) error {
+	var (
+		streams *zalandov1.FabricEventStreamList
+		err     error
+	)
+	c.setProcessName("syncing stream with applicationId %s", appId)
+	c.logger.Debugf("syncing stream with applicationId %s", appId)
+
+	listOptions := metav1.ListOptions{LabelSelector: c.labelsSet(true).String()}
+	streams, err = c.KubeClient.FabricEventStreams(c.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return fmt.Errorf("could not list of FabricEventStreams for applicationId %s: %v", appId, err)
+	}
+
 	streamExists := false
-	// update stream when it exists and EventStreams array differs
-	for _, stream := range c.Streams {
-		if appId == stream.Spec.ApplicationId {
-			streamExists = true
-			desiredStreams := c.generateFabricEventStream(appId)
-			if !reflect.DeepEqual(stream.ObjectMeta.OwnerReferences, desiredStreams.ObjectMeta.OwnerReferences) {
-				c.logger.Infof("owner references of event streams with applicationId %s do not match the current ones", appId)
-				stream.ObjectMeta.OwnerReferences = desiredStreams.ObjectMeta.OwnerReferences
-				c.setProcessName("updating event streams with applicationId %s", appId)
-				stream, err := c.KubeClient.FabricEventStreams(stream.Namespace).Update(context.TODO(), stream, metav1.UpdateOptions{})
-				if err != nil {
-					return fmt.Errorf("could not update event streams with applicationId %s: %v", appId, err)
-				}
-				c.Streams[appId] = stream
-			}
-			if match, reason := c.compareStreams(stream, desiredStreams); !match {
-				c.logger.Debugf("updating event streams with applicationId %s: %s", appId, reason)
-				desiredStreams.ObjectMeta = stream.ObjectMeta
-				updatedStream, err := c.updateStreams(desiredStreams)
-				if err != nil {
-					return fmt.Errorf("failed updating event streams %s with applicationId %s: %v", stream.Name, appId, err)
-				}
-				c.Streams[appId] = updatedStream
-				c.logger.Infof("event streams %q with applicationId %s have been successfully updated", updatedStream.Name, appId)
+	for _, stream := range streams.Items {
+		if stream.Spec.ApplicationId != appId {
+			continue
+		}
+		if streamExists {
+			c.logger.Warningf("more than one event stream with applicationId %s found, delete it", appId)
+			if err = c.KubeClient.FabricEventStreams(stream.ObjectMeta.Namespace).Delete(context.TODO(), stream.ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
+				c.logger.Errorf("could not delete event stream %q with applicationId %s: %v", stream.ObjectMeta.Name, appId, err)
+			} else {
+				c.logger.Infof("redundant event stream %q with applicationId %s has been successfully deleted", stream.ObjectMeta.Name, appId)
 			}
 			continue
+		}
+		streamExists = true
+		desiredStreams := c.generateFabricEventStream(appId)
+		if !reflect.DeepEqual(stream.ObjectMeta.OwnerReferences, desiredStreams.ObjectMeta.OwnerReferences) {
+			c.logger.Infof("owner references of event streams with applicationId %s do not match the current ones", appId)
+			stream.ObjectMeta.OwnerReferences = desiredStreams.ObjectMeta.OwnerReferences
+			c.setProcessName("updating event streams with applicationId %s", appId)
+			stream, err := c.KubeClient.FabricEventStreams(stream.Namespace).Update(context.TODO(), &stream, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update event streams with applicationId %s: %v", appId, err)
+			}
+			c.Streams[appId] = stream
+		}
+		if match, reason := c.compareStreams(&stream, desiredStreams); !match {
+			c.logger.Infof("updating event streams with applicationId %s: %s", appId, reason)
+			desiredStreams.ObjectMeta = stream.ObjectMeta
+			updatedStream, err := c.updateStreams(desiredStreams)
+			if err != nil {
+				return fmt.Errorf("failed updating event streams %s with applicationId %s: %v", stream.Name, appId, err)
+			}
+			c.Streams[appId] = updatedStream
+			c.logger.Infof("event streams %q with applicationId %s have been successfully updated", updatedStream.Name, appId)
 		}
 	}
 
@@ -529,7 +552,6 @@ func (c *Cluster) cleanupRemovedStreams(appIds []string) error {
 			if err != nil {
 				errors = append(errors, fmt.Sprintf("failed deleting event streams with applicationId %s: %v", appId, err))
 			}
-			c.logger.Infof("event streams with applicationId %s have been successfully deleted", appId)
 		}
 	}
 

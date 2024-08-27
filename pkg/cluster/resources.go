@@ -187,7 +187,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 			c.logger.Warningf("could not scale down: %v", err)
 		}
 	}
-	c.logger.Debugf("updating statefulset")
+	c.logger.Debug("updating statefulset")
 
 	patchData, err := specPatch(newStatefulSet.Spec)
 	if err != nil {
@@ -218,7 +218,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	}
 
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
-	c.logger.Debugf("replacing statefulset")
+	c.logger.Debug("replacing statefulset")
 
 	// Delete the current statefulset without deleting the pods
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
@@ -232,7 +232,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	// make sure we clear the stored statefulset status if the subsequent create fails.
 	c.Statefulset = nil
 	// wait until the statefulset is truly deleted
-	c.logger.Debugf("waiting for the statefulset to be deleted")
+	c.logger.Debug("waiting for the statefulset to be deleted")
 
 	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
@@ -266,7 +266,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 
 func (c *Cluster) deleteStatefulSet() error {
 	c.setProcessName("deleting statefulset")
-	c.logger.Debugln("deleting statefulset")
+	c.logger.Debug("deleting statefulset")
 	if c.Statefulset == nil {
 		c.logger.Debug("there is no statefulset in the cluster")
 		return nil
@@ -349,7 +349,8 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 }
 
 func (c *Cluster) deleteService(role PostgresRole) error {
-	c.logger.Debugf("deleting service %s", role)
+	c.setProcessName("deleting service")
+	c.logger.Debugf("deleting %s service", role)
 
 	if c.Services[role] == nil {
 		c.logger.Debugf("No service for %s role was found, nothing to delete", role)
@@ -495,7 +496,7 @@ func (c *Cluster) deletePodDisruptionBudget() error {
 
 func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	c.setProcessName("deleting endpoint")
-	c.logger.Debugln("deleting endpoint")
+	c.logger.Debugf("deleting %s endpoint", role)
 	if c.Endpoints[role] == nil {
 		c.logger.Debugf("there is no %s endpoint in the cluster", role)
 		return nil
@@ -543,7 +544,7 @@ func (c *Cluster) deletePatroniResources() error {
 
 func (c *Cluster) deletePatroniConfigMap(suffix string) error {
 	c.setProcessName("deleting Patroni config map")
-	c.logger.Debugln("deleting Patroni config map")
+	c.logger.Debugf("deleting %s Patroni config map", suffix)
 	cm := c.PatroniConfigMaps[suffix]
 	if cm == nil {
 		c.logger.Debugf("there is no %s Patroni config map in the cluster", suffix)
@@ -565,7 +566,7 @@ func (c *Cluster) deletePatroniConfigMap(suffix string) error {
 
 func (c *Cluster) deletePatroniEndpoint(suffix string) error {
 	c.setProcessName("deleting Patroni endpoint")
-	c.logger.Debugln("deleting Patroni endpoint")
+	c.logger.Debugf("deleting %s Patroni endpoint", suffix)
 	ep := c.PatroniEndpoints[suffix]
 	if ep == nil {
 		c.logger.Debugf("there is no %s Patroni endpoint in the cluster", suffix)

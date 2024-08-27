@@ -76,9 +76,8 @@ func (c *Controller) createOperatorCRD(desiredCrd *apiextv1.CustomResourceDefini
 			context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
 			return fmt.Errorf("could not update customResourceDefinition %q: %v", crd.Name, err)
 		}
-	} else {
-		c.logger.Infof("customResourceDefinition %q has been registered", crd.Name)
 	}
+	c.logger.Infof("customResourceDefinition %q is registered", crd.Name)
 
 	return wait.PollUntilContextTimeout(context.TODO(), c.config.CRDReadyWaitInterval, c.config.CRDReadyWaitTimeout, false, func(ctx context.Context) (bool, error) {
 		c, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), desiredCrd.Name, metav1.GetOptions{})

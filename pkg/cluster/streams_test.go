@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"context"
@@ -55,12 +56,12 @@ var (
 					ApplicationId: appId,
 					Database:      "foo",
 					Tables: map[string]acidv1.StreamTable{
-						"data.bar": acidv1.StreamTable{
+						"data.bar": {
 							EventType:     "stream-type-a",
 							IdColumn:      k8sutil.StringToPointer("b_id"),
 							PayloadColumn: k8sutil.StringToPointer("b_payload"),
 						},
-						"data.foobar": acidv1.StreamTable{
+						"data.foobar": {
 							EventType:         "stream-type-b",
 							RecoveryEventType: "stream-type-b-dlq",
 						},
@@ -87,8 +88,13 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-12345", clusterName),
 			Namespace: namespace,
+			Labels: map[string]string{
+				"application":  "spilo",
+				"cluster-name": fmt.Sprintf("%s-2", clusterName),
+				"team":         "acid",
+			},
 			OwnerReferences: []metav1.OwnerReference{
-				metav1.OwnerReference{
+				{
 					APIVersion: "apps/v1",
 					Kind:       "StatefulSet",
 					Name:       "acid-test-cluster",
@@ -99,7 +105,7 @@ var (
 		Spec: zalandov1.FabricEventStreamSpec{
 			ApplicationId: appId,
 			EventStreams: []zalandov1.EventStream{
-				zalandov1.EventStream{
+				{
 					EventStreamFlow: zalandov1.EventStreamFlow{
 						PayloadColumn: k8sutil.StringToPointer("b_payload"),
 						Type:          constants.EventStreamFlowPgGenericType,
@@ -138,7 +144,7 @@ var (
 						Type: constants.EventStreamSourcePGType,
 					},
 				},
-				zalandov1.EventStream{
+				{
 					EventStreamFlow: zalandov1.EventStreamFlow{
 						Type: constants.EventStreamFlowPgGenericType,
 					},
@@ -235,7 +241,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -243,7 +249,7 @@ func TestHasSlotsInSync(t *testing.T) {
 				},
 			},
 			actualSlots: map[string]map[string]string{
-				slotName: map[string]string{
+				slotName: {
 					"databases": dbName,
 					"plugin":    constants.EventStreamSourcePluginType,
 					"type":      "logical",
@@ -262,7 +268,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -283,7 +289,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -306,7 +312,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -320,7 +326,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test2": acidv1.StreamTable{
+							"test2": {
 								EventType: "stream-type-b",
 							},
 						},
@@ -328,7 +334,7 @@ func TestHasSlotsInSync(t *testing.T) {
 				},
 			},
 			actualSlots: map[string]map[string]string{
-				slotName: map[string]string{
+				slotName: {
 					"databases": dbName,
 					"plugin":    constants.EventStreamSourcePluginType,
 					"type":      "logical",
@@ -347,7 +353,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -361,7 +367,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test2": acidv1.StreamTable{
+							"test2": {
 								EventType: "stream-type-b",
 							},
 						},
@@ -369,7 +375,7 @@ func TestHasSlotsInSync(t *testing.T) {
 				},
 			},
 			actualSlots: map[string]map[string]string{
-				slotName: map[string]string{
+				slotName: {
 					"databases": dbName,
 					"plugin":    constants.EventStreamSourcePluginType,
 					"type":      "logical",
@@ -388,7 +394,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -402,7 +408,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test2": acidv1.StreamTable{
+							"test2": {
 								EventType: "stream-type-b",
 							},
 						},
@@ -410,7 +416,7 @@ func TestHasSlotsInSync(t *testing.T) {
 				},
 			},
 			actualSlots: map[string]map[string]string{
-				slotName: map[string]string{
+				slotName: {
 					"databases": dbName,
 					"plugin":    constants.EventStreamSourcePluginType,
 					"type":      "logical",
@@ -432,12 +438,8 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
 
-	// create statefulset to have ownerReference for streams
-	_, err := cluster.createStatefulSet()
-	assert.NoError(t, err)
-
 	// create the streams
-	err = cluster.syncStream(appId)
+	err := cluster.syncStream(appId)
 	assert.NoError(t, err)
 
 	// compare generated stream with expected stream
@@ -451,11 +453,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	}
 	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
-
-	// check if there is only one stream
-	if len(streams.Items) > 1 {
-		t.Errorf("too many stream CRDs found: got %d, but expected only one", len(streams.Items))
-	}
+	assert.Equalf(t, 1, len(streams.Items), "unexpected number of streams found: got %d, but expected only one", len(streams.Items))
 
 	// compare stream returned from API with expected stream
 	if match, _ := cluster.compareStreams(&streams.Items[0], fes); !match {
@@ -468,11 +466,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 
 	streams, err = cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
-
-	// check if there is still only one stream
-	if len(streams.Items) > 1 {
-		t.Errorf("too many stream CRDs found after sync: got %d, but expected only one", len(streams.Items))
-	}
+	assert.Equalf(t, 1, len(streams.Items), "unexpected number of streams found: got %d, but expected only one", len(streams.Items))
 
 	// compare stream resturned from API with generated stream
 	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
@@ -490,6 +484,62 @@ func newFabricEventStream(streams []zalandov1.EventStream, annotations map[strin
 			ApplicationId: appId,
 			EventStreams:  streams,
 		},
+	}
+}
+
+func TestSyncStreams(t *testing.T) {
+	pg.Name = fmt.Sprintf("%s-2", pg.Name)
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:         map[string]string{"application": "spilo"},
+					ClusterNameLabel:      "cluster-name",
+					DefaultCPURequest:     "300m",
+					DefaultCPULimit:       "300m",
+					DefaultMemoryRequest:  "300Mi",
+					DefaultMemoryLimit:    "300Mi",
+					EnableOwnerReferences: util.True(),
+					PodRoleLabel:          "spilo-role",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	_, err := cluster.KubeClient.Postgresqls(namespace).Create(
+		context.TODO(), &pg, metav1.CreateOptions{})
+	assert.NoError(t, err)
+
+	// create the stream
+	err = cluster.syncStream(appId)
+	assert.NoError(t, err)
+
+	// create a second stream with same spec but with different name
+	createdStream, err := cluster.KubeClient.FabricEventStreams(namespace).Create(
+		context.TODO(), fes, metav1.CreateOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, createdStream.Spec.ApplicationId, appId)
+
+	// check that two streams exist
+	listOptions := metav1.ListOptions{
+		LabelSelector: cluster.labelsSet(true).String(),
+	}
+	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
+	assert.NoError(t, err)
+	assert.Equalf(t, 2, len(streams.Items), "unexpected number of streams found: got %d, but expected only 2", len(streams.Items))
+
+	// sync the stream which should remove the redundant stream
+	err = cluster.syncStream(appId)
+	assert.NoError(t, err)
+
+	// check that only one stream remains after sync
+	streams, err = cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
+	assert.NoError(t, err)
+	assert.Equalf(t, 1, len(streams.Items), "unexpected number of streams found: got %d, but expected only 1", len(streams.Items))
+
+	// check owner references
+	if !reflect.DeepEqual(streams.Items[0].OwnerReferences, cluster.ownerReferences()) {
+		t.Errorf("unexpected owner references, expected %#v, got %#v", cluster.ownerReferences(), streams.Items[0].OwnerReferences)
 	}
 }
 
@@ -606,8 +656,8 @@ func TestSameStreams(t *testing.T) {
 	}
 }
 
-func TestUpdateFabricEventStream(t *testing.T) {
-	pg.Name = fmt.Sprintf("%s-2", pg.Name)
+func TestUpdateStreams(t *testing.T) {
+	pg.Name = fmt.Sprintf("%s-3", pg.Name)
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -628,11 +678,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 		context.TODO(), &pg, metav1.CreateOptions{})
 	assert.NoError(t, err)
 
-	// create statefulset to have ownerReference for streams
-	_, err = cluster.createStatefulSet()
-	assert.NoError(t, err)
-
-	// now create the stream
+	// create the stream
 	err = cluster.syncStream(appId)
 	assert.NoError(t, err)
 

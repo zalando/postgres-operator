@@ -176,7 +176,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			upgradeCommand := fmt.Sprintf("set -o pipefail && /usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
 
-			c.logger.Debugf("checking if the spilo image runs with root or non-root (check for user id=0)")
+			c.logger.Debug("checking if the spilo image runs with root or non-root (check for user id=0)")
 			resultIdCheck, errIdCheck := c.ExecCommand(podName, "/bin/bash", "-c", "/usr/bin/id -u")
 			if errIdCheck != nil {
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "checking user id to run upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, errIdCheck)
