@@ -22,6 +22,11 @@ var VersionMap = map[string]int{
 	"16": 160000,
 }
 
+const (
+	majorVersionUpgradeSuccessAnnotation = "last-major-upgrade-success"
+	majorVersionUpgradeFailureAnnotation = "last-major-upgrade-failure"
+)
+
 // IsBiggerPostgresVersion Compare two Postgres version numbers
 func IsBiggerPostgresVersion(old string, new string) bool {
 	oldN := VersionMap[old]
@@ -58,37 +63,20 @@ func (c *Cluster) isUpgradeAllowedForTeam(owningTeam string) bool {
 	return util.SliceContains(allowedTeams, owningTeam)
 }
 
-func (c *Cluster) PatchAnnotations(patchBytesAnnotation []byte) error {
-	resourceName := c.Name
-	_, err := c.KubeClient.Postgresqls(c.Namespace).Patch(context.Background(), resourceName, types.MergePatchType, patchBytesAnnotation, metav1.PatchOptions{})
-	if err != nil {
-		c.logger.Errorf("failed to patch annotations: %v", err)
-		return err
-	}
-	return nil
-}
-
 func (c *Cluster) annotatePostgresResource(isSuccess bool) error {
 	annotations := make(map[string]string)
 	currentTime := metav1.Now().Format("2006-01-02T15:04:05Z")
 	if isSuccess {
-		annotations["last-major-upgrade-success"] = currentTime
+		annotations[majorVersionUpgradeSuccessAnnotation] = currentTime
 	} else {
-		annotations["last-major-upgrade-failure"] = currentTime
+		annotations[majorVersionUpgradeFailureAnnotation] = currentTime
 	}
-
-	patchAnnotation := map[string]map[string]map[string]string{
-		"metadata": {
-			"annotations": annotations,
-		},
-	}
-	patchBytes, err := json.Marshal(patchAnnotation)
+	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
-		c.logger.Errorf("failed to marshal annotations: %v", err)
+		c.logger.Errorf("could not form patch for %s postgresql resource: %v", c.Name, err)
 		return err
 	}
-
-	err = c.PatchAnnotations(patchBytes)
+	_, err = c.KubeClient.Postgresqls(c.Namespace).Patch(context.Background(), c.Name, types.MergePatchType, patchData, metav1.PatchOptions{})
 	if err != nil {
 		c.logger.Errorf("failed to patch annotations to Postgres resource: %v", err)
 		return err
@@ -96,18 +84,24 @@ func (c *Cluster) annotatePostgresResource(isSuccess bool) error {
 	return nil
 }
 
-func (c *Cluster) getLastMajorUpgradeAnnotations() map[string]string {
-	annotations := c.ObjectMeta.GetAnnotations()
-	upgradeAnnotationKeys := []string{"last-major-upgrade-failure", "last-major-upgrade-success"}
-	upgradeAnnotationValues := make(map[string]string)
-	for _, annotationKey := range upgradeAnnotationKeys {
-		if val, exists := annotations[annotationKey]; exists {
-			upgradeAnnotationValues[annotationKey] = val
-		} else {
-			upgradeAnnotationValues[annotationKey] = ""
-		}
+func (c *Cluster) removeFailuresAnnotation() error {
+	annotationToRemove := []map[string]string{
+		{
+			"op":   "remove",
+			"path": fmt.Sprintf("/metadata/annotations/%s", majorVersionUpgradeFailureAnnotation),
+		},
 	}
-	return upgradeAnnotationValues
+	removePatch, err := json.Marshal(annotationToRemove)
+	if err != nil {
+		c.logger.Errorf("could not form patch for %s postgresql resource: %v", c.Name, err)
+		return err
+	}
+	_, err = c.KubeClient.Postgresqls(c.Namespace).Patch(context.Background(), c.Name, types.JSONPatchType, removePatch, metav1.PatchOptions{})
+	if err != nil {
+		c.logger.Errorf("failed to patch annotations to Postgres resource: %v", err)
+		return err
+	}
+	return nil
 }
 
 /*
@@ -124,18 +118,17 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	desiredVersion := c.GetDesiredMajorVersionAsInt()
 	isUpgradeSuccess := true
-	lastMajorUpgradeAnnotations := c.getLastMajorUpgradeAnnotations()
 
 	if c.currentMajorVersion >= desiredVersion {
-		if lastMajorUpgradeAnnotations["last-major-upgrade-success"] == "" {
-			c.annotatePostgresResource(isUpgradeSuccess)
-			c.logger.Info("update last major upgrade success annotation to current timestamp as it was not set")
+		if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists { // if failure annotation exists, remove it
+			c.removeFailuresAnnotation()
+			c.logger.Infof("removing failure annotation as the cluster is already up to date")
 		}
 		c.logger.Infof("cluster version up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
 		return nil
 	}
 
-	if lastMajorUpgradeAnnotations["last-major-upgrade-failure"] != "" {
+	if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists {
 		c.logger.Infof("last major upgrade failed, skipping upgrade")
 		return nil
 	}
@@ -170,10 +163,6 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	// Recheck version with newest data from Patroni
 	if c.currentMajorVersion >= desiredVersion {
-		if lastMajorUpgradeAnnotations["last-major-upgrade-success"] == "" {
-			c.annotatePostgresResource(isUpgradeSuccess)
-			c.logger.Info("update last major upgrade success annotation to current timestamp as it was not set")
-		}
 		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
 		return nil
 	}

@@ -1232,8 +1232,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(check_version, 13, "Version should be upgraded from 12 to 13")
 
         # check if annotation for last upgrade's success is set
-        previous_annotations = get_annotations()
-        self.assertIsNotNone(previous_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not set")
+        annotations = get_annotations()
+        self.assertIsNotNone(annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not set")
 
         # should not upgrade because current time is not in maintenanceWindow
         current_time = datetime.now()
@@ -1280,9 +1280,9 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(check_version, 15, "Version should be upgraded from 13 to 15")
 
         # check if annotation for last upgrade's success is updated after second upgrade
-        new_annotations = get_annotations()
-        self.assertIsNotNone(new_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not set")
-        self.assertNotEqual(previous_annotations.get("last-major-upgrade-success"), new_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not updated")
+        second_annotations = get_annotations()
+        self.assertIsNotNone(second_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not set")
+        self.assertNotEqual(annotations.get("last-major-upgrade-success"), second_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not updated")
 
         # test annotation with failed upgrade annotation
         pg_patch_version_16 = {
@@ -1305,6 +1305,18 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(check_version, 15, "Version should not be upgraded because annotation for last upgrade's failure is set")
+
+        # change the version back to 15 and should remove failure annotation
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+        third_annotations = get_annotations()
+        self.assertIsNone(third_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure is not removed")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_persistent_volume_claim_retention_policy(self):
