@@ -78,7 +78,7 @@ func (c *Cluster) annotatePostgresResource(isSuccess bool) error {
 	}
 	_, err = c.KubeClient.Postgresqls(c.Namespace).Patch(context.Background(), c.Name, types.MergePatchType, patchData, metav1.PatchOptions{})
 	if err != nil {
-		c.logger.Errorf("failed to patch annotations to Postgres resource: %v", err)
+		c.logger.Errorf("failed to patch annotations to postgresql resource: %v", err)
 		return err
 	}
 	return nil
@@ -93,12 +93,12 @@ func (c *Cluster) removeFailuresAnnotation() error {
 	}
 	removePatch, err := json.Marshal(annotationToRemove)
 	if err != nil {
-		c.logger.Errorf("could not form patch for %s postgresql resource: %v", c.Name, err)
+		c.logger.Errorf("could not form removal patch for %s postgresql resource: %v", c.Name, err)
 		return err
 	}
 	_, err = c.KubeClient.Postgresqls(c.Namespace).Patch(context.Background(), c.Name, types.JSONPatchType, removePatch, metav1.PatchOptions{})
 	if err != nil {
-		c.logger.Errorf("failed to patch annotations to Postgres resource: %v", err)
+		c.logger.Errorf("failed to remove annotations from postgresql resource: %v", err)
 		return err
 	}
 	return nil
@@ -117,7 +117,6 @@ func (c *Cluster) majorVersionUpgrade() error {
 	}
 
 	desiredVersion := c.GetDesiredMajorVersionAsInt()
-	isUpgradeSuccess := true
 
 	if c.currentMajorVersion >= desiredVersion {
 		if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists { // if failure annotation exists, remove it
@@ -167,6 +166,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
+	isUpgradeSuccess := true
 	numberOfPods := len(pods)
 	if allRunning && masterPod != nil {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
