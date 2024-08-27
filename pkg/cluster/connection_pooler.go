@@ -591,7 +591,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	// Lack of connection pooler objects is not a fatal error, just log it if
 	// it was present before in the manifest
 	if c.ConnectionPooler[role] == nil || role == "" {
-		c.logger.Debugf("no connection pooler to delete")
+		c.logger.Debug("no connection pooler to delete")
 		return nil
 	}
 
@@ -622,7 +622,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	// Repeat the same for the service object
 	service := c.ConnectionPooler[role].Service
 	if service == nil {
-		c.logger.Debugf("no connection pooler service object to delete")
+		c.logger.Debug("no connection pooler service object to delete")
 	} else {
 
 		err = c.KubeClient.
