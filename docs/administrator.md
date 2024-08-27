@@ -82,6 +82,12 @@ upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/z
 When `major_version_upgrade_mode` is set to `manual` the operator will run
 the upgrade script for you after the manifest is updated and pods are rotated.
 
+### Upgrade annotations
+
+When an upgrade is executed, the operator sets an annotation in the PostgreSQL resource, either `last-major-upgrade-success` if the upgrade succeeds, or `last-major-upgrade-failure` if it fails. The value of the annotation is a timestamp indicating when the upgrade occurred.
+
+If a PostgreSQL resource contains a failure annotation, the operator will not attempt to retry the upgrade during a sync event. To remove the failure annotation, you can revert the PostgreSQL version back to the current version. This action will trigger the removal of the failure annotation.
+
 ## Non-default cluster domain
 
 If your cluster uses a DNS domain other than the default `cluster.local`, this
