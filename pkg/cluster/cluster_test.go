@@ -95,6 +95,7 @@ func TestCreate(t *testing.T) {
 
 	client := k8sutil.KubernetesClient{
 		DeploymentsGetter:            clientSet.AppsV1(),
+		CronJobsGetter:               clientSet.BatchV1(),
 		EndpointsGetter:              clientSet.CoreV1(),
 		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
 		PodDisruptionBudgetsGetter:   clientSet.PolicyV1(),
@@ -111,6 +112,7 @@ func TestCreate(t *testing.T) {
 			Namespace: clusterNamespace,
 		},
 		Spec: acidv1.PostgresSpec{
+			EnableLogicalBackup: true,
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
