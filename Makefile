@@ -78,7 +78,7 @@ mocks:
 	GO111MODULE=on go generate ./...
 
 tools:
-	GO111MODULE=on go get -d k8s.io/client-go@kubernetes-1.28.12
+	GO111MODULE=on go get -d k8s.io/client-go@kubernetes-1.30.4
 	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.6.0
 	GO111MODULE=on go mod tidy
 
