@@ -300,6 +300,7 @@ func (c *Cluster) syncPatroniService() error {
 		err error
 	)
 	serviceName := fmt.Sprintf("%s-%s", c.Name, Patroni)
+	c.logger.Debugf("syncing %s service", serviceName)
 	c.setProcessName("syncing %s service", serviceName)
 
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), serviceName, metav1.GetOptions{}); err == nil {
@@ -311,7 +312,7 @@ func (c *Cluster) syncPatroniService() error {
 			c.setProcessName("updating %v service", serviceName)
 			svc, err = c.KubeClient.Services(c.Namespace).Update(context.TODO(), svc, metav1.UpdateOptions{})
 			if err != nil {
-				return fmt.Errorf("could not update %s endpoint: %v", serviceName, err)
+				return fmt.Errorf("could not update %s service: %v", serviceName, err)
 			}
 			c.Services[Patroni] = svc
 		}
@@ -537,7 +538,7 @@ func (c *Cluster) syncStatefulSet() error {
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
-		c.logger.Debugf("syncing statefulsets")
+		c.logger.Debug("syncing statefulsets")
 		// check if there are still pods with a rolling update flag
 		for _, pod := range pods {
 			if c.getRollingUpdateFlagFromPod(&pod) {
@@ -552,7 +553,7 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 
 		if len(podsToRecreate) > 0 {
-			c.logger.Debugf("%d / %d pod(s) still need to be rotated", len(podsToRecreate), len(pods))
+			c.logger.Infof("%d / %d pod(s) still need to be rotated", len(podsToRecreate), len(pods))
 		}
 
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
@@ -658,7 +659,7 @@ func (c *Cluster) syncStatefulSet() error {
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if len(podsToRecreate) > 0 {
 		if isSafeToRecreatePods {
-			c.logger.Debugln("performing rolling update")
+			c.logger.Info("performing rolling update")
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
 			if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
 				return fmt.Errorf("could not recreate pods: %v", err)
@@ -971,7 +972,7 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 	// carries the request to change configuration through
 	for _, pod := range pods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
-		c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
+		c.logger.Infof("patching Postgres config via Patroni API on pod %s with following options: %s",
 			podName, standbyOptionsToSet)
 		if err = c.patroni.SetStandbyClusterParameters(&pod, standbyOptionsToSet); err == nil {
 			return nil
@@ -983,7 +984,7 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 }
 
 func (c *Cluster) syncSecrets() error {
-	c.logger.Info("syncing secrets")
+	c.logger.Debug("syncing secrets")
 	c.setProcessName("syncing secrets")
 	generatedSecrets := c.generateUserSecrets()
 	retentionUsers := make([]string, 0)
@@ -993,7 +994,7 @@ func (c *Cluster) syncSecrets() error {
 		secret, err := c.KubeClient.Secrets(generatedSecret.Namespace).Create(context.TODO(), generatedSecret, metav1.CreateOptions{})
 		if err == nil {
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), generatedSecret.Namespace, secret.UID)
+			c.logger.Infof("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), generatedSecret.Namespace, secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
@@ -1134,7 +1135,7 @@ func (c *Cluster) updateSecret(
 	}
 
 	if updateSecret {
-		c.logger.Debugln(updateSecretMsg)
+		c.logger.Infof(updateSecretMsg)
 		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("could not update secret %s: %v", secretName, err)
 		}
