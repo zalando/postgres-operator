@@ -644,7 +644,7 @@ func TestUpdateSecret(t *testing.T) {
 					ApplicationId: appId,
 					Database:      dbname,
 					Tables: map[string]acidv1.StreamTable{
-						"data.foo": acidv1.StreamTable{
+						"data.foo": {
 							EventType: "stream-type-b",
 						},
 					},
