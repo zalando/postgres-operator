@@ -1284,7 +1284,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertIsNotNone(second_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not set")
         self.assertNotEqual(annotations.get("last-major-upgrade-success"), second_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not updated")
 
-        # test annotation with failed upgrade annotation
+        # test upgrade with failed upgrade annotation
         pg_patch_version_16 = {
             "metadata": {
                 "annotations": {
