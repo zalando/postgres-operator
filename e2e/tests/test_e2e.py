@@ -1257,6 +1257,9 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(check_version, 13, "Version should not be upgraded")
 
+        second_annotations = get_annotations()
+        self.assertIsNone(second_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure should not be set")
+
         # change the version again to trigger operator sync
         maintenance_window_current = f"{(current_time-timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=30)).strftime('%H:%M')}"
         pg_patch_version_15 = {
@@ -1280,9 +1283,9 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(check_version, 15, "Version should be upgraded from 13 to 15")
 
         # check if annotation for last upgrade's success is updated after second upgrade
-        second_annotations = get_annotations()
-        self.assertIsNotNone(second_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not set")
-        self.assertNotEqual(annotations.get("last-major-upgrade-success"), second_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not updated")
+        third_annotations = get_annotations()
+        self.assertIsNotNone(third_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not set")
+        self.assertNotEqual(annotations.get("last-major-upgrade-success"), third_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not updated")
 
         # test upgrade with failed upgrade annotation
         pg_patch_version_16 = {
@@ -1315,8 +1318,8 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
-        third_annotations = get_annotations()
-        self.assertIsNone(third_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure is not removed")
+        fourth_annotations = get_annotations()
+        self.assertIsNone(fourth_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure is not removed")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_persistent_volume_claim_retention_policy(self):
