@@ -228,7 +228,7 @@ type UserFlags []string
 
 type Conditions []Condition
 
-type ConditionType string
+type PostgresqlConditionType string
 type VolatileTime struct {
 	Inner metav1.Time `json:",inline"`
 }
@@ -254,11 +254,11 @@ func init() {
 
 // Condition contains the conditions of the PostgreSQL cluster
 type Condition struct {
-	Type               ConditionType      `json:"type" description:"type of status condition"`
-	Status             v1.ConditionStatus `json:"status" description:"status of the condition, one of True, False, Unknown"`
-	LastTransitionTime VolatileTime       `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
-	Reason             string             `json:"reason,omitempty" description:"one-word CamelCase reason for the condition's last transition"`
-	Message            string             `json:"message,omitempty" description:"human-readable message indicating details about last transition"`
+	Type               PostgresqlConditionType `json:"type" description:"type of status condition"`
+	Status             v1.ConditionStatus      `json:"status" description:"status of the condition, one of True, False, Unknown"`
+	LastTransitionTime VolatileTime            `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
+	Reason             string                  `json:"reason,omitempty" description:"one-word CamelCase reason for the condition's last transition"`
+	Message            string                  `json:"message,omitempty" description:"human-readable message indicating details about last transition"`
 }
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)

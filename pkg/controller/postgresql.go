@@ -161,9 +161,15 @@ func (c *Controller) acquireInitialListOfClusters() error {
 func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) (*cluster.Cluster, error) {
 	if c.opConfig.EnableTeamIdClusternamePrefix {
 		if _, err := acidv1.ExtractClusterName(clusterName.Name, pgSpec.Spec.TeamID); err != nil {
-			labelstring := fmt.Sprintf("%s=%s", "cluster-name", pgSpec.ObjectMeta.Labels["cluster-name"])
-			existingConditions := pgSpec.Status.Conditions
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusInvalid, pgSpec.Status.NumberOfInstances, labelstring, pgSpec.Status.ObservedGeneration, existingConditions, err.Error())
+			labelstring := fmt.Sprintf("%s=%s", c.opConfig.ClusterNameLabel, pgSpec.ObjectMeta.Labels[c.opConfig.ClusterNameLabel])
+			ClusterStatus := acidv1.PostgresStatus{
+				PostgresClusterStatus: acidv1.ClusterStatusInvalid,
+				NumberOfInstances:     pgSpec.Status.NumberOfInstances,
+				LabelSelector:         labelstring,
+				ObservedGeneration:    pgSpec.Status.ObservedGeneration,
+				Conditions:            pgSpec.Status.Conditions,
+			}
+			c.KubeClient.SetPostgresCRDStatus(clusterName, ClusterStatus, err.Error())
 			return nil, err
 		}
 	}
@@ -209,10 +215,10 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	if event.EventType == EventRepair {
 		runRepair, lastOperationStatus := cl.NeedsRepair()
 		if !runRepair {
-			lg.Debugf("observed cluster status %s, repair is not required", lastOperationStatus)
+			lg.Debugf("observed cluster status %#v, repair is not required", lastOperationStatus)
 			return
 		}
-		lg.Debugf("observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
+		lg.Debugf("observed cluster status %#v, running sync scan to repair the cluster", lastOperationStatus)
 		event.EventType = EventSync
 	}
 
@@ -474,18 +480,26 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 
 	if clusterError != "" && eventType != EventDelete {
 		c.logger.WithField("cluster-name", clusterName).Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
-		labelstring := fmt.Sprintf("%s=%s", "cluster-name", informerNewSpec.ObjectMeta.Labels["cluster-name"])
-		existingConditions := informerNewSpec.Status.Conditions
+		labelstring := fmt.Sprintf("%s=%s", c.opConfig.ClusterNameLabel, informerNewSpec.ObjectMeta.Labels[c.opConfig.ClusterNameLabel])
+		ClusterStatus := acidv1.PostgresStatus{
+			NumberOfInstances:  informerNewSpec.Status.NumberOfInstances,
+			LabelSelector:      labelstring,
+			ObservedGeneration: informerNewSpec.Status.ObservedGeneration,
+			Conditions:         informerNewSpec.Status.Conditions,
+		}
 
 		switch eventType {
 		case EventAdd:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusAddFailed, informerNewSpec.Status.NumberOfInstances, labelstring, informerNewSpec.Status.ObservedGeneration, existingConditions, clusterError)
+			ClusterStatus.PostgresClusterStatus = acidv1.ClusterStatusAddFailed
+			c.KubeClient.SetPostgresCRDStatus(clusterName, ClusterStatus, clusterError)
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Create", "%v", clusterError)
 		case EventUpdate:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusUpdateFailed, informerNewSpec.Status.NumberOfInstances, labelstring, informerNewSpec.Status.ObservedGeneration, existingConditions, clusterError)
+			ClusterStatus.PostgresClusterStatus = acidv1.ClusterStatusUpdateFailed
+			c.KubeClient.SetPostgresCRDStatus(clusterName, ClusterStatus, clusterError)
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Update", "%v", clusterError)
 		default:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusSyncFailed, informerNewSpec.Status.NumberOfInstances, labelstring, informerNewSpec.Status.ObservedGeneration, existingConditions, clusterError)
+			ClusterStatus.PostgresClusterStatus = acidv1.ClusterStatusSyncFailed
+			c.KubeClient.SetPostgresCRDStatus(clusterName, ClusterStatus, clusterError)
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Sync", "%v", clusterError)
 		}
 

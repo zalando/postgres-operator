@@ -23,9 +23,7 @@ const (
 	OperatorConfigCRDResourceList   = OperatorConfigCRDResouceKind + "List"
 	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
 	OperatorConfigCRDResourceShort  = "opconfig"
-)
 
-var (
 	specReplicasPath   = ".spec.numberOfInstances"
 	statusReplicasPath = ".status.numberOfInstances"
 	labelSelectorPath  = ".status.labelSelector"

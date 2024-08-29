@@ -193,15 +193,10 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 }
 
 // SetPostgresCRDStatus of Postgres cluster
-func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string, numberOfInstances int32, labelSelector string, observedGeneration int64, existingConditions apiacidv1.Conditions, message string) (*apiacidv1.Postgresql, error) {
+func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, pgStatus apiacidv1.PostgresStatus, message string) (*apiacidv1.Postgresql, error) {
 	var pg *apiacidv1.Postgresql
-	pgStatus := apiacidv1.PostgresStatus{}
-	pgStatus.PostgresClusterStatus = status
-	pgStatus.NumberOfInstances = numberOfInstances
-	pgStatus.LabelSelector = labelSelector
-	pgStatus.ObservedGeneration = observedGeneration
 
-	newConditions := updateConditions(existingConditions, status, message)
+	newConditions := updateConditions(pgStatus.Conditions, pgStatus.PostgresClusterStatus, message)
 	pgStatus.Conditions = newConditions
 
 	patch, err := json.Marshal(struct {
@@ -250,6 +245,17 @@ func updateConditions(existingConditions apiacidv1.Conditions, currentStatus str
 			existingConditions = append(existingConditions, apiacidv1.Condition{Type: "Ready"})
 			readyCondition = &existingConditions[len(existingConditions)-1]
 		}
+	}
+
+	// Safety checks to avoid nil pointer dereference
+	if readyCondition == nil {
+		readyCondition = &apiacidv1.Condition{Type: "Ready"}
+		existingConditions = append(existingConditions, *readyCondition)
+	}
+
+	if reconciliationCondition == nil {
+		reconciliationCondition = &apiacidv1.Condition{Type: "ReconciliationSuccessful"}
+		existingConditions = append(existingConditions, *reconciliationCondition)
 	}
 
 	// Update Ready condition
