@@ -1014,7 +1014,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		initUsers := !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser
 		if initUsers {
-			c.logger.Debugf("initialize users")
+			c.logger.Debug("initialize users")
 			if err := c.initUsers(); err != nil {
 				c.logger.Errorf("could not init users - skipping sync of secrets and databases: %v", err)
 				userInitFailed = true
@@ -1023,7 +1023,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			}
 		}
 		if initUsers || annotationsChanged {
-			c.logger.Debugf("syncing secrets")
+			c.logger.Debug("syncing secrets")
 			//TODO: mind the secrets of the deleted/new users
 			if err := c.syncSecrets(); err != nil {
 				c.logger.Errorf("could not sync secrets: %v", err)
@@ -1065,7 +1065,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		// create if it did not exist
 		if !oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup {
-			c.logger.Debugf("creating backup cron job")
+			c.logger.Debug("creating backup cron job")
 			if err := c.createLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not create a k8s cron job for logical backups: %v", err)
 				updateFailed = true
@@ -1075,7 +1075,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		// delete if no longer needed
 		if oldSpec.Spec.EnableLogicalBackup && !newSpec.Spec.EnableLogicalBackup {
-			c.logger.Debugf("deleting backup cron job")
+			c.logger.Debug("deleting backup cron job")
 			if err := c.deleteLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not delete a k8s cron job for logical backups: %v", err)
 				updateFailed = true
@@ -1095,7 +1095,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// Roles and Databases
 	if !userInitFailed && !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
-		c.logger.Debugf("syncing roles")
+		c.logger.Debug("syncing roles")
 		if err := c.syncRoles(); err != nil {
 			c.logger.Errorf("could not sync roles: %v", err)
 			updateFailed = true

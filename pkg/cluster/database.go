@@ -111,7 +111,7 @@ func (c *Cluster) pgConnectionString(dbname string) string {
 
 func (c *Cluster) databaseAccessDisabled() bool {
 	if !c.OpConfig.EnableDBAccess {
-		c.logger.Debugf("database access is disabled")
+		c.logger.Debug("database access is disabled")
 	}
 
 	return !c.OpConfig.EnableDBAccess

@@ -70,7 +70,7 @@ the manifest. Still, a rolling update would be triggered updating the
 script will notice the version mismatch and start the old version again.
 
 In this scenario the major version could then be run by a user from within the
-master pod. Exec into the container and run:
+primary pod. Exec into the container and run:
 ```bash
 python3 /scripts/inplace_upgrade.py N
 ```
@@ -81,6 +81,15 @@ upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/z
 
 When `major_version_upgrade_mode` is set to `manual` the operator will run
 the upgrade script for you after the manifest is updated and pods are rotated.
+It is also possible to define `maintenanceWindows` in the Postgres manifest to
+better control when such automated upgrades should take place after increasing
+the version.
+
+### Upgrade annotations
+
+When an upgrade is executed, the operator sets an annotation in the PostgreSQL resource, either `last-major-upgrade-success` if the upgrade succeeds, or `last-major-upgrade-failure` if it fails. The value of the annotation is a timestamp indicating when the upgrade occurred.
+
+If a PostgreSQL resource contains a failure annotation, the operator will not attempt to retry the upgrade during a sync event. To remove the failure annotation, you can revert the PostgreSQL version back to the current version. This action will trigger the removal of the failure annotation.
 
 ## Non-default cluster domain
 
@@ -1452,7 +1461,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t ghcr.io/zalando/postgres-operator-ui:v1.12.2 .
+docker build -t ghcr.io/zalando/postgres-operator-ui:v1.13.0 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/

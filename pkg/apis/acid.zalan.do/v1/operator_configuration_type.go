@@ -47,7 +47,7 @@ type PostgresUsersConfiguration struct {
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
 type MajorVersionUpgradeConfiguration struct {
-	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
+	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"manual"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
 	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
 	MinimalMajorVersion              string   `json:"minimal_major_version" default:"12"`
 	TargetMajorVersion               string   `json:"target_major_version" default:"16"`
@@ -160,7 +160,7 @@ type AWSGCPConfiguration struct {
 	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
 	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
 	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
-	AdditionalSecretMountPath    string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	AdditionalSecretMountPath    string `json:"additional_secret_mount_path,omitempty"`
 	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration" default:"false"`
 	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size" default:"1000"`
 }

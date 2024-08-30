@@ -143,7 +143,7 @@ func (c *Controller) acquireInitialListOfClusters() error {
 	if list, err = c.listClusters(metav1.ListOptions{ResourceVersion: "0"}); err != nil {
 		return err
 	}
-	c.logger.Debugf("acquiring initial list of clusters")
+	c.logger.Debug("acquiring initial list of clusters")
 	for _, pg := range list.Items {
 		// XXX: check the cluster status field instead
 		if pg.Error != "" {

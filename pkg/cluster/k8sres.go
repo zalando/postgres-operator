@@ -750,7 +750,7 @@ func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar,
 }
 
 // adds common fields to sidecars
-func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string, logger *logrus.Entry) []v1.Container {
+func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string) []v1.Container {
 	result := []v1.Container{}
 
 	for _, container := range in {
@@ -1455,7 +1455,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			containerName, containerName)
 	}
 
-	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
+	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername))
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
@@ -1609,7 +1609,7 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 	for k, v := range c.OpConfig.CustomPodAnnotations {
 		annotations[k] = v
 	}
-	if spec != nil || spec.PodAnnotations != nil {
+	if spec.PodAnnotations != nil {
 		for k, v := range spec.PodAnnotations {
 			annotations[k] = v
 		}
@@ -1870,7 +1870,7 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: quantity,
 				},
@@ -1886,18 +1886,16 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 
 func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	secrets := make(map[string]*v1.Secret, len(c.pgUsers)+len(c.systemUsers))
-	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		secret := c.generateSingleUserSecret(pgUser.Namespace, pgUser)
+		secret := c.generateSingleUserSecret(pgUser)
 		if secret != nil {
 			secrets[username] = secret
 		}
-		namespace = pgUser.Namespace
 	}
 	/* special case for the system user */
 	for _, systemUser := range c.systemUsers {
-		secret := c.generateSingleUserSecret(namespace, systemUser)
+		secret := c.generateSingleUserSecret(systemUser)
 		if secret != nil {
 			secrets[systemUser.Name] = secret
 		}
@@ -1906,7 +1904,7 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	return secrets
 }
 
-func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
+func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
 		if pgUser.Origin != spec.RoleOriginTeamsAPI {
@@ -2492,7 +2490,9 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		}
 
 	case "gcs":
-		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+		if c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+		}
 
 	case "az":
 		envVars = appendEnvVars(envVars, []v1.EnvVar{
@@ -2503,11 +2503,11 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			{
 				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
 				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageContainer,
-			},
-			{
-				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
-				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey,
 			}}...)
+
+		if c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey})
+		}
 	}
 
 	return envVars
