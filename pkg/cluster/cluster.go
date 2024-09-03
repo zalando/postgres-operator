@@ -3,7 +3,6 @@ package cluster
 // Postgres CustomResourceDefinition object i.e. Spilo
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	zalandov1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
 
 	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -30,7 +30,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	apipolicyv1 "k8s.io/api/policy/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,9 +61,13 @@ type Config struct {
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
 	Endpoints           map[PostgresRole]*v1.Endpoints
+	PatroniEndpoints    map[string]*v1.Endpoints
+	PatroniConfigMaps   map[string]*v1.ConfigMap
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
 	PodDisruptionBudget *policyv1.PodDisruptionBudget
+	LogicalBackupJob    *batchv1.CronJob
+	Streams             map[string]*zalandov1.FabricEventStream
 	//Pods are treated separately
 	//PVCs are treated separately
 }
@@ -132,9 +135,12 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 		systemUsers:    make(map[string]spec.PgUser),
 		podSubscribers: make(map[spec.NamespacedName]chan PodEvent),
 		kubeResources: kubeResources{
-			Secrets:   make(map[types.UID]*v1.Secret),
-			Services:  make(map[PostgresRole]*v1.Service),
-			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
+			Secrets:           make(map[types.UID]*v1.Secret),
+			Services:          make(map[PostgresRole]*v1.Service),
+			Endpoints:         make(map[PostgresRole]*v1.Endpoints),
+			PatroniEndpoints:  make(map[string]*v1.Endpoints),
+			PatroniConfigMaps: make(map[string]*v1.ConfigMap),
+			Streams:           make(map[string]*zalandov1.FabricEventStream)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
 			PasswordEncryption:   passwordEncryption,
 			RoleDeletionSuffix:   cfg.OpConfig.RoleDeletionSuffix,
@@ -357,6 +363,11 @@ func (c *Cluster) Create() (err error) {
 	c.logger.Infof("pods are ready")
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Pods are ready")
 
+	// sync resources created by Patroni
+	if err = c.syncPatroniResources(); err != nil {
+		c.logger.Warnf("Patroni resources not yet synced: %v", err)
+	}
+
 	// create database objects unless we are running without pods or disabled
 	// that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
@@ -380,10 +391,6 @@ func (c *Cluster) Create() (err error) {
 			return fmt.Errorf("could not create a k8s cron job for logical backups: %v", err)
 		}
 		c.logger.Info("a k8s cron job for logical backup has been successfully created")
-	}
-
-	if err := c.listResources(); err != nil {
-		c.logger.Errorf("could not list resources: %v", err)
 	}
 
 	// Create connection pooler deployment and services if necessary. Since we
@@ -410,6 +417,10 @@ func (c *Cluster) Create() (err error) {
 		}
 	}
 
+	if err := c.listResources(); err != nil {
+		c.logger.Errorf("could not list resources: %v", err)
+	}
+
 	return nil
 }
 
@@ -422,6 +433,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	if *c.Statefulset.Spec.Replicas != *statefulSet.Spec.Replicas {
 		match = false
 		reasons = append(reasons, "new statefulset's number of replicas does not match the current one")
+	}
+	if !reflect.DeepEqual(c.Statefulset.OwnerReferences, statefulSet.OwnerReferences) {
+		match = false
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's ownerReferences do not match")
 	}
 	if changed, reason := c.compareAnnotations(c.Statefulset.Annotations, statefulSet.Annotations); changed {
 		match = false
@@ -521,7 +537,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 			}
 			if changed, reason := c.compareAnnotations(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations); changed {
 				needsReplace = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one: %s", name, reason))
+				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q do not match the current ones: %s", name, reason))
 			}
 			if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
 				name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
@@ -652,7 +668,7 @@ func compareEnv(a, b []v1.EnvVar) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	equal := true
+	var equal bool
 	for _, enva := range a {
 		hasmatch := false
 		for _, envb := range b {
@@ -807,6 +823,10 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		}
 	}
 
+	if !reflect.DeepEqual(old.ObjectMeta.OwnerReferences, new.ObjectMeta.OwnerReferences) {
+		return false, "new service's owner references do not match the current ones"
+	}
+
 	return true, ""
 }
 
@@ -847,13 +867,16 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool
 	return true, ""
 }
 
-func (c *Cluster) comparePodDisruptionBudget(cur, new *apipolicyv1.PodDisruptionBudget) (bool, string) {
+func (c *Cluster) comparePodDisruptionBudget(cur, new *policyv1.PodDisruptionBudget) (bool, string) {
 	//TODO: improve comparison
-	if match := reflect.DeepEqual(new.Spec, cur.Spec); !match {
-		return false, "new PDB spec does not match the current one"
+	if !reflect.DeepEqual(new.Spec, cur.Spec) {
+		return false, "new PDB's spec does not match the current one"
+	}
+	if !reflect.DeepEqual(new.ObjectMeta.OwnerReferences, cur.ObjectMeta.OwnerReferences) {
+		return false, "new PDB's owner references do not match the current ones"
 	}
 	if changed, reason := c.compareAnnotations(cur.Annotations, new.Annotations); changed {
-		return false, "new PDB's annotations does not match the current one:" + reason
+		return false, "new PDB's annotations do not match the current ones:" + reason
 	}
 	return true, ""
 }
@@ -965,6 +988,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		updateFailed = true
 	}
 
+	// Patroni service and endpoints / config maps
+	if err := c.syncPatroniResources(); err != nil {
+		c.logger.Errorf("could not sync services: %v", err)
+		updateFailed = true
+	}
+
 	// Users
 	func() {
 		// check if users need to be synced during update
@@ -985,7 +1014,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		initUsers := !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser
 		if initUsers {
-			c.logger.Debugf("initialize users")
+			c.logger.Debug("initialize users")
 			if err := c.initUsers(); err != nil {
 				c.logger.Errorf("could not init users - skipping sync of secrets and databases: %v", err)
 				userInitFailed = true
@@ -994,7 +1023,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			}
 		}
 		if initUsers || annotationsChanged {
-			c.logger.Debugf("syncing secrets")
+			c.logger.Debug("syncing secrets")
 			//TODO: mind the secrets of the deleted/new users
 			if err := c.syncSecrets(); err != nil {
 				c.logger.Errorf("could not sync secrets: %v", err)
@@ -1036,7 +1065,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		// create if it did not exist
 		if !oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup {
-			c.logger.Debugf("creating backup cron job")
+			c.logger.Debug("creating backup cron job")
 			if err := c.createLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not create a k8s cron job for logical backups: %v", err)
 				updateFailed = true
@@ -1046,7 +1075,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		// delete if no longer needed
 		if oldSpec.Spec.EnableLogicalBackup && !newSpec.Spec.EnableLogicalBackup {
-			c.logger.Debugf("deleting backup cron job")
+			c.logger.Debug("deleting backup cron job")
 			if err := c.deleteLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not delete a k8s cron job for logical backups: %v", err)
 				updateFailed = true
@@ -1055,11 +1084,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		}
 
-		// apply schedule changes
-		// this is the only parameter of logical backups a user can overwrite in the cluster manifest
-		if (oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup) &&
-			(newSpec.Spec.LogicalBackupSchedule != oldSpec.Spec.LogicalBackupSchedule) {
-			c.logger.Debugf("updating schedule of the backup cron job")
+		if oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup {
 			if err := c.syncLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not sync logical backup jobs: %v", err)
 				updateFailed = true
@@ -1070,7 +1095,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// Roles and Databases
 	if !userInitFailed && !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
-		c.logger.Debugf("syncing roles")
+		c.logger.Debug("syncing roles")
 		if err := c.syncRoles(); err != nil {
 			c.logger.Errorf("could not sync roles: %v", err)
 			updateFailed = true
@@ -1183,7 +1208,6 @@ func (c *Cluster) Delete() error {
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
-
 		if !c.patroniKubernetesUseConfigMaps() {
 			if err := c.deleteEndpoint(role); err != nil {
 				anyErrors = true
@@ -1199,10 +1223,10 @@ func (c *Cluster) Delete() error {
 		}
 	}
 
-	if err := c.deletePatroniClusterObjects(); err != nil {
+	if err := c.deletePatroniResources(); err != nil {
 		anyErrors = true
-		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not remove leftover patroni objects; %v", err)
+		c.logger.Warningf("could not delete all Patroni resources: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete all Patroni resources: %v", err)
 	}
 
 	// Delete connection pooler objects anyway, even if it's not mentioned in the
@@ -1733,97 +1757,4 @@ func (c *Cluster) Lock() {
 // Unlock unlocks the cluster
 func (c *Cluster) Unlock() {
 	c.mu.Unlock()
-}
-
-type simpleActionWithResult func()
-
-type clusterObjectGet func(name string) (spec.NamespacedName, error)
-
-type clusterObjectDelete func(name string) error
-
-func (c *Cluster) deletePatroniClusterObjects() error {
-	// TODO: figure out how to remove leftover patroni objects in other cases
-	var actionsList []simpleActionWithResult
-
-	if !c.patroniUsesKubernetes() {
-		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
-	}
-
-	actionsList = append(actionsList, c.deletePatroniClusterServices)
-	if c.patroniKubernetesUseConfigMaps() {
-		actionsList = append(actionsList, c.deletePatroniClusterConfigMaps)
-	} else {
-		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
-	}
-
-	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
-	for _, deleter := range actionsList {
-		deleter()
-	}
-	return nil
-}
-
-func deleteClusterObject(
-	get clusterObjectGet,
-	del clusterObjectDelete,
-	objType string,
-	clusterName string,
-	logger *logrus.Entry) {
-	for _, suffix := range patroniObjectSuffixes {
-		name := fmt.Sprintf("%s-%s", clusterName, suffix)
-
-		namespacedName, err := get(name)
-		if err == nil {
-			logger.Debugf("deleting %s %q",
-				objType, namespacedName)
-
-			if err = del(name); err != nil {
-				logger.Warningf("could not delete %s %q: %v",
-					objType, namespacedName, err)
-			}
-
-		} else if !k8sutil.ResourceNotFound(err) {
-			logger.Warningf("could not fetch %s %q: %v",
-				objType, namespacedName, err)
-		}
-	}
-}
-
-func (c *Cluster) deletePatroniClusterServices() {
-	get := func(name string) (spec.NamespacedName, error) {
-		svc, err := c.KubeClient.Services(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		return util.NameFromMeta(svc.ObjectMeta), err
-	}
-
-	deleteServiceFn := func(name string) error {
-		return c.KubeClient.Services(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
-	}
-
-	deleteClusterObject(get, deleteServiceFn, "service", c.Name, c.logger)
-}
-
-func (c *Cluster) deletePatroniClusterEndpoints() {
-	get := func(name string) (spec.NamespacedName, error) {
-		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		return util.NameFromMeta(ep.ObjectMeta), err
-	}
-
-	deleteEndpointFn := func(name string) error {
-		return c.KubeClient.Endpoints(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
-	}
-
-	deleteClusterObject(get, deleteEndpointFn, "endpoint", c.Name, c.logger)
-}
-
-func (c *Cluster) deletePatroniClusterConfigMaps() {
-	get := func(name string) (spec.NamespacedName, error) {
-		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		return util.NameFromMeta(cm.ObjectMeta), err
-	}
-
-	deleteConfigMapFn := func(name string) error {
-		return c.KubeClient.ConfigMaps(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
-	}
-
-	deleteClusterObject(get, deleteConfigMapFn, "configmap", c.Name, c.logger)
 }

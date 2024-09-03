@@ -71,11 +71,11 @@ var cl = New(
 		Spec: acidv1.PostgresSpec{
 			EnableConnectionPooler: util.True(),
 			Streams: []acidv1.Stream{
-				acidv1.Stream{
+				{
 					ApplicationId: "test-app",
 					Database:      "test_db",
 					Tables: map[string]acidv1.StreamTable{
-						"test_table": acidv1.StreamTable{
+						"test_table": {
 							EventType: "test-app.test",
 						},
 					},
@@ -95,6 +95,7 @@ func TestCreate(t *testing.T) {
 
 	client := k8sutil.KubernetesClient{
 		DeploymentsGetter:            clientSet.AppsV1(),
+		CronJobsGetter:               clientSet.BatchV1(),
 		EndpointsGetter:              clientSet.CoreV1(),
 		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
 		PodDisruptionBudgetsGetter:   clientSet.PolicyV1(),
@@ -111,6 +112,7 @@ func TestCreate(t *testing.T) {
 			Namespace: clusterNamespace,
 		},
 		Spec: acidv1.PostgresSpec{
+			EnableLogicalBackup: true,
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
@@ -1363,6 +1365,23 @@ func TestCompareServices(t *testing.T) {
 		},
 	}
 
+	serviceWithOwnerReference := newService(
+		map[string]string{
+			constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
+			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+		},
+		v1.ServiceTypeClusterIP,
+		[]string{"128.141.0.0/16", "137.138.0.0/16"})
+
+	ownerRef := metav1.OwnerReference{
+		APIVersion: "acid.zalan.do/v1",
+		Controller: boolToPointer(true),
+		Kind:       "Postgresql",
+		Name:       "clstr",
+	}
+
+	serviceWithOwnerReference.ObjectMeta.OwnerReferences = append(serviceWithOwnerReference.ObjectMeta.OwnerReferences, ownerRef)
+
 	tests := []struct {
 		about   string
 		current *v1.Service
@@ -1445,6 +1464,18 @@ func TestCompareServices(t *testing.T) {
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
+		{
+			about: "new service doesn't have owner references",
+			current: newService(
+				map[string]string{
+					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
+					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+				},
+				v1.ServiceTypeClusterIP,
+				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+			new:   serviceWithOwnerReference,
+			match: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1475,7 +1506,7 @@ func newCronJob(image, schedule string, vars []v1.EnvVar, mounts []v1.VolumeMoun
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
-								v1.Container{
+								{
 									Name:  "logical-backup",
 									Image: image,
 									Env:   vars,

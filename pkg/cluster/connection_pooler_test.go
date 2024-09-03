@@ -969,7 +969,7 @@ func TestPoolerTLS(t *testing.T) {
 			TLS: &acidv1.TLSDescription{
 				SecretName: tlsSecretName, CAFile: "ca.crt"},
 			AdditionalVolumes: []acidv1.AdditionalVolume{
-				acidv1.AdditionalVolume{
+				{
 					Name:      tlsSecretName,
 					MountPath: mountPath,
 					VolumeSource: v1.VolumeSource{
@@ -1076,6 +1076,9 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+				},
+				Resources: config.Resources{
+					EnableOwnerReferences: util.True(),
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)

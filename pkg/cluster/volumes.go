@@ -66,7 +66,7 @@ func (c *Cluster) syncVolumes() error {
 }
 
 func (c *Cluster) syncUnderlyingEBSVolume() error {
-	c.logger.Infof("starting to sync EBS volumes: type, iops, throughput, and size")
+	c.logger.Debug("starting to sync EBS volumes: type, iops, throughput, and size")
 
 	var (
 		err     error
@@ -136,7 +136,7 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 }
 
 func (c *Cluster) populateVolumeMetaData() error {
-	c.logger.Infof("starting reading ebs meta data")
+	c.logger.Debug("starting reading ebs meta data")
 
 	pvs, err := c.listPersistentVolumes()
 	if err != nil {
@@ -165,7 +165,7 @@ func (c *Cluster) populateVolumeMetaData() error {
 	}
 
 	if len(currentVolumes) != len(c.EBSVolumes) && len(c.EBSVolumes) > 0 {
-		c.logger.Debugf("number of ebs volumes (%d) discovered differs from already known volumes (%d)", len(currentVolumes), len(c.EBSVolumes))
+		c.logger.Infof("number of ebs volumes (%d) discovered differs from already known volumes (%d)", len(currentVolumes), len(c.EBSVolumes))
 	}
 
 	// reset map, operator is not responsible for dangling ebs volumes
@@ -186,7 +186,6 @@ func (c *Cluster) syncVolumeClaims() error {
 	if c.OpConfig.StorageResizeMode == "off" || c.OpConfig.StorageResizeMode == "ebs" {
 		ignoreResize = true
 		c.logger.Debugf("Storage resize mode is set to %q. Skipping volume size sync of PVCs.", c.OpConfig.StorageResizeMode)
-		
 	}
 
 	newSize, err := resource.ParseQuantity(c.Spec.Volume.Size)
@@ -206,18 +205,18 @@ func (c *Cluster) syncVolumeClaims() error {
 			if currentSize < manifestSize {
 				pvc.Spec.Resources.Requests[v1.ResourceStorage] = newSize
 				needsUpdate = true
-				c.logger.Debugf("persistent volume claim for volume %q needs to be resized", pvc.Name)
+				c.logger.Infof("persistent volume claim for volume %q needs to be resized", pvc.Name)
 			} else {
 				c.logger.Warningf("cannot shrink persistent volume")
 			}
 		}
 
 		if needsUpdate {
-			c.logger.Debugf("updating persistent volume claim definition for volume %q", pvc.Name)
+			c.logger.Infof("updating persistent volume claim definition for volume %q", pvc.Name)
 			if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("could not update persistent volume claim: %q", err)
 			}
-			c.logger.Debugf("successfully updated persistent volume claim %q", pvc.Name)
+			c.logger.Infof("successfully updated persistent volume claim %q", pvc.Name)
 		} else {
 			c.logger.Debugf("volume claim for volume %q do not require updates", pvc.Name)
 		}
@@ -235,7 +234,7 @@ func (c *Cluster) syncVolumeClaims() error {
 		}
 	}
 
-	c.logger.Infof("volume claims have been synced successfully")
+	c.logger.Debug("volume claims have been synced successfully")
 
 	return nil
 }
@@ -256,7 +255,7 @@ func (c *Cluster) syncEbsVolumes() error {
 		return fmt.Errorf("could not sync volumes: %v", err)
 	}
 
-	c.logger.Infof("volumes have been synced successfully")
+	c.logger.Debug("volumes have been synced successfully")
 
 	return nil
 }
@@ -275,7 +274,7 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 }
 
 func (c *Cluster) deletePersistentVolumeClaims() error {
-	c.logger.Debugln("deleting PVCs")
+	c.logger.Debug("deleting PVCs")
 	pvcs, err := c.listPersistentVolumeClaims()
 	if err != nil {
 		return err
@@ -287,9 +286,9 @@ func (c *Cluster) deletePersistentVolumeClaims() error {
 		}
 	}
 	if len(pvcs) > 0 {
-		c.logger.Debugln("PVCs have been deleted")
+		c.logger.Debug("PVCs have been deleted")
 	} else {
-		c.logger.Debugln("no PVCs to delete")
+		c.logger.Debug("no PVCs to delete")
 	}
 
 	return nil
@@ -383,22 +382,22 @@ func (c *Cluster) resizeVolumes() error {
 		if err != nil {
 			return err
 		}
-		c.logger.Debugf("updating persistent volume %q to %d", pv.Name, newSize)
+		c.logger.Infof("updating persistent volume %q to %d", pv.Name, newSize)
 		if err := resizer.ResizeVolume(awsVolumeID, newSize); err != nil {
 			return fmt.Errorf("could not resize EBS volume %q: %v", awsVolumeID, err)
 		}
-		c.logger.Debugf("resizing the filesystem on the volume %q", pv.Name)
+		c.logger.Infof("resizing the filesystem on the volume %q", pv.Name)
 		podName := getPodNameFromPersistentVolume(pv)
 		if err := c.resizePostgresFilesystem(podName, []filesystems.FilesystemResizer{&filesystems.Ext234Resize{}}); err != nil {
 			return fmt.Errorf("could not resize the filesystem on pod %q: %v", podName, err)
 		}
-		c.logger.Debugf("filesystem resize successful on volume %q", pv.Name)
+		c.logger.Infof("filesystem resize successful on volume %q", pv.Name)
 		pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
-		c.logger.Debugf("updating persistent volume definition for volume %q", pv.Name)
+		c.logger.Infof("updating persistent volume definition for volume %q", pv.Name)
 		if _, err := c.KubeClient.PersistentVolumes().Update(context.TODO(), pv, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("could not update persistent volume: %q", err)
 		}
-		c.logger.Debugf("successfully updated persistent volume %q", pv.Name)
+		c.logger.Infof("successfully updated persistent volume %q", pv.Name)
 
 		if !compatible {
 			c.logger.Warningf("volume %q is incompatible with all available resizing providers, consider switching storage_resize_mode to pvc or off", pv.Name)
@@ -459,7 +458,7 @@ func (c *Cluster) executeEBSMigration() error {
 		}
 
 		if !hasGp2 {
-			c.logger.Infof("no EBS gp2 volumes left to migrate")
+			c.logger.Debugf("no EBS gp2 volumes left to migrate")
 			return nil
 		}
 	}
