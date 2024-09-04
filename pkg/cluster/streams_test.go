@@ -56,12 +56,12 @@ var (
 					ApplicationId: appId,
 					Database:      "foo",
 					Tables: map[string]acidv1.StreamTable{
-						"data.bar": acidv1.StreamTable{
+						"data.bar": {
 							EventType:     "stream-type-a",
 							IdColumn:      k8sutil.StringToPointer("b_id"),
 							PayloadColumn: k8sutil.StringToPointer("b_payload"),
 						},
-						"data.foobar": acidv1.StreamTable{
+						"data.foobar": {
 							EventType:         "stream-type-b",
 							RecoveryEventType: "stream-type-b-dlq",
 						},
@@ -94,7 +94,7 @@ var (
 				"team":         "acid",
 			},
 			OwnerReferences: []metav1.OwnerReference{
-				metav1.OwnerReference{
+				{
 					APIVersion: "apps/v1",
 					Kind:       "StatefulSet",
 					Name:       "acid-test-cluster",
@@ -105,7 +105,7 @@ var (
 		Spec: zalandov1.FabricEventStreamSpec{
 			ApplicationId: appId,
 			EventStreams: []zalandov1.EventStream{
-				zalandov1.EventStream{
+				{
 					EventStreamFlow: zalandov1.EventStreamFlow{
 						PayloadColumn: k8sutil.StringToPointer("b_payload"),
 						Type:          constants.EventStreamFlowPgGenericType,
@@ -144,7 +144,7 @@ var (
 						Type: constants.EventStreamSourcePGType,
 					},
 				},
-				zalandov1.EventStream{
+				{
 					EventStreamFlow: zalandov1.EventStreamFlow{
 						Type: constants.EventStreamFlowPgGenericType,
 					},
@@ -241,7 +241,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -249,7 +249,7 @@ func TestHasSlotsInSync(t *testing.T) {
 				},
 			},
 			actualSlots: map[string]map[string]string{
-				slotName: map[string]string{
+				slotName: {
 					"databases": dbName,
 					"plugin":    constants.EventStreamSourcePluginType,
 					"type":      "logical",
@@ -268,7 +268,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -289,7 +289,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -312,7 +312,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -326,7 +326,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test2": acidv1.StreamTable{
+							"test2": {
 								EventType: "stream-type-b",
 							},
 						},
@@ -334,7 +334,7 @@ func TestHasSlotsInSync(t *testing.T) {
 				},
 			},
 			actualSlots: map[string]map[string]string{
-				slotName: map[string]string{
+				slotName: {
 					"databases": dbName,
 					"plugin":    constants.EventStreamSourcePluginType,
 					"type":      "logical",
@@ -353,7 +353,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -367,7 +367,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test2": acidv1.StreamTable{
+							"test2": {
 								EventType: "stream-type-b",
 							},
 						},
@@ -375,7 +375,7 @@ func TestHasSlotsInSync(t *testing.T) {
 				},
 			},
 			actualSlots: map[string]map[string]string{
-				slotName: map[string]string{
+				slotName: {
 					"databases": dbName,
 					"plugin":    constants.EventStreamSourcePluginType,
 					"type":      "logical",
@@ -394,7 +394,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test1": acidv1.StreamTable{
+							"test1": {
 								EventType: "stream-type-a",
 							},
 						},
@@ -408,7 +408,7 @@ func TestHasSlotsInSync(t *testing.T) {
 							"type":      "logical",
 						},
 						Publication: map[string]acidv1.StreamTable{
-							"test2": acidv1.StreamTable{
+							"test2": {
 								EventType: "stream-type-b",
 							},
 						},
@@ -416,7 +416,7 @@ func TestHasSlotsInSync(t *testing.T) {
 				},
 			},
 			actualSlots: map[string]map[string]string{
-				slotName: map[string]string{
+				slotName: {
 					"databases": dbName,
 					"plugin":    constants.EventStreamSourcePluginType,
 					"type":      "logical",

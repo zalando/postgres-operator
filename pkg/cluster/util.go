@@ -193,7 +193,7 @@ func logNiceDiff(log *logrus.Entry, old, new interface{}) {
 	nice := nicediff.Diff(string(o), string(n), true)
 	for _, s := range strings.Split(nice, "\n") {
 		// " is not needed in the value to understand
-		log.Debugf(strings.ReplaceAll(s, "\"", ""))
+		log.Debug(strings.ReplaceAll(s, "\"", ""))
 	}
 }
 
@@ -209,7 +209,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *appsv1.StatefulSet, isUpdate b
 	logNiceDiff(c.logger, old.Spec, new.Spec)
 
 	if !reflect.DeepEqual(old.Annotations, new.Annotations) {
-		c.logger.Debugf("metadata.annotation are different")
+		c.logger.Debug("metadata.annotation are different")
 		logNiceDiff(c.logger, old.Annotations, new.Annotations)
 	}
 
@@ -280,7 +280,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	}
 
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debugf("team API is disabled")
+		c.logger.Debug("team API is disabled")
 		return members, nil
 	}
 
@@ -416,7 +416,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 		podsNumber = len(pods.Items)
 		c.logger.Debugf("Waiting for %d pods to become ready", podsNumber)
 	} else {
-		c.logger.Debugf("Waiting for any replica pod to become ready")
+		c.logger.Debug("Waiting for any replica pod to become ready")
 	}
 
 	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,

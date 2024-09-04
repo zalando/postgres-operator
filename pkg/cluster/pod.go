@@ -59,7 +59,7 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 		return nil
 	}
 
-	c.logger.Debugf("mark rolling update annotation for %s: reason %s", pod.Name, msg)
+	c.logger.Infof("mark rolling update annotation for %s: reason %s", pod.Name, msg)
 	flag := make(map[string]string)
 	flag[rollingUpdatePodAnnotationKey] = strconv.FormatBool(true)
 
@@ -110,7 +110,7 @@ func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod) (flag bool) {
 }
 
 func (c *Cluster) deletePods() error {
-	c.logger.Debugln("deleting pods")
+	c.logger.Debug("deleting pods")
 	pods, err := c.listPods()
 	if err != nil {
 		return err
@@ -127,9 +127,9 @@ func (c *Cluster) deletePods() error {
 		}
 	}
 	if len(pods) > 0 {
-		c.logger.Debugln("pods have been deleted")
+		c.logger.Debug("pods have been deleted")
 	} else {
-		c.logger.Debugln("no pods to delete")
+		c.logger.Debug("no pods to delete")
 	}
 
 	return nil
@@ -230,7 +230,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get node %q: %v", oldMaster.Spec.NodeName, err)
 	}
 	if !eol {
-		c.logger.Debugf("no action needed: master pod is already on a live node")
+		c.logger.Debug("no action needed: master pod is already on a live node")
 		return nil
 	}
 

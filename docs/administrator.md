@@ -85,6 +85,12 @@ It is also possible to define `maintenanceWindows` in the Postgres manifest to
 better control when such automated upgrades should take place after increasing
 the version.
 
+### Upgrade annotations
+
+When an upgrade is executed, the operator sets an annotation in the PostgreSQL resource, either `last-major-upgrade-success` if the upgrade succeeds, or `last-major-upgrade-failure` if it fails. The value of the annotation is a timestamp indicating when the upgrade occurred.
+
+If a PostgreSQL resource contains a failure annotation, the operator will not attempt to retry the upgrade during a sync event. To remove the failure annotation, you can revert the PostgreSQL version back to the current version. This action will trigger the removal of the failure annotation.
+
 ## Non-default cluster domain
 
 If your cluster uses a DNS domain other than the default `cluster.local`, this

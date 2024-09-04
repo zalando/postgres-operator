@@ -46,11 +46,13 @@ func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) (p
 
 func (c *Cluster) deleteStream(appId string) error {
 	c.setProcessName("deleting event stream")
+	c.logger.Debugf("deleting event stream with applicationId %s", appId)
 
 	err := c.KubeClient.FabricEventStreams(c.Streams[appId].Namespace).Delete(context.TODO(), c.Streams[appId].Name, metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("could not delete event stream %q with applicationId %s: %v", c.Streams[appId].Name, appId, err)
 	}
+	c.logger.Infof("event stream %q with applicationId %s has been successfully deleted", c.Streams[appId].Name, appId)
 	delete(c.Streams, appId)
 
 	return nil
@@ -183,7 +185,7 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 		}
 		for tableName, table := range stream.Tables {
 			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
-			streamFlow := getEventStreamFlow(stream, table.PayloadColumn)
+			streamFlow := getEventStreamFlow(table.PayloadColumn)
 			streamSink := getEventStreamSink(stream, table.EventType)
 			streamRecovery := getEventStreamRecovery(stream, table.RecoveryEventType, table.EventType)
 
@@ -230,7 +232,7 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName string, i
 	}
 }
 
-func getEventStreamFlow(stream acidv1.Stream, payloadColumn *string) zalandov1.EventStreamFlow {
+func getEventStreamFlow(payloadColumn *string) zalandov1.EventStreamFlow {
 	return zalandov1.EventStreamFlow{
 		Type:          constants.EventStreamFlowPgGenericType,
 		PayloadColumn: payloadColumn,
@@ -308,7 +310,7 @@ func (c *Cluster) syncStreams() error {
 
 	_, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), constants.EventStreamCRDName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("event stream CRD not installed, skipping")
+		c.logger.Debug("event stream CRD not installed, skipping")
 		return nil
 	}
 
@@ -473,7 +475,7 @@ func (c *Cluster) syncStream(appId string) error {
 			c.Streams[appId] = stream
 		}
 		if match, reason := c.compareStreams(&stream, desiredStreams); !match {
-			c.logger.Debugf("updating event streams with applicationId %s: %s", appId, reason)
+			c.logger.Infof("updating event streams with applicationId %s: %s", appId, reason)
 			desiredStreams.ObjectMeta = stream.ObjectMeta
 			updatedStream, err := c.updateStreams(desiredStreams)
 			if err != nil {
@@ -550,7 +552,6 @@ func (c *Cluster) cleanupRemovedStreams(appIds []string) error {
 			if err != nil {
 				errors = append(errors, fmt.Sprintf("failed deleting event streams with applicationId %s: %v", appId, err))
 			}
-			c.logger.Infof("event streams with applicationId %s have been successfully deleted", appId)
 		}
 	}
 
