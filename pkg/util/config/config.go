@@ -66,6 +66,7 @@ type Resources struct {
 	MaxInstances                      int32  `name:"max_instances" default:"-1"`
 	MinInstances                      int32  `name:"min_instances" default:"-1"`
 	IgnoreInstanceLimitsAnnotationKey string `name:"ignore_instance_limits_annotation_key"`
+	EnableSecretsDeletionKey          string `name:"enable_secrets_deletion_key"`
 }
 
 type InfrastructureRole struct {

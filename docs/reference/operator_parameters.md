@@ -365,6 +365,9 @@ configuration they are grouped under the `kubernetes` key.
   By default, the operator deletes secrets when removing the Postgres cluster
   manifest. To keep secrets, set this option to `false`. The default is `true`.
 
+* **enable_secrets_deletion_key**
+  By default, the `enable_secrets_deletion` decides on the deletion of secrets for the entire operator. To overwrite `enable_secrets_deletion` this property can be set and an annotation on cluster level can be added with the values: delete secrets `true` or `false`.
+
 * **enable_persistent_volume_claim_deletion**
   By default, the operator deletes PersistentVolumeClaims when removing the
   Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
