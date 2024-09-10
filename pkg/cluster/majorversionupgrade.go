@@ -127,11 +127,6 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
-	if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists {
-		c.logger.Infof("last major upgrade failed, skipping upgrade")
-		return nil
-	}
-
 	if !isInMainternanceWindow(c.Spec.MaintenanceWindows) {
 		c.logger.Infof("skipping major version upgrade, not in maintenance window")
 		return nil
@@ -162,7 +157,16 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	// Recheck version with newest data from Patroni
 	if c.currentMajorVersion >= desiredVersion {
+		if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists { // if failure annotation exists, remove it
+			c.removeFailuresAnnotation()
+			c.logger.Infof("removing failure annotation as the cluster is already up to date")
+		}
 		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
+		return nil
+	}
+
+	if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists {
+		c.logger.Infof("last major upgrade failed, skipping upgrade")
 		return nil
 	}
 
