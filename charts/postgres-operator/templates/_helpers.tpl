@@ -39,6 +39,13 @@ Create a pod service account name.
 {{- end -}}
 
 {{/*
+Create a pod priority class name.
+*/}}
+{{- define "postgres-pod.priorityClassName" -}}
+{{ default (printf "%s-%v" (include "postgres-operator.fullname" .) "pod") .Values.podPriorityClassName.name }}
+{{- end -}}
+
+{{/*
 Create a controller ID.
 */}}
 {{- define "postgres-operator.controllerID" -}}
@@ -63,8 +70,8 @@ Flatten nested config options when ConfigMap is used as ConfigTarget
         {{- $list := list }}
         {{- range $subKey, $subValue := $value }}
             {{- $list = append $list (printf "%s:%s" $subKey $subValue) }}
-{{ $key }}: {{ join "," $list | quote }}
         {{- end }}
+{{ $key }}: {{ join "," $list | quote }}
     {{- else }}
 {{ $key }}: {{ $value | quote }}
     {{- end }}

@@ -70,7 +70,7 @@ the manifest. Still, a rolling update would be triggered updating the
 script will notice the version mismatch and start the old version again.
 
 In this scenario the major version could then be run by a user from within the
-master pod. Exec into the container and run:
+primary pod. Exec into the container and run:
 ```bash
 python3 /scripts/inplace_upgrade.py N
 ```
@@ -81,6 +81,15 @@ upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/z
 
 When `major_version_upgrade_mode` is set to `manual` the operator will run
 the upgrade script for you after the manifest is updated and pods are rotated.
+It is also possible to define `maintenanceWindows` in the Postgres manifest to
+better control when such automated upgrades should take place after increasing
+the version.
+
+### Upgrade annotations
+
+When an upgrade is executed, the operator sets an annotation in the PostgreSQL resource, either `last-major-upgrade-success` if the upgrade succeeds, or `last-major-upgrade-failure` if it fails. The value of the annotation is a timestamp indicating when the upgrade occurred.
+
+If a PostgreSQL resource contains a failure annotation, the operator will not attempt to retry the upgrade during a sync event. To remove the failure annotation, you can revert the PostgreSQL version back to the current version. This action will trigger the removal of the failure annotation.
 
 ## Non-default cluster domain
 
@@ -223,9 +232,9 @@ configuration:
 
 Now, every cluster manifest must contain the configured annotation keys to
 trigger the delete process when running `kubectl delete pg`. Note, that the
-`Postgresql` resource would still get deleted as K8s' API server does not
-block it. Only the operator logs will tell, that the delete criteria wasn't
-met.
+`Postgresql` resource would still get deleted because the operator does not
+instruct K8s' API server to block it. Only the operator logs will tell, that
+the delete criteria was not met.
 
 **cluster manifest**
 
@@ -243,11 +252,64 @@ spec:
 
 In case, the resource has been deleted accidentally or the annotations were
 simply forgotten, it's safe to recreate the cluster with `kubectl create`.
-Existing Postgres cluster are not replaced by the operator. But, as the
-original cluster still exists the status will show `CreateFailed` at first.
-On the next sync event it should change to `Running`. However, as it is in
-fact a new resource for K8s, the UID will differ which can trigger a rolling
-update of the pods because the UID is used as part of backup path to S3.
+Existing Postgres cluster are not replaced by the operator. But, when the
+original cluster still exists the status will be `CreateFailed` at first. On
+the next sync event it should change to `Running`. However, because it is in
+fact a new resource for K8s, the UID and therefore, the backup path to S3,
+will differ and trigger a rolling update of the pods.
+
+## Owner References and Finalizers
+
+The Postgres Operator can set [owner references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/) to most of a cluster's child resources to improve
+monitoring with GitOps tools and enable cascading deletes. There are two
+exceptions:
+
+* Persistent Volume Claims, because they are handled by the [PV Reclaim Policy]https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/ of the Stateful Set
+* Cross-namespace secrets, because owner references are not allowed across namespaces by design
+
+The operator would clean these resources up with its regular delete loop
+unless they got synced correctly. If for some reason the initial cluster sync
+fails, e.g. after a cluster creation or operator restart, a deletion of the
+cluster manifest might leave orphaned resources behind which the user has to
+clean up manually.
+
+Another option is to enable finalizers which first ensures the deletion of all
+child resources before the cluster manifest gets removed. There is a trade-off
+though: The deletion is only performed after the next two operator SYNC cycles
+with the first one setting a `deletionTimestamp` and the latter reacting to it.
+The final removal of the custom resource will add a DELETE event to the worker
+queue but the child resources are already gone at this point. If you do not
+desire this behavior consider enabling owner references instead.
+
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  enable_finalizers: "false"
+  enable_owner_references: "true"
+```
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    enable_finalizers: false
+    enable_owner_references: true
+```
+
+:warning: Please note, both options are disabled by default. When enabling owner
+references the operator cannot block cascading deletes, even when the [delete protection annotations](administrator.md#delete-protection-via-annotations)
+are in place. You would need an K8s admission controller that blocks the actual
+`kubectl delete` API call e.g. based on existing annotations.
 
 ## Role-based access control for the operator
 
@@ -354,6 +416,23 @@ spec:
 This would be the recommended option to enable rotation in secrets of database
 owners, but only if they are not used as application users for regular read
 and write operations.
+
+### Ignore rotation for certain users
+
+If you wish to globally enable password rotation but need certain users to
+opt out from it there are two ways. First, you can remove the user from the
+manifest's `users` section. The corresponding secret to this user will no
+longer be synced by the operator then.
+
+Secondly, if you want the operator to continue syncing the secret (e.g. to
+recreate if it got accidentally removed) but cannot allow it being rotated,
+add the user to the following list in your manifest:
+
+```
+spec:
+  usersIgnoringSecretRotation:
+  - bar_user
+```
 
 ### Turning off password rotation
 
@@ -1200,7 +1279,7 @@ aws_or_gcp:
 
 If cluster members have to be (re)initialized restoring physical backups
 happens automatically either from the backup location or by running
-[pg_basebackup](https://www.postgresql.org/docs/15/app-pgbasebackup.html)
+[pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html)
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.
@@ -1266,7 +1345,7 @@ but only snapshots of your data. In its current state, see logical backups as a
 way to quickly create SQL dumps that you can easily restore in an empty test
 cluster.
 
-2. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile) implements the backup
+2. The [example image](https://github.com/zalando/postgres-operator/blob/master/logical-backup/Dockerfile) implements the backup
 via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket.
 `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when
 possible.
@@ -1348,6 +1427,8 @@ You can also expose the operator API through a [service](https://github.com/zala
 Some displayed options can be disabled from UI using simple flags under the
 `OPERATOR_UI_CONFIG` field in the deployment.
 
+The viewing and creation of clusters within the UI is limited to the namespace specified by the `TARGET_NAMESPACE` option. To allow the creation and viewing of clusters in all namespaces, set `TARGET_NAMESPACE` to `*`.
+
 ### Deploy the UI on K8s
 
 Now, apply all manifests from the `ui/manifests` folder to deploy the Postgres
@@ -1380,7 +1461,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.8.1 .
+docker build -t ghcr.io/zalando/postgres-operator-ui:v1.13.0 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/

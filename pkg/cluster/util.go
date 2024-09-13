@@ -78,7 +78,14 @@ func (c *Cluster) isProtectedUsername(username string) bool {
 }
 
 func (c *Cluster) isSystemUsername(username string) bool {
-	return (username == c.OpConfig.SuperUsername || username == c.OpConfig.ReplicationUsername)
+	// is there a pooler system user defined
+	for _, systemUser := range c.systemUsers {
+		if username == systemUser.Name {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isValidFlag(flag string) bool {
@@ -169,6 +176,10 @@ func (c *Cluster) logPDBChanges(old, new *policyv1.PodDisruptionBudget, isUpdate
 	}
 
 	logNiceDiff(c.logger, old.Spec, new.Spec)
+
+	if reason != "" {
+		c.logger.Infof("reason: %s", reason)
+	}
 }
 
 func logNiceDiff(log *logrus.Entry, old, new interface{}) {
@@ -182,7 +193,7 @@ func logNiceDiff(log *logrus.Entry, old, new interface{}) {
 	nice := nicediff.Diff(string(o), string(n), true)
 	for _, s := range strings.Split(nice, "\n") {
 		// " is not needed in the value to understand
-		log.Debugf(strings.ReplaceAll(s, "\"", ""))
+		log.Debug(strings.ReplaceAll(s, "\"", ""))
 	}
 }
 
@@ -198,7 +209,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *appsv1.StatefulSet, isUpdate b
 	logNiceDiff(c.logger, old.Spec, new.Spec)
 
 	if !reflect.DeepEqual(old.Annotations, new.Annotations) {
-		c.logger.Debugf("metadata.annotation are different")
+		c.logger.Debug("metadata.annotation are different")
 		logNiceDiff(c.logger, old.Annotations, new.Annotations)
 	}
 
@@ -269,7 +280,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	}
 
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debugf("team API is disabled")
+		c.logger.Debug("team API is disabled")
 		return members, nil
 	}
 
@@ -405,7 +416,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 		podsNumber = len(pods.Items)
 		c.logger.Debugf("Waiting for %d pods to become ready", podsNumber)
 	} else {
-		c.logger.Debugf("Waiting for any replica pod to become ready")
+		c.logger.Debug("Waiting for any replica pod to become ready")
 	}
 
 	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
@@ -436,10 +447,6 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 		})
 
 	return err
-}
-
-func (c *Cluster) waitForAnyReplicaLabelReady() error {
-	return c._waitPodLabelsReady(true)
 }
 
 func (c *Cluster) waitForAllPodsLabelReady() error {
@@ -654,4 +661,25 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 		return acidv1.Resources{}, fmt.Errorf("could not unmarshal K8s resources requirements into acidv1.Resources struct")
 	}
 	return resources, nil
+}
+
+func isInMainternanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
+	if len(specMaintenanceWindows) == 0 {
+		return true
+	}
+	now := time.Now()
+	currentDay := now.Weekday()
+	currentTime := now.Format("15:04")
+
+	for _, window := range specMaintenanceWindows {
+		startTime := window.StartTime.Format("15:04")
+		endTime := window.EndTime.Format("15:04")
+
+		if window.Everyday || window.Weekday == currentDay {
+			if currentTime >= startTime && currentTime <= endTime {
+				return true
+			}
+		}
+	}
+	return false
 }

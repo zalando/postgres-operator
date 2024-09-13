@@ -20,6 +20,7 @@ class K8sApi:
 
         self.config = config.load_kube_config()
         self.k8s_client = client.ApiClient()
+        self.rbac_api = client.RbacAuthorizationV1Api()
 
         self.core_v1 = client.CoreV1Api()
         self.apps_v1 = client.AppsV1Api()
@@ -217,7 +218,6 @@ class K8s:
         pod_phase = 'Failing over'
         new_pod_node = ''
         pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
-
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
@@ -314,7 +314,7 @@ class K8s:
 
     def get_patroni_running_members(self, pod="acid-minimal-cluster-0"):
         result = self.get_patroni_state(pod)
-        return list(filter(lambda x: "State" in x and x["State"] == "running", result))
+        return list(filter(lambda x: "State" in x and x["State"] in ["running", "streaming"], result))
 
     def get_deployment_replica_count(self, name="acid-minimal-cluster-pooler", namespace="default"):
         try:
@@ -524,7 +524,6 @@ class K8sBase:
         pod_phase = 'Failing over'
         new_pod_node = ''
         pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
-
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
@@ -583,7 +582,7 @@ class K8sBase:
 
     def get_patroni_running_members(self, pod):
         result = self.get_patroni_state(pod)
-        return list(filter(lambda x: x["State"] == "running", result))
+        return list(filter(lambda x: x["State"] in ["running", "streaming"], result))
 
     def get_statefulset_image(self, label_selector="application=spilo,cluster-name=acid-minimal-cluster", namespace='default'):
         ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=label_selector, limit=1)

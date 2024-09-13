@@ -1,11 +1,13 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -16,8 +18,11 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
@@ -26,18 +31,23 @@ import (
 const (
 	superUserName       = "postgres"
 	replicationUserName = "standby"
-	exampleSpiloConfig  = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
-	spiloConfigDiff     = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
+	poolerUserName      = "pooler"
+	adminUserName       = "admin"
+	exampleSpiloConfig  = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
+	spiloConfigDiff     = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
 )
 
 var logger = logrus.New().WithField("test", "cluster")
-var eventRecorder = record.NewFakeRecorder(1)
+
+// eventRecorder needs buffer for TestCreate which emit events for
+// 1 cluster, primary endpoint, 2 services, the secrets, the statefulset and pods being ready
+var eventRecorder = record.NewFakeRecorder(7)
 
 var cl = New(
 	Config{
 		OpConfig: config.Config{
 			PodManagementPolicy: "ordered_ready",
-			ProtectedRoles:      []string{"admin", "cron_admin", "part_man"},
+			ProtectedRoles:      []string{adminUserName, "cron_admin", "part_man"},
 			Auth: config.Auth{
 				SuperUsername:        superUserName,
 				ReplicationUsername:  replicationUserName,
@@ -45,6 +55,9 @@ var cl = New(
 			},
 			Resources: config.Resources{
 				DownscalerAnnotations: []string{"downscaler/*"},
+			},
+			ConnectionPooler: config.ConnectionPooler{
+				User: poolerUserName,
 			},
 		},
 	},
@@ -55,17 +68,106 @@ var cl = New(
 			Namespace:   "test",
 			Annotations: map[string]string{"downscaler/downtime_replicas": "0"},
 		},
+		Spec: acidv1.PostgresSpec{
+			EnableConnectionPooler: util.True(),
+			Streams: []acidv1.Stream{
+				{
+					ApplicationId: "test-app",
+					Database:      "test_db",
+					Tables: map[string]acidv1.StreamTable{
+						"test_table": {
+							EventType: "test-app.test",
+						},
+					},
+				},
+			},
+		},
 	},
 	logger,
 	eventRecorder,
 )
 
+func TestCreate(t *testing.T) {
+	clientSet := fake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	clusterName := "cluster-with-finalizer"
+	clusterNamespace := "test"
+
+	client := k8sutil.KubernetesClient{
+		DeploymentsGetter:            clientSet.AppsV1(),
+		CronJobsGetter:               clientSet.BatchV1(),
+		EndpointsGetter:              clientSet.CoreV1(),
+		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
+		PodDisruptionBudgetsGetter:   clientSet.PolicyV1(),
+		PodsGetter:                   clientSet.CoreV1(),
+		PostgresqlsGetter:            acidClientSet.AcidV1(),
+		ServicesGetter:               clientSet.CoreV1(),
+		SecretsGetter:                clientSet.CoreV1(),
+		StatefulSetsGetter:           clientSet.AppsV1(),
+	}
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: clusterNamespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			EnableLogicalBackup: true,
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-0", clusterName),
+			Namespace: clusterNamespace,
+			Labels: map[string]string{
+				"application":  "spilo",
+				"cluster-name": clusterName,
+				"spilo-role":   "master",
+			},
+		},
+	}
+
+	// manually create resources which must be found by further API calls and are not created by cluster.Create()
+	client.Postgresqls(clusterNamespace).Create(context.TODO(), &pg, metav1.CreateOptions{})
+	client.Pods(clusterNamespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:         map[string]string{"application": "spilo"},
+					ClusterNameLabel:      "cluster-name",
+					DefaultCPURequest:     "300m",
+					DefaultCPULimit:       "300m",
+					DefaultMemoryRequest:  "300Mi",
+					DefaultMemoryLimit:    "300Mi",
+					PodRoleLabel:          "spilo-role",
+					ResourceCheckInterval: time.Duration(3),
+					ResourceCheckTimeout:  time.Duration(10),
+				},
+				EnableFinalizers: util.True(),
+			},
+		}, client, pg, logger, eventRecorder)
+
+	err := cluster.Create()
+	assert.NoError(t, err)
+
+	if !cluster.hasFinalizer() {
+		t.Errorf("%s - expected finalizer not found on cluster", t.Name())
+	}
+}
+
 func TestStatefulSetAnnotations(t *testing.T) {
 	spec := acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: &acidv1.Resources{
-			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 		},
 		Volume: acidv1.Volume{
 			Size: "1G",
@@ -87,8 +189,8 @@ func TestStatefulSetUpdateWithEnv(t *testing.T) {
 	oldSpec := &acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: &acidv1.Resources{
-			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 		},
 		Volume: acidv1.Volume{
 			Size: "1G",
@@ -127,56 +229,85 @@ func TestStatefulSetUpdateWithEnv(t *testing.T) {
 
 func TestInitRobotUsers(t *testing.T) {
 	tests := []struct {
+		testCase      string
 		manifestUsers map[string]acidv1.UserFlags
 		infraRoles    map[string]spec.PgUser
 		result        map[string]spec.PgUser
 		err           error
 	}{
 		{
+			testCase:      "manifest user called like infrastructure role - latter should take percedence",
 			manifestUsers: map[string]acidv1.UserFlags{"foo": {"superuser", "createdb"}},
 			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Namespace: cl.Namespace, Password: "bar"}},
 			result:        map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Namespace: cl.Namespace, Password: "bar"}},
 			err:           nil,
 		},
 		{
+			testCase:      "manifest user with forbidden characters",
 			manifestUsers: map[string]acidv1.UserFlags{"!fooBar": {"superuser", "createdb"}},
 			err:           fmt.Errorf(`invalid username: "!fooBar"`),
 		},
 		{
+			testCase:      "manifest user with unknown privileges (should be catched by CRD, too)",
 			manifestUsers: map[string]acidv1.UserFlags{"foobar": {"!superuser", "createdb"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`user flag "!superuser" is not alphanumeric`),
 		},
 		{
+			testCase:      "manifest user with unknown privileges - part 2 (should be catched by CRD, too)",
 			manifestUsers: map[string]acidv1.UserFlags{"foobar": {"superuser1", "createdb"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`user flag "SUPERUSER1" is not valid`),
 		},
 		{
+			testCase:      "manifest user with conflicting flags",
 			manifestUsers: map[string]acidv1.UserFlags{"foobar": {"inherit", "noinherit"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`conflicting user flags: "NOINHERIT" and "INHERIT"`),
 		},
 		{
-			manifestUsers: map[string]acidv1.UserFlags{"admin": {"superuser"}, superUserName: {"createdb"}},
+			testCase:      "manifest user called like Spilo system users",
+			manifestUsers: map[string]acidv1.UserFlags{superUserName: {"createdb"}, replicationUserName: {"replication"}},
+			infraRoles:    map[string]spec.PgUser{},
+			result:        map[string]spec.PgUser{},
+			err:           nil,
+		},
+		{
+			testCase:      "manifest user called like protected user name",
+			manifestUsers: map[string]acidv1.UserFlags{adminUserName: {"superuser"}},
+			infraRoles:    map[string]spec.PgUser{},
+			result:        map[string]spec.PgUser{},
+			err:           nil,
+		},
+		{
+			testCase:      "manifest user called like pooler system user",
+			manifestUsers: map[string]acidv1.UserFlags{poolerUserName: {}},
+			infraRoles:    map[string]spec.PgUser{},
+			result:        map[string]spec.PgUser{},
+			err:           nil,
+		},
+		{
+			testCase:      "manifest user called like stream system user",
+			manifestUsers: map[string]acidv1.UserFlags{"fes_user": {"replication"}},
 			infraRoles:    map[string]spec.PgUser{},
 			result:        map[string]spec.PgUser{},
 			err:           nil,
 		},
 	}
+	cl.initSystemUsers()
 	for _, tt := range tests {
 		cl.Spec.Users = tt.manifestUsers
 		cl.pgUsers = tt.infraRoles
 		if err := cl.initRobotUsers(); err != nil {
 			if tt.err == nil {
-				t.Errorf("%s got an unexpected error: %v", t.Name(), err)
+				t.Errorf("%s - %s: got an unexpected error: %v", tt.testCase, t.Name(), err)
 			}
 			if err.Error() != tt.err.Error() {
-				t.Errorf("%s expected error %v, got %v", t.Name(), tt.err, err)
+				t.Errorf("%s - %s: expected error %v, got %v", tt.testCase, t.Name(), tt.err, err)
 			}
 		} else {
 			if !reflect.DeepEqual(cl.pgUsers, tt.result) {
-				t.Errorf("%s expected: %#v, got %#v", t.Name(), tt.result, cl.pgUsers)
+				t.Errorf("%s - %s: expected: %#v, got %#v", tt.testCase, t.Name(), tt.result, cl.pgUsers)
 			}
 		}
 	}
@@ -269,7 +400,7 @@ func TestInitHumanUsers(t *testing.T) {
 		},
 		{
 			existingRoles: map[string]spec.PgUser{},
-			teamRoles:     []string{"admin", replicationUserName},
+			teamRoles:     []string{adminUserName, replicationUserName},
 			result:        map[string]spec.PgUser{},
 			err:           nil,
 		},
@@ -896,6 +1027,11 @@ func TestServiceAnnotations(t *testing.T) {
 }
 
 func TestInitSystemUsers(t *testing.T) {
+	// reset system users, pooler and stream section
+	cl.systemUsers = make(map[string]spec.PgUser)
+	cl.Spec.EnableConnectionPooler = boolToPointer(false)
+	cl.Spec.Streams = []acidv1.Stream{}
+
 	// default cluster without connection pooler and event streams
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; exist {
@@ -914,35 +1050,35 @@ func TestInitSystemUsers(t *testing.T) {
 
 	// superuser is not allowed as connection pool user
 	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
-		User: "postgres",
+		User: superUserName,
 	}
-	cl.OpConfig.SuperUsername = "postgres"
-	cl.OpConfig.ConnectionPooler.User = "pooler"
+	cl.OpConfig.SuperUsername = superUserName
+	cl.OpConfig.ConnectionPooler.User = poolerUserName
 
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers["pooler"]; !exist {
+	if _, exist := cl.systemUsers[poolerUserName]; !exist {
 		t.Errorf("%s, Superuser is not allowed to be a connection pool user", t.Name())
 	}
 
 	// neither protected users are
-	delete(cl.systemUsers, "pooler")
+	delete(cl.systemUsers, poolerUserName)
 	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
-		User: "admin",
+		User: adminUserName,
 	}
-	cl.OpConfig.ProtectedRoles = []string{"admin"}
+	cl.OpConfig.ProtectedRoles = []string{adminUserName}
 
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers["pooler"]; !exist {
+	if _, exist := cl.systemUsers[poolerUserName]; !exist {
 		t.Errorf("%s, Protected user are not allowed to be a connection pool user", t.Name())
 	}
 
-	delete(cl.systemUsers, "pooler")
+	delete(cl.systemUsers, poolerUserName)
 	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
-		User: "standby",
+		User: replicationUserName,
 	}
 
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers["pooler"]; !exist {
+	if _, exist := cl.systemUsers[poolerUserName]; !exist {
 		t.Errorf("%s, System users are not allowed to be a connection pool user", t.Name())
 	}
 
@@ -960,8 +1096,8 @@ func TestInitSystemUsers(t *testing.T) {
 			ApplicationId: "test-app",
 			Database:      "test_db",
 			Tables: map[string]acidv1.StreamTable{
-				"data.test_table": {
-					EventType: "test_event",
+				"test_table": {
+					EventType: "test-app.test",
 				},
 			},
 		},
@@ -1017,7 +1153,7 @@ func TestPreparedDatabases(t *testing.T) {
 			subTest:  "Test admin role of owner",
 			role:     "foo_owner",
 			memberOf: "",
-			admin:    "admin",
+			admin:    adminUserName,
 		},
 		{
 			subTest:  "Test writer is a member of reader",
@@ -1062,16 +1198,12 @@ func TestCompareSpiloConfiguration(t *testing.T) {
 		ExpectedResult bool
 	}{
 		{
-			`{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+			`{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
 			true,
 		},
 		{
-			`{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"200","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+			`{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"200","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
 			true,
-		},
-		{
-			`{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"200","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
-			false,
 		},
 		{
 			`{}`,
@@ -1233,6 +1365,23 @@ func TestCompareServices(t *testing.T) {
 		},
 	}
 
+	serviceWithOwnerReference := newService(
+		map[string]string{
+			constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
+			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+		},
+		v1.ServiceTypeClusterIP,
+		[]string{"128.141.0.0/16", "137.138.0.0/16"})
+
+	ownerRef := metav1.OwnerReference{
+		APIVersion: "acid.zalan.do/v1",
+		Controller: boolToPointer(true),
+		Kind:       "Postgresql",
+		Name:       "clstr",
+	}
+
+	serviceWithOwnerReference.ObjectMeta.OwnerReferences = append(serviceWithOwnerReference.ObjectMeta.OwnerReferences, ownerRef)
+
 	tests := []struct {
 		about   string
 		current *v1.Service
@@ -1316,203 +1465,16 @@ func TestCompareServices(t *testing.T) {
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
 		{
-			about: "services differ on DNS annotation",
+			about: "new service doesn't have owner references",
 			current: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
-				v1.ServiceTypeLoadBalancer,
+				v1.ServiceTypeClusterIP,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "new_clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: "external-dns.alpha.kubernetes.io/hostname" changed from "clstr.acid.zalan.do" to "new_clstr.acid.zalan.do".`,
-		},
-		{
-			about: "services differ on AWS ELB annotation",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: "1800",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout" changed from "3600" to "1800".`,
-		},
-		{
-			about: "service changes existing annotation",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "baz",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: "foo" changed from "bar" to "baz".`,
-		},
-		{
-			about: "service changes multiple existing annotations",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-					"bar":                              "foo",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "baz",
-					"bar":                              "fooz",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+			new:   serviceWithOwnerReference,
 			match: false,
-			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations does not match the current one:`,
-		},
-		{
-			about: "service adds a new custom annotation",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: Added "foo" with value "bar".`,
-		},
-		{
-			about: "service removes a custom annotation",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: Removed "foo".`,
-		},
-		{
-			about: "service removes a custom annotation and adds a new one",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"bar":                              "foo",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: Removed "foo". Added "bar" with value "foo".`,
-		},
-		{
-			about: "service removes a custom annotation, adds a new one and change another",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-					"zalan":                            "do",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"bar":                              "foo",
-					"zalan":                            "do.com",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match: false,
-			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations does not match the current one: Removed "foo".`,
-		},
-		{
-			about: "service add annotations",
-			current: newService(
-				map[string]string{},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match: false,
-			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations does not match the current one: Added `,
-		},
-		{
-			about: "ignored annotations",
-			current: newService(
-				map[string]string{},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					"k8s.v1.cni.cncf.io/network-status": "up",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match: true,
 		},
 	}
 
@@ -1522,16 +1484,208 @@ func TestCompareServices(t *testing.T) {
 			if match && !tt.match {
 				t.Logf("match=%v current=%v, old=%v reason=%s", match, tt.current.Annotations, tt.new.Annotations, reason)
 				t.Errorf("%s - expected services to do not match: %q and %q", t.Name(), tt.current, tt.new)
-				return
 			}
 			if !match && tt.match {
 				t.Errorf("%s - expected services to be the same: %q and %q", t.Name(), tt.current, tt.new)
-				return
 			}
 			if !match && !tt.match {
 				if !strings.HasPrefix(reason, tt.reason) {
 					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
-					return
+				}
+			}
+		})
+	}
+}
+
+func newCronJob(image, schedule string, vars []v1.EnvVar, mounts []v1.VolumeMount) *batchv1.CronJob {
+	cron := &batchv1.CronJob{
+		Spec: batchv1.CronJobSpec{
+			Schedule: schedule,
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "logical-backup",
+									Image: image,
+									Env:   vars,
+									Ports: []v1.ContainerPort{
+										{
+											ContainerPort: patroni.ApiPort,
+											Protocol:      v1.ProtocolTCP,
+										},
+										{
+											ContainerPort: pgPort,
+											Protocol:      v1.ProtocolTCP,
+										},
+										{
+											ContainerPort: operatorPort,
+											Protocol:      v1.ProtocolTCP,
+										},
+									},
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+									},
+									SecurityContext: &v1.SecurityContext{
+										AllowPrivilegeEscalation: nil,
+										Privileged:               util.False(),
+										ReadOnlyRootFilesystem:   util.False(),
+										Capabilities:             nil,
+									},
+									VolumeMounts: mounts,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return cron
+}
+
+func TestCompareLogicalBackupJob(t *testing.T) {
+
+	img1 := "registry.opensource.zalan.do/acid/logical-backup:v1.0"
+	img2 := "registry.opensource.zalan.do/acid/logical-backup:v2.0"
+
+	clientSet := fake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	namespace := "default"
+
+	client := k8sutil.KubernetesClient{
+		CronJobsGetter:    clientSet.BatchV1(),
+		PostgresqlsGetter: acidClientSet.AcidV1(),
+	}
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "acid-cron-cluster",
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+			EnableLogicalBackup:    true,
+			LogicalBackupSchedule:  "0 0 * * *",
+			LogicalBackupRetention: "3 months",
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+				},
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupSchedule:                 "30 00 * * *",
+					LogicalBackupDockerImage:              img1,
+					LogicalBackupJobPrefix:                "logical-backup-",
+					LogicalBackupCPURequest:               "100m",
+					LogicalBackupCPULimit:                 "100m",
+					LogicalBackupMemoryRequest:            "100Mi",
+					LogicalBackupMemoryLimit:              "100Mi",
+					LogicalBackupProvider:                 "s3",
+					LogicalBackupS3Bucket:                 "testBucket",
+					LogicalBackupS3BucketPrefix:           "spilo",
+					LogicalBackupS3Region:                 "eu-central-1",
+					LogicalBackupS3Endpoint:               "https://s3.amazonaws.com",
+					LogicalBackupS3AccessKeyID:            "access",
+					LogicalBackupS3SecretAccessKey:        "secret",
+					LogicalBackupS3SSE:                    "aws:kms",
+					LogicalBackupS3RetentionTime:          "3 months",
+					LogicalBackupCronjobEnvironmentSecret: "",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	desiredCronJob, err := cluster.generateLogicalBackupJob()
+	if err != nil {
+		t.Errorf("Could not generate logical backup job with error: %v", err)
+	}
+
+	err = cluster.createLogicalBackupJob()
+	if err != nil {
+		t.Errorf("Could not create logical backup job with error: %v", err)
+	}
+
+	currentCronJob, err := cluster.KubeClient.CronJobs(namespace).Get(context.TODO(), cluster.getLogicalBackupJobName(), metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Could not create logical backup job with error: %v", err)
+	}
+
+	tests := []struct {
+		about   string
+		cronjob *batchv1.CronJob
+		match   bool
+		reason  string
+	}{
+		{
+			about:   "two equal cronjobs",
+			cronjob: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}, []v1.VolumeMount{}),
+			match:   true,
+		},
+		{
+			about:   "two cronjobs with different image",
+			cronjob: newCronJob(img2, "0 0 * * *", []v1.EnvVar{}, []v1.VolumeMount{}),
+			match:   false,
+			reason:  fmt.Sprintf("new job's image %q does not match the current one %q", img2, img1),
+		},
+		{
+			about:   "two cronjobs with different schedule",
+			cronjob: newCronJob(img1, "0 * * * *", []v1.EnvVar{}, []v1.VolumeMount{}),
+			match:   false,
+			reason:  fmt.Sprintf("new job's schedule %q does not match the current one %q", "0 * * * *", "0 0 * * *"),
+		},
+		{
+			about:   "two cronjobs with empty and nil volume mounts",
+			cronjob: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}, nil),
+			match:   true,
+		},
+		{
+			about:   "two cronjobs with different environment variables",
+			cronjob: newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "logical-backup"}}, []v1.VolumeMount{}),
+			match:   false,
+			reason:  "logical backup container specs do not match: new cronjob container's logical-backup (index 0) environment does not match the current one",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.about, func(t *testing.T) {
+			desiredCronJob.Spec.Schedule = tt.cronjob.Spec.Schedule
+			desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image = tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+			desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts
+
+			for _, testEnv := range tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+				for i, env := range desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+					if env.Name == testEnv.Name {
+						desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i] = testEnv
+					}
+				}
+			}
+
+			match, reason := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob)
+			if match != tt.match {
+				t.Errorf("%s - unexpected match result %t when comparing cronjobs %#v and %#v", t.Name(), match, currentCronJob, desiredCronJob)
+			} else {
+				if !strings.HasPrefix(reason, tt.reason) {
+					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
 				}
 			}
 		})
@@ -1720,6 +1874,186 @@ func TestComparePorts(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			got := comparePorts(testCase.setA, testCase.setB)
 			assert.Equal(t, testCase.expected, got)
+		})
+	}
+}
+
+func TestCompareVolumeMounts(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mountsA  []v1.VolumeMount
+		mountsB  []v1.VolumeMount
+		expected bool
+	}{
+		{
+			name:     "empty vs nil",
+			mountsA:  []v1.VolumeMount{},
+			mountsB:  nil,
+			expected: true,
+		},
+		{
+			name:     "both empty",
+			mountsA:  []v1.VolumeMount{},
+			mountsB:  []v1.VolumeMount{},
+			expected: true,
+		},
+		{
+			name: "same mounts",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "different mounts",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:        "data",
+					ReadOnly:    false,
+					MountPath:   "/data",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "one equal mount one different",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:        "poddata",
+					ReadOnly:    false,
+					MountPath:   "/poddata",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "same mounts, different order",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "new mounts added",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "one mount removed",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareVolumeMounts(tt.mountsA, tt.mountsB)
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }

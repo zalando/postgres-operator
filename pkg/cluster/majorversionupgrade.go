@@ -1,24 +1,31 @@
 package cluster
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"10": 100000,
-	"11": 110000,
 	"12": 120000,
 	"13": 130000,
 	"14": 140000,
 	"15": 150000,
-
+	"16": 160000,
 }
+
+const (
+	majorVersionUpgradeSuccessAnnotation = "last-major-upgrade-success"
+	majorVersionUpgradeFailureAnnotation = "last-major-upgrade-failure"
+)
 
 // IsBiggerPostgresVersion Compare two Postgres version numbers
 func IsBiggerPostgresVersion(old string, new string) bool {
@@ -36,7 +43,7 @@ func (c *Cluster) GetDesiredMajorVersionAsInt() int {
 func (c *Cluster) GetDesiredMajorVersion() string {
 
 	if c.Config.OpConfig.MajorVersionUpgradeMode == "full" {
-		// e.g. current is 10, minimal is 11 allowing 11 to 15 clusters, everything below is upgraded
+		// e.g. current is 12, minimal is 12 allowing 12 to 16 clusters, everything below is upgraded
 		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.MinimalMajorVersion) {
 			c.logger.Infof("overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
 			return c.Config.OpConfig.TargetMajorVersion
@@ -56,6 +63,47 @@ func (c *Cluster) isUpgradeAllowedForTeam(owningTeam string) bool {
 	return util.SliceContains(allowedTeams, owningTeam)
 }
 
+func (c *Cluster) annotatePostgresResource(isSuccess bool) error {
+	annotations := make(map[string]string)
+	currentTime := metav1.Now().Format("2006-01-02T15:04:05Z")
+	if isSuccess {
+		annotations[majorVersionUpgradeSuccessAnnotation] = currentTime
+	} else {
+		annotations[majorVersionUpgradeFailureAnnotation] = currentTime
+	}
+	patchData, err := metaAnnotationsPatch(annotations)
+	if err != nil {
+		c.logger.Errorf("could not form patch for %s postgresql resource: %v", c.Name, err)
+		return err
+	}
+	_, err = c.KubeClient.Postgresqls(c.Namespace).Patch(context.Background(), c.Name, types.MergePatchType, patchData, metav1.PatchOptions{})
+	if err != nil {
+		c.logger.Errorf("failed to patch annotations to postgresql resource: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (c *Cluster) removeFailuresAnnotation() error {
+	annotationToRemove := []map[string]string{
+		{
+			"op":   "remove",
+			"path": fmt.Sprintf("/metadata/annotations/%s", majorVersionUpgradeFailureAnnotation),
+		},
+	}
+	removePatch, err := json.Marshal(annotationToRemove)
+	if err != nil {
+		c.logger.Errorf("could not form removal patch for %s postgresql resource: %v", c.Name, err)
+		return err
+	}
+	_, err = c.KubeClient.Postgresqls(c.Namespace).Patch(context.Background(), c.Name, types.JSONPatchType, removePatch, metav1.PatchOptions{})
+	if err != nil {
+		c.logger.Errorf("failed to remove annotations from postgresql resource: %v", err)
+		return err
+	}
+	return nil
+}
+
 /*
 Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
 
@@ -71,7 +119,16 @@ func (c *Cluster) majorVersionUpgrade() error {
 	desiredVersion := c.GetDesiredMajorVersionAsInt()
 
 	if c.currentMajorVersion >= desiredVersion {
+		if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists { // if failure annotation exists, remove it
+			c.removeFailuresAnnotation()
+			c.logger.Infof("removing failure annotation as the cluster is already up to date")
+		}
 		c.logger.Infof("cluster version up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
+		return nil
+	}
+
+	if !isInMainternanceWindow(c.Spec.MaintenanceWindows) {
+		c.logger.Infof("skipping major version upgrade, not in maintenance window")
 		return nil
 	}
 
@@ -98,37 +155,56 @@ func (c *Cluster) majorVersionUpgrade() error {
 		}
 	}
 
+	// Recheck version with newest data from Patroni
+	if c.currentMajorVersion >= desiredVersion {
+		if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists { // if failure annotation exists, remove it
+			c.removeFailuresAnnotation()
+			c.logger.Infof("removing failure annotation as the cluster is already up to date")
+		}
+		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
+		return nil
+	}
+
+	if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists {
+		c.logger.Infof("last major upgrade failed, skipping upgrade")
+		return nil
+	}
+
+	isUpgradeSuccess := true
 	numberOfPods := len(pods)
 	if allRunning && masterPod != nil {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			upgradeCommand := fmt.Sprintf("set -o pipefail && /usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
 
-			c.logger.Debugf("checking if the spilo image runs with root or non-root (check for user id=0)")
+			c.logger.Debug("checking if the spilo image runs with root or non-root (check for user id=0)")
 			resultIdCheck, errIdCheck := c.ExecCommand(podName, "/bin/bash", "-c", "/usr/bin/id -u")
 			if errIdCheck != nil {
-				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "Checking user id to run upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, errIdCheck)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "checking user id to run upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, errIdCheck)
 			}
 
 			resultIdCheck = strings.TrimSuffix(resultIdCheck, "\n")
 			var result string
 			if resultIdCheck != "0" {
-				c.logger.Infof("User id was identified as: %s, hence default user is non-root already", resultIdCheck)
+				c.logger.Infof("user id was identified as: %s, hence default user is non-root already", resultIdCheck)
 				result, err = c.ExecCommand(podName, "/bin/bash", "-c", upgradeCommand)
 			} else {
-				c.logger.Infof("User id was identified as: %s, using su to reach the postgres user", resultIdCheck)
+				c.logger.Infof("user id was identified as: %s, using su to reach the postgres user", resultIdCheck)
 				result, err = c.ExecCommand(podName, "/bin/su", "postgres", "-c", upgradeCommand)
 			}
 			if err != nil {
-				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "Upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
+				isUpgradeSuccess = false
+				c.annotatePostgresResource(isUpgradeSuccess)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
 				return err
 			}
-			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
 
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d finished", c.currentMajorVersion, desiredVersion)
+			c.annotatePostgresResource(isUpgradeSuccess)
+			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "upgrade from %d to %d finished", c.currentMajorVersion, desiredVersion)
 		}
 	}
 

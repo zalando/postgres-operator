@@ -6,9 +6,9 @@ replicaCount: 1
 
 # configure ui image
 image:
-  registry: registry.opensource.zalan.do
-  repository: acid/postgres-operator-ui
-  tag: v1.10.1
+  registry: ghcr.io
+  repository: zalando/postgres-operator-ui
+  tag: v1.13.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -45,6 +45,7 @@ envs:
   operatorApiUrl: "http://postgres-operator:8080"
   operatorClusterNameLabel: "cluster-name"
   resourcesVisible: "False"
+  # Set to "*" to allow viewing/creation of clusters in all namespaces
   targetNamespace: "default"
   teams:
     - "acid"
@@ -110,3 +111,18 @@ ingress:
   #  - secretName: ui-tls
   #    hosts:
   #      - ui.exmaple.org
+
+# priority class for operator-ui pod
+priorityClassName: ""
+
+# Affinity for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+affinity: {}
+
+# Node labels for pod assignment
+# Ref: https://kubernetes.io/docs/user-guide/node-selection/
+nodeSelector: {}
+
+# Tolerations for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+tolerations: []

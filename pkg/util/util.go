@@ -35,7 +35,7 @@ const (
 var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 func init() {
-	rand.Seed(time.Now().Unix())
+	rand.New(rand.NewSource(time.Now().Unix()))
 }
 
 // helper function to get bool pointers
@@ -150,6 +150,17 @@ func IsEqualIgnoreOrder(a, b []string) bool {
 	sort.Strings(b_copy)
 
 	return reflect.DeepEqual(a_copy, b_copy)
+}
+
+// Iterate through slice and remove certain string, then return cleaned slice
+func RemoveString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
 }
 
 // SliceReplaceElement

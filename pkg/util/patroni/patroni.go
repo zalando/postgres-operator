@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -34,6 +34,7 @@ type Interface interface {
 	GetClusterMembers(master *v1.Pod) ([]ClusterMember, error)
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
+	SetStandbyClusterParameters(server *v1.Pod, options map[string]interface{}) error
 	GetMemberData(server *v1.Pod) (MemberData, error)
 	Restart(server *v1.Pod) error
 	GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, error)
@@ -103,7 +104,7 @@ func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer)
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("could not read response: %v", err)
 		}
@@ -122,7 +123,7 @@ func (p *Patroni) httpGet(url string) (string, error) {
 	}
 	defer response.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(response.Body)
+	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("could not read response: %v", err)
 	}
@@ -150,7 +151,7 @@ func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
 
 //TODO: add an option call /patroni to check if it is necessary to restart the server
 
-//SetPostgresParameters sets Postgres options via Patroni patch API call.
+// SetPostgresParameters sets Postgres options via Patroni patch API call.
 func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]string) error {
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(map[string]map[string]interface{}{"postgresql": {"parameters": parameters}})
@@ -164,7 +165,12 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
 }
 
-//SetConfig sets Patroni options via Patroni patch API call.
+// SetStandbyClusterParameters sets StandbyCluster options via Patroni patch API call.
+func (p *Patroni) SetStandbyClusterParameters(server *v1.Pod, parameters map[string]interface{}) error {
+	return p.SetConfig(server, map[string]interface{}{"standby_cluster": parameters})
+}
+
+// SetConfig sets Patroni options via Patroni patch API call.
 func (p *Patroni) SetConfig(server *v1.Pod, config map[string]interface{}) error {
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(config)

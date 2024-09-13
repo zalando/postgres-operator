@@ -24,18 +24,17 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Basic credential and user management on K8s, eases application deployments
 * Support for custom TLS certificates
 * UI to create and edit Postgres cluster manifests
-* Support for AWS EBS gp2 to gp3 migration, supporting iops and throughput configuration
 * Compatible with OpenShift
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 15, starting from 10+
+* Supports PostgreSQL 16, starting from 12+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
-[pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
+[pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html) /
 [WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
 * Preload libraries: [bg_mon](https://github.com/CyberDem0n/bg_mon),
-[pg_stat_statements](https://www.postgresql.org/docs/15/pgstatstatements.html),
+[pg_stat_statements](https://www.postgresql.org/docs/16/pgstatstatements.html),
 [pgextwlist](https://github.com/dimitri/pgextwlist),
 [pg_auth_mon](https://github.com/RafiaSabih/pg_auth_mon)
 * Incl. popular Postgres extensions such as
@@ -45,6 +44,7 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 [pg_partman](https://github.com/pgpartman/pg_partman),
 [pg_stat_kcache](https://github.com/powa-team/pg_stat_kcache),
 [pgq](https://github.com/pgq/pgq),
+[pgvector](https://github.com/pgvector/pgvector),
 [plpgsql_check](https://github.com/okbob/plpgsql_check),
 [postgis](https://postgis.net/),
 [set_user](https://github.com/pgaudit/set_user) and
@@ -57,11 +57,12 @@ production for over five years.
 
 | Release   | Postgres versions | K8s versions      | Golang  |
 | :-------- | :---------------: | :---------------: | :-----: |
-| v1.10.*   | 10 &rarr; 15      | 1.21+             | 1.19.8  |
+| v1.13.0   | 12 &rarr; 16      | 1.27+             | 1.22.5  |
+| v1.12.0   | 11 &rarr; 16      | 1.27+             | 1.22.3  |
+| v1.11.0   | 11 &rarr; 16      | 1.27+             | 1.21.7  |
+| v1.10.1   | 10 &rarr; 15      | 1.21+             | 1.19.8  |
 | v1.9.0    | 10 &rarr; 15      | 1.21+             | 1.18.9  |
-| v1.8.*    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
-| v1.7.1    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.16.9  |
-
+| v1.8.2    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
 
 ## Getting started
 
@@ -87,9 +88,3 @@ There is a browser-friendly version of this documentation at
 * [Configuration options](docs/reference/operator_parameters.md)
 * [Postgres manifest reference](docs/reference/cluster_manifest.md)
 * [Command-line options and environment variables](docs/reference/command_line_and_environment.md)
-
-## Community
-
-There are two places to get in touch with the community:
-1. The [GitHub issue tracker](https://github.com/zalando/postgres-operator/issues)
-2. The **#postgres-operator** [slack channel](https://postgres-slack.herokuapp.com)

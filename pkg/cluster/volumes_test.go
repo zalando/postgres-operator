@@ -74,6 +74,7 @@ func TestResizeVolumeClaim(t *testing.T) {
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
 	filterLabels := cluster.labelsSet(false)
+	cluster.Spec.Volume.Size = newVolumeSize
 
 	// define and create PVCs for 1Gi volumes
 	pvcList := CreatePVCs(namespace, clusterName, filterLabels, 2, "1Gi")
@@ -85,7 +86,7 @@ func TestResizeVolumeClaim(t *testing.T) {
 	}
 
 	// test resizing
-	cluster.resizeVolumeClaims(acidv1.Volume{Size: newVolumeSize})
+	cluster.syncVolumes()
 
 	pvcs, err := cluster.listPersistentVolumeClaims()
 	assert.NoError(t, err)
@@ -164,7 +165,7 @@ func CreatePVCs(namespace string, clusterName string, labels labels.Set, n int, 
 				Labels:    labels,
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceStorage: storage1Gi,
 					},
@@ -255,7 +256,7 @@ func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustern
 				Labels:    labels,
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceStorage: storage1Gi,
 					},

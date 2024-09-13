@@ -1,6 +1,7 @@
 package v1
 
 import (
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -88,4 +89,9 @@ type DBAuth struct {
 	Name        string `json:"name,omitempty"`
 	UserKey     string `json:"userKey,omitempty"`
 	PasswordKey string `json:"passwordKey,omitempty"`
+}
+
+type Slot struct {
+	Slot        map[string]string             `json:"slot"`
+	Publication map[string]acidv1.StreamTable `json:"publication"`
 }
