@@ -140,6 +140,7 @@ rules:
   - delete
   - get
   - list
+  - patch
 {{- if toString .Values.configKubernetes.storage_resize_mode | eq "pvc" }}
   - patch
   - update
