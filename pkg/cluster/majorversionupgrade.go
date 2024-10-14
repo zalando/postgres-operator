@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Masterminds/semver"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -127,11 +128,6 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
-	if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists {
-		c.logger.Infof("last major upgrade failed, skipping upgrade")
-		return nil
-	}
-
 	if !isInMainternanceWindow(c.Spec.MaintenanceWindows) {
 		c.logger.Infof("skipping major version upgrade, not in maintenance window")
 		return nil
@@ -162,8 +158,49 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	// Recheck version with newest data from Patroni
 	if c.currentMajorVersion >= desiredVersion {
+		if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists { // if failure annotation exists, remove it
+			c.removeFailuresAnnotation()
+			c.logger.Infof("removing failure annotation as the cluster is already up to date")
+		}
 		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
 		return nil
+	}
+
+	if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists {
+		c.logger.Infof("last major upgrade failed, skipping upgrade")
+		return nil
+	}
+
+	members, err := c.patroni.GetClusterMembers(masterPod)
+	if err != nil {
+		c.logger.Error("could not get cluster members data from Patroni API, skipping major version upgrade")
+		return err
+	}
+	patroniData, err := c.patroni.GetMemberData(masterPod)
+	if err != nil {
+		c.logger.Error("could not get members data from Patroni API, skipping major version upgrade")
+		return err
+	}
+	patroniVer, err := semver.NewVersion(patroniData.Patroni.Version)
+	if err != nil {
+		c.logger.Error("error parsing Patroni version")
+		patroniVer, _ = semver.NewVersion("3.0.4")
+	}
+	verConstraint, _ := semver.NewConstraint(">= 3.0.4")
+	checkStreaming, _ := verConstraint.Validate(patroniVer)
+
+	for _, member := range members {
+		if PostgresRole(member.Role) == Leader {
+			continue
+		}
+		if checkStreaming && member.State != "streaming" {
+			c.logger.Infof("skipping major version upgrade, replica %s is not streaming from primary", member.Name)
+			return nil
+		}
+		if member.Lag > 16*1024*1024 {
+			c.logger.Infof("skipping major version upgrade, replication lag on member %s is too high", member.Name)
+			return nil
+		}
 	}
 
 	isUpgradeSuccess := true
@@ -183,19 +220,21 @@ func (c *Cluster) majorVersionUpgrade() error {
 			}
 
 			resultIdCheck = strings.TrimSuffix(resultIdCheck, "\n")
-			var result string
+			var result, scriptErrMsg string
 			if resultIdCheck != "0" {
 				c.logger.Infof("user id was identified as: %s, hence default user is non-root already", resultIdCheck)
 				result, err = c.ExecCommand(podName, "/bin/bash", "-c", upgradeCommand)
+				scriptErrMsg, _ = c.ExecCommand(podName, "/bin/bash", "-c", "tail -n 1 last_upgrade.log")
 			} else {
 				c.logger.Infof("user id was identified as: %s, using su to reach the postgres user", resultIdCheck)
 				result, err = c.ExecCommand(podName, "/bin/su", "postgres", "-c", upgradeCommand)
+				scriptErrMsg, _ = c.ExecCommand(podName, "/bin/bash", "-c", "tail -n 1 last_upgrade.log")
 			}
 			if err != nil {
 				isUpgradeSuccess = false
 				c.annotatePostgresResource(isUpgradeSuccess)
-				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, err)
-				return err
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, scriptErrMsg)
+				return fmt.Errorf(scriptErrMsg)
 			}
 
 			c.annotatePostgresResource(isUpgradeSuccess)
