@@ -3,7 +3,7 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: ghcr.io/zalando/spilo-16:3.3-p1 # TODO: update to pg17 image
+  docker_image: container-registry-test.zalando.net/acid/spilo-cdp-17:3.3-p2
   # enable_crd_registration: true
   # crd_categories:
   # - all

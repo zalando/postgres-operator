@@ -68,7 +68,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "ghcr.io/zalando/spilo-16:3.3-p1" # TODO: update to pg17 image
+                default: "container-registry-test.zalando.net/acid/spilo-cdp-17:3.3-p2"
               enable_crd_registration:
                 type: boolean
                 default: true

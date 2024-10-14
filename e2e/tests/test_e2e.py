@@ -12,10 +12,9 @@ from kubernetes import client
 from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-16-e2e:0.1" # TODO: update to pg17 image
-SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-16-e2e:0.2" # TODO: update to pg17 image
-SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-16:3.2-p3" # TODO: update to pg17 image
-
+SPILO_CURRENT = "container-registry-test.zalando.net/acid/spilo-cdp-17:3.3-p2"
+SPILO_LAZY = "container-registry-test.zalando.net/acid/spilo-cdp-17:3.3-p2"
+SPILO_FULL_IMAGE = "container-registry-test.zalando.net/acid/spilo-cdp-17:3.3-p2"
 
 def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
