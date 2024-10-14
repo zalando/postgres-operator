@@ -68,7 +68,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "ghcr.io/zalando/spilo-16:3.3-p1"
+                default: "ghcr.io/zalando/spilo-16:3.3-p1" # TODO: update to pg17 image
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -167,10 +167,10 @@ spec:
                       type: string
                   minimal_major_version:
                     type: string
-                    default: "12"
+                    default: "13"
                   target_major_version:
                     type: string
-                    default: "16"
+                    default: "17"
               kubernetes:
                 type: object
                 properties:

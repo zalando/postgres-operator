@@ -72,7 +72,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 	}{
 		{
 			subtest: "Patroni default configuration",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				Auth: config.Auth{
@@ -83,7 +83,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "Patroni configured",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				InitDB: map[string]string{
 					"encoding":       "UTF8",
@@ -106,7 +106,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.True(),
@@ -115,7 +115,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.False(),
 			},
@@ -126,7 +126,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.True(),
 			},
@@ -166,13 +166,13 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 			subTest:  "test current bin path against hard coded template",
 			binPath:  "/usr/lib/postgresql/16/bin",
 			template: pgBinariesLocationTemplate,
-			expected: "16",
+			expected: "17",
 		},
 		{
 			subTest:  "test alternative bin path against a matching template",
 			binPath:  "/usr/pgsql-16/bin",
 			template: "/usr/pgsql-%v/bin",
-			expected: "16",
+			expected: "17",
 		},
 	}
 
@@ -2148,7 +2148,7 @@ func TestSidecars(t *testing.T) {
 
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
-			PgVersion: "16",
+			PgVersion: "17",
 			Parameters: map[string]string{
 				"max_connections": "100",
 			},

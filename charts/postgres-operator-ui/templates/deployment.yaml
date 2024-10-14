@@ -84,11 +84,11 @@ spec:
                   "limit_iops": 16000,
                   "limit_throughput": 1000,
                   "postgresql_versions": [
+                    "17",
                     "16",
                     "15",
                     "14",
-                    "13",
-                    "12"
+                    "13"
                   ]
                 }
             {{- if .Values.extraEnvs }}

@@ -596,9 +596,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 								Enum: []apiextv1.JSON{
 									{
-										Raw: []byte(`"12"`),
-									},
-									{
 										Raw: []byte(`"13"`),
 									},
 									{
@@ -609,6 +606,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									{
 										Raw: []byte(`"16"`),
+									},
+									{
+										Raw: []byte(`"17"`),
 									},
 								},
 							},
