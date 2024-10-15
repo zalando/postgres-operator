@@ -161,6 +161,11 @@ func (c *Cluster) majorVersionUpgrade() error {
 		}
 	}
 
+	if masterPod == nil {
+		c.logger.Infof("no master in the cluster, skipping major version upgrade")
+		return nil
+	}
+
 	// Recheck version with newest data from Patroni
 	if c.currentMajorVersion >= desiredVersion {
 		if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists { // if failure annotation exists, remove it
