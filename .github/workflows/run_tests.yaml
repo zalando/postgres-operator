@@ -22,7 +22,7 @@ jobs:
     - name: Run unit tests
       run: go test -race -covermode atomic -coverprofile=coverage.out ./...
     - name: Convert coverage to lcov
-      uses: jandelgado/gcov2lcov-action@v1.0.9
+      uses: jandelgado/gcov2lcov-action@v1.1.0
     - name: Coveralls
       uses: coverallsapp/github-action@master
       with:
