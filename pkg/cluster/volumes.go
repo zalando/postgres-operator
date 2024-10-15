@@ -151,7 +151,7 @@ func (c *Cluster) populateVolumeMetaData() error {
 	volumeIds := []string{}
 	var volumeID string
 	for _, pv := range pvs {
-		volumeID, err = c.VolumeResizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
+		volumeID, err = c.VolumeResizer.GetProviderVolumeID(pv)
 		if err != nil {
 			continue
 		}
