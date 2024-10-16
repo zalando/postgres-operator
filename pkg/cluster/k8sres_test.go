@@ -2994,6 +2994,44 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			},
 		},
 		{
+			subTest: "test generation of resources when min limits are all set to zero",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     clusterNameLabel,
+					DefaultCPURequest:    "0",
+					DefaultCPULimit:      "0",
+					MaxCPURequest:        "0",
+					MinCPULimit:          "0",
+					DefaultMemoryRequest: "0",
+					DefaultMemoryLimit:   "0",
+					MaxMemoryRequest:     "0",
+					MinMemoryLimit:       "0",
+					PodRoleLabel:         "spilo-role",
+				},
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
+			},
+		},
+		{
 			subTest: "test matchLimitsWithRequestsIfSmaller",
 			config: config.Config{
 				Resources:               configResources,
