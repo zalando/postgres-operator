@@ -599,6 +599,22 @@ func generatePodAntiAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuring
 	return podAntiAffinity
 }
 
+func generateTopologySpreadConstraints(labels labels.Set, additionalTopologySpreadConstraints []v1.TopologySpreadConstraint) []v1.TopologySpreadConstraint {
+	topologySpreadConstraint := v1.TopologySpreadConstraint{
+		MaxSkew:           int32(1),
+		TopologyKey:       "topology.kubernetes.io/zone",
+		WhenUnsatisfiable: v1.DoNotSchedule,
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+	}
+	topologySpreadConstraints := []v1.TopologySpreadConstraint{topologySpreadConstraint}
+	if len(additionalTopologySpreadConstraints) > 0 {
+		topologySpreadConstraints = append(topologySpreadConstraints, additionalTopologySpreadConstraints...)
+	}
+	return topologySpreadConstraints
+}
+
 func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
 	// allow to override tolerations by postgresql manifest
 	if len(*tolerationsSpec) > 0 {
@@ -821,6 +837,8 @@ func (c *Cluster) generatePodTemplate(
 	additionalSecretMount string,
 	additionalSecretMountPath string,
 	additionalVolumes []acidv1.AdditionalVolume,
+	topologySpreadConstraints bool,
+	additionalTopologySpreadConstraints []v1.TopologySpreadConstraint,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -871,6 +889,10 @@ func (c *Cluster) generatePodTemplate(
 
 	if priorityClassName != "" {
 		podSpec.PriorityClassName = priorityClassName
+	}
+
+	if topologySpreadConstraints {
+		podSpec.TopologySpreadConstraints = generateTopologySpreadConstraints(labels, additionalTopologySpreadConstraints)
 	}
 
 	if sharePgSocketWithSidecars != nil && *sharePgSocketWithSidecars {
@@ -1476,7 +1498,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.PodAntiAffinityPreferredDuringScheduling,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
-		additionalVolumes)
+		additionalVolumes,
+		c.OpConfig.EnablePostgresTopologySpreadConstraints,
+		spec.AdditionalTopologySpreadConstraints)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
@@ -2334,7 +2358,9 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		false,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
-		[]acidv1.AdditionalVolume{}); err != nil {
+		[]acidv1.AdditionalVolume{},
+		true,
+		[]v1.TopologySpreadConstraint{}); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
