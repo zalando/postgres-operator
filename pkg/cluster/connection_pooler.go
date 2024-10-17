@@ -342,6 +342,18 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 	}
 
+	sidecars := []v1.Container{}
+	if connectionPoolerSpec.Sidecars != nil && len(connectionPoolerSpec.Sidecars) > 0 {
+		sidecars, err = c.generateSidecarContainers(
+			connectionPoolerSpec.Sidecars,
+			makeDefaultConnectionPoolerResources(&c.OpConfig),
+			0,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not generate pooler sidecar containers: %v", err)
+		}
+	}
+
 	// If the cluster has custom TLS certificates configured, we do the following:
 	//  1. Add environment variables to tell pgBouncer where to find the TLS certificates
 	//  2. Reference the secret in a volume
@@ -403,7 +415,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 		Spec: v1.PodSpec{
 			TerminationGracePeriodSeconds: &gracePeriod,
-			Containers:                    []v1.Container{poolerContainer},
+			Containers:                    append([]v1.Container{poolerContainer}, sidecars...),
 			Tolerations:                   tolerationsSpec,
 			Volumes:                       poolerVolumes,
 			SecurityContext:               &securityContext,
