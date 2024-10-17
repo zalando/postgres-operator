@@ -1191,7 +1191,18 @@ func (c *Cluster) Delete() error {
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete statefulset: %v", err)
 	}
 
-	if c.OpConfig.EnableSecretsDeletion != nil && *c.OpConfig.EnableSecretsDeletion {
+	enable_secrets_deletion_cluster := c.OpConfig.EnableSecretsDeletion != nil && *c.OpConfig.EnableSecretsDeletion
+	if c.OpConfig.EnableSecretsDeletionKey != "" {
+		key := c.OpConfig.EnableSecretsDeletionKey
+		if value, ok := c.Postgresql.Annotations[key]; ok {
+			if value == "true" {
+				enable_secrets_deletion_cluster = true
+			} else if value == "false" {
+				enable_secrets_deletion_cluster = false
+			}
+		}
+	}
+	if enable_secrets_deletion_cluster {
 		if err := c.deleteSecrets(); err != nil {
 			anyErrors = true
 			c.logger.Warningf("could not delete secrets: %v", err)
@@ -1200,7 +1211,6 @@ func (c *Cluster) Delete() error {
 	} else {
 		c.logger.Info("not deleting secrets because disabled in configuration")
 	}
-
 	if err := c.deletePodDisruptionBudget(); err != nil {
 		anyErrors = true
 		c.logger.Warningf("could not delete pod disruption budget: %v", err)
