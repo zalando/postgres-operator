@@ -64,6 +64,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   custom Docker image that overrides the **docker_image** operator parameter.
   It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
+* **imagePullSecrets**
+  Specify an array of imagePullSecrets to pull the spilo image (if you want
+  to pull your own spilo image from a private registry). Optional.
+
 * **schedulerName**
   specifies the scheduling profile for database pods. If no value is provided
   K8s' `default-scheduler` will be used. Optional.
