@@ -185,7 +185,7 @@ func (c *Cluster) syncVolumeClaims() error {
 
 	if c.OpConfig.StorageResizeMode == "off" || c.OpConfig.StorageResizeMode == "ebs" {
 		ignoreResize = true
-		c.logger.Debugf("Storage resize mode is set to %q. Skipping volume size sync of PVCs.", c.OpConfig.StorageResizeMode)
+		c.logger.Debugf("Storage resize mode is set to %q. Skipping volume size sync of PersistentVolumeClaims.", c.OpConfig.StorageResizeMode)
 	}
 
 	newSize, err := resource.ParseQuantity(c.Spec.Volume.Size)
@@ -278,7 +278,7 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 }
 
 func (c *Cluster) deletePersistentVolumeClaims() error {
-	c.setProcessName("deleting PVCs")
+	c.setProcessName("deleting PersistentVolumeClaims")
 	errors := make([]string, 0)
 	for uid := range c.VolumeClaims {
 		err := c.deletePersistentVolumeClaim(uid)
@@ -295,16 +295,16 @@ func (c *Cluster) deletePersistentVolumeClaims() error {
 }
 
 func (c *Cluster) deletePersistentVolumeClaim(uid types.UID) error {
-	c.setProcessName("deleting PVC")
+	c.setProcessName("deleting PersistentVolumeClaim")
 	pvc := c.VolumeClaims[uid]
 	c.logger.Debugf("deleting secret %q", pvc.Name)
 	err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("PVC %q has already been deleted", pvc.Name)
+		c.logger.Debugf("PersistentVolumeClaim %q has already been deleted", pvc.Name)
 	} else if err != nil {
-		return fmt.Errorf("could not delete PVC %q: %v", pvc.Name, err)
+		return fmt.Errorf("could not delete PersistentVolumeClaim %q: %v", pvc.Name, err)
 	}
-	c.logger.Infof("PVC %q has been deleted", pvc.Name)
+	c.logger.Infof("PersistentVolumeClaim %q has been deleted", pvc.Name)
 	delete(c.VolumeClaims, uid)
 
 	return nil
