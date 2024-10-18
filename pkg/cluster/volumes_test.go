@@ -93,7 +93,7 @@ func TestResizeVolumeClaim(t *testing.T) {
 
 	// check if listPersistentVolumeClaims returns only the PVCs matching the filter
 	if len(pvcs) != len(pvcList.Items)-1 {
-		t.Errorf("%s: could not find all PVCs, got %v, expected %v", testName, len(pvcs), len(pvcList.Items)-1)
+		t.Errorf("%s: could not find all PersistentVolumeClaims, got %v, expected %v", testName, len(pvcs), len(pvcList.Items)-1)
 	}
 
 	// check if PVCs were correctly resized

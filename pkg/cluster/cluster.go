@@ -65,11 +65,11 @@ type kubeResources struct {
 	PatroniConfigMaps   map[string]*v1.ConfigMap
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
+	VolumeClaims        map[types.UID]*v1.PersistentVolumeClaim
 	PodDisruptionBudget *policyv1.PodDisruptionBudget
 	LogicalBackupJob    *batchv1.CronJob
 	Streams             map[string]*zalandov1.FabricEventStream
 	//Pods are treated separately
-	//PVCs are treated separately
 }
 
 // Cluster describes postgresql cluster
@@ -140,6 +140,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Endpoints:         make(map[PostgresRole]*v1.Endpoints),
 			PatroniEndpoints:  make(map[string]*v1.Endpoints),
 			PatroniConfigMaps: make(map[string]*v1.ConfigMap),
+			VolumeClaims:      make(map[types.UID]*v1.PersistentVolumeClaim),
 			Streams:           make(map[string]*zalandov1.FabricEventStream)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
 			PasswordEncryption:   passwordEncryption,

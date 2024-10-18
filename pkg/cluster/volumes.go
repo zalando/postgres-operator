@@ -13,9 +13,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/filesystems"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
 )
 
@@ -199,6 +199,7 @@ func (c *Cluster) syncVolumeClaims() error {
 		return fmt.Errorf("could not receive persistent volume claims: %v", err)
 	}
 	for _, pvc := range pvcs {
+		c.VolumeClaims[pvc.UID] = &pvc
 		needsUpdate := false
 		currentSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
 		if !ignoreResize && currentSize != manifestSize {
@@ -213,9 +214,11 @@ func (c *Cluster) syncVolumeClaims() error {
 
 		if needsUpdate {
 			c.logger.Infof("updating persistent volume claim definition for volume %q", pvc.Name)
-			if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{}); err != nil {
+			updatedPvc, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{})
+			if err != nil {
 				return fmt.Errorf("could not update persistent volume claim: %q", err)
 			}
+			c.VolumeClaims[pvc.UID] = updatedPvc
 			c.logger.Infof("successfully updated persistent volume claim %q", pvc.Name)
 		} else {
 			c.logger.Debugf("volume claim for volume %q do not require updates", pvc.Name)
@@ -227,10 +230,11 @@ func (c *Cluster) syncVolumeClaims() error {
 			if err != nil {
 				return fmt.Errorf("could not form patch for the persistent volume claim for volume %q: %v", pvc.Name, err)
 			}
-			_, err = c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			patchedPvc, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 			if err != nil {
 				return fmt.Errorf("could not patch annotations of the persistent volume claim for volume %q: %v", pvc.Name, err)
 			}
+			c.VolumeClaims[pvc.UID] = patchedPvc
 		}
 	}
 
@@ -274,22 +278,34 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 }
 
 func (c *Cluster) deletePersistentVolumeClaims() error {
-	c.logger.Debug("deleting PVCs")
-	pvcs, err := c.listPersistentVolumeClaims()
-	if err != nil {
-		return err
-	}
-	for _, pvc := range pvcs {
-		c.logger.Debugf("deleting PVC %q", util.NameFromMeta(pvc.ObjectMeta))
-		if err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, c.deleteOptions); err != nil {
-			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
+	c.setProcessName("deleting PVCs")
+	errors := make([]string, 0)
+	for uid := range c.VolumeClaims {
+		err := c.deletePersistentVolumeClaim(uid)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%v", err))
 		}
 	}
-	if len(pvcs) > 0 {
-		c.logger.Debug("PVCs have been deleted")
-	} else {
-		c.logger.Debug("no PVCs to delete")
+
+	if len(errors) > 0 {
+		c.logger.Warningf("could not delete all persistent volume claims: %v", strings.Join(errors, `', '`))
 	}
+
+	return nil
+}
+
+func (c *Cluster) deletePersistentVolumeClaim(uid types.UID) error {
+	c.setProcessName("deleting PVC")
+	pvc := c.VolumeClaims[uid]
+	c.logger.Debugf("deleting secret %q", pvc.Name)
+	err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, c.deleteOptions)
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("PVC %q has already been deleted", pvc.Name)
+	} else if err != nil {
+		return fmt.Errorf("could not delete PVC %q: %v", pvc.Name, err)
+	}
+	c.logger.Infof("PVC %q has been deleted", pvc.Name)
+	delete(c.VolumeClaims, uid)
 
 	return nil
 }
