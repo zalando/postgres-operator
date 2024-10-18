@@ -39,8 +39,8 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found logical backup job: %q (uid: %q)", util.NameFromMeta(c.LogicalBackupJob.ObjectMeta), c.LogicalBackupJob.UID)
 	}
 
-	for _, secret := range c.Secrets {
-		c.logger.Infof("found secret: %q (uid: %q) namespace: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID, secret.ObjectMeta.Namespace)
+	for uid, secret := range c.Secrets {
+		c.logger.Infof("found secret: %q (uid: %q) namespace: %s", util.NameFromMeta(secret.ObjectMeta), uid, secret.ObjectMeta.Namespace)
 	}
 
 	for role, service := range c.Services {
@@ -70,13 +70,8 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found pod: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
-	pvcs, err := c.listPersistentVolumeClaims()
-	if err != nil {
-		return fmt.Errorf("could not get the list of PVCs: %v", err)
-	}
-
-	for _, obj := range pvcs {
-		c.logger.Infof("found PVC: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+	for uid, pvc := range c.VolumeClaims {
+		c.logger.Infof("found PersistentVolumeClaim: %q (uid: %q)", util.NameFromMeta(pvc.ObjectMeta), uid)
 	}
 
 	for role, poolerObjs := range c.ConnectionPooler {
