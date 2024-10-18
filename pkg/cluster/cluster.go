@@ -364,6 +364,11 @@ func (c *Cluster) Create() (err error) {
 	c.logger.Infof("pods are ready")
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Pods are ready")
 
+	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
+	if err = c.syncVolumes(); err != nil {
+		return err
+	}
+
 	// sync resources created by Patroni
 	if err = c.syncPatroniResources(); err != nil {
 		c.logger.Warnf("Patroni resources not yet synced: %v", err)
