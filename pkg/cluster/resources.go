@@ -71,7 +71,7 @@ func (c *Cluster) listResources() error {
 	}
 
 	for uid, pvc := range c.VolumeClaims {
-		c.logger.Infof("found PersistentVolumeClaim: %q (uid: %q)", util.NameFromMeta(pvc.ObjectMeta), uid)
+		c.logger.Infof("found persistent volume claim: %q (uid: %q)", util.NameFromMeta(pvc.ObjectMeta), uid)
 	}
 
 	for role, poolerObjs := range c.ConnectionPooler {
@@ -283,10 +283,10 @@ func (c *Cluster) deleteStatefulSet() error {
 
 	if c.OpConfig.EnablePersistentVolumeClaimDeletion != nil && *c.OpConfig.EnablePersistentVolumeClaimDeletion {
 		if err := c.deletePersistentVolumeClaims(); err != nil {
-			return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
+			return fmt.Errorf("could not delete persistent volume claims: %v", err)
 		}
 	} else {
-		c.logger.Info("not deleting PersistentVolumeClaims because disabled in configuration")
+		c.logger.Info("not deleting persistent volume claims because disabled in configuration")
 	}
 
 	return nil
