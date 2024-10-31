@@ -297,7 +297,7 @@ func (c *Cluster) deletePersistentVolumeClaims() error {
 func (c *Cluster) deletePersistentVolumeClaim(uid types.UID) error {
 	c.setProcessName("deleting persistent volume claim")
 	pvc := c.VolumeClaims[uid]
-	c.logger.Debugf("deleting secret %q", pvc.Name)
+	c.logger.Debugf("deleting persistent volume claim %q", pvc.Name)
 	err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("persistent volume claim %q has already been deleted", pvc.Name)
