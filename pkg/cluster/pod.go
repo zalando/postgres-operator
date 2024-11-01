@@ -495,7 +495,7 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 			// if asynchronous mode is enabled and no candidates was found
 			// return false for retry - cannot switchover with no replicas candidate
 			if !c.Spec.Patroni.SynchronousMode && len(candidates) == 0 {
-				c.logger.Warnf("no replicas candidate found - retrying fetching cluster members")
+				c.logger.Warnf("no replica candidate found - retrying fetching cluster members")
 				return false, nil
 			}
 
