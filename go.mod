@@ -22,6 +22,7 @@ require (
 )
 
 require (
+	github.com/Masterminds/semver v1.5.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect

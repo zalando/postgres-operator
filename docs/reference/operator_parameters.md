@@ -366,7 +366,7 @@ configuration they are grouped under the `kubernetes` key.
   manifest. To keep secrets, set this option to `false`. The default is `true`.
 
 * **enable_persistent_volume_claim_deletion**
-  By default, the operator deletes PersistentVolumeClaims when removing the
+  By default, the operator deletes persistent volume claims when removing the
   Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
   on the statefulset is set to `retain`. To keep PVCs set this option to `false`.
   The default is `true`.
