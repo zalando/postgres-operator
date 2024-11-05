@@ -35,7 +35,7 @@ const (
 var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 func init() {
-	rand.Seed(time.Now().Unix())
+	rand.New(rand.NewSource(time.Now().Unix()))
 }
 
 // helper function to get bool pointers

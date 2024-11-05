@@ -24,7 +24,7 @@ const (
 	doBlockStmt          = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
 	passwordTemplate     = "ENCRYPTED PASSWORD '%s'"
 	inRoleTemplate       = `IN ROLE %s`
-	adminTemplate        = `ADMIN %s`
+	adminTemplate        = `ADMIN "%s"`
 )
 
 // DefaultUserSyncStrategy implements a user sync strategy that merges already existing database users

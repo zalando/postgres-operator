@@ -47,11 +47,6 @@ const (
 	operatorPort                   = 8080
 )
 
-type pgUser struct {
-	Password string   `json:"password"`
-	Options  []string `json:"options"`
-}
-
 type patroniDCS struct {
 	TTL                      uint32                       `json:"ttl,omitempty"`
 	LoopWait                 uint32                       `json:"loop_wait,omitempty"`
@@ -79,19 +74,13 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
-func (c *Cluster) endpointName(role PostgresRole) string {
-	name := c.Name
-	if role == Replica {
-		name = fmt.Sprintf("%s-%s", name, "repl")
-	}
-
-	return name
-}
-
 func (c *Cluster) serviceName(role PostgresRole) string {
 	name := c.Name
-	if role == Replica {
+	switch role {
+	case Replica:
 		name = fmt.Sprintf("%s-%s", name, "repl")
+	case Patroni:
+		name = fmt.Sprintf("%s-%s", name, "config")
 	}
 
 	return name
@@ -750,7 +739,7 @@ func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar,
 }
 
 // adds common fields to sidecars
-func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string, logger *logrus.Entry) []v1.Container {
+func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string) []v1.Container {
 	result := []v1.Container{}
 
 	for _, container := range in {
@@ -1455,7 +1444,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			containerName, containerName)
 	}
 
-	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
+	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername))
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
@@ -1530,10 +1519,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.statefulSetName(),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
+			Name:            c.statefulSetName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.AnnotationsToPropagate(c.annotationsSet(nil)),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:                             &numberOfInstances,
@@ -1608,7 +1598,7 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 	for k, v := range c.OpConfig.CustomPodAnnotations {
 		annotations[k] = v
 	}
-	if spec != nil || spec.PodAnnotations != nil {
+	if spec.PodAnnotations != nil {
 		for k, v := range spec.PodAnnotations {
 			annotations[k] = v
 		}
@@ -1869,7 +1859,7 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: quantity,
 				},
@@ -1885,18 +1875,16 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 
 func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	secrets := make(map[string]*v1.Secret, len(c.pgUsers)+len(c.systemUsers))
-	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		secret := c.generateSingleUserSecret(pgUser.Namespace, pgUser)
+		secret := c.generateSingleUserSecret(pgUser)
 		if secret != nil {
 			secrets[username] = secret
 		}
-		namespace = pgUser.Namespace
 	}
 	/* special case for the system user */
 	for _, systemUser := range c.systemUsers {
-		secret := c.generateSingleUserSecret(namespace, systemUser)
+		secret := c.generateSingleUserSecret(systemUser)
 		if secret != nil {
 			secrets[systemUser.Name] = secret
 		}
@@ -1905,7 +1893,7 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	return secrets
 }
 
-func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
+func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
 		if pgUser.Origin != spec.RoleOriginTeamsAPI {
@@ -1929,12 +1917,21 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 		lbls = c.connectionPoolerLabels("", false).MatchLabels
 	}
 
+	// if secret lives in another namespace we cannot set ownerReferences
+	var ownerReferences []metav1.OwnerReference
+	if c.Config.OpConfig.EnableCrossNamespaceSecret && strings.Contains(username, ".") {
+		ownerReferences = nil
+	} else {
+		ownerReferences = c.ownerReferences()
+	}
+
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.credentialSecretName(username),
-			Namespace:   pgUser.Namespace,
-			Labels:      lbls,
-			Annotations: c.annotationsSet(nil),
+			Name:            c.credentialSecretName(username),
+			Namespace:       pgUser.Namespace,
+			Labels:          lbls,
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: ownerReferences,
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -1992,10 +1989,11 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.serviceName(role),
-			Namespace:   c.Namespace,
-			Labels:      c.roleLabelsSet(true, role),
-			Annotations: c.annotationsSet(c.generateServiceAnnotations(role, spec)),
+			Name:            c.serviceName(role),
+			Namespace:       c.Namespace,
+			Labels:          c.roleLabelsSet(true, role),
+			Annotations:     c.annotationsSet(c.generateServiceAnnotations(role, spec)),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: serviceSpec,
 	}
@@ -2061,10 +2059,11 @@ func (c *Cluster) getCustomServiceAnnotations(role PostgresRole, spec *acidv1.Po
 func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.endpointName(role),
-			Namespace:   c.Namespace,
-			Annotations: c.annotationsSet(nil),
-			Labels:      c.roleLabelsSet(true, role),
+			Name:            c.serviceName(role),
+			Namespace:       c.Namespace,
+			Annotations:     c.annotationsSet(nil),
+			Labels:          c.roleLabelsSet(true, role),
+			OwnerReferences: c.ownerReferences(),
 		},
 	}
 	if len(subsets) > 0 {
@@ -2225,10 +2224,11 @@ func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.podDisruptionBudgetName(),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.annotationsSet(nil),
+			Name:            c.podDisruptionBudgetName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
@@ -2361,10 +2361,11 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.getLogicalBackupJobName(),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.annotationsSet(nil),
+			Name:            c.getLogicalBackupJobName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
@@ -2478,7 +2479,9 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		}
 
 	case "gcs":
-		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+		if c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+		}
 
 	case "az":
 		envVars = appendEnvVars(envVars, []v1.EnvVar{
@@ -2489,11 +2492,11 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			{
 				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
 				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageContainer,
-			},
-			{
-				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
-				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey,
 			}}...)
+
+		if c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey})
+		}
 	}
 
 	return envVars
@@ -2519,22 +2522,26 @@ func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 // survived, we can't delete an object because it will affect the functioning
 // cluster).
 func (c *Cluster) ownerReferences() []metav1.OwnerReference {
-	controller := true
-
-	if c.Statefulset == nil {
-		c.logger.Warning("Cannot get owner reference, no statefulset")
-		return []metav1.OwnerReference{}
+	currentOwnerReferences := c.ObjectMeta.OwnerReferences
+	if c.OpConfig.EnableOwnerReferences == nil || !*c.OpConfig.EnableOwnerReferences {
+		return currentOwnerReferences
 	}
 
-	return []metav1.OwnerReference{
-		{
-			UID:        c.Statefulset.ObjectMeta.UID,
-			APIVersion: "apps/v1",
-			Kind:       "StatefulSet",
-			Name:       c.Statefulset.ObjectMeta.Name,
-			Controller: &controller,
-		},
+	for _, ownerRef := range currentOwnerReferences {
+		if ownerRef.UID == c.Postgresql.ObjectMeta.UID {
+			return currentOwnerReferences
+		}
 	}
+
+	controllerReference := metav1.OwnerReference{
+		UID:        c.Postgresql.ObjectMeta.UID,
+		APIVersion: acidv1.SchemeGroupVersion.Identifier(),
+		Kind:       acidv1.PostgresCRDResourceKind,
+		Name:       c.Postgresql.ObjectMeta.Name,
+		Controller: util.True(),
+	}
+
+	return append(currentOwnerReferences, controllerReference)
 }
 
 func ensurePath(file string, defaultDir string, defaultFile string) string {

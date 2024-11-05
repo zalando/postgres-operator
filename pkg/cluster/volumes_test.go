@@ -93,7 +93,7 @@ func TestResizeVolumeClaim(t *testing.T) {
 
 	// check if listPersistentVolumeClaims returns only the PVCs matching the filter
 	if len(pvcs) != len(pvcList.Items)-1 {
-		t.Errorf("%s: could not find all PVCs, got %v, expected %v", testName, len(pvcs), len(pvcList.Items)-1)
+		t.Errorf("%s: could not find all persistent volume claims, got %v, expected %v", testName, len(pvcs), len(pvcList.Items)-1)
 	}
 
 	// check if PVCs were correctly resized
@@ -165,7 +165,7 @@ func CreatePVCs(namespace string, clusterName string, labels labels.Set, n int, 
 				Labels:    labels,
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceStorage: storage1Gi,
 					},
@@ -256,7 +256,7 @@ func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustern
 				Labels:    labels,
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceStorage: storage1Gi,
 					},

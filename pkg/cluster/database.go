@@ -46,7 +46,7 @@ const (
 	createExtensionSQL      = `CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
 	alterExtensionSQL       = `ALTER EXTENSION "%s" SET SCHEMA "%s"`
 
-	getPublicationsSQL = `SELECT p.pubname, string_agg(pt.schemaname || '.' || pt.tablename, ', ' ORDER BY pt.schemaname, pt.tablename)
+	getPublicationsSQL = `SELECT p.pubname, COALESCE(string_agg(pt.schemaname || '.' || pt.tablename, ', ' ORDER BY pt.schemaname, pt.tablename), '') AS pubtables
 	        FROM pg_publication p
 			LEFT JOIN pg_publication_tables pt ON pt.pubname = p.pubname
 			WHERE p.pubowner = 'postgres'::regrole
@@ -111,7 +111,7 @@ func (c *Cluster) pgConnectionString(dbname string) string {
 
 func (c *Cluster) databaseAccessDisabled() bool {
 	if !c.OpConfig.EnableDBAccess {
-		c.logger.Debugf("database access is disabled")
+		c.logger.Debug("database access is disabled")
 	}
 
 	return !c.OpConfig.EnableDBAccess
