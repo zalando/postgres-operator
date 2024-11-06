@@ -141,7 +141,7 @@ rules:
   - get
   - list
   - patch
-{{- if toString .Values.configKubernetes.storage_resize_mode | eq "pvc" }}
+{{- if or (toString .Values.configKubernetes.storage_resize_mode | eq "pvc") (toString .Values.configKubernetes.storage_resize_mode | eq "mixed") }}
   - update
 {{- end }}
  # to read existing PVs. Creation should be done via dynamic provisioning

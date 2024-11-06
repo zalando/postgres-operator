@@ -7,6 +7,7 @@ const (
 	// EBS related constants
 	EBSVolumeIDStart = "/vol-"
 	EBSProvisioner   = "kubernetes.io/aws-ebs"
+	EBSDriver        = "ebs.csi.aws.com"
 	//https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VolumeModification.html
 	EBSVolumeStateModifying     = "modifying"
 	EBSVolumeStateOptimizing    = "optimizing"
