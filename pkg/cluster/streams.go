@@ -453,15 +453,6 @@ func (c *Cluster) syncStream(appId string) error {
 		if stream.Spec.ApplicationId != appId {
 			continue
 		}
-		if streamExists {
-			c.logger.Warningf("more than one event stream with applicationId %s found, delete it", appId)
-			if err = c.KubeClient.FabricEventStreams(stream.ObjectMeta.Namespace).Delete(context.TODO(), stream.ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
-				c.logger.Errorf("could not delete event stream %q with applicationId %s: %v", stream.ObjectMeta.Name, appId, err)
-			} else {
-				c.logger.Infof("redundant event stream %q with applicationId %s has been successfully deleted", stream.ObjectMeta.Name, appId)
-			}
-			continue
-		}
 		streamExists = true
 		desiredStreams := c.generateFabricEventStream(appId)
 		if !reflect.DeepEqual(stream.ObjectMeta.OwnerReferences, desiredStreams.ObjectMeta.OwnerReferences) {
@@ -484,6 +475,7 @@ func (c *Cluster) syncStream(appId string) error {
 			c.Streams[appId] = updatedStream
 			c.logger.Infof("event streams %q with applicationId %s have been successfully updated", updatedStream.Name, appId)
 		}
+		break
 	}
 
 	if !streamExists {
