@@ -111,6 +111,13 @@ func (in *ConnectionPooler) DeepCopyInto(out *ConnectionPooler) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Sidecars != nil {
+		in, out := &in.Sidecars, &out.Sidecars
+		*out = make([]Sidecar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = new(Resources)
