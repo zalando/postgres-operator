@@ -73,11 +73,11 @@ spec:
                   "limit_iops": 16000,
                   "limit_throughput": 1000,
                   "postgresql_versions": [
+                    "17",
                     "16",
                     "15",
                     "14",
-                    "13",
-                    "12"
+                    "13"
                   ]
                 }
             # Exemple of settings to make snapshot view working in the ui when using AWS
