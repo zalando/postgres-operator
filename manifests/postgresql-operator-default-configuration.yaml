@@ -4,6 +4,8 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   docker_image: ghcr.io/zalando/spilo-16:3.3-p1
+  # image_pull_secrets:
+  # - name: myRegistryKeySecretName  
   # enable_crd_registration: true
   # crd_categories:
   # - all

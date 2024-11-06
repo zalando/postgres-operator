@@ -39,6 +39,9 @@ configGeneral:
   etcd_host: ""
   # Spilo docker image
   docker_image: ghcr.io/zalando/spilo-16:3.3-p1
+  # Optionally specify an array of imagePullSecrets for the spilo pod
+  # image_pull_secrets:
+  # - myRegistryKeySecretName
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
