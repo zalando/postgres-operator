@@ -1451,9 +1451,9 @@ func TestNodeAffinity(t *testing.T) {
 	nodeAff := &v1.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				v1.NodeSelectorTerm{
+				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
-						v1.NodeSelectorRequirement{
+						{
 							Key:      "test-label",
 							Operator: v1.NodeSelectorOpIn,
 							Values: []string{
@@ -1566,22 +1566,28 @@ func TestPodAffinity(t *testing.T) {
 }
 
 func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
+	if len(deployment.ObjectMeta.OwnerReferences) == 0 {
+		return nil
+	}
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
-	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
-		return fmt.Errorf("Ownere reference is incorrect, got %s, expected %s",
-			owner.Name, cluster.Statefulset.ObjectMeta.Name)
+	if owner.Name != cluster.Postgresql.ObjectMeta.Name {
+		return fmt.Errorf("Owner reference is incorrect, got %s, expected %s",
+			owner.Name, cluster.Postgresql.ObjectMeta.Name)
 	}
 
 	return nil
 }
 
 func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role PostgresRole) error {
+	if len(service.ObjectMeta.OwnerReferences) == 0 {
+		return nil
+	}
 	owner := service.ObjectMeta.OwnerReferences[0]
 
-	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
-		return fmt.Errorf("Ownere reference is incorrect, got %s, expected %s",
-			owner.Name, cluster.Statefulset.ObjectMeta.Name)
+	if owner.Name != cluster.Postgresql.ObjectMeta.Name {
+		return fmt.Errorf("Owner reference is incorrect, got %s, expected %s",
+			owner.Name, cluster.Postgresql.ObjectMeta.Name)
 	}
 
 	return nil
@@ -1667,7 +1673,7 @@ func TestTLS(t *testing.T) {
 			TLS: &acidv1.TLSDescription{
 				SecretName: tlsSecretName, CAFile: "ca.crt"},
 			AdditionalVolumes: []acidv1.AdditionalVolume{
-				acidv1.AdditionalVolume{
+				{
 					Name:      tlsSecretName,
 					MountPath: mountPath,
 					VolumeSource: v1.VolumeSource{
@@ -2156,17 +2162,17 @@ func TestSidecars(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("210m"), Memory: k8sutil.StringToPointer("0.8Gi")},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("510m"), Memory: k8sutil.StringToPointer("1.4Gi")},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
 			},
@@ -2194,11 +2200,11 @@ func TestSidecars(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -2253,7 +2259,7 @@ func TestSidecars(t *testing.T) {
 		},
 	}
 	mounts := []v1.VolumeMount{
-		v1.VolumeMount{
+		{
 			Name:      "pgdata",
 			MountPath: "/home/postgres/pgdata",
 		},
@@ -2320,13 +2326,69 @@ func TestSidecars(t *testing.T) {
 }
 
 func TestGeneratePodDisruptionBudget(t *testing.T) {
+	testName := "Test PodDisruptionBudget spec generation"
+
+	hasName := func(pdbName string) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+			if pdbName != podDisruptionBudget.ObjectMeta.Name {
+				return fmt.Errorf("PodDisruptionBudget name is incorrect, got %s, expected %s",
+					podDisruptionBudget.ObjectMeta.Name, pdbName)
+			}
+			return nil
+		}
+	}
+
+	hasMinAvailable := func(expectedMinAvailable int) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+			actual := podDisruptionBudget.Spec.MinAvailable.IntVal
+			if actual != int32(expectedMinAvailable) {
+				return fmt.Errorf("PodDisruptionBudget MinAvailable is incorrect, got %d, expected %d",
+					actual, expectedMinAvailable)
+			}
+			return nil
+		}
+	}
+
+	testLabelsAndSelectors := func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		masterLabelSelectorDisabled := cluster.OpConfig.PDBMasterLabelSelector != nil && !*cluster.OpConfig.PDBMasterLabelSelector
+		if podDisruptionBudget.ObjectMeta.Namespace != "myapp" {
+			return fmt.Errorf("Object Namespace incorrect.")
+		}
+		if !reflect.DeepEqual(podDisruptionBudget.Labels, map[string]string{"team": "myapp", "cluster-name": "myapp-database"}) {
+			return fmt.Errorf("Labels incorrect.")
+		}
+		if !masterLabelSelectorDisabled &&
+			!reflect.DeepEqual(podDisruptionBudget.Spec.Selector, &metav1.LabelSelector{
+				MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"}}) {
+
+			return fmt.Errorf("MatchLabels incorrect.")
+		}
+
+		return nil
+	}
+
+	testPodDisruptionBudgetOwnerReference := func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		if len(podDisruptionBudget.ObjectMeta.OwnerReferences) == 0 {
+			return nil
+		}
+		owner := podDisruptionBudget.ObjectMeta.OwnerReferences[0]
+
+		if owner.Name != cluster.Postgresql.ObjectMeta.Name {
+			return fmt.Errorf("Owner reference is incorrect, got %s, expected %s",
+				owner.Name, cluster.Postgresql.ObjectMeta.Name)
+		}
+
+		return nil
+	}
+
 	tests := []struct {
-		c   *Cluster
-		out policyv1.PodDisruptionBudget
+		scenario string
+		spec     *Cluster
+		check    []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error
 	}{
-		// With multiple instances.
 		{
-			New(
+			scenario: "With multiple instances",
+			spec: New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2334,23 +2396,16 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-pdb",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(1),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(1),
+				testLabelsAndSelectors,
 			},
 		},
-		// With zero instances.
 		{
-			New(
+			scenario: "With zero instances",
+			spec: New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2358,23 +2413,16 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-pdb",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(0),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(0),
+				testLabelsAndSelectors,
 			},
 		},
-		// With PodDisruptionBudget disabled.
 		{
-			New(
+			scenario: "With PodDisruptionBudget disabled",
+			spec: New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2382,23 +2430,16 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-pdb",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(0),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(0),
+				testLabelsAndSelectors,
 			},
 		},
-		// With non-default PDBNameFormat and PodDisruptionBudget explicitly enabled.
 		{
-			New(
+			scenario: "With non-default PDBNameFormat and PodDisruptionBudget explicitly enabled",
+			spec: New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2406,50 +2447,57 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-databass-budget",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(1),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-databass-budget"),
+				hasMinAvailable(1),
+				testLabelsAndSelectors,
 			},
 		},
-		// With PDBMasterLabelSelector disabled.
 		{
-			New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", PDBMasterLabelSelector: util.False()}},
+			scenario: "With PDBMasterLabelSelector disabled",
+			spec: New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-pdb",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(1),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(1),
+				testLabelsAndSelectors,
+			},
+		},
+		{
+			scenario: "With OwnerReference enabled",
+			spec: New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+				logger,
+				eventRecorder),
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(1),
+				testLabelsAndSelectors,
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		result := tt.c.generatePodDisruptionBudget()
-		if !reflect.DeepEqual(*result, tt.out) {
-			t.Errorf("Expected PodDisruptionBudget: %#v, got %#v", tt.out, *result)
+		result := tt.spec.generatePodDisruptionBudget()
+		for _, check := range tt.check {
+			err := check(tt.spec, result)
+			if err != nil {
+				t.Errorf("%s [%s]: PodDisruptionBudget spec is incorrect, %+v",
+					testName, tt.scenario, err)
+			}
 		}
 	}
 }
@@ -2468,17 +2516,17 @@ func TestGenerateService(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("210m"), Memory: k8sutil.StringToPointer("0.8Gi")},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("510m"), Memory: k8sutil.StringToPointer("1.4Gi")},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
 			},
@@ -2507,11 +2555,11 @@ func TestGenerateService(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -2606,27 +2654,27 @@ func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 
 func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPolicy, clusterName string) []v1.ServiceSpec {
 	return []v1.ServiceSpec{
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler"},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"spilo-role": "replica", "application": "spilo", "cluster-name": clusterName},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
@@ -2846,7 +2894,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 						},
 					},
@@ -2943,6 +2991,44 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			},
 			expectedResources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+			},
+		},
+		{
+			subTest: "test generation of resources when min limits are all set to zero",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     clusterNameLabel,
+					DefaultCPURequest:    "0",
+					DefaultCPULimit:      "0",
+					MaxCPURequest:        "0",
+					MinCPULimit:          "0",
+					DefaultMemoryRequest: "0",
+					DefaultMemoryLimit:   "0",
+					MaxMemoryRequest:     "0",
+					MinMemoryLimit:       "0",
+					PodRoleLabel:         "spilo-role",
+				},
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
 			},
 		},
 		{
@@ -3047,7 +3133,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
 								ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("10Mi")},
@@ -3136,7 +3222,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
 								ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("10Mi")},
@@ -3541,6 +3627,11 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 		cluster.Spec.LogicalBackupSchedule = tt.specSchedule
 		cronJob, err := cluster.generateLogicalBackupJob()
 		assert.NoError(t, err)
+
+		if !reflect.DeepEqual(cronJob.ObjectMeta.OwnerReferences, cluster.ownerReferences()) {
+			t.Errorf("%s - %s: expected owner references %#v, got %#v", t.Name(), tt.subTest, cluster.ownerReferences(), cronJob.ObjectMeta.OwnerReferences)
+		}
+
 		if cronJob.Spec.Schedule != tt.expectedSchedule {
 			t.Errorf("%s - %s: expected schedule %s, got %s", t.Name(), tt.subTest, tt.expectedSchedule, cronJob.Spec.Schedule)
 		}

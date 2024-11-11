@@ -242,7 +242,7 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
   `"manual"` = manifest triggers action,
   `"full"` = manifest and minimal version violation trigger upgrade.
   Note, that with all three modes increasing the version in the manifest will
-  trigger a rolling update of the pods. The default is `"off"`.
+  trigger a rolling update of the pods. The default is `"manual"`.
 
 * **major_version_upgrade_team_allow_list**
   Upgrades will only be carried out for clusters of listed teams when mode is
@@ -262,6 +262,31 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 Parameters to configure cluster-related Kubernetes objects created by the
 operator, as well as some timeouts associated with them. In a CRD-based
 configuration they are grouped under the `kubernetes` key.
+
+* **enable_finalizers**
+  By default, a deletion of the Postgresql resource will trigger an event
+  that leads to a cleanup of all child resources. However, if the database
+  cluster is in a broken state (e.g. failed initialization) and the operator
+  cannot fully sync it, there can be leftovers. By enabling finalizers the
+  operator will ensure all managed resources are deleted prior to the
+  Postgresql resource. See also [admin docs](../administrator.md#owner-references-and-finalizers)
+  for more information The default is `false`.
+
+* **enable_owner_references**
+  The operator can set owner references on its child resources (except PVCs,
+  Patroni config service/endpoint, cross-namespace secrets) to improve cluster
+  monitoring and enable cascading deletion. The default is `false`. Warning,
+  enabling this option disables configured delete protection checks (see below).
+
+* **delete_annotation_date_key**
+  key name for annotation that compares manifest value with current date in the
+  YYYY-MM-DD format. Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`.
+  The default is empty which also disables this delete protection check.
+
+* **delete_annotation_name_key**
+  key name for annotation that compares manifest value with Postgres cluster name.
+  Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`. The default is
+  empty which also disables this delete protection check.
 
 * **pod_service_account_name**
   service account used by Patroni running on individual Pods to communicate
@@ -293,16 +318,6 @@ configuration they are grouped under the `kubernetes` key.
   of a database created by the operator. If the annotation key is also provided
   by the database definition, the database definition value is used.
 
-* **delete_annotation_date_key**
-  key name for annotation that compares manifest value with current date in the
-  YYYY-MM-DD format. Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`.
-  The default is empty which also disables this delete protection check.
-
-* **delete_annotation_name_key**
-  key name for annotation that compares manifest value with Postgres cluster name.
-  Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`. The default is
-  empty which also disables this delete protection check.
-
 * **downscaler_annotations**
   An array of annotations that should be passed from Postgres CRD on to the
   statefulset and, if exists, to the connection pooler deployment as well.
@@ -332,20 +347,6 @@ configuration they are grouped under the `kubernetes` key.
   drained if the node_readiness_label is not used. If this option if set to
   `false` the `spilo-role=master` selector will not be added to the PDB.
 
-* **enable_finalizers**
-  By default, a deletion of the Postgresql resource will trigger an event
-  that leads to a cleanup of all child resources. However, if the database
-  cluster is in a broken state (e.g. failed initialization) and the operator
-  cannot fully sync it, there can be leftovers. By enabling finalizers the
-  operator will ensure all managed resources are deleted prior to the
-  Postgresql resource. There is a trade-off though: The deletion is only
-  performed after the next two SYNC cycles with the first one updating the
-  internal spec and the latter reacting on the `deletionTimestamp` while
-  processing the SYNC event. The final removal of the custom resource will
-  add a DELETE event to the worker queue but the child resources are already
-  gone at this point.
-  The default is `false`.
-
 * **persistent_volume_claim_retention_policy**
   The operator tries to protect volumes as much as possible. If somebody
   accidentally deletes the statefulset or scales in the `numberOfInstances` the
@@ -365,7 +366,7 @@ configuration they are grouped under the `kubernetes` key.
   manifest. To keep secrets, set this option to `false`. The default is `true`.
 
 * **enable_persistent_volume_claim_deletion**
-  By default, the operator deletes PersistentVolumeClaims when removing the
+  By default, the operator deletes persistent volume claims when removing the
   Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
   on the statefulset is set to `retain`. To keep PVCs set this option to `false`.
   The default is `true`.
@@ -821,7 +822,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
