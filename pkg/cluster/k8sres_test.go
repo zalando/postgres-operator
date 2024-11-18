@@ -4315,12 +4315,14 @@ func TestTopologySpreadConstraints(t *testing.T) {
 
 	s, err := cluster.generateStatefulSet(&pg.Spec)
 	assert.NoError(t, err)
-	assert.Contains(t, s.Spec.Template.Spec.TopologySpreadConstraints, v1.TopologySpreadConstraint{
-		MaxSkew:           int32(1),
-		TopologyKey:       "topology.kubernetes.io/zone",
-		WhenUnsatisfiable: v1.DoNotSchedule,
-		LabelSelector: &metav1.LabelSelector{
-			MatchLabels: cluster.labelsSet(true),
+	assert.Contains(t, s.Spec.Template.Spec.TopologySpreadConstraints, []v1.TopologySpreadConstraint{
+		{
+			MaxSkew:           int32(1),
+			TopologyKey:       "topology.kubernetes.io/zone",
+			WhenUnsatisfiable: v1.DoNotSchedule,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: cluster.labelsSet(true),
+			},
 		},
 	})
 }
