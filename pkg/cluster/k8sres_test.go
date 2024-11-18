@@ -4173,6 +4173,9 @@ func TestGenerateCapabilities(t *testing.T) {
 func TestTopologySpreadConstraints(t *testing.T) {
 	clusterName := "acid-test-cluster"
 	namespace := "default"
+	labelSelector := &metav1.LabelSelector{
+		MatchLabels: cluster.labelsSet(true),
+	}
 
 	pg := acidv1.Postgresql{
 		ObjectMeta: metav1.ObjectMeta{
@@ -4193,9 +4196,7 @@ func TestTopologySpreadConstraints(t *testing.T) {
 					MaxSkew:           1,
 					TopologyKey:       "topology.kubernetes.io/zone",
 					WhenUnsatisfiable: v1.DoNotSchedule,
-					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: cluster.labelsSet(true),
-					},
+					LabelSelector:     labelSelector,
 				},
 			},
 		},
@@ -4213,14 +4214,11 @@ func TestTopologySpreadConstraints(t *testing.T) {
 
 	s, err := cluster.generateStatefulSet(&pg.Spec)
 	assert.NoError(t, err)
-	assert.Contains(t, s.Spec.Template.Spec.TopologySpreadConstraints, []v1.TopologySpreadConstraint{
-		{
-			MaxSkew:           int32(1),
-			TopologyKey:       "topology.kubernetes.io/zone",
-			WhenUnsatisfiable: v1.DoNotSchedule,
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: cluster.labelsSet(true),
-			},
-		},
-	})
+	assert.Contains(t, s.Spec.Template.Spec.TopologySpreadConstraints, v1.TopologySpreadConstraint{
+		MaxSkew:           int32(1),
+		TopologyKey:       "topology.kubernetes.io/zone",
+		WhenUnsatisfiable: v1.DoNotSchedule,
+		LabelSelector:     labelSelector,
+	},
+	)
 }
