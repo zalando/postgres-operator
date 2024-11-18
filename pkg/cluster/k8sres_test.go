@@ -4290,6 +4290,16 @@ func TestTopologySpreadConstraints(t *testing.T) {
 			Volume: acidv1.Volume{
 				Size: "1G",
 			},
+			TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "topology.kubernetes.io/zone",
+					WhenUnsatisfiable: v1.DoNotSchedule,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: cluster.labelsSet(true),
+					},
+				},
+			},
 		},
 	}
 
