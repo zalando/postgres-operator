@@ -90,7 +90,7 @@ var (
 			Namespace: namespace,
 			Labels: map[string]string{
 				"application":  "spilo",
-				"cluster-name": fmt.Sprintf("%s-2", clusterName),
+				"cluster-name": clusterName,
 				"team":         "acid",
 			},
 			OwnerReferences: []metav1.OwnerReference{
@@ -449,7 +449,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	}
 
 	listOptions := metav1.ListOptions{
-		LabelSelector: cluster.labelsSet(true).String(),
+		LabelSelector: cluster.labelsSet(false).String(),
 	}
 	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
@@ -488,7 +488,8 @@ func newFabricEventStream(streams []zalandov1.EventStream, annotations map[strin
 }
 
 func TestSyncStreams(t *testing.T) {
-	pg.Name = fmt.Sprintf("%s-2", pg.Name)
+	newClusterName := fmt.Sprintf("%s-2", pg.Name)
+	pg.Name = newClusterName
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -515,6 +516,7 @@ func TestSyncStreams(t *testing.T) {
 	assert.NoError(t, err)
 
 	// create a second stream with same spec but with different name
+	fes.ObjectMeta.Labels["cluster-name"] = newClusterName
 	createdStream, err := cluster.KubeClient.FabricEventStreams(namespace).Create(
 		context.TODO(), fes, metav1.CreateOptions{})
 	assert.NoError(t, err)
@@ -522,7 +524,7 @@ func TestSyncStreams(t *testing.T) {
 
 	// check that two streams exist
 	listOptions := metav1.ListOptions{
-		LabelSelector: cluster.labelsSet(true).String(),
+		LabelSelector: cluster.labelsSet(false).String(),
 	}
 	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
@@ -695,12 +697,20 @@ func TestUpdateStreams(t *testing.T) {
 
 	// compare stream returned from API with expected stream
 	listOptions := metav1.ListOptions{
-		LabelSelector: cluster.labelsSet(true).String(),
+		LabelSelector: cluster.labelsSet(false).String(),
 	}
 	streams := patchPostgresqlStreams(t, cluster, &pg.Spec, listOptions)
 	result := cluster.generateFabricEventStream(appId)
 	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
 		t.Errorf("Malformed FabricEventStream after updating manifest, expected %#v, got %#v", streams.Items[0], result)
+	}
+
+	// change teamId and check that stream is updated
+	pg.Spec.TeamID = "new-team"
+	streams = patchPostgresqlStreams(t, cluster, &pg.Spec, listOptions)
+	result = cluster.generateFabricEventStream(appId)
+	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
+		t.Errorf("Malformed FabricEventStream after updating teamId, expected %#v, got %#v", streams.Items[0].ObjectMeta.Labels, result.ObjectMeta.Labels)
 	}
 
 	// disable recovery

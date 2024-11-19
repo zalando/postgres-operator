@@ -478,7 +478,8 @@ func (c *Cluster) syncStream(appId string) error {
 		}
 		if match, reason := c.compareStreams(&stream, desiredStreams); !match {
 			c.logger.Infof("updating event streams with applicationId %s: %s", appId, reason)
-			desiredStreams.ObjectMeta = stream.ObjectMeta
+			// make sure to keep the old name with randomly generated suffix
+			desiredStreams.ObjectMeta.Name = stream.ObjectMeta.Name
 			updatedStream, err := c.updateStreams(desiredStreams)
 			if err != nil {
 				return fmt.Errorf("failed updating event streams %s with applicationId %s: %v", stream.Name, appId, err)
@@ -510,6 +511,11 @@ func (c *Cluster) compareStreams(curEventStreams, newEventStreams *zalandov1.Fab
 	if changed, reason := c.compareAnnotations(curEventStreams.ObjectMeta.Annotations, desiredAnnotations); changed {
 		match = false
 		reasons = append(reasons, fmt.Sprintf("new streams annotations do not match: %s", reason))
+	}
+
+	if !reflect.DeepEqual(curEventStreams.ObjectMeta.Labels, newEventStreams.ObjectMeta.Labels) {
+		match = false
+		reasons = append(reasons, "new streams labels do not match the current ones")
 	}
 
 	if changed, reason := sameEventStreams(curEventStreams.Spec.EventStreams, newEventStreams.Spec.EventStreams); !changed {
