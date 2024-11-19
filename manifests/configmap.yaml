@@ -34,7 +34,7 @@ data:
   default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: ghcr.io/zalando/spilo-16:3.3-p1
+  docker_image: container-registry-test.zalando.net/acid/spilo-cdp-pr1050-16:4.0-p4
   # downscaler_annotations: "deployment-time,downscaler/*"
   enable_admin_role_for_users: "true"
   enable_crd_registration: "true"
@@ -134,6 +134,8 @@ data:
   pod_management_policy: "ordered_ready"
   # pod_priority_class_name: "postgres-pod-priority"
   pod_role_label: spilo-role
+  pod_leader_label_value: master
+  pod_standby_leader_label_value: standby_leader
   pod_service_account_definition: ""
   pod_service_account_name: "postgres-pod"
   pod_service_account_role_binding_definition: ""
