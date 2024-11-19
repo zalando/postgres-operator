@@ -442,7 +442,9 @@ func (c *Cluster) syncStream(appId string) error {
 	c.setProcessName("syncing stream with applicationId %s", appId)
 	c.logger.Debugf("syncing stream with applicationId %s", appId)
 
-	listOptions := metav1.ListOptions{LabelSelector: c.labelsSet(true).String()}
+	listOptions := metav1.ListOptions{
+		LabelSelector: c.labelsSet(false).String(),
+	}
 	streams, err = c.KubeClient.FabricEventStreams(c.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("could not list of FabricEventStreams for applicationId %s: %v", appId, err)
