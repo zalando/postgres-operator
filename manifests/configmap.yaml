@@ -135,7 +135,7 @@ data:
   # pod_priority_class_name: "postgres-pod-priority"
   pod_role_label: spilo-role
   pod_leader_label_value: master
-  pod_standby_leader_label_value: standby_leader
+  pod_standby_leader_label_value: master
   pod_service_account_definition: ""
   pod_service_account_name: "postgres-pod"
   pod_service_account_role_binding_definition: ""
