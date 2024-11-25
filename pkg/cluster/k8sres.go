@@ -955,9 +955,9 @@ func (c *Cluster) generateSpiloPodEnvVars(
 			Value: c.OpConfig.PodLeaderLabelValue,
 		},
 		{
-			Name: "KUBERNETES_STANDBY_LEADER_LABEL_VALUE",
+			Name:  "KUBERNETES_STANDBY_LEADER_LABEL_VALUE",
 			Value: c.OpConfig.PodStandbyLeaderLabelValue,
-		}
+		},
 		{
 			Name: "PGPASSWORD_SUPERUSER",
 			ValueFrom: &v1.EnvVarSource{
