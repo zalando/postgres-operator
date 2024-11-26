@@ -63,14 +63,14 @@ the `PGVERSION` environment variable is set for the database pods. Since
 `v1.6.0` the related option `enable_pgversion_env_var` is enabled by default.
 
 In-place major version upgrades can be configured to be executed by the
-operator with the `major_version_upgrade_mode` option. By default it is set
-to `off` which means the cluster version will not change when increased in
-the manifest. Still, a rolling update would be triggered updating the
-`PGVERSION` variable. But Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
-script will notice the version mismatch and start the old version again.
+operator with the `major_version_upgrade_mode` option. By default, it is
+enabled (mode: `manual`). In any case, altering the version in the manifest
+will trigger a rolling update of pods to update the `PGVERSION` env variable.
+Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
+script will notice the version mismatch but start the current version again.
 
-In this scenario the major version could then be run by a user from within the
-primary pod. Exec into the container and run:
+If the automatic upgrade is disabled (mode: `off`) the upgrade could be run
+by a user from within the primary pod. Exec into the container and run:
 ```bash
 python3 /scripts/inplace_upgrade.py N
 ```
