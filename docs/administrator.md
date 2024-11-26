@@ -69,8 +69,11 @@ will trigger a rolling update of pods to update the `PGVERSION` env variable.
 Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
 script will notice the version mismatch but start the current version again.
 
-If the automatic upgrade is disabled (mode: `off`) the upgrade could be run
-by a user from within the primary pod. Exec into the container and run:
+Next, the operator would call an updage script inside Spilo. When automatic
+upgrades are disabled (mode: `off`) the upgrade could still be run by a user
+from within the primary pod. This gives you full control about the point in
+time when the upgrade can be started (check also maintenance windows below).
+Exec into the container and run:
 ```bash
 python3 /scripts/inplace_upgrade.py N
 ```
@@ -79,17 +82,32 @@ The upgrade is usually fast, well under one minute for most DBs. Note, that
 changes become irrevertible once `pg_upgrade` is called. To understand the
 upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/zalando/spilo/pull/488).
 
-When `major_version_upgrade_mode` is set to `manual` the operator will run
-the upgrade script for you after the manifest is updated and pods are rotated.
-It is also possible to define `maintenanceWindows` in the Postgres manifest to
-better control when such automated upgrades should take place after increasing
-the version.
+When `major_version_upgrade_mode` is set to `full` the operator will compare
+the version in the manifest with the configured `minimal_major_version`. If it
+is lower the operator would start an automatic upgrade as described above. The
+configured `major_target_version` will be used as the new version. This option
+can be useful if you have to get rid of outdated major versions in your fleet.
+Please note, that the operator does not patch the version in the manifest.
+Thus, the `full` mode can create drift between desired and actual state.
+
+### Upgrade during maintenance windows
+
+When `maintenanceWindows` are defined in the Postgres manifest the operator
+will trigger a major version upgrade only during these periods. Make sure they
+are at least twice as long as your configured `resync_period` to guarantee
+that operator actions can be triggered.
 
 ### Upgrade annotations
 
-When an upgrade is executed, the operator sets an annotation in the PostgreSQL resource, either `last-major-upgrade-success` if the upgrade succeeds, or `last-major-upgrade-failure` if it fails. The value of the annotation is a timestamp indicating when the upgrade occurred.
+When an upgrade is executed, the operator sets an annotation in the PostgreSQL
+resource, either `last-major-upgrade-success` if the upgrade succeeds, or
+`last-major-upgrade-failure` if it fails. The value of the annotation is a
+timestamp indicating when the upgrade occurred.
 
-If a PostgreSQL resource contains a failure annotation, the operator will not attempt to retry the upgrade during a sync event. To remove the failure annotation, you can revert the PostgreSQL version back to the current version. This action will trigger the removal of the failure annotation.
+If a PostgreSQL resource contains a failure annotation, the operator will not
+attempt to retry the upgrade during a sync event. To remove the failure
+annotation, you can revert the PostgreSQL version back to the current version.
+This action will trigger the removal of the failure annotation.
 
 ## Non-default cluster domain
 
