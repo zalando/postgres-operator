@@ -291,7 +291,7 @@ func getOutboxTable(tableName string, idColumn *string) zalandov1.EventStreamTab
 func getSlotName(dbName, appId string) string {
 	name := fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
 	if len(name) > 63 {
-		name = fmt.Sprintf("%s_%s", constants.EventStreamSourceSlotPrefix, sha1.Sum([]byte(name)))
+		name = fmt.Sprintf("%s_%x", constants.EventStreamSourceSlotPrefix, sha1.Sum([]byte(name)))
 	}
 	return name
 }
