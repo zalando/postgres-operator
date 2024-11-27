@@ -1500,9 +1500,6 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pod_leader_label_value": {
 								Type: "string",
 							},
-							"pod_standby_leader_label_value": {
-								Type: "string",
-							},
 							"pod_service_account_definition": {
 								Type: "string",
 							},

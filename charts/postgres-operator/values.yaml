@@ -195,7 +195,6 @@ configKubernetes:
   # label assigned to the Postgres pods (and services/endpoints)
   pod_role_label: spilo-role
   pod_leader_label_value: master
-  pod_standby_leader_label_value: master
   # service account definition as JSON/YAML string to be used by postgres cluster pods
   # pod_service_account_definition: ""
 
