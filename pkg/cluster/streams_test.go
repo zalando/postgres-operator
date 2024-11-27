@@ -752,3 +752,27 @@ func patchPostgresqlStreams(t *testing.T, cluster *Cluster, pgSpec *acidv1.Postg
 
 	return streams
 }
+
+func TestSlotNameWithinMaxLength(t *testing.T) {
+	dbName := "testdb"
+	appId := "test-app"
+	expected := constants.EventStreamSourceSlotPrefix + "_testdb_test_app"
+	result := getSlotName(dbName, appId)
+	assert.Equal(t, expected, result)
+}
+
+func TestSlotNameExceedsMaxLength(t *testing.T) {
+	dbName := "testdb"
+	appId := "this-is-a-very-long-application-id-that-will-exceed-the-maximum-length"
+	expected := constants.EventStreamSourceSlotPrefix + "_5a300d179c894b672b35bac212eab875d4c4145a"
+	result := getSlotName(dbName, appId)
+	assert.Equal(t, expected, result)
+}
+
+func TestSlotNameWithHyphens(t *testing.T) {
+	dbName := "testdb"
+	appId := "test-app-with-hyphens"
+	expected := constants.EventStreamSourceSlotPrefix + "_testdb_test_app_with_hyphens"
+	result := getSlotName(dbName, appId)
+	assert.Equal(t, expected, result)
+}

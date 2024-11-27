@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -288,7 +289,11 @@ func getOutboxTable(tableName string, idColumn *string) zalandov1.EventStreamTab
 }
 
 func getSlotName(dbName, appId string) string {
-	return fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
+	name := fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
+	if len(name) > 63 {
+		name = fmt.Sprintf("%s_%s", constants.EventStreamSourceSlotPrefix, sha1.Sum([]byte(name)))
+	}
+	return name
 }
 
 func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1.Connection {
