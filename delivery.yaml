@@ -14,6 +14,7 @@ pipeline:
         - desc: Run unit tests
           cmd: |
             make deps mocks test
+
         - desc: Build Docker image
           cmd: |
             IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
