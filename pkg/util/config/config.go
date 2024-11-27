@@ -49,7 +49,6 @@ type Resources struct {
 	DeleteAnnotationNameKey       string              `name:"delete_annotation_name_key"`
 	PodRoleLabel                  string              `name:"pod_role_label" default:"spilo-role"`
 	PodLeaderLabelValue           string              `name:"pod_leader_label_value" default:"master"`
-	PodStandbyLeaderLabelValue    string              `name:"pod_standby_leader_label_value" default:"master"`
 	PodToleration                 map[string]string   `name:"toleration" default:""`
 	DefaultCPURequest             string              `name:"default_cpu_request"`
 	DefaultMemoryRequest          string              `name:"default_memory_request"`
