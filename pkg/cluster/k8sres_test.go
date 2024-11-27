@@ -2359,7 +2359,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		}
 		if !masterLabelSelectorDisabled &&
 			!reflect.DeepEqual(podDisruptionBudget.Spec.Selector, &metav1.LabelSelector{
-				MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"}}) {
+				MatchLabels: map[string]string{"spilo-role": leaderLabelValue, "cluster-name": "myapp-database"}}) {
 
 			return fmt.Errorf("MatchLabels incorrect.")
 		}
@@ -2389,7 +2389,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With multiple instances",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: leaderLabelValue}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2406,7 +2406,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With zero instances",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: leaderLabelValue}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2423,7 +2423,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With PodDisruptionBudget disabled",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: leaderLabelValue}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2440,7 +2440,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With non-default PDBNameFormat and PodDisruptionBudget explicitly enabled",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: util.True()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: leaderLabelValue}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2457,7 +2457,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With PDBMasterLabelSelector disabled",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: leaderLabelValue}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2474,7 +2474,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With OwnerReference enabled",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: leaderLabelValue, EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2550,7 +2550,7 @@ func TestGenerateService(t *testing.T) {
 					DefaultMemoryRequest: "0.7Gi",
 					MaxMemoryRequest:     "1.0Gi",
 					DefaultMemoryLimit:   "1.3Gi",
-					PodLeaderLabelValue:  "master",
+					PodLeaderLabelValue:  leaderLabelValue,
 				},
 				SidecarImages: map[string]string{
 					"deprecated-global-sidecar": "image:123",

@@ -424,7 +424,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 					DefaultMemoryRequest: "300Mi",
 					DefaultMemoryLimit:   "300Mi",
 					PodRoleLabel:         "spilo-role",
-					PodLeaderLabelValue:  "master",
+					PodLeaderLabelValue:  leaderLabelValue,
 				},
 			},
 		}, client, pg, logger, eventRecorder)
