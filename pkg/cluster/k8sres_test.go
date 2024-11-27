@@ -576,67 +576,67 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 	expectedSpiloWalPathCompat := []ExpectedValue{
 		{
-			envIndex:       12,
+			envIndex:       14,
 			envVarConstant: "ENABLE_WAL_PATH_COMPAT",
 			envVarValue:    "true",
 		},
 	}
 	expectedValuesS3Bucket := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       17,
 			envVarConstant: "WAL_S3_BUCKET",
 			envVarValue:    "global-s3-bucket",
 		},
 		{
-			envIndex:       16,
+			envIndex:       18,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    fmt.Sprintf("/%s", dummyUUID),
 		},
 		{
-			envIndex:       17,
+			envIndex:       19,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 	}
 	expectedValuesGCPCreds := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       17,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "global-gs-bucket",
 		},
 		{
-			envIndex:       16,
+			envIndex:       18,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    fmt.Sprintf("/%s", dummyUUID),
 		},
 		{
-			envIndex:       17,
+			envIndex:       19,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 		{
-			envIndex:       18,
+			envIndex:       20,
 			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
 			envVarValue:    "some-path-to-credentials",
 		},
 	}
 	expectedS3BucketConfigMap := []ExpectedValue{
 		{
-			envIndex:       17,
+			envIndex:       19,
 			envVarConstant: "wal_s3_bucket",
 			envVarValue:    "global-s3-bucket-configmap",
 		},
 	}
 	expectedCustomS3BucketSpec := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       17,
 			envVarConstant: "WAL_S3_BUCKET",
 			envVarValue:    "custom-s3-bucket",
 		},
 	}
 	expectedCustomVariableSecret := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       18,
 			envVarConstant: "custom_variable",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -650,72 +650,72 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 	expectedCustomVariableConfigMap := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       18,
 			envVarConstant: "custom_variable",
 			envVarValue:    "configmap-test",
 		},
 	}
 	expectedCustomVariableSpec := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       17,
 			envVarConstant: "CUSTOM_VARIABLE",
 			envVarValue:    "spec-env-test",
 		},
 	}
 	expectedCloneEnvSpec := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       18,
 			envVarConstant: "CLONE_WALE_S3_PREFIX",
 			envVarValue:    "s3://another-bucket",
 		},
 		{
-			envIndex:       19,
+			envIndex:       21,
 			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 		{
-			envIndex:       20,
+			envIndex:       22,
 			envVarConstant: "CLONE_AWS_ENDPOINT",
 			envVarValue:    "s3.eu-central-1.amazonaws.com",
 		},
 	}
 	expectedCloneEnvSpecEnv := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       17,
 			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "test-cluster",
 		},
 		{
-			envIndex:       17,
+			envIndex:       19,
 			envVarConstant: "CLONE_WALE_S3_PREFIX",
 			envVarValue:    "s3://another-bucket",
 		},
 		{
-			envIndex:       21,
+			envIndex:       23,
 			envVarConstant: "CLONE_AWS_ENDPOINT",
 			envVarValue:    "s3.eu-central-1.amazonaws.com",
 		},
 	}
 	expectedCloneEnvConfigMap := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       18,
 			envVarConstant: "CLONE_WAL_S3_BUCKET",
 			envVarValue:    "global-s3-bucket",
 		},
 		{
-			envIndex:       17,
+			envIndex:       19,
 			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    fmt.Sprintf("/%s", dummyUUID),
 		},
 		{
-			envIndex:       21,
+			envIndex:       23,
 			envVarConstant: "clone_aws_endpoint",
 			envVarValue:    "s3.eu-west-1.amazonaws.com",
 		},
 	}
 	expectedCloneEnvSecret := []ExpectedValue{
 		{
-			envIndex:       21,
+			envIndex:       23,
 			envVarConstant: "clone_aws_access_key_id",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -729,12 +729,12 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 	expectedStandbyEnvSecret := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       17,
 			envVarConstant: "STANDBY_WALE_GS_PREFIX",
 			envVarValue:    "gs://some/path/",
 		},
 		{
-			envIndex:       20,
+			envIndex:       22,
 			envVarConstant: "standby_google_application_credentials",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -2389,7 +2389,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With multiple instances",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2406,7 +2406,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With zero instances",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2423,7 +2423,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With PodDisruptionBudget disabled",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2440,7 +2440,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With non-default PDBNameFormat and PodDisruptionBudget explicitly enabled",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: util.True()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2457,7 +2457,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With PDBMasterLabelSelector disabled",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2474,7 +2474,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		{
 			scenario: "With OwnerReference enabled",
 			spec: New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", PodLeaderLabelValue: "master", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -2550,6 +2550,7 @@ func TestGenerateService(t *testing.T) {
 					DefaultMemoryRequest: "0.7Gi",
 					MaxMemoryRequest:     "1.0Gi",
 					DefaultMemoryLimit:   "1.3Gi",
+					PodLeaderLabelValue:  "master",
 				},
 				SidecarImages: map[string]string{
 					"deprecated-global-sidecar": "image:123",
@@ -2576,10 +2577,10 @@ func TestGenerateService(t *testing.T) {
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
-	service := cluster.generateService(Master, &spec)
+	service := cluster.generateService(cluster.masterRole(), &spec)
 	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeCluster, service.Spec.ExternalTrafficPolicy)
 	cluster.OpConfig.ExternalTrafficPolicy = "Local"
-	service = cluster.generateService(Master, &spec)
+	service = cluster.generateService(cluster.masterRole(), &spec)
 	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
 
 }
@@ -2605,28 +2606,28 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 	}{
 		{
 			subtest:  "new format, load balancer is enabled for replica",
-			role:     Replica,
+			role:     cluster.replicaRole(),
 			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: util.True()},
 			opConfig: config.Config{},
 			result:   true,
 		},
 		{
 			subtest:  "new format, load balancer is disabled for replica",
-			role:     Replica,
+			role:     cluster.replicaRole(),
 			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: util.False()},
 			opConfig: config.Config{},
 			result:   false,
 		},
 		{
 			subtest:  "new format, load balancer isn't specified for replica",
-			role:     Replica,
+			role:     cluster.replicaRole(),
 			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: nil},
 			opConfig: config.Config{EnableReplicaLoadBalancer: true},
 			result:   true,
 		},
 		{
 			subtest:  "new format, load balancer isn't specified for replica",
-			role:     Replica,
+			role:     cluster.replicaRole(),
 			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: nil},
 			opConfig: config.Config{EnableReplicaLoadBalancer: false},
 			result:   false,
@@ -2690,7 +2691,7 @@ func TestEnableLoadBalancers(t *testing.T) {
 	namespace := "default"
 	clusterNameLabel := "cluster-name"
 	roleLabel := "spilo-role"
-	roles := []PostgresRole{Master, Replica}
+	roles := []PostgresRole{cluster.masterRole(), cluster.replicaRole()}
 	sourceRanges := []string{"192.186.1.2/22"}
 	extTrafficPolicy := "Cluster"
 

@@ -49,7 +49,7 @@ type ConnectionPoolerObjects struct {
 
 func (c *Cluster) connectionPoolerName(role PostgresRole) string {
 	name := fmt.Sprintf("%s-%s", c.Name, constants.ConnectionPoolerResourceSuffix)
-	if role == Replica {
+	if role == c.replicaRole() {
 		name = fmt.Sprintf("%s-%s", name, "repl")
 	}
 	return name
@@ -537,8 +537,8 @@ func (c *Cluster) generatePoolerServiceAnnotations(role PostgresRole, spec *acid
 			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
 		}
 		// -repl suffix will be added by replicaDNSName
-		clusterNameWithPoolerSuffix := c.connectionPoolerName(Master)
-		if role == Master {
+		clusterNameWithPoolerSuffix := c.connectionPoolerName(c.masterRole())
+		if role == c.masterRole() {
 			dnsString = c.masterDNSName(clusterNameWithPoolerSuffix)
 		} else {
 			dnsString = c.replicaDNSName(clusterNameWithPoolerSuffix)
@@ -557,7 +557,7 @@ func (c *Cluster) shouldCreateLoadBalancerForPoolerService(role PostgresRole, sp
 
 	switch role {
 
-	case Replica:
+	case c.replicaRole():
 		// if the value is explicitly set in a Postgresql manifest, follow this setting
 		if spec.EnableReplicaPoolerLoadBalancer != nil {
 			return *spec.EnableReplicaPoolerLoadBalancer
@@ -565,7 +565,7 @@ func (c *Cluster) shouldCreateLoadBalancerForPoolerService(role PostgresRole, sp
 		// otherwise, follow the operator configuration
 		return c.OpConfig.EnableReplicaPoolerLoadBalancer
 
-	case Master:
+	case c.masterRole():
 		if spec.EnableMasterPoolerLoadBalancer != nil {
 			return *spec.EnableMasterPoolerLoadBalancer
 		}
@@ -877,9 +877,9 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	logPoolerEssentials(c.logger, oldSpec, newSpec)
 
 	// Check and perform the sync requirements for each of the roles.
-	for _, role := range [2]PostgresRole{Master, Replica} {
+	for _, role := range [2]PostgresRole{c.masterRole(), c.replicaRole()} {
 
-		if role == Master {
+		if role == c.masterRole() {
 			connectionPoolerNeeded = needMasterConnectionPoolerWorker(&newSpec.Spec)
 		} else {
 			connectionPoolerNeeded = needReplicaConnectionPoolerWorker(&newSpec.Spec)

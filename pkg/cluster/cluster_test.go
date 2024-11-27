@@ -55,6 +55,7 @@ var cl = New(
 			},
 			Resources: config.Resources{
 				DownscalerAnnotations: []string{"downscaler/*"},
+				PodLeaderLabelValue:   "master",
 			},
 			ConnectionPooler: config.ConnectionPooler{
 				User: poolerUserName,
@@ -147,6 +148,7 @@ func TestCreate(t *testing.T) {
 					DefaultMemoryRequest:  "300Mi",
 					DefaultMemoryLimit:    "300Mi",
 					PodRoleLabel:          "spilo-role",
+					PodLeaderLabelValue:   "master",
 					ResourceCheckInterval: time.Duration(3),
 					ResourceCheckTimeout:  time.Duration(10),
 				},
