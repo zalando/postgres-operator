@@ -323,7 +323,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 	cluster.Name = "acid-fake-cluster"
 	cluster.Namespace = "default"
 
-	_, err := cluster.createService(cluster.masterRole()) //PROBLEM1
+	_, err := cluster.createService(cluster.masterRole())
 	assert.NoError(t, err)
 	_, err = cluster.createStatefulSet()
 	assert.NoError(t, err)

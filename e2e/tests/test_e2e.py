@@ -8,13 +8,10 @@ import base64
 
 from datetime import datetime, date, timedelta
 from kubernetes import client
-
-from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-16-e2e:0.1"
-SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-16-e2e:0.2"
-SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-16:3.2-p3"
+from tests.k8s_api import K8s
+from tests.constants import SPILO_CURRENT, SPILO_FULL_IMAGE, SPILO_LAZY, LEADER_LABEL_VALUE
 
 
 def to_selector(labels):
@@ -155,7 +152,7 @@ class EndToEndTestCase(unittest.TestCase):
         result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         print('stdout: {}, stderr: {}'.format(result.stdout, result.stderr))
         try:
-            k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -224,7 +221,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.update_config(patch_capabilities)
 
             # changed security context of postgres container should trigger a rolling update
-            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
@@ -658,7 +655,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_tls)
 
             # wait for switched over
-            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("SSL_CERTIFICATE_FILE", cluster_label), 2, "TLS env variable SSL_CERTIFICATE_FILE missing in Spilo pods")
@@ -861,7 +858,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster,spilo-role={}'
 
-        self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("master")),
+        self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format(LEADER_LABEL_VALUE)),
                              'ClusterIP',
                              "Expected ClusterIP type initially, found {}")
 
@@ -876,7 +873,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_lbs)
 
-            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("master")),
+            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format(LEADER_LABEL_VALUE)),
                                  'LoadBalancer',
                                  "Expected LoadBalancer service type for master, found {}")
 
@@ -894,7 +891,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_lbs)
 
-            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("master")),
+            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format(LEADER_LABEL_VALUE)),
                                  'ClusterIP',
                                  "Expected LoadBalancer service type for master, found {}")
 
@@ -1227,7 +1224,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(check_version, 13, "Version should be upgraded from 12 to 13")
 
@@ -1252,8 +1249,8 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_14)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_failover(master_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
+        k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(check_version, 13, "Version should not be upgraded")
 
@@ -1278,7 +1275,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(check_version, 15, "Version should be upgraded from 13 to 15")
 
@@ -1304,8 +1301,8 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_16)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_failover(master_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
+        k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(check_version, 15, "Version should not be upgraded because annotation for last upgrade's failure is set")
 
@@ -1315,7 +1312,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         fourth_annotations = get_annotations()
@@ -1433,7 +1430,7 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
         # wait for switched over
-        k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_failover(replica_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         def verify_pod_resources():
@@ -1465,7 +1462,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             k8s.create_with_kubectl("manifests/complete-postgres-manifest.yaml")
-            k8s.wait_for_pod_start("spilo-role=master", self.test_namespace)
+            k8s.wait_for_pod_start("spilo-role={}".format(LEADER_LABEL_VALUE), self.test_namespace)
             k8s.wait_for_pod_start("spilo-role=replica", self.test_namespace)
             self.assert_master_is_unique(self.test_namespace, "acid-test-cluster")
             # acid-test-cluster will be deleted in test_owner_references test
@@ -1540,7 +1537,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
             # next master will be switched over and pod needs to be replaced as well to finish the rolling update
-            k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_failover(master_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
@@ -1573,7 +1570,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # node affinity change should cause another rolling update and relocation of replica
             k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
-            k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         except timeout_decorator.TimeoutError:
@@ -1634,7 +1631,7 @@ class EndToEndTestCase(unittest.TestCase):
                 k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # next master will be switched over and pod needs to be replaced as well to finish the rolling update
-            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # patch also node where master ran before
@@ -1922,7 +1919,7 @@ class EndToEndTestCase(unittest.TestCase):
             podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
             for pod in podsList.items:
                 # add flag only to the master to make it appear to the operator as a leftover from a rolling update
-                if pod.metadata.labels.get('spilo-role') == 'master':
+                if pod.metadata.labels.get('spilo-role') == LEADER_LABEL_VALUE:
                     old_creation_timestamp = pod.metadata.creation_timestamp
                     k8s.patch_pod(flag, pod.metadata.name, pod.metadata.namespace)
                 else:
@@ -1933,7 +1930,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.delete_operator_pod()
 
             # operator should now recreate the master pod and do a switchover before
-            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # check if the former replica is now the new master
@@ -2004,7 +2001,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "SyncFailed", "Expected SYNC event to fail")
 
             # wait for next sync, replica should be running normally by now and be ready for switchover
-            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # check if the former replica is now the new master
@@ -2079,7 +2076,7 @@ class EndToEndTestCase(unittest.TestCase):
             "alice": "bob"
         }
 
-        self.eventuallyTrue(lambda: k8s.check_service_annotations("cluster-name=acid-minimal-cluster,spilo-role=master", annotations), "Wrong annotations")
+        self.eventuallyTrue(lambda: k8s.check_service_annotations("cluster-name=acid-minimal-cluster,spilo-role={}".format(LEADER_LABEL_VALUE), annotations), "Wrong annotations")
         self.eventuallyTrue(lambda: k8s.check_service_annotations("cluster-name=acid-minimal-cluster,spilo-role=replica", annotations), "Wrong annotations")
 
         # clean up
@@ -2151,7 +2148,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             k8s.create_with_kubectl("manifests/standby-manifest.yaml")
-            k8s.wait_for_pod_start("spilo-role=master," + cluster_label)
+            k8s.wait_for_pod_start("spilo-role={},".format(LEADER_LABEL_VALUE) + cluster_label)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -2455,11 +2452,11 @@ class EndToEndTestCase(unittest.TestCase):
 
     def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         '''
-           Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
+           Check that there is a single pod in the k8s cluster with the label "spilo-role=primary" or "spilo-role=master"
            To be called manually after operations that affect pods
         '''
         k8s = self.k8s
-        labels = 'spilo-role=master,cluster-name=' + clusterName
+        labels = 'spilo-role={},cluster-name='.format(LEADER_LABEL_VALUE) + clusterName
 
         num_of_master_pods = k8s.count_pods_with_label(labels, namespace)
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
