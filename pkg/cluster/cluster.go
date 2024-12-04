@@ -837,6 +837,10 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		}
 	}
 
+	if !reflect.DeepEqual(old.Labels, new.Labels) {
+		return false, "new service's labels do not match the current ones"
+	}
+
 	if !reflect.DeepEqual(old.ObjectMeta.OwnerReferences, new.ObjectMeta.OwnerReferences) {
 		return false, "new service's owner references do not match the current ones"
 	}
