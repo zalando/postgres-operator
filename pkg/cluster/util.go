@@ -663,7 +663,7 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 	return resources, nil
 }
 
-func isInMainternanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
+func IsInMainternanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
 	if len(specMaintenanceWindows) == 0 {
 		return true
 	}
