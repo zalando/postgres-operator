@@ -10,7 +10,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: container-registry.zalando.net/acid/spilo-cdp-17:3.3-p5
+  dockerImage: ghcr.io/zalando/spilo-17:4.0-p1
   numberOfInstances: 2
   users:  # Application/Robot users
     zalando:
