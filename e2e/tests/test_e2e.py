@@ -1200,14 +1200,14 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-upgrade-test'
 
-        with open("manifests/minimal-postgres-manifest-13.yaml", 'r+') as f:
+        with open("manifests/minimal-postgres-lowest-version-manifest.yaml", 'r+') as f:
             upgrade_manifest = yaml.safe_load(f)
             upgrade_manifest["spec"]["dockerImage"] = SPILO_FULL_IMAGE
 
-        with open("manifests/minimal-postgres-manifest-13.yaml", 'w') as f:
+        with open("manifests/minimal-postgres-lowest-version-manifest.yaml", 'w') as f:
             yaml.dump(upgrade_manifest, f, Dumper=yaml.Dumper)
 
-        k8s.create_with_kubectl("manifests/minimal-postgres-manifest-13.yaml")
+        k8s.create_with_kubectl("manifests/minimal-postgres-lowest-version-manifest.yaml")
         self.eventuallyEqual(lambda: k8s.count_running_pods(labels=cluster_label), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(check_version, 13, "Version is not correct")

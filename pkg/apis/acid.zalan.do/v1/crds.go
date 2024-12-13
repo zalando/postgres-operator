@@ -1164,7 +1164,8 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "boolean",
 					},
 					"enable_spilo_wal_path_compat": {
-						Type: "boolean",
+						Type:        "boolean",
+						Description: "deprecated",
 					},
 					"enable_team_id_clustername_prefix": {
 						Type: "boolean",

@@ -101,7 +101,7 @@ data:
   logical_backup_s3_sse: "AES256"
   logical_backup_s3_retention_time: ""
   logical_backup_schedule: "30 00 * * *"
-  major_version_upgrade_mode: "full"
+  major_version_upgrade_mode: "manual"
   # major_version_upgrade_team_allow_list: ""
   master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
   master_legacy_dns_name_format: "{cluster}.{team}.{hostedzone}"
@@ -148,7 +148,7 @@ data:
   replication_username: standby
   resource_check_interval: 3s
   resource_check_timeout: 10m
-  resync_period: 5m
+  resync_period: 30m
   ring_log_lines: "100"
   role_deletion_suffix: "_deleted"
   secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
