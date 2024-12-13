@@ -11,6 +11,7 @@ metadata:
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
   dockerImage: ghcr.io/zalando/spilo-17:4.0-p1
+  teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
     zalando:
