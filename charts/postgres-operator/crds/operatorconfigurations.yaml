@@ -376,28 +376,28 @@ spec:
                 properties:
                   default_cpu_limit:
                     type: string
-                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$|^$'
                   default_cpu_request:
                     type: string
-                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$|^$'
                   default_memory_limit:
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$|^$'
                   default_memory_request:
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$|^$'
                   max_cpu_request:
                     type: string
-                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$|^$'
                   max_memory_request:
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$|^$'
                   min_cpu_limit:
                     type: string
-                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$|^$'
                   min_memory_limit:
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$|^$'
               timeouts:
                 type: object
                 properties:
