@@ -178,16 +178,35 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 
 func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEventStream {
 	eventStreams := make([]zalandov1.EventStream, 0)
+	resourceAnnotations := map[string]string{}
 
 	for _, stream := range c.Spec.Streams {
 		if stream.ApplicationId != appId {
 			continue
 		}
+		if stream.CPU != nil {
+			cpu, exists := resourceAnnotations[constants.EventStreamCpuAnnotationKey]
+			if exists {
+				isSmaller, _ := util.IsSmallerQuantity(cpu, *stream.CPU)
+				if isSmaller {
+					resourceAnnotations[constants.EventStreamCpuAnnotationKey] = *stream.CPU
+				}
+			}
+		}
+		if stream.Memory != nil {
+			memory, exists := resourceAnnotations[constants.EventStreamMemoryAnnotationKey]
+			if exists {
+				isSmaller, _ := util.IsSmallerQuantity(memory, *stream.Memory)
+				if isSmaller {
+					resourceAnnotations[constants.EventStreamMemoryAnnotationKey] = *stream.Memory
+				}
+			}
+		}
 		for tableName, table := range stream.Tables {
 			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
 			streamFlow := getEventStreamFlow(table.PayloadColumn)
 			streamSink := getEventStreamSink(stream, table.EventType)
-			streamRecovery := getEventStreamRecovery(stream, table.RecoveryEventType, table.EventType)
+			streamRecovery := getEventStreamRecovery(stream, table.RecoveryEventType, table.EventType, table.IgnoreRecovery)
 
 			eventStreams = append(eventStreams, zalandov1.EventStream{
 				EventStreamFlow:     streamFlow,
@@ -207,7 +226,7 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 			Name:            fmt.Sprintf("%s-%s", c.Name, strings.ToLower(util.RandomPassword(5))),
 			Namespace:       c.Namespace,
 			Labels:          c.labelsSet(true),
-			Annotations:     c.AnnotationsToPropagate(c.annotationsSet(nil)),
+			Annotations:     c.AnnotationsToPropagate(c.annotationsSet(resourceAnnotations)),
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: zalandov1.FabricEventStreamSpec{
@@ -247,11 +266,17 @@ func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1.EventS
 	}
 }
 
-func getEventStreamRecovery(stream acidv1.Stream, recoveryEventType, eventType string) zalandov1.EventStreamRecovery {
+func getEventStreamRecovery(stream acidv1.Stream, recoveryEventType, eventType string, ignoreRecovery *bool) zalandov1.EventStreamRecovery {
 	if (stream.EnableRecovery != nil && !*stream.EnableRecovery) ||
 		(stream.EnableRecovery == nil && recoveryEventType == "") {
 		return zalandov1.EventStreamRecovery{
 			Type: constants.EventStreamRecoveryNoneType,
+		}
+	}
+
+	if ignoreRecovery != nil && *ignoreRecovery {
+		return zalandov1.EventStreamRecovery{
+			Type: constants.EventStreamRecoveryIgnoreType,
 		}
 	}
 
