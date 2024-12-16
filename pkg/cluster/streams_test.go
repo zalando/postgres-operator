@@ -65,12 +65,18 @@ var (
 							EventType:         "stream-type-b",
 							RecoveryEventType: "stream-type-b-dlq",
 						},
+						"data.foofoobar": {
+							EventType:      "stream-type-c",
+							IgnoreRecovery: util.True(),
+						},
 					},
 					EnableRecovery: util.True(),
 					Filter: map[string]*string{
 						"data.bar": k8sutil.StringToPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
 					},
 					BatchSize: k8sutil.UInt32ToPointer(uint32(100)),
+					CPU:       k8sutil.StringToPointer("250m"),
+					Memory:    k8sutil.StringToPointer("500Mi"),
 				},
 			},
 			TeamID: "acid",
@@ -88,6 +94,10 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-12345", clusterName),
 			Namespace: namespace,
+			Annotations: map[string]string{
+				constants.EventStreamCpuAnnotationKey:    "250m",
+				constants.EventStreamMemoryAnnotationKey: "500Mi",
+			},
 			Labels: map[string]string{
 				"application":  "spilo",
 				"cluster-name": clusterName,
@@ -176,6 +186,37 @@ var (
 						Schema: "data",
 						EventStreamTable: zalandov1.EventStreamTable{
 							Name: "foobar",
+						},
+						Type: constants.EventStreamSourcePGType,
+					},
+				},
+				{
+					EventStreamFlow: zalandov1.EventStreamFlow{
+						Type: constants.EventStreamFlowPgGenericType,
+					},
+					EventStreamRecovery: zalandov1.EventStreamRecovery{
+						Type: constants.EventStreamRecoveryIgnoreType,
+					},
+					EventStreamSink: zalandov1.EventStreamSink{
+						EventType:    "stream-type-c",
+						MaxBatchSize: k8sutil.UInt32ToPointer(uint32(100)),
+						Type:         constants.EventStreamSinkNakadiType,
+					},
+					EventStreamSource: zalandov1.EventStreamSource{
+						Connection: zalandov1.Connection{
+							DBAuth: zalandov1.DBAuth{
+								Name:        fmt.Sprintf("fes-user.%s.credentials.postgresql.acid.zalan.do", clusterName),
+								PasswordKey: "password",
+								Type:        constants.EventStreamSourceAuthType,
+								UserKey:     "username",
+							},
+							Url:        fmt.Sprintf("jdbc:postgresql://%s.%s/foo?user=%s&ssl=true&sslmode=require", clusterName, namespace, fesUser),
+							SlotName:   slotName,
+							PluginType: constants.EventStreamSourcePluginType,
+						},
+						Schema: "data",
+						EventStreamTable: zalandov1.EventStreamTable{
+							Name: "foofoobar",
 						},
 						Type: constants.EventStreamSourcePGType,
 					},
@@ -528,8 +569,8 @@ func TestSyncStreams(t *testing.T) {
 
 func TestSameStreams(t *testing.T) {
 	testName := "TestSameStreams"
-	annotationsA := map[string]string{"owned-by": "acid"}
-	annotationsB := map[string]string{"owned-by": "foo"}
+	annotationsA := map[string]string{constants.EventStreamMemoryAnnotationKey: "500Mi"}
+	annotationsB := map[string]string{constants.EventStreamMemoryAnnotationKey: "1Gi"}
 
 	stream1 := zalandov1.EventStream{
 		EventStreamFlow:     zalandov1.EventStreamFlow{},
@@ -618,6 +659,13 @@ func TestSameStreams(t *testing.T) {
 			subTest:  "event stream recovery specs differ",
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, nil),
 			streamsB: newFabricEventStream([]zalandov1.EventStream{stream3}, nil),
+			match:    false,
+			reason:   "event stream specs differ",
+		},
+		{
+			subTest:  "event stream annotations differ",
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, nil),
+			streamsB: newFabricEventStream([]zalandov1.EventStream{stream3}, annotationsA),
 			match:    false,
 			reason:   "event stream specs differ",
 		},
