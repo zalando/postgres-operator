@@ -679,7 +679,7 @@ can have the following properties:
   configured. Defaults are `id` and `payload`. The target `eventType` has to
   be defined. One can also specify a `recoveryEventType` that will be used
   for a dead letter queue. By enabling `ignoreRecovery`, you can choose to
-  ignore failingn events.
+  ignore failing events.
 
 * **filter**
   Streamed events can be filtered by a jsonpath expression for each table.
