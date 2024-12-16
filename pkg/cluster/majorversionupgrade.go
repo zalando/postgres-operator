@@ -155,7 +155,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 			c.logger.Infof("identified non running pod, potentially skipping major version upgrade")
 		}
 
-		if ps.Role == "master" || ps.Role == "primary" {
+		if ps.Role == "master" {
 			masterPod = &pods[i]
 			c.currentMajorVersion = ps.ServerVersion
 		}
