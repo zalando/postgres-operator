@@ -16,11 +16,11 @@ import (
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"12": 120000,
 	"13": 130000,
 	"14": 140000,
 	"15": 150000,
 	"16": 160000,
+	"17": 170000,
 }
 
 const (
@@ -44,7 +44,7 @@ func (c *Cluster) GetDesiredMajorVersionAsInt() int {
 func (c *Cluster) GetDesiredMajorVersion() string {
 
 	if c.Config.OpConfig.MajorVersionUpgradeMode == "full" {
-		// e.g. current is 12, minimal is 12 allowing 12 to 16 clusters, everything below is upgraded
+		// e.g. current is 13, minimal is 13 allowing 13 to 17 clusters, everything below is upgraded
 		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.MinimalMajorVersion) {
 			c.logger.Infof("overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
 			return c.Config.OpConfig.TargetMajorVersion
@@ -155,7 +155,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 			c.logger.Infof("identified non running pod, potentially skipping major version upgrade")
 		}
 
-		if ps.Role == "master" {
+		if ps.Role == "master" || ps.Role == "primary" {
 			masterPod = &pods[i]
 			c.currentMajorVersion = ps.ServerVersion
 		}
