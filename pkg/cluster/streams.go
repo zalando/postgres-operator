@@ -467,7 +467,9 @@ func (c *Cluster) syncStream(appId string) error {
 	c.setProcessName("syncing stream with applicationId %s", appId)
 	c.logger.Debugf("syncing stream with applicationId %s", appId)
 
-	listOptions := metav1.ListOptions{LabelSelector: c.labelsSet(true).String()}
+	listOptions := metav1.ListOptions{
+		LabelSelector: c.labelsSet(false).String(),
+	}
 	streams, err = c.KubeClient.FabricEventStreams(c.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("could not list of FabricEventStreams for applicationId %s: %v", appId, err)
@@ -492,7 +494,8 @@ func (c *Cluster) syncStream(appId string) error {
 		}
 		if match, reason := c.compareStreams(&stream, desiredStreams); !match {
 			c.logger.Infof("updating event streams with applicationId %s: %s", appId, reason)
-			desiredStreams.ObjectMeta = stream.ObjectMeta
+			// make sure to keep the old name with randomly generated suffix
+			desiredStreams.ObjectMeta.Name = stream.ObjectMeta.Name
 			updatedStream, err := c.updateStreams(desiredStreams)
 			if err != nil {
 				return fmt.Errorf("failed updating event streams %s with applicationId %s: %v", stream.Name, appId, err)
@@ -525,6 +528,11 @@ func (c *Cluster) compareStreams(curEventStreams, newEventStreams *zalandov1.Fab
 	if changed, reason := c.compareAnnotations(curEventStreams.ObjectMeta.Annotations, desiredAnnotations); changed {
 		match = false
 		reasons = append(reasons, fmt.Sprintf("new streams annotations do not match: %s", reason))
+	}
+
+	if !reflect.DeepEqual(curEventStreams.ObjectMeta.Labels, newEventStreams.ObjectMeta.Labels) {
+		match = false
+		reasons = append(reasons, "new streams labels do not match the current ones")
 	}
 
 	if changed, reason := sameEventStreams(curEventStreams.Spec.EventStreams, newEventStreams.Spec.EventStreams); !changed {
