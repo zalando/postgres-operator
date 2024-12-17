@@ -640,49 +640,49 @@ func TestSameStreams(t *testing.T) {
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1}, nil),
 			streamsB: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
 			match:    false,
-			reason:   "number of defined streams is different",
+			reason:   "new streams EventStreams array does not match : number of defined streams is different",
 		},
 		{
 			subTest:  "different number of streams",
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1}, nil),
 			streamsB: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
 			match:    false,
-			reason:   "number of defined streams is different",
+			reason:   "new streams EventStreams array does not match : number of defined streams is different",
 		},
 		{
 			subTest:  "event stream specs differ",
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
 			streamsB: fes,
 			match:    false,
-			reason:   "number of defined streams is different",
+			reason:   "new streams annotations do not match:  Added \"fes.zalando.org/FES_CPU\" with value \"250m\". Added \"fes.zalando.org/FES_MEMORY\" with value \"500Mi\"., new streams labels do not match the current ones, new streams EventStreams array does not match : number of defined streams is different",
 		},
 		{
 			subTest:  "event stream recovery specs differ",
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, nil),
 			streamsB: newFabricEventStream([]zalandov1.EventStream{stream3}, nil),
 			match:    false,
-			reason:   "event stream specs differ",
+			reason:   "new streams EventStreams array does not match : event stream specs differ",
 		},
 		{
-			subTest:  "event stream annotations differ",
+			subTest:  "event stream with new annotations",
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, nil),
-			streamsB: newFabricEventStream([]zalandov1.EventStream{stream3}, annotationsA),
+			streamsB: newFabricEventStream([]zalandov1.EventStream{stream2}, annotationsA),
 			match:    false,
-			reason:   "event stream specs differ",
+			reason:   "new streams annotations do not match:  Added \"fes.zalando.org/FES_MEMORY\" with value \"500Mi\".",
 		},
 		{
 			subTest:  "event stream annotations differ",
-			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, annotationsA),
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream3}, annotationsA),
 			streamsB: newFabricEventStream([]zalandov1.EventStream{stream3}, annotationsB),
 			match:    false,
-			reason:   "event stream specs differ",
+			reason:   "new streams annotations do not match:  \"fes.zalando.org/FES_MEMORY\" changed from \"500Mi\" to \"1Gi\".",
 		},
 	}
 
 	for _, tt := range tests {
 		streamsMatch, matchReason := cluster.compareStreams(tt.streamsA, tt.streamsB)
-		if streamsMatch != tt.match {
-			t.Errorf("%s %s: unexpected match result when comparing streams: got %s, epxected %s",
+		if streamsMatch != tt.match || matchReason != tt.reason {
+			t.Errorf("%s %s: unexpected match result when comparing streams: got %s, expected %s",
 				testName, tt.subTest, matchReason, tt.reason)
 		}
 	}
