@@ -1344,6 +1344,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_secrets_deletion": {
 								Type: "boolean",
 							},
+							"enable_secrets_deletion_key": {
+								Type: "string",
+							},
 							"enable_sidecars": {
 								Type: "boolean",
 							},
