@@ -1370,6 +1370,19 @@ func TestStandbyEnv(t *testing.T) {
 			envLen: 2,
 		},
 		{
+			subTest: "from remote primary with slot",
+			standbyOpts: &acidv1.StandbyDescription{
+				StandbyHost: "remote-primary",
+				StandbyPrimarySlotName: "slot",
+			},
+			env: v1.EnvVar{
+				Name:  "STANDBY_PRIMARY_SLOT_NAME",
+				Value: "slot",
+			},
+			envPos: 1,
+			envLen: 2,
+		},
+		{
 			subTest: "from remote primary - ignore WAL path",
 			standbyOpts: &acidv1.StandbyDescription{
 				GSWalPath:   "gs://some/path/",
