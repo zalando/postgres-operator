@@ -40,6 +40,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
 	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "ghcr.io/zalando/spilo-16:3.3-p1")
+	result.ImagePullSecrets = util.StrArrToLocalObjectReferenceArr(fromCRD.ImagePullSecrets)
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances

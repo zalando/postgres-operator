@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/motomux/pretty"
+	corev1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -377,6 +378,15 @@ func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 	}
 
 	return request.Cmp(limit) == -1, nil
+}
+
+// StrArrToLocalObjectReferenceArr : Converts an array of strings into an array of v1.LocalObjectReference
+func StrArrToLocalObjectReferenceArr(arr []string) []corev1.LocalObjectReference {
+	ret := make([]corev1.LocalObjectReference, len(arr))
+	for k, v := range arr {
+		ret[k] = corev1.LocalObjectReference{Name: v}
+	}
+	return ret
 }
 
 func MinResource(maxRequestStr, requestStr string) (resource.Quantity, error) {

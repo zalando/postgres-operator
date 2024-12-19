@@ -67,6 +67,16 @@ spec:
               docker_image:
                 type: string
                 default: "ghcr.io/zalando/spilo-16:3.3-p1"
+              image_pull_secrets:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
               enable_crd_registration:
                 type: boolean
                 default: true

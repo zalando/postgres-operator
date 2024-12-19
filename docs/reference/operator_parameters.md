@@ -119,6 +119,10 @@ Those are top-level keys, containing both leaf keys and groups.
   your own Spilo image from the [github
   repository](https://github.com/zalando/spilo).
 
+* **image_pull_secrets**
+  Specify an array of imagePullSecrets to pull the spilo image (if you
+  want to pull your own spilo image from a private registry). Optional.
+
 * **sidecar_docker_images**
   *deprecated*: use **sidecars** instead. A map of sidecar names to Docker
   images to run with Spilo. In case of the name conflict with the definition in
