@@ -179,29 +179,19 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEventStream {
 	eventStreams := make([]zalandov1.EventStream, 0)
 	resourceAnnotations := map[string]string{}
+	var err, err2 error
 
 	for _, stream := range c.Spec.Streams {
 		if stream.ApplicationId != appId {
 			continue
 		}
-		if stream.CPU != nil {
-			cpu, exists := resourceAnnotations[constants.EventStreamCpuAnnotationKey]
-			if exists {
-				isSmaller, _ := util.IsSmallerQuantity(cpu, *stream.CPU)
-				if isSmaller {
-					resourceAnnotations[constants.EventStreamCpuAnnotationKey] = *stream.CPU
-				}
-			}
+
+		err = setResourceAnnotation(&resourceAnnotations, stream.CPU, constants.EventStreamCpuAnnotationKey)
+		err2 = setResourceAnnotation(&resourceAnnotations, stream.Memory, constants.EventStreamMemoryAnnotationKey)
+		if err != nil || err2 != nil {
+			c.logger.Warningf("could not set resource annotation for event stream: %v", err)
 		}
-		if stream.Memory != nil {
-			memory, exists := resourceAnnotations[constants.EventStreamMemoryAnnotationKey]
-			if exists {
-				isSmaller, _ := util.IsSmallerQuantity(memory, *stream.Memory)
-				if isSmaller {
-					resourceAnnotations[constants.EventStreamMemoryAnnotationKey] = *stream.Memory
-				}
-			}
-		}
+
 		for tableName, table := range stream.Tables {
 			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
 			streamFlow := getEventStreamFlow(table.PayloadColumn)
@@ -234,6 +224,27 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 			EventStreams:  eventStreams,
 		},
 	}
+}
+
+func setResourceAnnotation(annotations *map[string]string, resource *string, key string) error {
+	var (
+		isSmaller bool
+		err       error
+	)
+	if resource != nil {
+		currentValue, exists := (*annotations)[key]
+		if exists {
+			isSmaller, err = util.IsSmallerQuantity(currentValue, *resource)
+			if err != nil {
+				return fmt.Errorf("could not compare resource in %q annotation: %v", key, err)
+			}
+		}
+		if isSmaller || !exists {
+			(*annotations)[key] = *resource
+		}
+	}
+
+	return nil
 }
 
 func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName string, idColumn *string) zalandov1.EventStreamSource {
@@ -521,10 +532,19 @@ func (c *Cluster) syncStream(appId string) error {
 
 func (c *Cluster) compareStreams(curEventStreams, newEventStreams *zalandov1.FabricEventStream) (match bool, reason string) {
 	reasons := make([]string, 0)
+	desiredAnnotations := make(map[string]string)
 	match = true
 
 	// stream operator can add extra annotations so incl. current annotations in desired annotations
-	desiredAnnotations := c.annotationsSet(curEventStreams.Annotations)
+	for curKey, curValue := range curEventStreams.Annotations {
+		if _, exists := desiredAnnotations[curKey]; !exists {
+			desiredAnnotations[curKey] = curValue
+		}
+	}
+	// add/or override annotations if cpu and memory values were changed
+	for newKey, newValue := range newEventStreams.Annotations {
+		desiredAnnotations[newKey] = newValue
+	}
 	if changed, reason := c.compareAnnotations(curEventStreams.ObjectMeta.Annotations, desiredAnnotations); changed {
 		match = false
 		reasons = append(reasons, fmt.Sprintf("new streams annotations do not match: %s", reason))
