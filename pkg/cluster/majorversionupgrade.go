@@ -145,15 +145,25 @@ func (c *Cluster) majorVersionUpgrade() error {
 	for i, pod := range pods {
 		ps, _ := c.patroni.GetMemberData(&pod)
 
+		if ps.Role == "standby_leader" {
+			c.logger.Errorf("skipping major version upgrade for %s/%s standby cluster. Re-deploy standby cluster with the required Postgres version specified", c.Namespace, c.Name)
+			return nil
+		}
+
 		if ps.State != "running" {
 			allRunning = false
 			c.logger.Infof("identified non running pod, potentially skipping major version upgrade")
 		}
 
-		if ps.Role == "master" {
+		if ps.Role == "master" || ps.Role == "primary" {
 			masterPod = &pods[i]
 			c.currentMajorVersion = ps.ServerVersion
 		}
+	}
+
+	if masterPod == nil {
+		c.logger.Infof("no master in the cluster, skipping major version upgrade")
+		return nil
 	}
 
 	// Recheck version with newest data from Patroni

@@ -480,12 +480,21 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 				if PostgresRole(member.Role) == SyncStandby {
 					syncCandidates = append(syncCandidates, member)
 				}
+				if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && slices.Contains([]string{"running", "streaming", "in archive recovery"}, member.State) {
+					candidates = append(candidates, member)
+				}
 			}
 
 			// if synchronous mode is enabled and no SyncStandy was found
 			// return false for retry - cannot failover with no sync candidate
 			if c.Spec.Patroni.SynchronousMode && len(syncCandidates) == 0 {
 				c.logger.Warnf("no sync standby found - retrying fetching cluster members")
+				return false, nil
+			}
+
+			// retry also in asynchronous mode when no replica candidate was found
+			if !c.Spec.Patroni.SynchronousMode && len(candidates) == 0 {
+				c.logger.Warnf("no replica candidate found - retrying fetching cluster members")
 				return false, nil
 			}
 
@@ -502,24 +511,12 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 			return syncCandidates[i].Lag < syncCandidates[j].Lag
 		})
 		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
-	} else {
-		// in asynchronous mode find running replicas
-		for _, member := range members {
-			if PostgresRole(member.Role) == Leader || PostgresRole(member.Role) == StandbyLeader {
-				continue
-			}
-
-			if slices.Contains([]string{"running", "streaming", "in archive recovery"}, member.State) {
-				candidates = append(candidates, member)
-			}
-		}
-
-		if len(candidates) > 0 {
-			sort.Slice(candidates, func(i, j int) bool {
-				return candidates[i].Lag < candidates[j].Lag
-			})
-			return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
-		}
+	}
+	if len(candidates) > 0 {
+		sort.Slice(candidates, func(i, j int) bool {
+			return candidates[i].Lag < candidates[j].Lag
+		})
+		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
 	}
 
 	return spec.NamespacedName{}, fmt.Errorf("no switchover candidate found")

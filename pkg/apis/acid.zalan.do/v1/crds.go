@@ -1589,35 +1589,35 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Properties: map[string]apiextv1.JSONSchemaProps{
 							"default_cpu_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"default_cpu_request": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"default_memory_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 							"default_memory_request": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 							"max_cpu_request": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"max_memory_request": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 							"min_cpu_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"min_memory_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 						},
 					},

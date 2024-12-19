@@ -65,12 +65,18 @@ var (
 							EventType:         "stream-type-b",
 							RecoveryEventType: "stream-type-b-dlq",
 						},
+						"data.foofoobar": {
+							EventType:      "stream-type-c",
+							IgnoreRecovery: util.True(),
+						},
 					},
 					EnableRecovery: util.True(),
 					Filter: map[string]*string{
 						"data.bar": k8sutil.StringToPointer("[?(@.source.txId > 500 && @.source.lsn > 123456)]"),
 					},
 					BatchSize: k8sutil.UInt32ToPointer(uint32(100)),
+					CPU:       k8sutil.StringToPointer("250m"),
+					Memory:    k8sutil.StringToPointer("500Mi"),
 				},
 			},
 			TeamID: "acid",
@@ -88,9 +94,13 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-12345", clusterName),
 			Namespace: namespace,
+			Annotations: map[string]string{
+				constants.EventStreamCpuAnnotationKey:    "250m",
+				constants.EventStreamMemoryAnnotationKey: "500Mi",
+			},
 			Labels: map[string]string{
 				"application":  "spilo",
-				"cluster-name": fmt.Sprintf("%s-2", clusterName),
+				"cluster-name": clusterName,
 				"team":         "acid",
 			},
 			OwnerReferences: []metav1.OwnerReference{
@@ -176,6 +186,37 @@ var (
 						Schema: "data",
 						EventStreamTable: zalandov1.EventStreamTable{
 							Name: "foobar",
+						},
+						Type: constants.EventStreamSourcePGType,
+					},
+				},
+				{
+					EventStreamFlow: zalandov1.EventStreamFlow{
+						Type: constants.EventStreamFlowPgGenericType,
+					},
+					EventStreamRecovery: zalandov1.EventStreamRecovery{
+						Type: constants.EventStreamRecoveryIgnoreType,
+					},
+					EventStreamSink: zalandov1.EventStreamSink{
+						EventType:    "stream-type-c",
+						MaxBatchSize: k8sutil.UInt32ToPointer(uint32(100)),
+						Type:         constants.EventStreamSinkNakadiType,
+					},
+					EventStreamSource: zalandov1.EventStreamSource{
+						Connection: zalandov1.Connection{
+							DBAuth: zalandov1.DBAuth{
+								Name:        fmt.Sprintf("fes-user.%s.credentials.postgresql.acid.zalan.do", clusterName),
+								PasswordKey: "password",
+								Type:        constants.EventStreamSourceAuthType,
+								UserKey:     "username",
+							},
+							Url:        fmt.Sprintf("jdbc:postgresql://%s.%s/foo?user=%s&ssl=true&sslmode=require", clusterName, namespace, fesUser),
+							SlotName:   slotName,
+							PluginType: constants.EventStreamSourcePluginType,
+						},
+						Schema: "data",
+						EventStreamTable: zalandov1.EventStreamTable{
+							Name: "foofoobar",
 						},
 						Type: constants.EventStreamSourcePGType,
 					},
@@ -449,7 +490,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	}
 
 	listOptions := metav1.ListOptions{
-		LabelSelector: cluster.labelsSet(true).String(),
+		LabelSelector: cluster.labelsSet(false).String(),
 	}
 	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
@@ -488,20 +529,20 @@ func newFabricEventStream(streams []zalandov1.EventStream, annotations map[strin
 }
 
 func TestSyncStreams(t *testing.T) {
-	pg.Name = fmt.Sprintf("%s-2", pg.Name)
+	newClusterName := fmt.Sprintf("%s-2", pg.Name)
+	pg.Name = newClusterName
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
 				Resources: config.Resources{
-					ClusterLabels:         map[string]string{"application": "spilo"},
-					ClusterNameLabel:      "cluster-name",
-					DefaultCPURequest:     "300m",
-					DefaultCPULimit:       "300m",
-					DefaultMemoryRequest:  "300Mi",
-					DefaultMemoryLimit:    "300Mi",
-					EnableOwnerReferences: util.True(),
-					PodRoleLabel:          "spilo-role",
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -514,39 +555,23 @@ func TestSyncStreams(t *testing.T) {
 	err = cluster.syncStream(appId)
 	assert.NoError(t, err)
 
-	// create a second stream with same spec but with different name
-	createdStream, err := cluster.KubeClient.FabricEventStreams(namespace).Create(
-		context.TODO(), fes, metav1.CreateOptions{})
-	assert.NoError(t, err)
-	assert.Equal(t, createdStream.Spec.ApplicationId, appId)
-
-	// check that two streams exist
-	listOptions := metav1.ListOptions{
-		LabelSelector: cluster.labelsSet(true).String(),
-	}
-	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
-	assert.NoError(t, err)
-	assert.Equalf(t, 2, len(streams.Items), "unexpected number of streams found: got %d, but expected only 2", len(streams.Items))
-
-	// sync the stream which should remove the redundant stream
+	// sync the stream again
 	err = cluster.syncStream(appId)
 	assert.NoError(t, err)
 
 	// check that only one stream remains after sync
-	streams, err = cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
+	listOptions := metav1.ListOptions{
+		LabelSelector: cluster.labelsSet(false).String(),
+	}
+	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
 	assert.Equalf(t, 1, len(streams.Items), "unexpected number of streams found: got %d, but expected only 1", len(streams.Items))
-
-	// check owner references
-	if !reflect.DeepEqual(streams.Items[0].OwnerReferences, cluster.ownerReferences()) {
-		t.Errorf("unexpected owner references, expected %#v, got %#v", cluster.ownerReferences(), streams.Items[0].OwnerReferences)
-	}
 }
 
 func TestSameStreams(t *testing.T) {
 	testName := "TestSameStreams"
-	annotationsA := map[string]string{"owned-by": "acid"}
-	annotationsB := map[string]string{"owned-by": "foo"}
+	annotationsA := map[string]string{constants.EventStreamMemoryAnnotationKey: "500Mi"}
+	annotationsB := map[string]string{constants.EventStreamMemoryAnnotationKey: "1Gi"}
 
 	stream1 := zalandov1.EventStream{
 		EventStreamFlow:     zalandov1.EventStreamFlow{},
@@ -615,42 +640,49 @@ func TestSameStreams(t *testing.T) {
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1}, nil),
 			streamsB: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
 			match:    false,
-			reason:   "number of defined streams is different",
+			reason:   "new streams EventStreams array does not match : number of defined streams is different",
 		},
 		{
 			subTest:  "different number of streams",
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1}, nil),
 			streamsB: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
 			match:    false,
-			reason:   "number of defined streams is different",
+			reason:   "new streams EventStreams array does not match : number of defined streams is different",
 		},
 		{
 			subTest:  "event stream specs differ",
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
 			streamsB: fes,
 			match:    false,
-			reason:   "number of defined streams is different",
+			reason:   "new streams annotations do not match:  Added \"fes.zalando.org/FES_CPU\" with value \"250m\". Added \"fes.zalando.org/FES_MEMORY\" with value \"500Mi\"., new streams labels do not match the current ones, new streams EventStreams array does not match : number of defined streams is different",
 		},
 		{
 			subTest:  "event stream recovery specs differ",
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, nil),
 			streamsB: newFabricEventStream([]zalandov1.EventStream{stream3}, nil),
 			match:    false,
-			reason:   "event stream specs differ",
+			reason:   "new streams EventStreams array does not match : event stream specs differ",
+		},
+		{
+			subTest:  "event stream with new annotations",
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, nil),
+			streamsB: newFabricEventStream([]zalandov1.EventStream{stream2}, annotationsA),
+			match:    false,
+			reason:   "new streams annotations do not match:  Added \"fes.zalando.org/FES_MEMORY\" with value \"500Mi\".",
 		},
 		{
 			subTest:  "event stream annotations differ",
-			streamsA: newFabricEventStream([]zalandov1.EventStream{stream2}, annotationsA),
+			streamsA: newFabricEventStream([]zalandov1.EventStream{stream3}, annotationsA),
 			streamsB: newFabricEventStream([]zalandov1.EventStream{stream3}, annotationsB),
 			match:    false,
-			reason:   "event stream specs differ",
+			reason:   "new streams annotations do not match:  \"fes.zalando.org/FES_MEMORY\" changed from \"500Mi\" to \"1Gi\".",
 		},
 	}
 
 	for _, tt := range tests {
 		streamsMatch, matchReason := cluster.compareStreams(tt.streamsA, tt.streamsB)
-		if streamsMatch != tt.match {
-			t.Errorf("%s %s: unexpected match result when comparing streams: got %s, epxected %s",
+		if streamsMatch != tt.match || matchReason != tt.reason {
+			t.Errorf("%s %s: unexpected match result when comparing streams: got %s, expected %s",
 				testName, tt.subTest, matchReason, tt.reason)
 		}
 	}
@@ -658,6 +690,105 @@ func TestSameStreams(t *testing.T) {
 
 func TestUpdateStreams(t *testing.T) {
 	pg.Name = fmt.Sprintf("%s-3", pg.Name)
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:         map[string]string{"application": "spilo"},
+					ClusterNameLabel:      "cluster-name",
+					DefaultCPURequest:     "300m",
+					DefaultCPULimit:       "300m",
+					DefaultMemoryRequest:  "300Mi",
+					DefaultMemoryLimit:    "300Mi",
+					EnableOwnerReferences: util.True(),
+					PodRoleLabel:          "spilo-role",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	_, err := cluster.KubeClient.Postgresqls(namespace).Create(
+		context.TODO(), &pg, metav1.CreateOptions{})
+	assert.NoError(t, err)
+
+	// create stream with different owner reference
+	fes.ObjectMeta.Name = fmt.Sprintf("%s-12345", pg.Name)
+	fes.ObjectMeta.Labels["cluster-name"] = pg.Name
+	createdStream, err := cluster.KubeClient.FabricEventStreams(namespace).Create(
+		context.TODO(), fes, metav1.CreateOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, createdStream.Spec.ApplicationId, appId)
+
+	// sync the stream which should update the owner reference
+	err = cluster.syncStream(appId)
+	assert.NoError(t, err)
+
+	// check that only one stream exists after sync
+	listOptions := metav1.ListOptions{
+		LabelSelector: cluster.labelsSet(true).String(),
+	}
+	streams, err := cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
+	assert.NoError(t, err)
+	assert.Equalf(t, 1, len(streams.Items), "unexpected number of streams found: got %d, but expected only 1", len(streams.Items))
+
+	// compare owner references
+	if !reflect.DeepEqual(streams.Items[0].OwnerReferences, cluster.ownerReferences()) {
+		t.Errorf("unexpected owner references, expected %#v, got %#v", cluster.ownerReferences(), streams.Items[0].OwnerReferences)
+	}
+
+	// change specs of streams and patch CRD
+	for i, stream := range pg.Spec.Streams {
+		if stream.ApplicationId == appId {
+			streamTable := stream.Tables["data.bar"]
+			streamTable.EventType = "stream-type-c"
+			stream.Tables["data.bar"] = streamTable
+			stream.BatchSize = k8sutil.UInt32ToPointer(uint32(250))
+			pg.Spec.Streams[i] = stream
+		}
+	}
+
+	// compare stream returned from API with expected stream
+	streams = patchPostgresqlStreams(t, cluster, &pg.Spec, listOptions)
+	result := cluster.generateFabricEventStream(appId)
+	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
+		t.Errorf("Malformed FabricEventStream after updating manifest, expected %#v, got %#v", streams.Items[0], result)
+	}
+
+	// disable recovery
+	for idx, stream := range pg.Spec.Streams {
+		if stream.ApplicationId == appId {
+			stream.EnableRecovery = util.False()
+			pg.Spec.Streams[idx] = stream
+		}
+	}
+
+	streams = patchPostgresqlStreams(t, cluster, &pg.Spec, listOptions)
+	result = cluster.generateFabricEventStream(appId)
+	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
+		t.Errorf("Malformed FabricEventStream after disabling event recovery, expected %#v, got %#v", streams.Items[0], result)
+	}
+}
+
+func patchPostgresqlStreams(t *testing.T, cluster *Cluster, pgSpec *acidv1.PostgresSpec, listOptions metav1.ListOptions) (streams *zalandov1.FabricEventStreamList) {
+	patchData, err := specPatch(pgSpec)
+	assert.NoError(t, err)
+
+	pgPatched, err := cluster.KubeClient.Postgresqls(namespace).Patch(
+		context.TODO(), cluster.Name, types.MergePatchType, patchData, metav1.PatchOptions{}, "spec")
+	assert.NoError(t, err)
+
+	cluster.Postgresql.Spec = pgPatched.Spec
+	err = cluster.syncStream(appId)
+	assert.NoError(t, err)
+
+	streams, err = cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
+	assert.NoError(t, err)
+
+	return streams
+}
+
+func TestDeleteStreams(t *testing.T) {
+	pg.Name = fmt.Sprintf("%s-4", pg.Name)
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -695,12 +826,20 @@ func TestUpdateStreams(t *testing.T) {
 
 	// compare stream returned from API with expected stream
 	listOptions := metav1.ListOptions{
-		LabelSelector: cluster.labelsSet(true).String(),
+		LabelSelector: cluster.labelsSet(false).String(),
 	}
 	streams := patchPostgresqlStreams(t, cluster, &pg.Spec, listOptions)
 	result := cluster.generateFabricEventStream(appId)
 	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
 		t.Errorf("Malformed FabricEventStream after updating manifest, expected %#v, got %#v", streams.Items[0], result)
+	}
+
+	// change teamId and check that stream is updated
+	pg.Spec.TeamID = "new-team"
+	streams = patchPostgresqlStreams(t, cluster, &pg.Spec, listOptions)
+	result = cluster.generateFabricEventStream(appId)
+	if match, _ := cluster.compareStreams(&streams.Items[0], result); !match {
+		t.Errorf("Malformed FabricEventStream after updating teamId, expected %#v, got %#v", streams.Items[0].ObjectMeta.Labels, result.ObjectMeta.Labels)
 	}
 
 	// disable recovery
@@ -717,9 +856,6 @@ func TestUpdateStreams(t *testing.T) {
 		t.Errorf("Malformed FabricEventStream after disabling event recovery, expected %#v, got %#v", streams.Items[0], result)
 	}
 
-	mockClient := k8sutil.NewMockKubernetesClient()
-	cluster.KubeClient.CustomResourceDefinitionsGetter = mockClient.CustomResourceDefinitionsGetter
-
 	// remove streams from manifest
 	pg.Spec.Streams = nil
 	pgUpdated, err := cluster.KubeClient.Postgresqls(namespace).Update(
@@ -729,26 +865,29 @@ func TestUpdateStreams(t *testing.T) {
 	appIds := getDistinctApplicationIds(pgUpdated.Spec.Streams)
 	cluster.cleanupRemovedStreams(appIds)
 
+	// check that streams have been deleted
 	streams, err = cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
-	if len(streams.Items) > 0 || err != nil {
-		t.Errorf("stream resource has not been removed or unexpected error %v", err)
-	}
-}
+	assert.NoError(t, err)
+	assert.Equalf(t, 0, len(streams.Items), "unexpected number of streams found: got %d, but expected none", len(streams.Items))
 
-func patchPostgresqlStreams(t *testing.T, cluster *Cluster, pgSpec *acidv1.PostgresSpec, listOptions metav1.ListOptions) (streams *zalandov1.FabricEventStreamList) {
-	patchData, err := specPatch(pgSpec)
+	// create stream to test deleteStreams code
+	fes.ObjectMeta.Name = fmt.Sprintf("%s-12345", pg.Name)
+	fes.ObjectMeta.Labels["cluster-name"] = pg.Name
+	_, err = cluster.KubeClient.FabricEventStreams(namespace).Create(
+		context.TODO(), fes, metav1.CreateOptions{})
 	assert.NoError(t, err)
 
-	pgPatched, err := cluster.KubeClient.Postgresqls(namespace).Patch(
-		context.TODO(), cluster.Name, types.MergePatchType, patchData, metav1.PatchOptions{}, "spec")
-	assert.NoError(t, err)
-
-	cluster.Postgresql.Spec = pgPatched.Spec
+	// sync it once to cluster struct
 	err = cluster.syncStream(appId)
 	assert.NoError(t, err)
 
+	// we need a mock client because deleteStreams checks for CRD existance
+	mockClient := k8sutil.NewMockKubernetesClient()
+	cluster.KubeClient.CustomResourceDefinitionsGetter = mockClient.CustomResourceDefinitionsGetter
+	cluster.deleteStreams()
+
+	// check that streams have been deleted
 	streams, err = cluster.KubeClient.FabricEventStreams(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
-
-	return streams
+	assert.Equalf(t, 0, len(streams.Items), "unexpected number of streams found: got %d, but expected none", len(streams.Items))
 }

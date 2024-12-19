@@ -259,6 +259,8 @@ type Stream struct {
 	Tables         map[string]StreamTable `json:"tables"`
 	Filter         map[string]*string     `json:"filter,omitempty"`
 	BatchSize      *uint32                `json:"batchSize,omitempty"`
+	CPU            *string                `json:"cpu,omitempty"`
+	Memory         *string                `json:"memory,omitempty"`
 	EnableRecovery *bool                  `json:"enableRecovery,omitempty"`
 }
 
@@ -266,6 +268,7 @@ type Stream struct {
 type StreamTable struct {
 	EventType         string  `json:"eventType"`
 	RecoveryEventType string  `json:"recoveryEventType,omitempty"`
+	IgnoreRecovery    *bool   `json:"ignoreRecovery,omitempty"`
 	IdColumn          *string `json:"idColumn,omitempty"`
 	PayloadColumn     *string `json:"payloadColumn,omitempty"`
 }
