@@ -15,8 +15,6 @@ type PostgresRole string
 
 const (
 	// spilo roles
-	Master  PostgresRole = "master"
-	Replica PostgresRole = "replica"
 	Patroni PostgresRole = "config"
 
 	// roles returned by Patroni cluster endpoint

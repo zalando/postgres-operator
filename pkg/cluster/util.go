@@ -340,7 +340,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{},
 			podRole := PostgresRole(podEvent.CurPod.Labels[c.OpConfig.PodRoleLabel])
 
 			if role == nil {
-				if podRole == Master || podRole == Replica {
+				if podRole == c.masterRole() || podRole == c.replicaRole() {
 					return podEvent.CurPod, nil
 				}
 			} else if *role == podRole {
@@ -399,12 +399,12 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 	}
 	masterListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: string(Master),
+			c.OpConfig.PodRoleLabel: string(c.masterRole()),
 		}).String(),
 	}
 	replicaListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: string(Replica),
+			c.OpConfig.PodRoleLabel: string(c.replicaRole()),
 		}).String(),
 	}
 	podsNumber = 1
@@ -515,7 +515,7 @@ func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) la
 func (c *Cluster) dnsName(role PostgresRole) string {
 	var dnsString, oldDnsString string
 
-	if role == Master {
+	if role == c.masterRole() {
 		dnsString = c.masterDNSName(c.Name)
 	} else {
 		dnsString = c.replicaDNSName(c.Name)
@@ -524,7 +524,7 @@ func (c *Cluster) dnsName(role PostgresRole) string {
 	// if cluster name starts with teamID we might need to provide backwards compatibility
 	clusterNameWithoutTeamPrefix, _ := acidv1.ExtractClusterName(c.Name, c.Spec.TeamID)
 	if clusterNameWithoutTeamPrefix != "" {
-		if role == Master {
+		if role == c.masterRole() {
 			oldDnsString = c.oldMasterDNSName(clusterNameWithoutTeamPrefix)
 		} else {
 			oldDnsString = c.oldReplicaDNSName(clusterNameWithoutTeamPrefix)

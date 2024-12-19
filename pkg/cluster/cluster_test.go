@@ -35,6 +35,7 @@ const (
 	adminUserName       = "admin"
 	exampleSpiloConfig  = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
 	spiloConfigDiff     = `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`
+	leaderLabelValue    = "primary"
 )
 
 var logger = logrus.New().WithField("test", "cluster")
@@ -55,6 +56,7 @@ var cl = New(
 			},
 			Resources: config.Resources{
 				DownscalerAnnotations: []string{"downscaler/*"},
+				PodLeaderLabelValue:   leaderLabelValue,
 			},
 			ConnectionPooler: config.ConnectionPooler{
 				User: poolerUserName,
@@ -126,7 +128,7 @@ func TestCreate(t *testing.T) {
 			Labels: map[string]string{
 				"application":  "spilo",
 				"cluster-name": clusterName,
-				"spilo-role":   "master",
+				"spilo-role":   leaderLabelValue,
 			},
 		},
 	}
@@ -147,6 +149,7 @@ func TestCreate(t *testing.T) {
 					DefaultMemoryRequest:  "300Mi",
 					DefaultMemoryLimit:    "300Mi",
 					PodRoleLabel:          "spilo-role",
+					PodLeaderLabelValue:   leaderLabelValue,
 					ResourceCheckInterval: time.Duration(3),
 					ResourceCheckTimeout:  time.Duration(10),
 				},
@@ -663,7 +666,7 @@ func TestServiceAnnotations(t *testing.T) {
 		//MASTER
 		{
 			about:                        "Master with no annotations and EnableMasterLoadBalancer disabled on spec and OperatorConfig",
-			role:                         "master",
+			role:                         leaderLabelValue,
 			enableMasterLoadBalancerSpec: &disabled,
 			enableMasterLoadBalancerOC:   false,
 			enableTeamIdClusterPrefix:    false,
@@ -673,7 +676,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                        "Master with no annotations and EnableMasterLoadBalancer enabled on spec",
-			role:                         "master",
+			role:                         leaderLabelValue,
 			enableMasterLoadBalancerSpec: &enabled,
 			enableMasterLoadBalancerOC:   false,
 			enableTeamIdClusterPrefix:    false,
@@ -686,7 +689,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                        "Master with no annotations and EnableMasterLoadBalancer enabled only on operator config",
-			role:                         "master",
+			role:                         leaderLabelValue,
 			enableMasterLoadBalancerSpec: &disabled,
 			enableMasterLoadBalancerOC:   true,
 			enableTeamIdClusterPrefix:    false,
@@ -696,7 +699,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                      "Master with no annotations and EnableMasterLoadBalancer defined only on operator config",
-			role:                       "master",
+			role:                       leaderLabelValue,
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
@@ -708,7 +711,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                      "Master with cluster annotations and load balancer enabled",
-			role:                       "master",
+			role:                       leaderLabelValue,
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
@@ -721,7 +724,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                        "Master with cluster annotations and load balancer disabled",
-			role:                         "master",
+			role:                         leaderLabelValue,
 			enableMasterLoadBalancerSpec: &disabled,
 			enableMasterLoadBalancerOC:   true,
 			enableTeamIdClusterPrefix:    false,
@@ -731,7 +734,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                      "Master with operator annotations and load balancer enabled",
-			role:                       "master",
+			role:                       leaderLabelValue,
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        map[string]string{"foo": "bar"},
@@ -744,7 +747,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                      "Master with operator annotations override default annotations",
-			role:                       "master",
+			role:                       leaderLabelValue,
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations: map[string]string{
@@ -758,7 +761,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                      "Master with cluster annotations override default annotations",
-			role:                       "master",
+			role:                       leaderLabelValue,
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
@@ -772,7 +775,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                      "Master with cluster annotations do not override external-dns annotations",
-			role:                       "master",
+			role:                       leaderLabelValue,
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
@@ -786,7 +789,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                      "Master with cluster name teamId prefix enabled",
-			role:                       "master",
+			role:                       leaderLabelValue,
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  true,
 			serviceAnnotations:         make(map[string]string),
@@ -798,7 +801,7 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		{
 			about:                      "Master with master service annotations override service annotations",
-			role:                       "master",
+			role:                       leaderLabelValue,
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),

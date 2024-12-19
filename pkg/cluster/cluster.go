@@ -175,6 +175,14 @@ func (c *Cluster) clusterNamespace() string {
 	return c.ObjectMeta.Namespace
 }
 
+func (c *Cluster) masterRole() PostgresRole {
+	return PostgresRole(c.OpConfig.PodLeaderLabelValue)
+}
+
+func (c *Cluster) replicaRole() PostgresRole {
+	return PostgresRole("replica")
+}
+
 func (c *Cluster) teamName() string {
 	// TODO: check Teams API for the actual name (in case the user passes an integer Id).
 	return c.Spec.TeamID
@@ -294,7 +302,7 @@ func (c *Cluster) Create() (err error) {
 	}
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
-	for _, role := range []PostgresRole{Master, Replica} {
+	for _, role := range []PostgresRole{c.masterRole(), c.replicaRole()} {
 
 		// if kubernetes_use_configmaps is set Patroni will create configmaps
 		// otherwise it will use endpoints
@@ -302,7 +310,7 @@ func (c *Cluster) Create() (err error) {
 			if c.Endpoints[role] != nil {
 				return fmt.Errorf("%s endpoint already exists in the cluster", role)
 			}
-			if role == Master {
+			if role == c.masterRole() {
 				// replica endpoint will be created by the replica service. Master endpoint needs to be created by us,
 				// since the corresponding master service does not define any selectors.
 				ep, err = c.createEndpoint(role)
@@ -829,6 +837,10 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		}
 	}
 
+	if !reflect.DeepEqual(old.Labels, new.Labels) {
+		return false, "new service's labels do not match the current ones"
+	}
+
 	if !reflect.DeepEqual(old.ObjectMeta.OwnerReferences, new.ObjectMeta.OwnerReferences) {
 		return false, "new service's owner references do not match the current ones"
 	}
@@ -1213,7 +1225,7 @@ func (c *Cluster) Delete() error {
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budget: %v", err)
 	}
 
-	for _, role := range []PostgresRole{Master, Replica} {
+	for _, role := range []PostgresRole{c.masterRole(), c.replicaRole()} {
 		if !c.patroniKubernetesUseConfigMaps() {
 			if err := c.deleteEndpoint(role); err != nil {
 				anyErrors = true
@@ -1238,7 +1250,7 @@ func (c *Cluster) Delete() error {
 	// Delete connection pooler objects anyway, even if it's not mentioned in the
 	// manifest, just to not keep orphaned components in case if something went
 	// wrong
-	for _, role := range [2]PostgresRole{Master, Replica} {
+	for _, role := range [2]PostgresRole{c.masterRole(), c.replicaRole()} {
 		if err := c.deleteConnectionPooler(role); err != nil {
 			anyErrors = true
 			c.logger.Warningf("could not remove connection pooler: %v", err)

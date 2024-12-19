@@ -44,7 +44,7 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 		return nil, fmt.Errorf("could not get list of pods: %v", err)
 	}
 
-	if role == Master && len(pods.Items) > 1 {
+	if role == c.masterRole() && len(pods.Items) > 1 {
 		return nil, fmt.Errorf("too many masters")
 	}
 
@@ -234,7 +234,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return nil
 	}
 
-	if role := PostgresRole(oldMaster.Labels[c.OpConfig.PodRoleLabel]); role != Master {
+	if role := PostgresRole(oldMaster.Labels[c.OpConfig.PodRoleLabel]); role != c.masterRole() {
 		c.logger.Warningf("no action needed: pod %q is not the master (anymore)", podName)
 		return nil
 	}
@@ -312,7 +312,7 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 		return nil
 	}
 
-	if role := PostgresRole(replicaPod.Labels[c.OpConfig.PodRoleLabel]); role != Replica {
+	if role := PostgresRole(replicaPod.Labels[c.OpConfig.PodRoleLabel]); role != c.replicaRole() {
 		return fmt.Errorf("check failed: pod %q is not a replica", podName)
 	}
 
@@ -416,7 +416,7 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 	for i, pod := range pods {
 		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
-		if role == Master {
+		if role == c.masterRole() {
 			masterPod = &pods[i]
 			continue
 		}
@@ -428,9 +428,9 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 		}
 
 		newRole := PostgresRole(newPod.Labels[c.OpConfig.PodRoleLabel])
-		if newRole == Replica {
+		if newRole == c.replicaRole() {
 			replicas = append(replicas, util.NameFromMeta(pod.ObjectMeta))
-		} else if newRole == Master {
+		} else if newRole == c.masterRole() {
 			newMasterPod = newPod
 		}
 	}
