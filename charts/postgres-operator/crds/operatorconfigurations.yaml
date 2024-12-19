@@ -229,6 +229,8 @@ spec:
                   enable_secrets_deletion:
                     type: boolean
                     default: true
+                  enable_secrets_deletion_key:
+                    type: string
                   enable_sidecars:
                     type: boolean
                     default: true

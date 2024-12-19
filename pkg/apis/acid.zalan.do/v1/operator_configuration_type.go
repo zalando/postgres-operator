@@ -104,6 +104,7 @@ type KubernetesMetaConfiguration struct {
 	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
 	PersistentVolumeClaimRetentionPolicy     map[string]string   `json:"persistent_volume_claim_retention_policy,omitempty"`
 	EnableSecretsDeletion                    *bool               `json:"enable_secrets_deletion,omitempty"`
+	EnableSecretsDeletionKey                 string              `json:"enable_secrets_deletion_key,omitempty"`
 	EnablePersistentVolumeClaimDeletion      *bool               `json:"enable_persistent_volume_claim_deletion,omitempty"`
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
