@@ -33,8 +33,9 @@ type PostgresSpec struct {
 	EnableReplicaConnectionPooler *bool             `json:"enableReplicaConnectionPooler,omitempty"`
 	ConnectionPooler              *ConnectionPooler `json:"connectionPooler,omitempty"`
 
-	TeamID      string `json:"teamId"`
-	DockerImage string `json:"dockerImage,omitempty"`
+	TeamID           string                    `json:"teamId"`
+	DockerImage      string                    `json:"dockerImage,omitempty"`
+	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// deprecated field storing cluster name without teamId prefix
 	ClusterName string `json:"-"`

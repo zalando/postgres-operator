@@ -291,6 +291,22 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"dockerImage": {
 						Type: "string",
 					},
+					"imagePullSecrets": {
+						Type:        "array",
+						Description: "Optionally specify an array of imagePullSecrets for the spilo pod",
+						Nullable:    true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:     "object",
+								Required: []string{"name"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+								},
+							},
+						},
+					},
 					"enableConnectionPooler": {
 						Type: "boolean",
 					},

@@ -182,6 +182,17 @@ spec:
                 # Note: usernames specified here as database owners must be declared in the users key of the spec key.
               dockerImage:
                 type: string
+              imagePullSecrets:
+                type: array
+                nullable: true
+                description: "Optionally specify an array of imagePullSecrets for the spilo pod"
+                items:
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
               enableConnectionPooler:
                 type: boolean
               enableReplicaConnectionPooler:
