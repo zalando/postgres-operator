@@ -9,7 +9,7 @@ metadata:
   name: {{ template "postgres-operator-ui.fullname" . }}
   namespace: {{ .Release.Namespace }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
