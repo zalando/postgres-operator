@@ -556,7 +556,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	podLabels := map[string]string{
 		"cluster-name": clusterName,
 		"application":  applicationLabel,
-		"spilo-role":   "master",
+		"spilo-role":   leaderLabelValue,
 	}
 	mockPod.Labels = podLabels
 	client.PodsGetter.Pods(namespace).Create(context.TODO(), mockPod, metav1.CreateOptions{})
