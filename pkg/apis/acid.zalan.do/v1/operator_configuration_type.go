@@ -288,6 +288,8 @@ type OperatorConfigurationData struct {
 	MinInstances                      int32  `json:"min_instances,omitempty"`
 	MaxInstances                      int32  `json:"max_instances,omitempty"`
 	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
+
+	AllowEphemeralVolumes *bool `json:"allow_ephemeral_volumes,omitempty"`
 }
 
 // Duration shortens this frequently used name
