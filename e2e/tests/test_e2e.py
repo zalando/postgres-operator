@@ -2204,6 +2204,8 @@ class EndToEndTestCase(unittest.TestCase):
                         {
                             "applicationId": "test-app",
                             "batchSize": 100,
+                            "cpu": "100m",
+                            "memory": "200Mi",
                             "database": "foo",
                             "enableRecovery": True,
                             "tables": {
@@ -2225,7 +2227,7 @@ class EndToEndTestCase(unittest.TestCase):
                                     "eventType": "test-event",
                                     "idColumn": "id",
                                     "payloadColumn": "payload",
-                                    "recoveryEventType": "test-event-dlq"
+                                    "ignoreRecovery": True
                                 }
                             }
                         }
