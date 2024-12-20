@@ -61,6 +61,7 @@ data:
   enable_replica_load_balancer: "false"
   enable_replica_pooler_load_balancer: "false"
   enable_secrets_deletion: "true"
+  # enable_secrets_deletion_key: enable-secrets-deletion
   enable_shm_volume: "true"
   enable_sidecars: "true"
   enable_spilo_wal_path_compat: "true"
