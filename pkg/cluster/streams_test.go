@@ -76,7 +76,6 @@ var (
 					},
 					BatchSize: k8sutil.UInt32ToPointer(uint32(100)),
 					CPU:       k8sutil.StringToPointer("250m"),
-					Memory:    k8sutil.StringToPointer("500Mi"),
 				},
 			},
 			TeamID: "acid",
@@ -95,8 +94,7 @@ var (
 			Name:      fmt.Sprintf("%s-12345", clusterName),
 			Namespace: namespace,
 			Annotations: map[string]string{
-				constants.EventStreamCpuAnnotationKey:    "250m",
-				constants.EventStreamMemoryAnnotationKey: "500Mi",
+				constants.EventStreamCpuAnnotationKey: "250m",
 			},
 			Labels: map[string]string{
 				"application":  "spilo",
@@ -654,7 +652,7 @@ func TestSameStreams(t *testing.T) {
 			streamsA: newFabricEventStream([]zalandov1.EventStream{stream1, stream2}, nil),
 			streamsB: fes,
 			match:    false,
-			reason:   "new streams annotations do not match:  Added \"fes.zalando.org/FES_CPU\" with value \"250m\". Added \"fes.zalando.org/FES_MEMORY\" with value \"500Mi\"., new streams labels do not match the current ones, new streams EventStreams array does not match : number of defined streams is different",
+			reason:   "new streams annotations do not match:  Added \"fes.zalando.org/FES_CPU\" with value \"250m\"., new streams labels do not match the current ones, new streams EventStreams array does not match : number of defined streams is different",
 		},
 		{
 			subTest:  "event stream recovery specs differ",
