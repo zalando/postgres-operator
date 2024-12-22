@@ -1,6 +1,6 @@
 module github.com/zalando/postgres-operator/kubectl-pg
 
-go 1.22.0
+go 1.23.4
 
 require (
 	github.com/spf13/cobra v1.8.1
