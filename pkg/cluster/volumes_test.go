@@ -93,7 +93,7 @@ func TestResizeVolumeClaim(t *testing.T) {
 
 	// check if listPersistentVolumeClaims returns only the PVCs matching the filter
 	if len(pvcs) != len(pvcList.Items)-1 {
-		t.Errorf("%s: could not find all PVCs, got %v, expected %v", testName, len(pvcs), len(pvcList.Items)-1)
+		t.Errorf("%s: could not find all persistent volume claims, got %v, expected %v", testName, len(pvcs), len(pvcList.Items)-1)
 	}
 
 	// check if PVCs were correctly resized
@@ -216,6 +216,12 @@ func TestMigrateEBS(t *testing.T) {
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-1")).Return("ebs-volume-1", nil)
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-2")).Return("ebs-volume-2", nil)
 
+	resizer.EXPECT().GetProviderVolumeID(gomock.Any()).
+		DoAndReturn(func(pv *v1.PersistentVolume) (string, error) {
+			return resizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
+		}).
+		Times(2)
+
 	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2"})).Return(
 		[]volumes.VolumeProperties{
 			{VolumeID: "ebs-volume-1", VolumeType: "gp2", Size: 100},
@@ -322,6 +328,12 @@ func TestMigrateGp3Support(t *testing.T) {
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-2")).Return("ebs-volume-2", nil)
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-3")).Return("ebs-volume-3", nil)
 
+	resizer.EXPECT().GetProviderVolumeID(gomock.Any()).
+		DoAndReturn(func(pv *v1.PersistentVolume) (string, error) {
+			return resizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
+		}).
+		Times(3)
+
 	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2", "ebs-volume-3"})).Return(
 		[]volumes.VolumeProperties{
 			{VolumeID: "ebs-volume-1", VolumeType: "gp3", Size: 100, Iops: 3000},
@@ -376,6 +388,12 @@ func TestManualGp2Gp3Support(t *testing.T) {
 
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-1")).Return("ebs-volume-1", nil)
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-2")).Return("ebs-volume-2", nil)
+
+	resizer.EXPECT().GetProviderVolumeID(gomock.Any()).
+		DoAndReturn(func(pv *v1.PersistentVolume) (string, error) {
+			return resizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
+		}).
+		Times(2)
 
 	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2"})).Return(
 		[]volumes.VolumeProperties{
@@ -435,6 +453,12 @@ func TestDontTouchType(t *testing.T) {
 
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-1")).Return("ebs-volume-1", nil)
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-2")).Return("ebs-volume-2", nil)
+
+	resizer.EXPECT().GetProviderVolumeID(gomock.Any()).
+		DoAndReturn(func(pv *v1.PersistentVolume) (string, error) {
+			return resizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
+		}).
+		Times(2)
 
 	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2"})).Return(
 		[]volumes.VolumeProperties{

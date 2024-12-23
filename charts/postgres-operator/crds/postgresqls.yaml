@@ -375,11 +375,11 @@ spec:
                   version:
                     type: string
                     enum:
-                      - "12"
                       - "13"
                       - "14"
                       - "15"
                       - "16"
+                      - "17"
                   parameters:
                     type: object
                     additionalProperties:
@@ -514,6 +514,9 @@ spec:
                       type: string
                     batchSize:
                       type: integer
+                    cpu:
+                      type: string
+                      pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                     database:
                       type: string
                     enableRecovery:
@@ -522,6 +525,9 @@ spec:
                       type: object
                       additionalProperties:
                         type: string
+                    memory:
+                      type: string
+                      pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                     tables:
                       type: object
                       additionalProperties:
@@ -533,6 +539,8 @@ spec:
                             type: string
                           idColumn:
                             type: string
+                          ignoreRecovery:
+                            type: boolean
                           payloadColumn:
                             type: string
                           recoveryEventType:

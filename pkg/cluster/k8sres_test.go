@@ -72,18 +72,18 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 	}{
 		{
 			subtest: "Patroni default configuration",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				Auth: config.Auth{
 					PamRoleName: "zalandos",
 				},
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				InitDB: map[string]string{
 					"encoding":       "UTF8",
@@ -102,38 +102,38 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				FailsafeMode:          util.True(),
 			},
 			opConfig: &config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.False(),
 			},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.True(),
 			},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.False(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -164,15 +164,15 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		},
 		{
 			subTest:  "test current bin path against hard coded template",
-			binPath:  "/usr/lib/postgresql/16/bin",
+			binPath:  "/usr/lib/postgresql/17/bin",
 			template: pgBinariesLocationTemplate,
-			expected: "16",
+			expected: "17",
 		},
 		{
 			subTest:  "test alternative bin path against a matching template",
-			binPath:  "/usr/pgsql-16/bin",
+			binPath:  "/usr/pgsql-17/bin",
 			template: "/usr/pgsql-%v/bin",
-			expected: "16",
+			expected: "17",
 		},
 	}
 
@@ -2148,7 +2148,7 @@ func TestSidecars(t *testing.T) {
 
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
-			PgVersion: "16",
+			PgVersion: "17",
 			Parameters: map[string]string{
 				"max_connections": "100",
 			},
@@ -2991,6 +2991,44 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			},
 			expectedResources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+			},
+		},
+		{
+			subTest: "test generation of resources when min limits are all set to zero",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     clusterNameLabel,
+					DefaultCPURequest:    "0",
+					DefaultCPULimit:      "0",
+					MaxCPURequest:        "0",
+					MinCPULimit:          "0",
+					DefaultMemoryRequest: "0",
+					DefaultMemoryLimit:   "0",
+					MaxMemoryRequest:     "0",
+					MinMemoryLimit:       "0",
+					PodRoleLabel:         "spilo-role",
+				},
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
 			},
 		},
 		{

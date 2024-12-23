@@ -13,9 +13,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/filesystems"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
 )
 
@@ -151,7 +151,7 @@ func (c *Cluster) populateVolumeMetaData() error {
 	volumeIds := []string{}
 	var volumeID string
 	for _, pv := range pvs {
-		volumeID, err = c.VolumeResizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
+		volumeID, err = c.VolumeResizer.GetProviderVolumeID(pv)
 		if err != nil {
 			continue
 		}
@@ -185,7 +185,7 @@ func (c *Cluster) syncVolumeClaims() error {
 
 	if c.OpConfig.StorageResizeMode == "off" || c.OpConfig.StorageResizeMode == "ebs" {
 		ignoreResize = true
-		c.logger.Debugf("Storage resize mode is set to %q. Skipping volume size sync of PVCs.", c.OpConfig.StorageResizeMode)
+		c.logger.Debugf("Storage resize mode is set to %q. Skipping volume size sync of persistent volume claims.", c.OpConfig.StorageResizeMode)
 	}
 
 	newSize, err := resource.ParseQuantity(c.Spec.Volume.Size)
@@ -196,9 +196,10 @@ func (c *Cluster) syncVolumeClaims() error {
 
 	pvcs, err := c.listPersistentVolumeClaims()
 	if err != nil {
-		return fmt.Errorf("could not receive persistent volume claims: %v", err)
+		return fmt.Errorf("could not list persistent volume claims: %v", err)
 	}
 	for _, pvc := range pvcs {
+		c.VolumeClaims[pvc.UID] = &pvc
 		needsUpdate := false
 		currentSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
 		if !ignoreResize && currentSize != manifestSize {
@@ -213,9 +214,11 @@ func (c *Cluster) syncVolumeClaims() error {
 
 		if needsUpdate {
 			c.logger.Infof("updating persistent volume claim definition for volume %q", pvc.Name)
-			if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{}); err != nil {
+			updatedPvc, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{})
+			if err != nil {
 				return fmt.Errorf("could not update persistent volume claim: %q", err)
 			}
+			c.VolumeClaims[pvc.UID] = updatedPvc
 			c.logger.Infof("successfully updated persistent volume claim %q", pvc.Name)
 		} else {
 			c.logger.Debugf("volume claim for volume %q do not require updates", pvc.Name)
@@ -227,10 +230,11 @@ func (c *Cluster) syncVolumeClaims() error {
 			if err != nil {
 				return fmt.Errorf("could not form patch for the persistent volume claim for volume %q: %v", pvc.Name, err)
 			}
-			_, err = c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			patchedPvc, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 			if err != nil {
 				return fmt.Errorf("could not patch annotations of the persistent volume claim for volume %q: %v", pvc.Name, err)
 			}
+			c.VolumeClaims[pvc.UID] = patchedPvc
 		}
 	}
 
@@ -268,28 +272,40 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 
 	pvcs, err := c.KubeClient.PersistentVolumeClaims(ns).List(context.TODO(), listOptions)
 	if err != nil {
-		return nil, fmt.Errorf("could not list of PersistentVolumeClaims: %v", err)
+		return nil, fmt.Errorf("could not list of persistent volume claims: %v", err)
 	}
 	return pvcs.Items, nil
 }
 
 func (c *Cluster) deletePersistentVolumeClaims() error {
-	c.logger.Debug("deleting PVCs")
-	pvcs, err := c.listPersistentVolumeClaims()
-	if err != nil {
-		return err
-	}
-	for _, pvc := range pvcs {
-		c.logger.Debugf("deleting PVC %q", util.NameFromMeta(pvc.ObjectMeta))
-		if err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, c.deleteOptions); err != nil {
-			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
+	c.setProcessName("deleting persistent volume claims")
+	errors := make([]string, 0)
+	for uid := range c.VolumeClaims {
+		err := c.deletePersistentVolumeClaim(uid)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%v", err))
 		}
 	}
-	if len(pvcs) > 0 {
-		c.logger.Debug("PVCs have been deleted")
-	} else {
-		c.logger.Debug("no PVCs to delete")
+
+	if len(errors) > 0 {
+		c.logger.Warningf("could not delete all persistent volume claims: %v", strings.Join(errors, `', '`))
 	}
+
+	return nil
+}
+
+func (c *Cluster) deletePersistentVolumeClaim(uid types.UID) error {
+	c.setProcessName("deleting persistent volume claim")
+	pvc := c.VolumeClaims[uid]
+	c.logger.Debugf("deleting persistent volume claim %q", pvc.Name)
+	err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, c.deleteOptions)
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("persistent volume claim %q has already been deleted", pvc.Name)
+	} else if err != nil {
+		return fmt.Errorf("could not delete persistent volume claim %q: %v", pvc.Name, err)
+	}
+	c.logger.Infof("persistent volume claim %q has been deleted", pvc.Name)
+	delete(c.VolumeClaims, uid)
 
 	return nil
 }
@@ -299,7 +315,7 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 
 	pvcs, err := c.listPersistentVolumeClaims()
 	if err != nil {
-		return nil, fmt.Errorf("could not list cluster's PersistentVolumeClaims: %v", err)
+		return nil, fmt.Errorf("could not list cluster's persistent volume claims: %v", err)
 	}
 
 	pods, err := c.listPods()

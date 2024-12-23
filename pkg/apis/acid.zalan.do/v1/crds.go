@@ -596,9 +596,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 								Enum: []apiextv1.JSON{
 									{
-										Raw: []byte(`"12"`),
-									},
-									{
 										Raw: []byte(`"13"`),
 									},
 									{
@@ -609,6 +606,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									{
 										Raw: []byte(`"16"`),
+									},
+									{
+										Raw: []byte(`"17"`),
 									},
 								},
 							},
@@ -1164,7 +1164,8 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "boolean",
 					},
 					"enable_spilo_wal_path_compat": {
-						Type: "boolean",
+						Type:        "boolean",
+						Description: "deprecated",
 					},
 					"enable_team_id_clustername_prefix": {
 						Type: "boolean",
@@ -1573,35 +1574,35 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Properties: map[string]apiextv1.JSONSchemaProps{
 							"default_cpu_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"default_cpu_request": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"default_memory_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 							"default_memory_request": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 							"max_cpu_request": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"max_memory_request": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 							"min_cpu_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"min_memory_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 						},
 					},

@@ -186,7 +186,7 @@ go get -u github.com/derekparker/delve/cmd/dlv
 
 ```
 RUN apk --no-cache add go git musl-dev
-RUN go get -d github.com/derekparker/delve/cmd/dlv
+RUN go get github.com/derekparker/delve/cmd/dlv
 ```
 
 * Update the `Makefile` to build the project with debugging symbols. For that
