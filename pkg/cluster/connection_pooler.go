@@ -1037,10 +1037,44 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			syncReason = append(syncReason, specReason...)
 		}
 
+		listOptions := metav1.ListOptions{
+			LabelSelector: labels.Set(c.connectionPoolerLabels(role, true).MatchLabels).String(),
+		}
+		pods, err = c.listPoolerPods(listOptions)
 		newPodAnnotations := c.annotationsSet(c.generatePodAnnotations(&c.Spec))
 		if changed, reason := c.compareAnnotations(deployment.Spec.Template.Annotations, newPodAnnotations); changed {
 			specSync = true
 			syncReason = append(syncReason, []string{"new connection pooler's pod template annotations do not match the current ones: " + reason}...)
+
+			if strings.Contains(reason, "Removed") {
+				for anno := range deployment.Spec.Template.Annotations {
+					if _, ok := newPodAnnotations[anno]; !ok {
+						// template annotation was removed
+						for _, ignore := range c.OpConfig.IgnoredAnnotations {
+							if anno == ignore {
+								continue
+							}
+						}
+						annotationToRemove := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":null}}}`, anno))
+						annotationToRemoveTemplate := []byte(fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"%s":null}}}}}`, anno))
+						deployment, err = c.KubeClient.Deployments(c.Namespace).Patch(context.TODO(),
+							deployment.Name, types.StrategicMergePatchType, annotationToRemoveTemplate, metav1.PatchOptions{}, "")
+						if err != nil {
+							c.logger.Errorf("failed to remove annotation %s from %s connection pooler's pod template: %v",
+								anno, role, err)
+							return nil, err
+						}
+						for _, pod := range pods {
+							_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name,
+								types.StrategicMergePatchType, annotationToRemove, metav1.PatchOptions{})
+							if err != nil {
+								c.logger.Errorf("failed to remove annotation %s from pod %s: %v", anno, pod.Name, err)
+								return nil, err
+							}
+						}
+					}
+				}
+			}
 			deployment.Spec.Template.Annotations = newPodAnnotations
 		}
 
@@ -1060,7 +1094,6 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			if err != nil {
 				return syncReason, err
 			}
-			c.ConnectionPooler[role].Deployment = deployment
 		}
 
 		newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(nil)) // including the downscaling annotations
@@ -1069,15 +1102,10 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			if err != nil {
 				return nil, err
 			}
-			c.ConnectionPooler[role].Deployment = deployment
 		}
 	}
 
 	// check if pooler pods must be replaced due to secret update
-	listOptions := metav1.ListOptions{
-		LabelSelector: labels.Set(c.connectionPoolerLabels(role, true).MatchLabels).String(),
-	}
-	pods, err = c.listPoolerPods(listOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -1098,17 +1126,21 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			if err != nil {
 				return nil, fmt.Errorf("could not delete pooler pod: %v", err)
 			}
-		} else if changed, _ := c.compareAnnotations(pod.Annotations, deployment.Spec.Template.Annotations); changed {
-			patchData, err := metaAnnotationsPatch(deployment.Spec.Template.Annotations)
-			if err != nil {
-				return nil, fmt.Errorf("could not form patch for pooler's pod annotations: %v", err)
-			}
-			_, err = c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
-			if err != nil {
-				return nil, fmt.Errorf("could not patch annotations for pooler's pod %q: %v", pod.Name, err)
+		} else {
+			if changed, _ := c.compareAnnotations(pod.Annotations, deployment.Spec.Template.Annotations); changed {
+				patchData, err := metaAnnotationsPatch(deployment.Spec.Template.Annotations)
+				if err != nil {
+					return nil, fmt.Errorf("could not form patch for pooler's pod annotations: %v", err)
+				}
+				_, err = c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("could not patch annotations for pooler's pod %q: %v", pod.Name, err)
+				}
 			}
 		}
 	}
+
+	c.ConnectionPooler[role].Deployment = deployment
 
 	if service, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
 		c.ConnectionPooler[role].Service = service

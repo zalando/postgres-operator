@@ -573,6 +573,25 @@ func (c *Cluster) syncStatefulSet() error {
 					}
 				}
 			}
+			for anno := range c.Statefulset.Spec.Template.Annotations {
+				if _, ok := desiredSts.Spec.Template.Annotations[anno]; !ok {
+					// template annotation was removed
+					for _, ignore := range c.OpConfig.IgnoredAnnotations {
+						if anno == ignore {
+							continue
+						}
+					}
+					annotationToRemove := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":null}}}`, anno))
+					for _, pod := range pods {
+						_, err = c.KubeClient.Pods(c.Namespace).Patch(context.Background(), pod.Name,
+							types.StrategicMergePatchType, annotationToRemove, metav1.PatchOptions{})
+						if err != nil {
+							c.logger.Errorf("failed to remove annotation %s from pod %s: %v", anno, pod.Name, err)
+							return err
+						}
+					}
+				}
+			}
 		}
 		if !cmp.match {
 			if cmp.rollingUpdate {
@@ -1593,6 +1612,26 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			)
 			if reason != "" {
 				c.logger.Infof("reason: %s", reason)
+			}
+			if strings.Contains(reason, "annotations do not match") {
+				for anno := range job.Spec.JobTemplate.Spec.Template.Annotations {
+					if _, ok := desiredJob.Spec.JobTemplate.Spec.Template.Annotations[anno]; !ok {
+						// template annotation was removed
+						for _, ignore := range c.OpConfig.IgnoredAnnotations {
+							if anno == ignore {
+								continue
+							}
+						}
+						annotationToRemoveTemplate := []byte(fmt.Sprintf(
+							`{"spec":{"jobTemplate":{"spec":{"template":{"metadata":{"annotations":{"%s":null}}}}}}}`, anno))
+						job, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(),
+							jobName, types.StrategicMergePatchType, annotationToRemoveTemplate, metav1.PatchOptions{}, "")
+						if err != nil {
+							c.logger.Errorf("failed to remove annotation %s from the logical backup job %q pod template: %v", anno, jobName, err)
+							return err
+						}
+					}
+				}
 			}
 			if err = c.patchLogicalBackupJob(desiredJob); err != nil {
 				return fmt.Errorf("could not update logical backup job to match desired state: %v", err)
