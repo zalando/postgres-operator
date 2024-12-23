@@ -1405,6 +1405,10 @@ configuration:
     volumeMounts:
     - mountPath: /custom-pgdata-mountpoint
       name: pgdata
+    env:
+      - name: "ENV_VAR_NAME"
+        value: "any-k8s-env-things"
+    command: ['sh', '-c', 'echo "logging" > /opt/logs.txt']
   - ...
 ```
 
