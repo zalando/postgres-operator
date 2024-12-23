@@ -18,7 +18,7 @@ spec:
       serviceAccountName: postgres-operator-ui
       containers:
         - name: "service"
-          image: ghcr.io/zalando/postgres-operator-ui:v1.13.0
+          image: ghcr.io/zalando/postgres-operator-ui:v1.14.0
           ports:
             - containerPort: 8081
               protocol: "TCP"
@@ -73,11 +73,11 @@ spec:
                   "limit_iops": 16000,
                   "limit_throughput": 1000,
                   "postgresql_versions": [
+                    "17",
                     "16",
                     "15",
                     "14",
-                    "13",
-                    "12"
+                    "13"
                   ]
                 }
             # Exemple of settings to make snapshot view working in the ui when using AWS

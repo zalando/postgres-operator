@@ -94,9 +94,6 @@ Those are top-level keys, containing both leaf keys and groups.
 * **enable_pgversion_env_var**
   With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `true`.
 
-* **enable_spilo_wal_path_compat**
-  enables backwards compatible path between Spilo 12 and Spilo 13+ images. The default is `false`.
-
 * **enable_team_id_clustername_prefix**
   To lower the risk of name clashes between clusters of different teams you
   can turn on this flag and the operator will sync only clusters where the
@@ -250,12 +247,12 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
-  when `major_version_upgrade_mode` is set to `"full"`. The default is `"12"`.
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"13"`.
 
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
   which violate the configured allowed `minimal_major_version` when
-  `major_version_upgrade_mode` is set to `"full"`. The default is `"16"`.
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"17"`.
 
 ## Kubernetes resources
 
@@ -366,7 +363,7 @@ configuration they are grouped under the `kubernetes` key.
   manifest. To keep secrets, set this option to `false`. The default is `true`.
 
 * **enable_persistent_volume_claim_deletion**
-  By default, the operator deletes PersistentVolumeClaims when removing the
+  By default, the operator deletes persistent volume claims when removing the
   Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
   on the statefulset is set to `retain`. To keep PVCs set this option to `false`.
   The default is `true`.

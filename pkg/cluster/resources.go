@@ -39,8 +39,8 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found logical backup job: %q (uid: %q)", util.NameFromMeta(c.LogicalBackupJob.ObjectMeta), c.LogicalBackupJob.UID)
 	}
 
-	for _, secret := range c.Secrets {
-		c.logger.Infof("found secret: %q (uid: %q) namespace: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID, secret.ObjectMeta.Namespace)
+	for uid, secret := range c.Secrets {
+		c.logger.Infof("found secret: %q (uid: %q) namespace: %s", util.NameFromMeta(secret.ObjectMeta), uid, secret.ObjectMeta.Namespace)
 	}
 
 	for role, service := range c.Services {
@@ -70,13 +70,8 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found pod: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
-	pvcs, err := c.listPersistentVolumeClaims()
-	if err != nil {
-		return fmt.Errorf("could not get the list of PVCs: %v", err)
-	}
-
-	for _, obj := range pvcs {
-		c.logger.Infof("found PVC: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+	for uid, pvc := range c.VolumeClaims {
+		c.logger.Infof("found persistent volume claim: %q (uid: %q)", util.NameFromMeta(pvc.ObjectMeta), uid)
 	}
 
 	for role, poolerObjs := range c.ConnectionPooler {
@@ -187,7 +182,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 			c.logger.Warningf("could not scale down: %v", err)
 		}
 	}
-	c.logger.Debugf("updating statefulset")
+	c.logger.Debug("updating statefulset")
 
 	patchData, err := specPatch(newStatefulSet.Spec)
 	if err != nil {
@@ -218,7 +213,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	}
 
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
-	c.logger.Debugf("replacing statefulset")
+	c.logger.Debug("replacing statefulset")
 
 	// Delete the current statefulset without deleting the pods
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
@@ -232,7 +227,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	// make sure we clear the stored statefulset status if the subsequent create fails.
 	c.Statefulset = nil
 	// wait until the statefulset is truly deleted
-	c.logger.Debugf("waiting for the statefulset to be deleted")
+	c.logger.Debug("waiting for the statefulset to be deleted")
 
 	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
@@ -266,7 +261,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 
 func (c *Cluster) deleteStatefulSet() error {
 	c.setProcessName("deleting statefulset")
-	c.logger.Debugln("deleting statefulset")
+	c.logger.Debug("deleting statefulset")
 	if c.Statefulset == nil {
 		c.logger.Debug("there is no statefulset in the cluster")
 		return nil
@@ -288,10 +283,10 @@ func (c *Cluster) deleteStatefulSet() error {
 
 	if c.OpConfig.EnablePersistentVolumeClaimDeletion != nil && *c.OpConfig.EnablePersistentVolumeClaimDeletion {
 		if err := c.deletePersistentVolumeClaims(); err != nil {
-			return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
+			return fmt.Errorf("could not delete persistent volume claims: %v", err)
 		}
 	} else {
-		c.logger.Info("not deleting PersistentVolumeClaims because disabled in configuration")
+		c.logger.Info("not deleting persistent volume claims because disabled in configuration")
 	}
 
 	return nil
@@ -349,7 +344,8 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 }
 
 func (c *Cluster) deleteService(role PostgresRole) error {
-	c.logger.Debugf("deleting service %s", role)
+	c.setProcessName("deleting service")
+	c.logger.Debugf("deleting %s service", role)
 
 	if c.Services[role] == nil {
 		c.logger.Debugf("No service for %s role was found, nothing to delete", role)
@@ -495,7 +491,7 @@ func (c *Cluster) deletePodDisruptionBudget() error {
 
 func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	c.setProcessName("deleting endpoint")
-	c.logger.Debugln("deleting endpoint")
+	c.logger.Debugf("deleting %s endpoint", role)
 	if c.Endpoints[role] == nil {
 		c.logger.Debugf("there is no %s endpoint in the cluster", role)
 		return nil
@@ -543,7 +539,7 @@ func (c *Cluster) deletePatroniResources() error {
 
 func (c *Cluster) deletePatroniConfigMap(suffix string) error {
 	c.setProcessName("deleting Patroni config map")
-	c.logger.Debugln("deleting Patroni config map")
+	c.logger.Debugf("deleting %s Patroni config map", suffix)
 	cm := c.PatroniConfigMaps[suffix]
 	if cm == nil {
 		c.logger.Debugf("there is no %s Patroni config map in the cluster", suffix)
@@ -565,7 +561,7 @@ func (c *Cluster) deletePatroniConfigMap(suffix string) error {
 
 func (c *Cluster) deletePatroniEndpoint(suffix string) error {
 	c.setProcessName("deleting Patroni endpoint")
-	c.logger.Debugln("deleting Patroni endpoint")
+	c.logger.Debugf("deleting %s Patroni endpoint", suffix)
 	ep := c.PatroniEndpoints[suffix]
 	if ep == nil {
 		c.logger.Debugf("there is no %s Patroni endpoint in the cluster", suffix)

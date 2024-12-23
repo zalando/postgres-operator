@@ -72,18 +72,18 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 	}{
 		{
 			subtest: "Patroni default configuration",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				Auth: config.Auth{
 					PamRoleName: "zalandos",
 				},
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				InitDB: map[string]string{
 					"encoding":       "UTF8",
@@ -102,38 +102,38 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				FailsafeMode:          util.True(),
 			},
 			opConfig: &config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.False(),
 			},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.True(),
 			},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.False(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -164,15 +164,15 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		},
 		{
 			subTest:  "test current bin path against hard coded template",
-			binPath:  "/usr/lib/postgresql/16/bin",
+			binPath:  "/usr/lib/postgresql/17/bin",
 			template: pgBinariesLocationTemplate,
-			expected: "16",
+			expected: "17",
 		},
 		{
 			subTest:  "test alternative bin path against a matching template",
-			binPath:  "/usr/pgsql-16/bin",
+			binPath:  "/usr/pgsql-17/bin",
 			template: "/usr/pgsql-%v/bin",
-			expected: "16",
+			expected: "17",
 		},
 	}
 
@@ -1451,9 +1451,9 @@ func TestNodeAffinity(t *testing.T) {
 	nodeAff := &v1.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				v1.NodeSelectorTerm{
+				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
-						v1.NodeSelectorRequirement{
+						{
 							Key:      "test-label",
 							Operator: v1.NodeSelectorOpIn,
 							Values: []string{
@@ -1673,7 +1673,7 @@ func TestTLS(t *testing.T) {
 			TLS: &acidv1.TLSDescription{
 				SecretName: tlsSecretName, CAFile: "ca.crt"},
 			AdditionalVolumes: []acidv1.AdditionalVolume{
-				acidv1.AdditionalVolume{
+				{
 					Name:      tlsSecretName,
 					MountPath: mountPath,
 					VolumeSource: v1.VolumeSource{
@@ -2148,7 +2148,7 @@ func TestSidecars(t *testing.T) {
 
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
-			PgVersion: "16",
+			PgVersion: "17",
 			Parameters: map[string]string{
 				"max_connections": "100",
 			},
@@ -2162,17 +2162,17 @@ func TestSidecars(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("210m"), Memory: k8sutil.StringToPointer("0.8Gi")},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("510m"), Memory: k8sutil.StringToPointer("1.4Gi")},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
 			},
@@ -2200,11 +2200,11 @@ func TestSidecars(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -2259,7 +2259,7 @@ func TestSidecars(t *testing.T) {
 		},
 	}
 	mounts := []v1.VolumeMount{
-		v1.VolumeMount{
+		{
 			Name:      "pgdata",
 			MountPath: "/home/postgres/pgdata",
 		},
@@ -2516,17 +2516,17 @@ func TestGenerateService(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("210m"), Memory: k8sutil.StringToPointer("0.8Gi")},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("510m"), Memory: k8sutil.StringToPointer("1.4Gi")},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
 			},
@@ -2555,11 +2555,11 @@ func TestGenerateService(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -2654,27 +2654,27 @@ func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 
 func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPolicy, clusterName string) []v1.ServiceSpec {
 	return []v1.ServiceSpec{
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler"},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"spilo-role": "replica", "application": "spilo", "cluster-name": clusterName},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
@@ -2894,7 +2894,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 						},
 					},
@@ -2991,6 +2991,44 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			},
 			expectedResources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+			},
+		},
+		{
+			subTest: "test generation of resources when min limits are all set to zero",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     clusterNameLabel,
+					DefaultCPURequest:    "0",
+					DefaultCPULimit:      "0",
+					MaxCPURequest:        "0",
+					MinCPULimit:          "0",
+					DefaultMemoryRequest: "0",
+					DefaultMemoryLimit:   "0",
+					MaxMemoryRequest:     "0",
+					MinMemoryLimit:       "0",
+					PodRoleLabel:         "spilo-role",
+				},
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
 			},
 		},
 		{
@@ -3095,7 +3133,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
 								ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("10Mi")},
@@ -3184,7 +3222,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
 								ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("10Mi")},

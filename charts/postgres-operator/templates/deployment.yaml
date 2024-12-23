@@ -54,7 +54,7 @@ spec:
           value: {{ template "postgres-operator.controllerID" . }}
       {{- end }}
       {{- if .Values.extraEnvs }}
-      {{- .Values.extraEnvs | toYaml | nindent 12 }}
+{{ toYaml .Values.extraEnvs | indent 8 }}
       {{- end }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}

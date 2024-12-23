@@ -3,7 +3,7 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: ghcr.io/zalando/spilo-16:3.3-p1
+  docker_image: ghcr.io/zalando/spilo-17:4.0-p2
   # enable_crd_registration: true
   # crd_categories:
   # - all
@@ -39,8 +39,8 @@ configuration:
     major_version_upgrade_mode: "manual"
     # major_version_upgrade_team_allow_list:
     # - acid
-    minimal_major_version: "12"
-    target_major_version: "16"
+    minimal_major_version: "13"
+    target_major_version: "17"
   kubernetes:
     # additional_pod_capabilities:
     # - "SYS_NICE"
@@ -168,7 +168,7 @@ configuration:
     # logical_backup_cpu_request: ""
     # logical_backup_memory_limit: ""
     # logical_backup_memory_request: ""
-    logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
+    logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0"
     # logical_backup_google_application_credentials: ""
     logical_backup_job_prefix: "logical-backup-"
     logical_backup_provider: "s3"

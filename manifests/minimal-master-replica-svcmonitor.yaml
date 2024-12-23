@@ -31,11 +31,21 @@ spec:
     version: "13"
   sidecars:
     - name: "exporter"
-      image: "wrouesnel/postgres_exporter"
+      image: "quay.io/prometheuscommunity/postgres-exporter:v0.15.0"
       ports:
         - name: exporter
           containerPort: 9187
           protocol: TCP
+      env:
+       - name: DATA_SOURCE_URI
+         value: ":5432/?sslmode=disable"
+       - name: DATA_SOURCE_USER
+         value: "postgres"
+       - name: DATA_SOURCE_PASS
+         valueFrom:
+           secretKeyRef:
+             name: postgres.test-pg.credentials.postgresql.acid.zalan.do
+             key: password
       resources:
         limits:
           cpu: 500m

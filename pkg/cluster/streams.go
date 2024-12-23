@@ -46,11 +46,13 @@ func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) (p
 
 func (c *Cluster) deleteStream(appId string) error {
 	c.setProcessName("deleting event stream")
+	c.logger.Debugf("deleting event stream with applicationId %s", appId)
 
 	err := c.KubeClient.FabricEventStreams(c.Streams[appId].Namespace).Delete(context.TODO(), c.Streams[appId].Name, metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("could not delete event stream %q with applicationId %s: %v", c.Streams[appId].Name, appId, err)
 	}
+	c.logger.Infof("event stream %q with applicationId %s has been successfully deleted", c.Streams[appId].Name, appId)
 	delete(c.Streams, appId)
 
 	return nil
@@ -176,16 +178,25 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 
 func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEventStream {
 	eventStreams := make([]zalandov1.EventStream, 0)
+	resourceAnnotations := map[string]string{}
+	var err, err2 error
 
 	for _, stream := range c.Spec.Streams {
 		if stream.ApplicationId != appId {
 			continue
 		}
+
+		err = setResourceAnnotation(&resourceAnnotations, stream.CPU, constants.EventStreamCpuAnnotationKey)
+		err2 = setResourceAnnotation(&resourceAnnotations, stream.Memory, constants.EventStreamMemoryAnnotationKey)
+		if err != nil || err2 != nil {
+			c.logger.Warningf("could not set resource annotation for event stream: %v", err)
+		}
+
 		for tableName, table := range stream.Tables {
 			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
-			streamFlow := getEventStreamFlow(stream, table.PayloadColumn)
+			streamFlow := getEventStreamFlow(table.PayloadColumn)
 			streamSink := getEventStreamSink(stream, table.EventType)
-			streamRecovery := getEventStreamRecovery(stream, table.RecoveryEventType, table.EventType)
+			streamRecovery := getEventStreamRecovery(stream, table.RecoveryEventType, table.EventType, table.IgnoreRecovery)
 
 			eventStreams = append(eventStreams, zalandov1.EventStream{
 				EventStreamFlow:     streamFlow,
@@ -205,7 +216,7 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 			Name:            fmt.Sprintf("%s-%s", c.Name, strings.ToLower(util.RandomPassword(5))),
 			Namespace:       c.Namespace,
 			Labels:          c.labelsSet(true),
-			Annotations:     c.AnnotationsToPropagate(c.annotationsSet(nil)),
+			Annotations:     c.AnnotationsToPropagate(c.annotationsSet(resourceAnnotations)),
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: zalandov1.FabricEventStreamSpec{
@@ -213,6 +224,27 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 			EventStreams:  eventStreams,
 		},
 	}
+}
+
+func setResourceAnnotation(annotations *map[string]string, resource *string, key string) error {
+	var (
+		isSmaller bool
+		err       error
+	)
+	if resource != nil {
+		currentValue, exists := (*annotations)[key]
+		if exists {
+			isSmaller, err = util.IsSmallerQuantity(currentValue, *resource)
+			if err != nil {
+				return fmt.Errorf("could not compare resource in %q annotation: %v", key, err)
+			}
+		}
+		if isSmaller || !exists {
+			(*annotations)[key] = *resource
+		}
+	}
+
+	return nil
 }
 
 func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName string, idColumn *string) zalandov1.EventStreamSource {
@@ -230,7 +262,7 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName string, i
 	}
 }
 
-func getEventStreamFlow(stream acidv1.Stream, payloadColumn *string) zalandov1.EventStreamFlow {
+func getEventStreamFlow(payloadColumn *string) zalandov1.EventStreamFlow {
 	return zalandov1.EventStreamFlow{
 		Type:          constants.EventStreamFlowPgGenericType,
 		PayloadColumn: payloadColumn,
@@ -245,11 +277,17 @@ func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1.EventS
 	}
 }
 
-func getEventStreamRecovery(stream acidv1.Stream, recoveryEventType, eventType string) zalandov1.EventStreamRecovery {
+func getEventStreamRecovery(stream acidv1.Stream, recoveryEventType, eventType string, ignoreRecovery *bool) zalandov1.EventStreamRecovery {
 	if (stream.EnableRecovery != nil && !*stream.EnableRecovery) ||
 		(stream.EnableRecovery == nil && recoveryEventType == "") {
 		return zalandov1.EventStreamRecovery{
 			Type: constants.EventStreamRecoveryNoneType,
+		}
+	}
+
+	if ignoreRecovery != nil && *ignoreRecovery {
+		return zalandov1.EventStreamRecovery{
+			Type: constants.EventStreamRecoveryIgnoreType,
 		}
 	}
 
@@ -308,7 +346,7 @@ func (c *Cluster) syncStreams() error {
 
 	_, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), constants.EventStreamCRDName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("event stream CRD not installed, skipping")
+		c.logger.Debug("event stream CRD not installed, skipping")
 		return nil
 	}
 
@@ -440,7 +478,9 @@ func (c *Cluster) syncStream(appId string) error {
 	c.setProcessName("syncing stream with applicationId %s", appId)
 	c.logger.Debugf("syncing stream with applicationId %s", appId)
 
-	listOptions := metav1.ListOptions{LabelSelector: c.labelsSet(true).String()}
+	listOptions := metav1.ListOptions{
+		LabelSelector: c.labelsSet(false).String(),
+	}
 	streams, err = c.KubeClient.FabricEventStreams(c.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("could not list of FabricEventStreams for applicationId %s: %v", appId, err)
@@ -449,15 +489,6 @@ func (c *Cluster) syncStream(appId string) error {
 	streamExists := false
 	for _, stream := range streams.Items {
 		if stream.Spec.ApplicationId != appId {
-			continue
-		}
-		if streamExists {
-			c.logger.Warningf("more than one event stream with applicationId %s found, delete it", appId)
-			if err = c.KubeClient.FabricEventStreams(stream.ObjectMeta.Namespace).Delete(context.TODO(), stream.ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
-				c.logger.Errorf("could not delete event stream %q with applicationId %s: %v", stream.ObjectMeta.Name, appId, err)
-			} else {
-				c.logger.Infof("redundant event stream %q with applicationId %s has been successfully deleted", stream.ObjectMeta.Name, appId)
-			}
 			continue
 		}
 		streamExists = true
@@ -473,8 +504,9 @@ func (c *Cluster) syncStream(appId string) error {
 			c.Streams[appId] = stream
 		}
 		if match, reason := c.compareStreams(&stream, desiredStreams); !match {
-			c.logger.Debugf("updating event streams with applicationId %s: %s", appId, reason)
-			desiredStreams.ObjectMeta = stream.ObjectMeta
+			c.logger.Infof("updating event streams with applicationId %s: %s", appId, reason)
+			// make sure to keep the old name with randomly generated suffix
+			desiredStreams.ObjectMeta.Name = stream.ObjectMeta.Name
 			updatedStream, err := c.updateStreams(desiredStreams)
 			if err != nil {
 				return fmt.Errorf("failed updating event streams %s with applicationId %s: %v", stream.Name, appId, err)
@@ -482,6 +514,7 @@ func (c *Cluster) syncStream(appId string) error {
 			c.Streams[appId] = updatedStream
 			c.logger.Infof("event streams %q with applicationId %s have been successfully updated", updatedStream.Name, appId)
 		}
+		break
 	}
 
 	if !streamExists {
@@ -499,13 +532,27 @@ func (c *Cluster) syncStream(appId string) error {
 
 func (c *Cluster) compareStreams(curEventStreams, newEventStreams *zalandov1.FabricEventStream) (match bool, reason string) {
 	reasons := make([]string, 0)
+	desiredAnnotations := make(map[string]string)
 	match = true
 
 	// stream operator can add extra annotations so incl. current annotations in desired annotations
-	desiredAnnotations := c.annotationsSet(curEventStreams.Annotations)
+	for curKey, curValue := range curEventStreams.Annotations {
+		if _, exists := desiredAnnotations[curKey]; !exists {
+			desiredAnnotations[curKey] = curValue
+		}
+	}
+	// add/or override annotations if cpu and memory values were changed
+	for newKey, newValue := range newEventStreams.Annotations {
+		desiredAnnotations[newKey] = newValue
+	}
 	if changed, reason := c.compareAnnotations(curEventStreams.ObjectMeta.Annotations, desiredAnnotations); changed {
 		match = false
 		reasons = append(reasons, fmt.Sprintf("new streams annotations do not match: %s", reason))
+	}
+
+	if !reflect.DeepEqual(curEventStreams.ObjectMeta.Labels, newEventStreams.ObjectMeta.Labels) {
+		match = false
+		reasons = append(reasons, "new streams labels do not match the current ones")
 	}
 
 	if changed, reason := sameEventStreams(curEventStreams.Spec.EventStreams, newEventStreams.Spec.EventStreams); !changed {
@@ -550,7 +597,6 @@ func (c *Cluster) cleanupRemovedStreams(appIds []string) error {
 			if err != nil {
 				errors = append(errors, fmt.Sprintf("failed deleting event streams with applicationId %s: %v", appId, err))
 			}
-			c.logger.Infof("event streams with applicationId %s have been successfully deleted", appId)
 		}
 	}
 

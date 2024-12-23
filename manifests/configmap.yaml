@@ -34,7 +34,7 @@ data:
   default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: ghcr.io/zalando/spilo-16:3.3-p1
+  docker_image: ghcr.io/zalando/spilo-17:4.0-p2
   # downscaler_annotations: "deployment-time,downscaler/*"
   enable_admin_role_for_users: "true"
   enable_crd_registration: "true"
@@ -86,7 +86,7 @@ data:
   # logical_backup_cpu_limit: ""
   # logical_backup_cpu_request: ""
   logical_backup_cronjob_environment_secret: ""
-  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0"
   # logical_backup_google_application_credentials: ""
   logical_backup_job_prefix: "logical-backup-"
   # logical_backup_memory_limit: ""
@@ -112,7 +112,7 @@ data:
   min_cpu_limit: 250m
   min_instances: "-1"
   min_memory_limit: 250Mi
-  minimal_major_version: "12"
+  minimal_major_version: "13"
   # node_readiness_label: "status:ready"
   # node_readiness_label_merge: "OR"
   oauth_token_secret_name: postgresql-operator
@@ -162,7 +162,7 @@ data:
   spilo_privileged: "false"
   storage_resize_mode: "pvc"
   super_username: postgres
-  target_major_version: "16"
+  target_major_version: "17"
   team_admin_role: "admin"
   team_api_role_configuration: "log_statement:all"
   teams_api_url: http://fake-teams-api.default.svc.cluster.local

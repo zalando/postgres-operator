@@ -65,11 +65,11 @@ type kubeResources struct {
 	PatroniConfigMaps   map[string]*v1.ConfigMap
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
+	VolumeClaims        map[types.UID]*v1.PersistentVolumeClaim
 	PodDisruptionBudget *policyv1.PodDisruptionBudget
 	LogicalBackupJob    *batchv1.CronJob
 	Streams             map[string]*zalandov1.FabricEventStream
 	//Pods are treated separately
-	//PVCs are treated separately
 }
 
 // Cluster describes postgresql cluster
@@ -140,6 +140,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Endpoints:         make(map[PostgresRole]*v1.Endpoints),
 			PatroniEndpoints:  make(map[string]*v1.Endpoints),
 			PatroniConfigMaps: make(map[string]*v1.ConfigMap),
+			VolumeClaims:      make(map[types.UID]*v1.PersistentVolumeClaim),
 			Streams:           make(map[string]*zalandov1.FabricEventStream)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
 			PasswordEncryption:   passwordEncryption,
@@ -362,6 +363,11 @@ func (c *Cluster) Create() (err error) {
 	}
 	c.logger.Infof("pods are ready")
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Pods are ready")
+
+	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
+	if err = c.syncVolumes(); err != nil {
+		return err
+	}
 
 	// sync resources created by Patroni
 	if err = c.syncPatroniResources(); err != nil {
@@ -1014,7 +1020,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		initUsers := !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser
 		if initUsers {
-			c.logger.Debugf("initialize users")
+			c.logger.Debug("initialize users")
 			if err := c.initUsers(); err != nil {
 				c.logger.Errorf("could not init users - skipping sync of secrets and databases: %v", err)
 				userInitFailed = true
@@ -1023,7 +1029,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			}
 		}
 		if initUsers || annotationsChanged {
-			c.logger.Debugf("syncing secrets")
+			c.logger.Debug("syncing secrets")
 			//TODO: mind the secrets of the deleted/new users
 			if err := c.syncSecrets(); err != nil {
 				c.logger.Errorf("could not sync secrets: %v", err)
@@ -1065,7 +1071,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		// create if it did not exist
 		if !oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup {
-			c.logger.Debugf("creating backup cron job")
+			c.logger.Debug("creating backup cron job")
 			if err := c.createLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not create a k8s cron job for logical backups: %v", err)
 				updateFailed = true
@@ -1075,7 +1081,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		// delete if no longer needed
 		if oldSpec.Spec.EnableLogicalBackup && !newSpec.Spec.EnableLogicalBackup {
-			c.logger.Debugf("deleting backup cron job")
+			c.logger.Debug("deleting backup cron job")
 			if err := c.deleteLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not delete a k8s cron job for logical backups: %v", err)
 				updateFailed = true
@@ -1095,7 +1101,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// Roles and Databases
 	if !userInitFailed && !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
-		c.logger.Debugf("syncing roles")
+		c.logger.Debug("syncing roles")
 		if err := c.syncRoles(); err != nil {
 			c.logger.Errorf("could not sync roles: %v", err)
 			updateFailed = true
@@ -1390,18 +1396,18 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
 		}
 
-		var searchPath strings.Builder
-		searchPath.WriteString(constants.DefaultSearchPath)
+		searchPathArr := []string{constants.DefaultSearchPath}
 		for preparedSchemaName := range preparedSchemas {
-			searchPath.WriteString(", " + preparedSchemaName)
+			searchPathArr = append(searchPathArr, fmt.Sprintf("%q", preparedSchemaName))
 		}
+		searchPath := strings.Join(searchPathArr, ", ")
 
 		// default roles per database
-		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath.String(), preparedDB.SecretNamespace); err != nil {
+		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath, preparedDB.SecretNamespace); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 		}
 		if preparedDB.DefaultUsers {
-			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath.String(), preparedDB.SecretNamespace); err != nil {
+			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath, preparedDB.SecretNamespace); err != nil {
 				return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 			}
 		}
@@ -1412,14 +1418,16 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 				if err := c.initDefaultRoles(defaultRoles,
 					preparedDbName+constants.OwnerRoleNameSuffix,
 					preparedDbName+"_"+preparedSchemaName,
-					constants.DefaultSearchPath+", "+preparedSchemaName, preparedDB.SecretNamespace); err != nil {
+					fmt.Sprintf("%s, %q", constants.DefaultSearchPath, preparedSchemaName),
+					preparedDB.SecretNamespace); err != nil {
 					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
 				}
 				if preparedSchema.DefaultUsers {
 					if err := c.initDefaultRoles(defaultUsers,
 						preparedDbName+constants.OwnerRoleNameSuffix,
 						preparedDbName+"_"+preparedSchemaName,
-						constants.DefaultSearchPath+", "+preparedSchemaName, preparedDB.SecretNamespace); err != nil {
+						fmt.Sprintf("%s, %q", constants.DefaultSearchPath, preparedSchemaName),
+						preparedDB.SecretNamespace); err != nil {
 						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
 					}
 				}
