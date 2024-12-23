@@ -19,7 +19,7 @@ spec:
       serviceAccountName: postgres-operator
       containers:
       - name: postgres-operator
-        image: ghcr.io/zalando/postgres-operator:v1.13.0
+        image: ghcr.io/zalando/postgres-operator:v1.14.0
         imagePullPolicy: IfNotPresent
         resources:
           requests:

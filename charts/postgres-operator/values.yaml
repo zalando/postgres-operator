@@ -1,7 +1,7 @@
 image:
   registry: ghcr.io
   repository: zalando/postgres-operator
-  tag: v1.13.0
+  tag: v1.14.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.

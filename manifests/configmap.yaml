@@ -86,7 +86,7 @@ data:
   # logical_backup_cpu_limit: ""
   # logical_backup_cpu_request: ""
   logical_backup_cronjob_environment_secret: ""
-  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0"
   # logical_backup_google_application_credentials: ""
   logical_backup_job_prefix: "logical-backup-"
   # logical_backup_memory_limit: ""
