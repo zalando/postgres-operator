@@ -1005,6 +1005,7 @@ spec:
       env:
         - name: "ENV_VAR_NAME"
           value: "any-k8s-env-things"
+      command: ['sh', '-c', 'echo "logging" > /opt/logs.txt']
 ```
 
 In addition to any environment variables you specify, the following environment

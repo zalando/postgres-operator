@@ -1277,6 +1277,11 @@ func (in *Sidecar) DeepCopyInto(out *Sidecar) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Command != nil {
+		in, out := &in.Command, &out.Command
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
