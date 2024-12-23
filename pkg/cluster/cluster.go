@@ -853,7 +853,7 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool
 	newPodAnnotation := new.Spec.JobTemplate.Spec.Template.Annotations
 	curPodAnnotation := cur.Spec.JobTemplate.Spec.Template.Annotations
 	if changed, reason := c.compareAnnotations(curPodAnnotation, newPodAnnotation); changed {
-		return false, fmt.Sprintf("new job's pod template metadata annotations does not match " + reason)
+		return false, fmt.Sprint("new job's pod template metadata annotations do not match " + reason)
 	}
 
 	newPgVersion := getPgVersion(new)
