@@ -2491,7 +2491,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := tt.spec.generateMasterPodDisruptionBudget()
+		result := tt.spec.generateGeneralPodDisruptionBudget()
 		for _, check := range tt.check {
 			err := check(tt.spec, result)
 			if err != nil {

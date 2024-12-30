@@ -23,8 +23,8 @@ const (
 )
 
 func (c *Cluster) listResources() error {
-	if c.MasterPodDisruptionBudget != nil {
-		c.logger.Infof("found master pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.MasterPodDisruptionBudget.ObjectMeta), c.MasterPodDisruptionBudget.UID)
+	if c.GeneralPodDisruptionBudget != nil {
+		c.logger.Infof("found general pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.GeneralPodDisruptionBudget.ObjectMeta), c.GeneralPodDisruptionBudget.UID)
 	}
 
 	if c.Statefulset != nil {
@@ -417,13 +417,13 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	return result
 }
 
-func (c *Cluster) createMasterPodDisruptionBudget() error {
-	c.logger.Debug("creating master pod disruption budget")
-	if c.MasterPodDisruptionBudget != nil {
-		return fmt.Errorf("master pod disruption budget already exists in the cluster")
+func (c *Cluster) createGeneralPodDisruptionBudget() error {
+	c.logger.Debug("creating general pod disruption budget")
+	if c.GeneralPodDisruptionBudget != nil {
+		return fmt.Errorf("general pod disruption budget already exists in the cluster")
 	}
 
-	podDisruptionBudgetSpec := c.generateMasterPodDisruptionBudget()
+	podDisruptionBudgetSpec := c.generateGeneralPodDisruptionBudget()
 	podDisruptionBudget, err := c.KubeClient.
 		PodDisruptionBudgets(podDisruptionBudgetSpec.Namespace).
 		Create(context.TODO(), podDisruptionBudgetSpec, metav1.CreateOptions{})
@@ -432,7 +432,7 @@ func (c *Cluster) createMasterPodDisruptionBudget() error {
 		return err
 	}
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(podDisruptionBudget.ObjectMeta))
-	c.MasterPodDisruptionBudget = podDisruptionBudget
+	c.GeneralPodDisruptionBudget = podDisruptionBudget
 
 	return nil
 }
@@ -440,9 +440,9 @@ func (c *Cluster) createMasterPodDisruptionBudget() error {
 func (c *Cluster) createPodDisruptionBudgets() error {
 	errors := make([]string, 0)
 
-	err := c.createMasterPodDisruptionBudget()
+	err := c.createGeneralPodDisruptionBudget()
 	if err != nil {
-		errors = append(errors, fmt.Sprintf("could not create master pod disruption budget: %v", err))
+		errors = append(errors, fmt.Sprintf("could not create general pod disruption budget: %v", err))
 	}
 
 	if len(errors) > 0 {
@@ -451,13 +451,13 @@ func (c *Cluster) createPodDisruptionBudgets() error {
 	return nil
 }
 
-func (c *Cluster) updateMasterPodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
-	c.logger.Debug("updating master pod disruption budget")
-	if c.MasterPodDisruptionBudget == nil {
+func (c *Cluster) updateGeneralPodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
+	c.logger.Debug("updating general pod disruption budget")
+	if c.GeneralPodDisruptionBudget == nil {
 		return fmt.Errorf("there is no pod disruption budget in the cluster")
 	}
 
-	if err := c.deleteMasterPodDisruptionBudget(); err != nil {
+	if err := c.deleteGeneralPodDisruptionBudget(); err != nil {
 		return fmt.Errorf("could not delete pod disruption budget: %v", err)
 	}
 
@@ -467,30 +467,30 @@ func (c *Cluster) updateMasterPodDisruptionBudget(pdb *policyv1.PodDisruptionBud
 	if err != nil {
 		return fmt.Errorf("could not create pod disruption budget: %v", err)
 	}
-	c.MasterPodDisruptionBudget = newPdb
+	c.GeneralPodDisruptionBudget = newPdb
 
 	return nil
 }
 
-func (c *Cluster) deleteMasterPodDisruptionBudget() error {
-	c.logger.Debug("deleting master pod disruption budget")
-	if c.MasterPodDisruptionBudget == nil {
-		c.logger.Debug("there is no master pod disruption budget in the cluster")
+func (c *Cluster) deleteGeneralPodDisruptionBudget() error {
+	c.logger.Debug("deleting general pod disruption budget")
+	if c.GeneralPodDisruptionBudget == nil {
+		c.logger.Debug("there is no general pod disruption budget in the cluster")
 		return nil
 	}
 
-	pdbName := util.NameFromMeta(c.MasterPodDisruptionBudget.ObjectMeta)
+	pdbName := util.NameFromMeta(c.GeneralPodDisruptionBudget.ObjectMeta)
 	err := c.KubeClient.
-		PodDisruptionBudgets(c.MasterPodDisruptionBudget.Namespace).
-		Delete(context.TODO(), c.MasterPodDisruptionBudget.Name, c.deleteOptions)
+		PodDisruptionBudgets(c.GeneralPodDisruptionBudget.Namespace).
+		Delete(context.TODO(), c.GeneralPodDisruptionBudget.Name, c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.MasterPodDisruptionBudget.ObjectMeta))
+		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.GeneralPodDisruptionBudget.ObjectMeta))
 	} else if err != nil {
-		return fmt.Errorf("could not delete master pod disruption budget: %v", err)
+		return fmt.Errorf("could not delete general pod disruption budget: %v", err)
 	}
 
-	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.MasterPodDisruptionBudget.ObjectMeta))
-	c.MasterPodDisruptionBudget = nil
+	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.GeneralPodDisruptionBudget.ObjectMeta))
+	c.GeneralPodDisruptionBudget = nil
 
 	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
@@ -504,7 +504,7 @@ func (c *Cluster) deleteMasterPodDisruptionBudget() error {
 			return false, err2
 		})
 	if err != nil {
-		return fmt.Errorf("could not delete master pod disruption budget: %v", err)
+		return fmt.Errorf("could not delete general pod disruption budget: %v", err)
 	}
 
 	return nil
@@ -513,7 +513,7 @@ func (c *Cluster) deleteMasterPodDisruptionBudget() error {
 func (c *Cluster) deletePodDisruptionBudgets() error {
 	errors := make([]string, 0)
 
-	if err := c.deleteMasterPodDisruptionBudget(); err != nil {
+	if err := c.deleteGeneralPodDisruptionBudget(); err != nil {
 		errors = append(errors, fmt.Sprintf("%v", err))
 	}
 
@@ -739,7 +739,7 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 	return c.Statefulset
 }
 
-// GetMasterPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget for Master Pod
-func (c *Cluster) GetMasterPodDisruptionBudget() *policyv1.PodDisruptionBudget {
-	return c.MasterPodDisruptionBudget
+// GetPodDisruptionBudget returns cluster's general kubernetes PodDisruptionBudget
+func (c *Cluster) GetGeneralPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+	return c.GeneralPodDisruptionBudget
 }
