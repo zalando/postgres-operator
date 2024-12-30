@@ -109,7 +109,7 @@ func (c *Cluster) servicePort(role PostgresRole) int32 {
 	return pgPort
 }
 
-func (c *Cluster) podDisruptionBudgetName() string {
+func (c *Cluster) masterPodDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
 
@@ -2207,7 +2207,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	return result
 }
 
-func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
+func (c *Cluster) generateMasterPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 	pdbMasterLabelSelector := c.OpConfig.PDBMasterLabelSelector
@@ -2225,7 +2225,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            c.podDisruptionBudgetName(),
+			Name:            c.masterPodDisruptionBudgetName(),
 			Namespace:       c.Namespace,
 			Labels:          c.labelsSet(true),
 			Annotations:     c.annotationsSet(nil),

@@ -59,16 +59,16 @@ type Config struct {
 }
 
 type kubeResources struct {
-	Services            map[PostgresRole]*v1.Service
-	Endpoints           map[PostgresRole]*v1.Endpoints
-	PatroniEndpoints    map[string]*v1.Endpoints
-	PatroniConfigMaps   map[string]*v1.ConfigMap
-	Secrets             map[types.UID]*v1.Secret
-	Statefulset         *appsv1.StatefulSet
-	VolumeClaims        map[types.UID]*v1.PersistentVolumeClaim
-	PodDisruptionBudget *policyv1.PodDisruptionBudget
-	LogicalBackupJob    *batchv1.CronJob
-	Streams             map[string]*zalandov1.FabricEventStream
+	Services                  map[PostgresRole]*v1.Service
+	Endpoints                 map[PostgresRole]*v1.Endpoints
+	PatroniEndpoints          map[string]*v1.Endpoints
+	PatroniConfigMaps         map[string]*v1.ConfigMap
+	Secrets                   map[types.UID]*v1.Secret
+	Statefulset               *appsv1.StatefulSet
+	VolumeClaims              map[types.UID]*v1.PersistentVolumeClaim
+	MasterPodDisruptionBudget *policyv1.PodDisruptionBudget
+	LogicalBackupJob          *batchv1.CronJob
+	Streams                   map[string]*zalandov1.FabricEventStream
 	//Pods are treated separately
 }
 
@@ -343,14 +343,10 @@ func (c *Cluster) Create() (err error) {
 	c.logger.Infof("secrets have been successfully created")
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Secrets", "The secrets have been successfully created")
 
-	if c.PodDisruptionBudget != nil {
-		return fmt.Errorf("pod disruption budget already exists in the cluster")
+	if err = c.createPodDisruptionBudgets(); err != nil {
+		return fmt.Errorf("could not create pod disruption budgets: %v", err)
 	}
-	pdb, err := c.createPodDisruptionBudget()
-	if err != nil {
-		return fmt.Errorf("could not create pod disruption budget: %v", err)
-	}
-	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
+	c.logger.Info("pod disruption budgets have been successfully created")
 
 	if c.Statefulset != nil {
 		return fmt.Errorf("statefulset already exists in the cluster")
@@ -1081,9 +1077,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// pod disruption budget
-	if err := c.syncPodDisruptionBudget(true); err != nil {
-		c.logger.Errorf("could not sync pod disruption budget: %v", err)
+	// pod disruption budgets
+	if err := c.syncPodDisruptionBudgets(true); err != nil {
+		c.logger.Errorf("could not sync pod disruption budgets: %v", err)
 		updateFailed = true
 	}
 
@@ -1228,10 +1224,10 @@ func (c *Cluster) Delete() error {
 		c.logger.Info("not deleting secrets because disabled in configuration")
 	}
 
-	if err := c.deletePodDisruptionBudget(); err != nil {
+	if err := c.deletePodDisruptionBudgets(); err != nil {
 		anyErrors = true
-		c.logger.Warningf("could not delete pod disruption budget: %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budget: %v", err)
+		c.logger.Warningf("could not delete pod disruption budgets: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budgets: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -1730,16 +1726,16 @@ func (c *Cluster) GetCurrentProcess() Process {
 // GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() *ClusterStatus {
 	status := &ClusterStatus{
-		Cluster:             c.Name,
-		Namespace:           c.Namespace,
-		Team:                c.Spec.TeamID,
-		Status:              c.Status,
-		Spec:                c.Spec,
-		MasterService:       c.GetServiceMaster(),
-		ReplicaService:      c.GetServiceReplica(),
-		StatefulSet:         c.GetStatefulSet(),
-		PodDisruptionBudget: c.GetPodDisruptionBudget(),
-		CurrentProcess:      c.GetCurrentProcess(),
+		Cluster:                   c.Name,
+		Namespace:                 c.Namespace,
+		Team:                      c.Spec.TeamID,
+		Status:                    c.Status,
+		Spec:                      c.Spec,
+		MasterService:             c.GetServiceMaster(),
+		ReplicaService:            c.GetServiceReplica(),
+		StatefulSet:               c.GetStatefulSet(),
+		MasterPodDisruptionBudget: c.GetMasterPodDisruptionBudget(),
+		CurrentProcess:            c.GetCurrentProcess(),
 
 		Error: fmt.Errorf("error: %s", c.Error),
 	}

@@ -329,7 +329,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 	if err != nil {
 		return nil, err
 	}
-	_, err = cluster.createPodDisruptionBudget()
+	err = cluster.createPodDisruptionBudgets()
 	if err != nil {
 		return nil, err
 	}
