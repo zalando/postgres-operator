@@ -59,16 +59,16 @@ type Config struct {
 }
 
 type kubeResources struct {
-	Services                  map[PostgresRole]*v1.Service
-	Endpoints                 map[PostgresRole]*v1.Endpoints
-	PatroniEndpoints          map[string]*v1.Endpoints
-	PatroniConfigMaps         map[string]*v1.ConfigMap
-	Secrets                   map[types.UID]*v1.Secret
-	Statefulset               *appsv1.StatefulSet
-	VolumeClaims              map[types.UID]*v1.PersistentVolumeClaim
-	MasterPodDisruptionBudget *policyv1.PodDisruptionBudget
-	LogicalBackupJob          *batchv1.CronJob
-	Streams                   map[string]*zalandov1.FabricEventStream
+	Services                   map[PostgresRole]*v1.Service
+	Endpoints                  map[PostgresRole]*v1.Endpoints
+	PatroniEndpoints           map[string]*v1.Endpoints
+	PatroniConfigMaps          map[string]*v1.ConfigMap
+	Secrets                    map[types.UID]*v1.Secret
+	Statefulset                *appsv1.StatefulSet
+	VolumeClaims               map[types.UID]*v1.PersistentVolumeClaim
+	GeneralPodDisruptionBudget *policyv1.PodDisruptionBudget
+	LogicalBackupJob           *batchv1.CronJob
+	Streams                    map[string]*zalandov1.FabricEventStream
 	//Pods are treated separately
 }
 
@@ -1726,16 +1726,16 @@ func (c *Cluster) GetCurrentProcess() Process {
 // GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() *ClusterStatus {
 	status := &ClusterStatus{
-		Cluster:                   c.Name,
-		Namespace:                 c.Namespace,
-		Team:                      c.Spec.TeamID,
-		Status:                    c.Status,
-		Spec:                      c.Spec,
-		MasterService:             c.GetServiceMaster(),
-		ReplicaService:            c.GetServiceReplica(),
-		StatefulSet:               c.GetStatefulSet(),
-		MasterPodDisruptionBudget: c.GetMasterPodDisruptionBudget(),
-		CurrentProcess:            c.GetCurrentProcess(),
+		Cluster:                    c.Name,
+		Namespace:                  c.Namespace,
+		Team:                       c.Spec.TeamID,
+		Status:                     c.Status,
+		Spec:                       c.Spec,
+		MasterService:              c.GetServiceMaster(),
+		ReplicaService:             c.GetServiceReplica(),
+		StatefulSet:                c.GetStatefulSet(),
+		GeneralPodDisruptionBudget: c.GetGeneralPodDisruptionBudget(),
+		CurrentProcess:             c.GetCurrentProcess(),
 
 		Error: fmt.Errorf("error: %s", c.Error),
 	}
