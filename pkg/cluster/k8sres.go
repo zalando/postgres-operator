@@ -2248,7 +2248,6 @@ func (c *Cluster) generateGeneralPodDisruptionBudget() *policyv1.PodDisruptionBu
 func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt32(c.Spec.NumberOfInstances)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
-	pdbMasterLabelSelector := c.OpConfig.PDBMasterLabelSelector
 
 	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
 	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
@@ -2256,9 +2255,7 @@ func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptio
 	}
 
 	labels := c.labelsSet(false)
-	if pdbMasterLabelSelector == nil || *c.OpConfig.PDBMasterLabelSelector {
-		labels["critical-operaton"] = "true"
-	}
+	labels["critical-operaton"] = "true"
 
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
