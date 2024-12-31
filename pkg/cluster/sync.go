@@ -494,10 +494,56 @@ func (c *Cluster) syncGeneralPodDisruptionBudget(isUpdate bool) error {
 	return nil
 }
 
+func (c *Cluster) syncCriticalOpPodDisruptionBudget(isUpdate bool) error {
+	var (
+		pdb *policyv1.PodDisruptionBudget
+		err error
+	)
+	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
+		c.CriticalOpPodDisruptionBudget = pdb
+		newPDB := c.generateCriticalOpPodDisruptionBudget()
+		match, reason := c.comparePodDisruptionBudget(pdb, newPDB)
+		if !match {
+			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
+			if err = c.updateCriticalOpPodDisruptionBudget(newPDB); err != nil {
+				return err
+			}
+		} else {
+			c.CriticalOpPodDisruptionBudget = pdb
+		}
+		return nil
+
+	}
+	if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get pod disruption budget: %v", err)
+	}
+	// no existing pod disruption budget, create new one
+	c.logger.Infof("could not find pod disruption budget for critical operations")
+
+	if err = c.createCriticalOpPodDisruptionBudget(); err != nil {
+		if !k8sutil.ResourceAlreadyExists(err) {
+			return fmt.Errorf("could not create pod disruption budget for critical operations: %v", err)
+		}
+		c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
+		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
+		}
+	}
+
+	c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
+	c.CriticalOpPodDisruptionBudget = pdb
+
+	return nil
+}
+
 func (c *Cluster) syncPodDisruptionBudgets(isUpdate bool) error {
 	errors := make([]string, 0)
 
 	if err := c.syncGeneralPodDisruptionBudget(isUpdate); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	if err := c.syncCriticalOpPodDisruptionBudget(isUpdate); err != nil {
 		errors = append(errors, fmt.Sprintf("%v", err))
 	}
 

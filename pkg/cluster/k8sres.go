@@ -113,6 +113,11 @@ func (c *Cluster) generalPodDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
 
+func (c *Cluster) criticalOpPodDisruptionBudgetName() string {
+	pdbTemplate := config.StringTemplate("postgres-{cluster}-critical-operation-pdb")
+	return pdbTemplate.Format("cluster", c.Name)
+}
+
 func makeDefaultResources(config *config.Config) acidv1.Resources {
 
 	defaultRequests := acidv1.ResourceDescription{
@@ -2226,6 +2231,38 @@ func (c *Cluster) generateGeneralPodDisruptionBudget() *policyv1.PodDisruptionBu
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.generalPodDisruptionBudgetName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: policyv1.PodDisruptionBudgetSpec{
+			MinAvailable: &minAvailable,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+		},
+	}
+}
+
+func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+	minAvailable := intstr.FromInt32(c.Spec.NumberOfInstances)
+	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
+	pdbMasterLabelSelector := c.OpConfig.PDBMasterLabelSelector
+
+	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
+	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
+		minAvailable = intstr.FromInt(0)
+	}
+
+	labels := c.labelsSet(false)
+	if pdbMasterLabelSelector == nil || *c.OpConfig.PDBMasterLabelSelector {
+		labels["critical-operaton"] = "true"
+	}
+
+	return &policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            c.criticalOpPodDisruptionBudgetName(),
 			Namespace:       c.Namespace,
 			Labels:          c.labelsSet(true),
 			Annotations:     c.annotationsSet(nil),
