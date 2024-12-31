@@ -831,3 +831,8 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 func (c *Cluster) GetGeneralPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	return c.GeneralPodDisruptionBudget
 }
+
+// GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget for critical operations
+func (c *Cluster) GetCriticalOpPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+	return c.CriticalOpPodDisruptionBudget
+}
