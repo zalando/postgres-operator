@@ -1727,16 +1727,17 @@ func (c *Cluster) GetCurrentProcess() Process {
 // GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() *ClusterStatus {
 	status := &ClusterStatus{
-		Cluster:                    c.Name,
-		Namespace:                  c.Namespace,
-		Team:                       c.Spec.TeamID,
-		Status:                     c.Status,
-		Spec:                       c.Spec,
-		MasterService:              c.GetServiceMaster(),
-		ReplicaService:             c.GetServiceReplica(),
-		StatefulSet:                c.GetStatefulSet(),
-		GeneralPodDisruptionBudget: c.GetGeneralPodDisruptionBudget(),
-		CurrentProcess:             c.GetCurrentProcess(),
+		Cluster:                       c.Name,
+		Namespace:                     c.Namespace,
+		Team:                          c.Spec.TeamID,
+		Status:                        c.Status,
+		Spec:                          c.Spec,
+		MasterService:                 c.GetServiceMaster(),
+		ReplicaService:                c.GetServiceReplica(),
+		StatefulSet:                   c.GetStatefulSet(),
+		GeneralPodDisruptionBudget:    c.GetGeneralPodDisruptionBudget(),
+		CriticalOpPodDisruptionBudget: c.GetCriticalOpPodDisruptionBudget(),
+		CurrentProcess:                c.GetCurrentProcess(),
 
 		Error: fmt.Errorf("error: %s", c.Error),
 	}
