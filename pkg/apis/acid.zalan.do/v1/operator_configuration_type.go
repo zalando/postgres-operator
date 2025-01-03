@@ -81,6 +81,7 @@ type KubernetesMetaConfiguration struct {
 	InfrastructureRolesSecretName          spec.NamespacedName          `json:"infrastructure_roles_secret_name,omitempty"`
 	InfrastructureRolesDefs                []*config.InfrastructureRole `json:"infrastructure_roles_secrets,omitempty"`
 	PodRoleLabel                           string                       `json:"pod_role_label,omitempty"`
+	PodLeaderLabelValue                    string                       `json:"pod_leader_label_value,omitempty"`
 	ClusterLabels                          map[string]string            `json:"cluster_labels,omitempty"`
 	InheritedLabels                        []string                     `json:"inherited_labels,omitempty"`
 	InheritedAnnotations                   []string                     `json:"inherited_annotations,omitempty"`

@@ -77,7 +77,7 @@ func (c *Cluster) statefulSetName() string {
 func (c *Cluster) serviceName(role PostgresRole) string {
 	name := c.Name
 	switch role {
-	case Replica:
+	case c.replicaRole():
 		name = fmt.Sprintf("%s-%s", name, "repl")
 	case Patroni:
 		name = fmt.Sprintf("%s-%s", name, "config")
@@ -951,6 +951,14 @@ func (c *Cluster) generateSpiloPodEnvVars(
 			Value: c.OpConfig.PodRoleLabel,
 		},
 		{
+			Name:  "KUBERNETES_LEADER_LABEL_VALUE",
+			Value: c.OpConfig.PodLeaderLabelValue,
+		},
+		{
+			Name:  "KUBERNETES_STANDBY_LEADER_LABEL_VALUE",
+			Value: c.OpConfig.PodLeaderLabelValue,
+		},
+		{
 			Name: "PGPASSWORD_SUPERUSER",
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -1529,7 +1537,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:                             &numberOfInstances,
 			Selector:                             c.labelsSelector(),
-			ServiceName:                          c.serviceName(Master),
+			ServiceName:                          c.serviceName(c.masterRole()),
 			Template:                             *podTemplate,
 			VolumeClaimTemplates:                 []v1.PersistentVolumeClaim{*volumeClaimTemplate},
 			UpdateStrategy:                       updateStrategy,
@@ -1948,7 +1956,7 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 
 	switch role {
 
-	case Replica:
+	case c.replicaRole():
 
 		// if the value is explicitly set in a Postgresql manifest, follow this setting
 		if spec.EnableReplicaLoadBalancer != nil {
@@ -1958,7 +1966,7 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 		// otherwise, follow the operator configuration
 		return c.OpConfig.EnableReplicaLoadBalancer
 
-	case Master:
+	case c.masterRole():
 
 		if spec.EnableMasterLoadBalancer != nil {
 			return *spec.EnableMasterLoadBalancer
@@ -1980,7 +1988,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 
 	// no selector for master, see https://github.com/zalando/postgres-operator/issues/340
 	// if kubernetes_use_configmaps is set master service needs a selector
-	if role == Replica || c.patroniKubernetesUseConfigMaps() {
+	if role == c.replicaRole() || c.patroniKubernetesUseConfigMaps() {
 		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
 
@@ -2047,9 +2055,9 @@ func (c *Cluster) getCustomServiceAnnotations(role PostgresRole, spec *acidv1.Po
 		maps.Copy(annotations, spec.ServiceAnnotations)
 
 		switch role {
-		case Master:
+		case c.masterRole():
 			maps.Copy(annotations, spec.MasterServiceAnnotations)
-		case Replica:
+		case c.replicaRole():
 			maps.Copy(annotations, spec.ReplicaServiceAnnotations)
 		}
 	}
@@ -2220,7 +2228,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	// define label selector and add the master role selector if enabled
 	labels := c.labelsSet(false)
 	if pdbMasterLabelSelector == nil || *c.OpConfig.PDBMasterLabelSelector {
-		labels[c.OpConfig.PodRoleLabel] = string(Master)
+		labels[c.OpConfig.PodRoleLabel] = string(c.masterRole())
 	}
 
 	return &policyv1.PodDisruptionBudget{

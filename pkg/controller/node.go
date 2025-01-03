@@ -108,7 +108,7 @@ func (c *Controller) attemptToMoveMasterPodsOffNode(node *v1.Node) error {
 		podName := util.NameFromMeta(pod.ObjectMeta)
 
 		role, ok := pod.Labels[c.opConfig.PodRoleLabel]
-		if !ok || cluster.PostgresRole(role) != cluster.Master {
+		if !ok || cluster.PostgresRole(role) != cluster.PostgresRole(c.opConfig.PodLeaderLabelValue) {
 			if !ok {
 				c.logger.Warningf("could not move pod %q: pod has no role", podName)
 			}

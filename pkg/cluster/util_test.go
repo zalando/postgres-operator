@@ -161,7 +161,7 @@ func checkResourcesInheritedAnnotations(cluster *Cluster, resultAnnotations map[
 	}
 
 	checkPooler := func(annotations map[string]string) error {
-		for _, role := range []PostgresRole{Master, Replica} {
+		for _, role := range []PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 			deploy, err := cluster.KubeClient.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(role), metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -244,7 +244,7 @@ func checkResourcesInheritedAnnotations(cluster *Cluster, resultAnnotations map[
 
 func createPods(cluster *Cluster) []v1.Pod {
 	podsList := make([]v1.Pod, 0)
-	for i, role := range []PostgresRole{Master, Replica} {
+	for i, role := range []PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 		podsList = append(podsList, v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-%d", clusterName, i),
@@ -325,7 +325,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 	if err != nil {
 		return nil, err
 	}
-	_, err = cluster.createService(Master)
+	_, err = cluster.createService(cluster.masterRole())
 	if err != nil {
 		return nil, err
 	}
@@ -365,7 +365,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 }
 
 func createPatroniResources(cluster *Cluster) error {
-	patroniService := cluster.generateService(Replica, &pg.Spec)
+	patroniService := cluster.generateService(cluster.replicaRole(), &pg.Spec)
 	patroniService.ObjectMeta.Name = cluster.serviceName(Patroni)
 	_, err := cluster.KubeClient.Services(namespace).Create(context.TODO(), patroniService, metav1.CreateOptions{})
 	if err != nil {
@@ -479,7 +479,7 @@ func annotateResources(cluster *Cluster) error {
 		}
 	}
 
-	for _, role := range []PostgresRole{Master, Replica} {
+	for _, role := range []PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 		deploy, err := cluster.KubeClient.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(role), metav1.GetOptions{})
 		if err != nil {
 			return err

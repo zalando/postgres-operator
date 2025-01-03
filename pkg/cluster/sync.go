@@ -340,7 +340,7 @@ func (c *Cluster) syncPatroniService() error {
 }
 
 func (c *Cluster) syncServices() error {
-	for _, role := range []PostgresRole{Master, Replica} {
+	for _, role := range []PostgresRole{c.masterRole(), c.replicaRole()} {
 		c.logger.Debugf("syncing %s service", role)
 
 		if !c.patroniKubernetesUseConfigMaps() {
@@ -404,8 +404,8 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		desiredEp := c.generateEndpoint(role, ep.Subsets)
 		// if owner references differ we update which would also change annotations
-		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredEp.ObjectMeta.OwnerReferences) {
-			c.logger.Infof("new %s endpoints's owner references do not match the current ones", role)
+		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredEp.ObjectMeta.OwnerReferences) || !reflect.DeepEqual(ep.Labels, desiredEp.Labels) {
+			c.logger.Infof("new %s endpoints's owner references or labels do not match the current ones", role)
 			c.setProcessName("updating %v endpoint", role)
 			ep, err = c.KubeClient.Endpoints(c.Namespace).Update(context.TODO(), desiredEp, metav1.UpdateOptions{})
 			if err != nil {
@@ -545,7 +545,7 @@ func (c *Cluster) syncStatefulSet() error {
 				podsToRecreate = append(podsToRecreate, pod)
 			} else {
 				role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-				if role == Master {
+				if role == c.masterRole() {
 					continue
 				}
 				switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
@@ -616,7 +616,7 @@ func (c *Cluster) syncStatefulSet() error {
 					podsToRecreate = append(podsToRecreate, pod)
 				} else {
 					role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-					if role == Master {
+					if role == c.masterRole() {
 						continue
 					}
 					switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
@@ -726,9 +726,9 @@ func (c *Cluster) restartInstances(pods []v1.Pod, restartWait uint32, restartPri
 	errors := make([]string, 0)
 	remainingPods := make([]*v1.Pod, 0)
 
-	skipRole := Master
+	skipRole := c.masterRole()
 	if restartPrimaryFirst {
-		skipRole = Replica
+		skipRole = c.replicaRole()
 	}
 
 	for i, pod := range pods {
@@ -1422,7 +1422,7 @@ func (c *Cluster) syncDatabases() error {
 	if len(createDatabases) > 0 {
 		// trigger creation of pooler objects in new database in syncConnectionPooler
 		if c.ConnectionPooler != nil {
-			for _, role := range [2]PostgresRole{Master, Replica} {
+			for _, role := range [2]PostgresRole{c.masterRole(), c.replicaRole()} {
 				c.ConnectionPooler[role].LookupFunction = false
 			}
 		}

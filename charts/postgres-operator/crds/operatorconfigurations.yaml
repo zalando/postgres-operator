@@ -327,6 +327,9 @@ spec:
                   pod_role_label:
                     type: string
                     default: "spilo-role"
+                  pod_leader_label_value:
+                    type: string
+                    default: "master"
                   pod_service_account_definition:
                     type: string
                     default: ""
