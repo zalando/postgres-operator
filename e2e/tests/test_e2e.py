@@ -1198,35 +1198,35 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-upgrade-test'
 
-        with open("manifests/minimal-postgres-manifest-12.yaml", 'r+') as f:
+        with open("manifests/minimal-postgres-lowest-version-manifest.yaml", 'r+') as f:
             upgrade_manifest = yaml.safe_load(f)
             upgrade_manifest["spec"]["dockerImage"] = SPILO_FULL_IMAGE
 
-        with open("manifests/minimal-postgres-manifest-12.yaml", 'w') as f:
+        with open("manifests/minimal-postgres-lowest-version-manifest.yaml", 'w') as f:
             yaml.dump(upgrade_manifest, f, Dumper=yaml.Dumper)
 
-        k8s.create_with_kubectl("manifests/minimal-postgres-manifest-12.yaml")
+        k8s.create_with_kubectl("manifests/minimal-postgres-lowest-version-manifest.yaml")
         self.eventuallyEqual(lambda: k8s.count_running_pods(labels=cluster_label), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(check_version, 12, "Version is not correct")
+        self.eventuallyEqual(check_version, 13, "Version is not correct")
 
         master_nodes, _ = k8s.get_cluster_nodes(cluster_labels=cluster_label)
         # should upgrade immediately
-        pg_patch_version_13 = {
+        pg_patch_version_14 = {
             "spec": {
                 "postgresql": {
-                    "version": "13"
+                    "version": "14"
                 }
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_13)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_14)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 13, "Version should be upgraded from 12 to 13")
+        self.eventuallyEqual(check_version, 14, "Version should be upgraded from 13 to 14")
 
         # check if annotation for last upgrade's success is set
         annotations = get_annotations()
@@ -1235,10 +1235,10 @@ class EndToEndTestCase(unittest.TestCase):
         # should not upgrade because current time is not in maintenanceWindow
         current_time = datetime.now()
         maintenance_window_future = f"{(current_time+timedelta(minutes=60)).strftime('%H:%M')}-{(current_time+timedelta(minutes=120)).strftime('%H:%M')}"
-        pg_patch_version_14 = {
+        pg_patch_version_15 = {
             "spec": {
                 "postgresql": {
-                    "version": "14"
+                    "version": "15"
                 },
                 "maintenanceWindows": [
                     maintenance_window_future
@@ -1246,23 +1246,23 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_14)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 13, "Version should not be upgraded")
+        self.eventuallyEqual(check_version, 14, "Version should not be upgraded")
 
         second_annotations = get_annotations()
         self.assertIsNone(second_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure should not be set")
 
         # change the version again to trigger operator sync
         maintenance_window_current = f"{(current_time-timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=30)).strftime('%H:%M')}"
-        pg_patch_version_15 = {
+        pg_patch_version_16 = {
             "spec": {
                 "postgresql": {
-                    "version": "15"
+                    "version": "16"
                 },
                 "maintenanceWindows": [
                     maintenance_window_current
@@ -1271,13 +1271,13 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_16)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 15, "Version should be upgraded from 13 to 15")
+        self.eventuallyEqual(check_version, 16, "Version should be upgraded from 14 to 16")
 
         # check if annotation for last upgrade's success is updated after second upgrade
         third_annotations = get_annotations()
@@ -1285,7 +1285,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertNotEqual(annotations.get("last-major-upgrade-success"), third_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not updated")
 
         # test upgrade with failed upgrade annotation
-        pg_patch_version_16 = {
+        pg_patch_version_17 = {
             "metadata": {
                 "annotations": {
                     "last-major-upgrade-failure": "2024-01-02T15:04:05Z"
@@ -1293,18 +1293,18 @@ class EndToEndTestCase(unittest.TestCase):
             },
             "spec": {
                 "postgresql": {
-                    "version": "16"
+                    "version": "17"
                 },
             },
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_16)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_17)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role={},'.format(LEADER_LABEL_VALUE) + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 15, "Version should not be upgraded because annotation for last upgrade's failure is set")
+        self.eventuallyEqual(check_version, 16, "Version should not be upgraded because annotation for last upgrade's failure is set")
 
         # change the version back to 15 and should remove failure annotation
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -2201,6 +2201,8 @@ class EndToEndTestCase(unittest.TestCase):
                         {
                             "applicationId": "test-app",
                             "batchSize": 100,
+                            "cpu": "100m",
+                            "memory": "200Mi",
                             "database": "foo",
                             "enableRecovery": True,
                             "tables": {
@@ -2222,7 +2224,7 @@ class EndToEndTestCase(unittest.TestCase):
                                     "eventType": "test-event",
                                     "idColumn": "id",
                                     "payloadColumn": "payload",
-                                    "recoveryEventType": "test-event-dlq"
+                                    "ignoreRecovery": True
                                 }
                             }
                         }

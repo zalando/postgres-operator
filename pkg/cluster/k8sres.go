@@ -1230,6 +1230,7 @@ func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.Resour
 		Resources:       *resources,
 		Env:             sidecar.Env,
 		Ports:           sidecar.Ports,
+		Command:         sidecar.Command,
 	}
 }
 

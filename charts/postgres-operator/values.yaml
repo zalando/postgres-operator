@@ -1,7 +1,7 @@
 image:
   registry: ghcr.io
   repository: zalando/postgres-operator
-  tag: v1.13.0
+  tag: v1.14.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -38,7 +38,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: ghcr.io/zalando/spilo-16:3.3-p1
+  docker_image: ghcr.io/zalando/spilo-17:4.0-p2
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
@@ -89,9 +89,9 @@ configMajorVersionUpgrade:
   # - acid
 
   # minimal Postgres major version that will not automatically be upgraded
-  minimal_major_version: "12"
+  minimal_major_version: "13"
   # target Postgres major version when upgrading clusters automatically
-  target_major_version: "16"
+  target_major_version: "17"
 
 configKubernetes:
   # list of additional capabilities for postgres container

@@ -638,7 +638,7 @@ the global configuration before adding the `tls` section'.
 ## Change data capture streams
 
 This sections enables change data capture (CDC) streams via Postgres' 
-[logical decoding](https://www.postgresql.org/docs/16/logicaldecoding.html)
+[logical decoding](https://www.postgresql.org/docs/17/logicaldecoding.html)
 feature and `pgoutput` plugin. While the Postgres operator takes responsibility
 for providing the setup to publish change events, it relies on external tools
 to consume them. At Zalando, we are using a workflow based on
@@ -652,11 +652,11 @@ can have the following properties:
 
 * **applicationId**
   The application name to which the database and CDC belongs to. For each
-  set of streams with a distinct `applicationId` a separate stream CR as well
-  as a separate logical replication slot will be created. This means there can
-  be different streams in the same database and streams with the same
-  `applicationId` are bundled in one stream CR. The stream CR will be called
-  like the Postgres cluster plus "-<applicationId>" suffix. Required.
+  set of streams with a distinct `applicationId` a separate stream resource as
+  well as a separate logical replication slot will be created. This means there
+  can be different streams in the same database and streams with the same
+  `applicationId` are bundled in one stream resource. The stream resource will
+  be called like the Postgres cluster plus "-<applicationId>" suffix. Required.
 
 * **database**
   Name of the database from where events will be published via Postgres'
@@ -667,21 +667,37 @@ can have the following properties:
 
 * **tables**
   Defines a map of table names and their properties (`eventType`, `idColumn`
-  and `payloadColumn`). The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
+  and `payloadColumn`). Required.
+  The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
   The application is responsible for putting events into a (JSON/B or VARCHAR)
   payload column of the outbox table in the structure of the specified target
-  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/16/logical-replication-publication.html)
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/17/logical-replication-publication.html)
   in Postgres for all tables specified for one `database` and `applicationId`.
   The CDC operator will consume from it shortly after transactions are
   committed to the outbox table. The `idColumn` will be used in telemetry for
   the CDC operator. The names for `idColumn` and `payloadColumn` can be
   configured. Defaults are `id` and `payload`. The target `eventType` has to
-  be defined. Required.
+  be defined. One can also specify a `recoveryEventType` that will be used
+  for a dead letter queue. By enabling `ignoreRecovery`, you can choose to
+  ignore failing events.
 
 * **filter**
   Streamed events can be filtered by a jsonpath expression for each table.
   Optional.
 
+* **enableRecovery**
+  Flag to enable a dead letter queue recovery for all streams tables.
+  Alternatively, recovery can also be enable for single outbox tables by only
+  specifying a `recoveryEventType` and no `enableRecovery` flag. When set to
+  false or missing, events will be retried until consuming succeeded. You can
+  use a `filter` expression to get rid of poison pills. Optional.
+
 * **batchSize**
   Defines the size of batches in which events are consumed. Optional.
   Defaults to 1.
+
+* **cpu**
+  CPU requests to be set as an annotation on the stream resource. Optional.
+
+* **memory**
+  memory requests to be set as an annotation on the stream resource. Optional.

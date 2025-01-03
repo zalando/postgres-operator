@@ -596,9 +596,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 								Enum: []apiextv1.JSON{
 									{
-										Raw: []byte(`"12"`),
-									},
-									{
 										Raw: []byte(`"13"`),
 									},
 									{
@@ -609,6 +606,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									{
 										Raw: []byte(`"16"`),
+									},
+									{
+										Raw: []byte(`"17"`),
 									},
 								},
 							},
@@ -1164,7 +1164,8 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "boolean",
 					},
 					"enable_spilo_wal_path_compat": {
-						Type: "boolean",
+						Type:        "boolean",
+						Description: "deprecated",
 					},
 					"enable_team_id_clustername_prefix": {
 						Type: "boolean",

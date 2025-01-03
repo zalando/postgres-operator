@@ -1,6 +1,6 @@
 module github.com/zalando/postgres-operator
 
-go 1.22.0
+go 1.23.4
 
 require (
 	github.com/aws/aws-sdk-go v1.53.8
@@ -11,7 +11,7 @@ require (
 	github.com/r3labs/diff v1.1.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.31.0
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.30.4
@@ -54,10 +54,10 @@ require (
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.23.0 // indirect
-	golang.org/x/term v0.23.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/appengine v1.6.7 // indirect
