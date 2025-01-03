@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -103,6 +105,74 @@ func (c *Cluster) removeFailuresAnnotation() error {
 		c.logger.Errorf("failed to remove annotations from postgresql resource: %v", err)
 		return err
 	}
+	return nil
+}
+
+func (c *Cluster) labelCriticalOperation(pods []v1.Pod) error {
+	for _, pod := range pods {
+		var meta metav1.ObjectMeta
+		meta.Labels = map[string]string{"critical-operaton": "true"}
+		patchData, err := json.Marshal(struct {
+			ObjMeta interface{} `json:"metadata"`
+		}{&meta})
+		if err != nil {
+			return fmt.Errorf("could not form patch for critical operation label: %v", err)
+		}
+
+		err = retryutil.Retry(1*time.Second, 5*time.Second,
+			func() (bool, error) {
+				_, err2 := c.KubeClient.Pods(pod.Namespace).Patch(
+					context.TODO(),
+					pod.Name,
+					types.MergePatchType,
+					[]byte(patchData),
+					metav1.PatchOptions{},
+					"")
+				if err2 != nil {
+					return false, err2
+				}
+				return true, nil
+			})
+		if err != nil {
+			return fmt.Errorf("could not patch pod critical operation label: %v", err)
+		}
+	}
+	c.logger.Info("pods are patched with critical operation label")
+	return nil
+}
+
+func (c *Cluster) removeCriticalOperationLabel(pods []v1.Pod) error {
+	for _, pod := range pods {
+		annotationToRemove := []map[string]string{
+			{
+				"op":   "remove",
+				"path": fmt.Sprintf("/metadata/labels/%s", "critical-operaton"),
+			},
+		}
+		removePatch, err := json.Marshal(annotationToRemove)
+		if err != nil {
+			c.logger.Errorf("could not form patch for critical operation label: %v", err)
+			return err
+		}
+		err = retryutil.Retry(1*time.Second, 5*time.Second,
+			func() (bool, error) {
+				_, err2 := c.KubeClient.Pods(pod.Namespace).Patch(
+					context.TODO(),
+					pod.Name,
+					types.JSONPatchType,
+					[]byte(removePatch),
+					metav1.PatchOptions{},
+					"")
+				if err2 != nil {
+					return false, err2
+				}
+				return true, nil
+			})
+		if err != nil {
+			return fmt.Errorf("failed to remove pod critical operation label: %v", err)
+		}
+	}
+	c.logger.Info("critical operation label is removed from all pods")
 	return nil
 }
 
@@ -224,6 +294,16 @@ func (c *Cluster) majorVersionUpgrade() error {
 	if allRunning && masterPod != nil {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
+			defer func() error {
+				if err = c.removeCriticalOperationLabel(pods); err != nil {
+					return fmt.Errorf("failed to remove critical-operation label: %s", err)
+				}
+				return nil
+			}()
+			if err = c.labelCriticalOperation(pods); err != nil {
+				return fmt.Errorf("failed to assign critical-operation label: %s", err)
+			}
+
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
