@@ -146,7 +146,7 @@ func TestPodAnnotationsSync(t *testing.T) {
 	clusterName := "acid-test-cluster-2"
 	namespace := "default"
 	podAnnotation := "no-scale-down"
-	podAnnotations := map[string]string{"no-scale-down": "true"}
+	podAnnotations := map[string]string{podAnnotation: "true"}
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -271,7 +271,7 @@ func TestPodAnnotationsSync(t *testing.T) {
 	stsList, err = cluster.KubeClient.StatefulSets(namespace).List(context.TODO(), clusterOptions)
 	assert.NoError(t, err)
 	for _, sts := range stsList.Items {
-		assert.NotContains(t, sts.Spec.Template.Annotations, "no-scale-down")
+		assert.NotContains(t, sts.Spec.Template.Annotations, podAnnotation)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -286,7 +286,7 @@ func TestPodAnnotationsSync(t *testing.T) {
 	podList, err = cluster.KubeClient.Pods(namespace).List(context.TODO(), clusterOptions)
 	assert.NoError(t, err)
 	for _, pod := range podList.Items {
-		assert.NotContains(t, pod.Annotations, "no-scale-down",
+		assert.NotContains(t, pod.Annotations, podAnnotation,
 			fmt.Sprintf("pod %s should not contain annotation %s, found %#v", pod.Name, podAnnotation, pod.Annotations))
 	}
 

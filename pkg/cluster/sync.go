@@ -573,6 +573,7 @@ func (c *Cluster) syncStatefulSet() error {
 					}
 				}
 			}
+			annotationToRemove := ""
 			for anno := range c.Statefulset.Spec.Template.Annotations {
 				if _, ok := desiredSts.Spec.Template.Annotations[anno]; !ok {
 					// template annotation was removed
@@ -581,14 +582,21 @@ func (c *Cluster) syncStatefulSet() error {
 							continue
 						}
 					}
-					annotationToRemove := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":null}}}`, anno))
-					for _, pod := range pods {
-						_, err = c.KubeClient.Pods(c.Namespace).Patch(context.Background(), pod.Name,
-							types.StrategicMergePatchType, annotationToRemove, metav1.PatchOptions{})
-						if err != nil {
-							c.logger.Errorf("failed to remove annotation %s from pod %s: %v", anno, pod.Name, err)
-							return err
-						}
+					if annotationToRemove != "" {
+						annotationToRemove = `{"metadata":{"annotations":{`
+					}
+					annotationToRemove += fmt.Sprintf(`"%s":null,`, anno)
+					// annotationToRemove := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":null}}}`, anno))
+				}
+			}
+			if annotationToRemove != "" {
+				annotationToRemove = strings.TrimSuffix(annotationToRemove, ",") + `}}}`
+				for _, pod := range pods {
+					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.Background(), pod.Name,
+						types.StrategicMergePatchType, []byte(annotationToRemove), metav1.PatchOptions{})
+					if err != nil {
+						c.logger.Errorf("failed to remove annotations from pod %s: %v", pod.Name, err)
+						return err
 					}
 				}
 			}
@@ -1614,6 +1622,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 				c.logger.Infof("reason: %s", reason)
 			}
 			if strings.Contains(reason, "annotations do not match") {
+				annotationToRemoveTemplate := `{"spec":{"jobTemplate":{"spec":{"template":{"metadata":{"annotations":{`
 				for anno := range job.Spec.JobTemplate.Spec.Template.Annotations {
 					if _, ok := desiredJob.Spec.JobTemplate.Spec.Template.Annotations[anno]; !ok {
 						// template annotation was removed
@@ -1622,15 +1631,15 @@ func (c *Cluster) syncLogicalBackupJob() error {
 								continue
 							}
 						}
-						annotationToRemoveTemplate := []byte(fmt.Sprintf(
-							`{"spec":{"jobTemplate":{"spec":{"template":{"metadata":{"annotations":{"%s":null}}}}}}}`, anno))
-						job, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(),
-							jobName, types.StrategicMergePatchType, annotationToRemoveTemplate, metav1.PatchOptions{}, "")
-						if err != nil {
-							c.logger.Errorf("failed to remove annotation %s from the logical backup job %q pod template: %v", anno, jobName, err)
-							return err
-						}
+						annotationToRemoveTemplate += fmt.Sprintf(`"%s":null,`, anno)
 					}
+				}
+				annotationToRemoveTemplate = strings.TrimSuffix(annotationToRemoveTemplate, ",") + `}}}}}}}`
+				job, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(),
+					jobName, types.StrategicMergePatchType, []byte(annotationToRemoveTemplate), metav1.PatchOptions{}, "")
+				if err != nil {
+					c.logger.Errorf("failed to remove annotations from the logical backup job %q pod template: %v", jobName, err)
+					return err
 				}
 			}
 			if err = c.patchLogicalBackupJob(desiredJob); err != nil {

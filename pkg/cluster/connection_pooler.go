@@ -1047,6 +1047,8 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			syncReason = append(syncReason, []string{"new connection pooler's pod template annotations do not match the current ones: " + reason}...)
 
 			if strings.Contains(reason, "Removed") {
+				annotationToRemove := `{"metadata":{"annotations":{`
+				annotationToRemoveTemplate := `{"spec":{"template":{"metadata":{"annotations":{`
 				for anno := range deployment.Spec.Template.Annotations {
 					if _, ok := newPodAnnotations[anno]; !ok {
 						// template annotation was removed
@@ -1055,23 +1057,24 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 								continue
 							}
 						}
-						annotationToRemove := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":null}}}`, anno))
-						annotationToRemoveTemplate := []byte(fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"%s":null}}}}}`, anno))
-						deployment, err = c.KubeClient.Deployments(c.Namespace).Patch(context.TODO(),
-							deployment.Name, types.StrategicMergePatchType, annotationToRemoveTemplate, metav1.PatchOptions{}, "")
-						if err != nil {
-							c.logger.Errorf("failed to remove annotation %s from %s connection pooler's pod template: %v",
-								anno, role, err)
-							return nil, err
-						}
-						for _, pod := range pods {
-							_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name,
-								types.StrategicMergePatchType, annotationToRemove, metav1.PatchOptions{})
-							if err != nil {
-								c.logger.Errorf("failed to remove annotation %s from pod %s: %v", anno, pod.Name, err)
-								return nil, err
-							}
-						}
+						annotationToRemove += fmt.Sprintf(`"%s":null,`, anno)
+						annotationToRemoveTemplate += fmt.Sprintf(`"%s":null,`, anno)
+					}
+				}
+				annotationToRemove = strings.TrimSuffix(annotationToRemove, ",") + `}}}`
+				annotationToRemoveTemplate = strings.TrimSuffix(annotationToRemoveTemplate, ",") + `}}}}}`
+				deployment, err = c.KubeClient.Deployments(c.Namespace).Patch(context.TODO(),
+					deployment.Name, types.StrategicMergePatchType, []byte(annotationToRemoveTemplate), metav1.PatchOptions{}, "")
+				if err != nil {
+					c.logger.Errorf("failed to remove annotations from %s connection pooler's pod template: %v", role, err)
+					return nil, err
+				}
+				for _, pod := range pods {
+					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name,
+						types.StrategicMergePatchType, []byte(annotationToRemove), metav1.PatchOptions{})
+					if err != nil {
+						c.logger.Errorf("failed to remove annotations from pod %s: %v", pod.Name, err)
+						return nil, err
 					}
 				}
 			}
