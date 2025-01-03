@@ -705,8 +705,8 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster.Spec.MaintenanceWindows = tt.windows
-			if IsInMainternanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
-				t.Errorf("Expected isInMainternanceWindow to return %t", tt.expected)
+			if IsInMaintenanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
+				t.Errorf("Expected IsInMaintenanceWindow to return %t", tt.expected)
 			}
 		})
 	}

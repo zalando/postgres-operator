@@ -139,7 +139,7 @@ func (c *Controller) attemptToMoveMasterPodsOffNode(node *v1.Node) error {
 	for pod, cl := range masterPods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
 
-		if !cluster.IsInMainternanceWindow(cl.Spec.MaintenanceWindows) {
+		if !cluster.IsInMaintenanceWindow(cl.Spec.MaintenanceWindows) {
 			c.logger.Infof("skipping master pod migration, not in maintenance window")
 			continue
 		}
