@@ -141,6 +141,9 @@ configKubernetes:
   enable_readiness_probe: false
   # toggles if operator should delete secrets on cluster deletion
   enable_secrets_deletion: true
+  # key name for annotation that overrides enable_secrets_deletion on cluster level
+  # enable_secrets_deletion_key: "enable-secrets-deletion"
+
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
 
