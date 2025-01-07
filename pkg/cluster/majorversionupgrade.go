@@ -129,7 +129,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
-	if !IsInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
 		c.logger.Infof("skipping major version upgrade, not in maintenance window")
 		return nil
 	}

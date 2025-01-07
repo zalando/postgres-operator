@@ -1736,6 +1736,12 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 
 	var err error
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
+
+	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+		c.logger.Infof("skipping switchover, not in maintenance window")
+		return nil
+	}
+
 	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
 	stopCh := make(chan struct{})
 	ch := c.registerPodSubscriber(candidate)

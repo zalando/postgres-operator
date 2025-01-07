@@ -658,7 +658,9 @@ func (c *Cluster) syncStatefulSet() error {
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if len(podsToRecreate) > 0 {
-		if isSafeToRecreatePods {
+		if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+			c.logger.Infof("skipping pod recreation, not in maintenance window")
+		} else if isSafeToRecreatePods {
 			c.logger.Info("performing rolling update")
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
 			if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
