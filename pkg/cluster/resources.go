@@ -132,7 +132,7 @@ func getPodIndex(podName string) (int32, error) {
 }
 
 func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
-	masterPod, err := c.getRolePods(Master)
+	masterPod, err := c.getRolePods(c.masterRole())
 	if err != nil {
 		return fmt.Errorf("could not get master pod: %v", err)
 	}
@@ -393,7 +393,7 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	result := make([]v1.EndpointSubset, 0)
 	pods, err := c.getRolePods(role)
 	if err != nil {
-		if role == Master {
+		if role == c.masterRole() {
 			c.logger.Warningf("could not obtain the address for %s pod: %v", role, err)
 		} else {
 			c.logger.Warningf("could not obtain the addresses for %s pods: %v", role, err)
@@ -410,7 +410,7 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 			Addresses: endPointAddresses,
 			Ports:     []v1.EndpointPort{{Name: "postgresql", Port: 5432, Protocol: "TCP"}},
 		})
-	} else if role == Master {
+	} else if role == c.masterRole() {
 		c.logger.Warningf("master is not running, generated master endpoint does not contain any addresses")
 	}
 
@@ -682,22 +682,22 @@ func (c *Cluster) deleteLogicalBackupJob() error {
 
 // GetServiceMaster returns cluster's kubernetes master Service
 func (c *Cluster) GetServiceMaster() *v1.Service {
-	return c.Services[Master]
+	return c.Services[c.masterRole()]
 }
 
 // GetServiceReplica returns cluster's kubernetes replica Service
 func (c *Cluster) GetServiceReplica() *v1.Service {
-	return c.Services[Replica]
+	return c.Services[c.replicaRole()]
 }
 
 // GetEndpointMaster returns cluster's kubernetes master Endpoint
 func (c *Cluster) GetEndpointMaster() *v1.Endpoints {
-	return c.Endpoints[Master]
+	return c.Endpoints[c.masterRole()]
 }
 
 // GetEndpointReplica returns cluster's kubernetes replica Endpoint
 func (c *Cluster) GetEndpointReplica() *v1.Endpoints {
-	return c.Endpoints[Replica]
+	return c.Endpoints[c.replicaRole()]
 }
 
 // GetStatefulSet returns cluster's kubernetes StatefulSet

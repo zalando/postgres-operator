@@ -434,6 +434,10 @@ configuration they are grouped under the `kubernetes` key.
   name of the label assigned to the Postgres pods (and services/endpoints) by
   the operator. The default is `spilo-role`.
 
+* **pod_leader_label_value**
+  value of the pod label if Postgres role is primary when running on Kubernetes.
+  The default is 'master'.
+
 * **cluster_labels**
   list of `name:value` pairs for additional labels assigned to the cluster
   objects. The default is `application:spilo`.

@@ -6,6 +6,7 @@ import warnings
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
+from tests.constants import LEADER_LABEL_VALUE
 
 def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
@@ -47,7 +48,7 @@ class K8s:
         replica_pod_nodes = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pg_cluster_name)
         for pod in podsList.items:
-            if pod.metadata.labels.get('spilo-role') == 'master':
+            if pod.metadata.labels.get('spilo-role') == LEADER_LABEL_VALUE:
                 master_pod_node = pod.spec.node_name
             elif pod.metadata.labels.get('spilo-role') == 'replica':
                 replica_pod_nodes.append(pod.spec.node_name)
@@ -59,7 +60,7 @@ class K8s:
         r = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=cluster_labels)
         for pod in podsList.items:
-            if pod.metadata.labels.get('spilo-role') == 'master' and pod.status.phase == 'Running':
+            if pod.metadata.labels.get('spilo-role') == LEADER_LABEL_VALUE and pod.status.phase == 'Running':
                 m.append(pod.spec.node_name)
             elif pod.metadata.labels.get('spilo-role') == 'replica' and pod.status.phase == 'Running':
                 r.append(pod.spec.node_name)
@@ -351,7 +352,7 @@ class K8s:
             return pods[0]
 
     def get_cluster_leader_pod(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
-        return self.get_cluster_pod('master', labels, namespace)
+        return self.get_cluster_pod(LEADER_LABEL_VALUE, labels, namespace)
 
     def get_cluster_replica_pod(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         return self.get_cluster_pod('replica', labels, namespace)
@@ -383,7 +384,7 @@ class K8sBase:
         replica_pod_nodes = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pg_cluster_labels)
         for pod in podsList.items:
-            if pod.metadata.labels.get('spilo-role') == 'master':
+            if pod.metadata.labels.get('spilo-role') == LEADER_LABEL_VALUE:
                 master_pod_node = pod.spec.node_name
             elif pod.metadata.labels.get('spilo-role') == 'replica':
                 replica_pod_nodes.append(pod.spec.node_name)
@@ -395,7 +396,7 @@ class K8sBase:
         r = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=cluster_labels)
         for pod in podsList.items:
-            if pod.metadata.labels.get('spilo-role') == 'master' and pod.status.phase == 'Running':
+            if pod.metadata.labels.get('spilo-role') == LEADER_LABEL_VALUE and pod.status.phase == 'Running':
                 m.append(pod.spec.node_name)
             elif pod.metadata.labels.get('spilo-role') == 'replica' and pod.status.phase == 'Running':
                 r.append(pod.spec.node_name)
@@ -622,7 +623,7 @@ class K8sPostgres(K8sBase):
         replica_pod_nodes = []
         podsList = self.api.core_v1.list_namespaced_pod(self.namespace, label_selector=self.labels)
         for pod in podsList.items:
-            if pod.metadata.labels.get('spilo-role') == 'master':
+            if pod.metadata.labels.get('spilo-role') == LEADER_LABEL_VALUE:
                 master_pod_node = pod.spec.node_name
             elif pod.metadata.labels.get('spilo-role') == 'replica':
                 replica_pod_nodes.append(pod.spec.node_name)

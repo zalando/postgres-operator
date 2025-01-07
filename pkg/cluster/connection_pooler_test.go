@@ -42,7 +42,7 @@ func boolToPointer(value bool) *bool {
 }
 
 func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
-	for _, role := range [2]PostgresRole{Master, Replica} {
+	for _, role := range [2]PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 
 		poolerLabels := cluster.labelsSet(false)
 		poolerLabels["application"] = "db-connection-pooler"
@@ -63,7 +63,7 @@ func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
 		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	for _, role := range []PostgresRole{Master, Replica} {
+	for _, role := range []PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 		poolerLabels := cluster.labelsSet(false)
 		poolerLabels["application"] = "db-connection-pooler"
 		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
@@ -87,14 +87,14 @@ func MasterObjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error
 
 	poolerLabels := cluster.labelsSet(false)
 	poolerLabels["application"] = "db-connection-pooler"
-	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(Master)
+	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(cluster.masterRole())
 
-	if cluster.ConnectionPooler[Master].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[Master].Deployment.Labels, poolerLabels) {
-		return fmt.Errorf("Deployment was not saved or labels not attached %s", cluster.ConnectionPooler[Master].Deployment.Labels)
+	if cluster.ConnectionPooler[cluster.masterRole()].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[cluster.masterRole()].Deployment.Labels, poolerLabels) {
+		return fmt.Errorf("Deployment was not saved or labels not attached %s", cluster.ConnectionPooler[cluster.masterRole()].Deployment.Labels)
 	}
 
-	if cluster.ConnectionPooler[Master].Service == nil || !util.MapContains(cluster.ConnectionPooler[Master].Service.Labels, poolerLabels) {
-		return fmt.Errorf("Service was not saved or labels not attached %s", cluster.ConnectionPooler[Master].Service.Labels)
+	if cluster.ConnectionPooler[cluster.masterRole()].Service == nil || !util.MapContains(cluster.ConnectionPooler[cluster.masterRole()].Service.Labels, poolerLabels) {
+		return fmt.Errorf("Service was not saved or labels not attached %s", cluster.ConnectionPooler[cluster.masterRole()].Service.Labels)
 	}
 
 	return nil
@@ -107,21 +107,21 @@ func ReplicaObjectsAreSaved(cluster *Cluster, err error, reason SyncReason) erro
 
 	poolerLabels := cluster.labelsSet(false)
 	poolerLabels["application"] = "db-connection-pooler"
-	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(Replica)
+	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(cluster.replicaRole())
 
-	if cluster.ConnectionPooler[Replica].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[Replica].Deployment.Labels, poolerLabels) {
-		return fmt.Errorf("Deployment was not saved or labels not attached %s", cluster.ConnectionPooler[Replica].Deployment.Labels)
+	if cluster.ConnectionPooler[cluster.replicaRole()].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[cluster.replicaRole()].Deployment.Labels, poolerLabels) {
+		return fmt.Errorf("Deployment was not saved or labels not attached %s", cluster.ConnectionPooler[cluster.replicaRole()].Deployment.Labels)
 	}
 
-	if cluster.ConnectionPooler[Replica].Service == nil || !util.MapContains(cluster.ConnectionPooler[Replica].Service.Labels, poolerLabels) {
-		return fmt.Errorf("Service was not saved or labels not attached %s", cluster.ConnectionPooler[Replica].Service.Labels)
+	if cluster.ConnectionPooler[cluster.replicaRole()].Service == nil || !util.MapContains(cluster.ConnectionPooler[cluster.replicaRole()].Service.Labels, poolerLabels) {
+		return fmt.Errorf("Service was not saved or labels not attached %s", cluster.ConnectionPooler[cluster.replicaRole()].Service.Labels)
 	}
 
 	return nil
 }
 
 func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
-	for _, role := range [2]PostgresRole{Master, Replica} {
+	for _, role := range [2]PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 		if cluster.ConnectionPooler[role] != nil &&
 			(cluster.ConnectionPooler[role].Deployment != nil || cluster.ConnectionPooler[role].Service != nil) {
 			return fmt.Errorf("Connection pooler was not deleted for role %v", role)
@@ -133,8 +133,8 @@ func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
 
 func OnlyMasterDeleted(cluster *Cluster, err error, reason SyncReason) error {
 
-	if cluster.ConnectionPooler[Master] != nil &&
-		(cluster.ConnectionPooler[Master].Deployment != nil || cluster.ConnectionPooler[Master].Service != nil) {
+	if cluster.ConnectionPooler[cluster.masterRole()] != nil &&
+		(cluster.ConnectionPooler[cluster.masterRole()].Deployment != nil || cluster.ConnectionPooler[cluster.masterRole()].Service != nil) {
 		return fmt.Errorf("Connection pooler master was not deleted")
 	}
 	return nil
@@ -142,8 +142,8 @@ func OnlyMasterDeleted(cluster *Cluster, err error, reason SyncReason) error {
 
 func OnlyReplicaDeleted(cluster *Cluster, err error, reason SyncReason) error {
 
-	if cluster.ConnectionPooler[Replica] != nil &&
-		(cluster.ConnectionPooler[Replica].Deployment != nil || cluster.ConnectionPooler[Replica].Service != nil) {
+	if cluster.ConnectionPooler[cluster.replicaRole()] != nil &&
+		(cluster.ConnectionPooler[cluster.replicaRole()].Deployment != nil || cluster.ConnectionPooler[cluster.replicaRole()].Service != nil) {
 		return fmt.Errorf("Connection pooler replica was not deleted")
 	}
 	return nil
@@ -323,7 +323,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 	cluster.Name = "acid-fake-cluster"
 	cluster.Namespace = "default"
 
-	_, err := cluster.createService(Master)
+	_, err := cluster.createService(cluster.masterRole())
 	assert.NoError(t, err)
 	_, err = cluster.createStatefulSet()
 	assert.NoError(t, err)
@@ -334,7 +334,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
 			testName, err, reason)
 	}
-	for _, role := range [2]PostgresRole{Master, Replica} {
+	for _, role := range [2]PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 		poolerLabels := cluster.labelsSet(false)
 		poolerLabels["application"] = "db-connection-pooler"
 		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
@@ -369,7 +369,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 		t.Errorf("%s: Cannot sync connection pooler, %s", testName, err)
 	}
 
-	for _, role := range [2]PostgresRole{Master, Replica} {
+	for _, role := range [2]PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 		err = cluster.deleteConnectionPooler(role)
 		if err != nil {
 			t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
@@ -424,6 +424,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 					DefaultMemoryRequest: "300Mi",
 					DefaultMemoryLimit:   "300Mi",
 					PodRoleLabel:         "spilo-role",
+					PodLeaderLabelValue:  leaderLabelValue,
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -431,7 +432,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 	cluster.Name = "acid-fake-cluster"
 	cluster.Namespace = "default"
 
-	_, err := cluster.createService(Master)
+	_, err := cluster.createService(cluster.masterRole())
 	assert.NoError(t, err)
 	_, err = cluster.createStatefulSet()
 	assert.NoError(t, err)
@@ -765,7 +766,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 			check:   testEnvs,
 		},
 	}
-	for _, role := range [2]PostgresRole{Master, Replica} {
+	for _, role := range [2]PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 		for _, tt := range tests {
 			podSpec, _ := tt.cluster.generateConnectionPoolerPodTemplate(role)
 
@@ -802,12 +803,12 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 		},
 	}
 	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
-		Master: {
+		cluster.masterRole(): {
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: true,
 			Name:           "",
-			Role:           Master,
+			Role:           cluster.masterRole(),
 		},
 	}
 
@@ -854,7 +855,7 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		deployment, err := tt.cluster.generateConnectionPoolerDeployment(cluster.ConnectionPooler[Master])
+		deployment, err := tt.cluster.generateConnectionPoolerDeployment(cluster.ConnectionPooler[cluster.masterRole()])
 
 		if err != tt.expected && err.Error() != tt.expected.Error() {
 			t.Errorf("%s [%s]: Could not generate deployment spec,\n %+v, expected\n %+v",
@@ -921,7 +922,7 @@ func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole
 
 func testSelector(cluster *Cluster, deployment *appsv1.Deployment) error {
 	labels := deployment.Spec.Selector.MatchLabels
-	expected := cluster.connectionPoolerLabels(Master, true).MatchLabels
+	expected := cluster.connectionPoolerLabels(cluster.masterRole(), true).MatchLabels
 
 	if labels["connection-pooler"] != expected["connection-pooler"] {
 		return fmt.Errorf("Labels are incorrect, got %+v, expected %+v",
@@ -1018,20 +1019,20 @@ func TestPoolerTLS(t *testing.T) {
 
 	// create pooler resources
 	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
-	cluster.ConnectionPooler[Master] = &ConnectionPoolerObjects{
+	cluster.ConnectionPooler[cluster.masterRole()] = &ConnectionPoolerObjects{
 		Deployment:     nil,
 		Service:        nil,
-		Name:           cluster.connectionPoolerName(Master),
+		Name:           cluster.connectionPoolerName(cluster.masterRole()),
 		ClusterName:    clusterName,
 		Namespace:      namespace,
 		LookupFunction: false,
-		Role:           Master,
+		Role:           cluster.masterRole(),
 	}
 
-	_, err = cluster.syncConnectionPoolerWorker(nil, &pg, Master)
+	_, err = cluster.syncConnectionPoolerWorker(nil, &pg, cluster.masterRole())
 	assert.NoError(t, err)
 
-	deploy, err := client.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(Master), metav1.GetOptions{})
+	deploy, err := client.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(cluster.masterRole()), metav1.GetOptions{})
 	assert.NoError(t, err)
 
 	fsGroup := int64(103)
@@ -1088,17 +1089,17 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 		},
 	}
 	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
-		Master: {
+		cluster.masterRole(): {
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: false,
-			Role:           Master,
+			Role:           cluster.masterRole(),
 		},
-		Replica: {
+		cluster.replicaRole(): {
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: false,
-			Role:           Replica,
+			Role:           cluster.replicaRole(),
 		},
 	}
 
@@ -1138,7 +1139,7 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 			check:   testServiceSelector,
 		},
 	}
-	for _, role := range [2]PostgresRole{Master, Replica} {
+	for _, role := range [2]PostgresRole{cluster.masterRole(), cluster.replicaRole()} {
 		for _, tt := range tests {
 			service := tt.cluster.generateConnectionPoolerService(tt.cluster.ConnectionPooler[role])
 
