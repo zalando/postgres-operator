@@ -1733,12 +1733,46 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 
 // Switchover does a switchover (via Patroni) to a candidate pod
 func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
-
 	var err error
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
 
 	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
-		c.logger.Infof("skipping switchover, not in maintenance window")
+		c.logger.Infof("postponing switchover, not in maintenance window")
+
+		var possibleSwitchover, schedule time.Time
+
+		now := time.Now().UTC()
+		for _, window := range c.Spec.MaintenanceWindows {
+			if window.Everyday {
+				possibleSwitchover = time.Date(now.Year(), now.Month(), now.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
+				if now.After(possibleSwitchover) {
+					// we are already past the time for today, try tomorrow
+					day := now.AddDate(0, 0, 1)
+					possibleSwitchover = time.Date(day.Year(), day.Month(), day.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
+				}
+			} else {
+				timeToday := time.Date(now.Year(), now.Month(), now.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
+				// is it still possible today?
+				if now.Weekday() == window.Weekday {
+					if now.Before(timeToday) {
+						possibleSwitchover = timeToday
+					}
+				} else {
+					// get closest possible time for this window
+					date := now.AddDate(0, 0, int((7+window.Weekday-now.Weekday())%7))
+					possibleSwitchover = time.Date(date.Year(), date.Month(), date.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
+				}
+			}
+
+			if (schedule == time.Time{}) || possibleSwitchover.Before(schedule) {
+				schedule = possibleSwitchover
+			}
+		}
+
+		if err := c.patroni.Switchover(curMaster, candidate.Name, schedule.Format("2006-01-02T15:04+00")); err != nil {
+			return fmt.Errorf("could not schedule switchover: %v", err)
+		}
+		c.logger.Infof("switchover is scheduled at %s", schedule.Format("2006-01-02T15:04+00"))
 		return nil
 	}
 
@@ -1748,7 +1782,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	defer c.unregisterPodSubscriber(candidate)
 	defer close(stopCh)
 
-	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
+	if err = c.patroni.Switchover(curMaster, candidate.Name, ""); err == nil {
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
 		_, err = c.waitForPodLabel(ch, stopCh, nil)
