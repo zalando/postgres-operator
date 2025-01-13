@@ -247,18 +247,18 @@ func createPods(cluster *Cluster) []v1.Pod {
 	for i, role := range []PostgresRole{Master, Replica} {
 		podsList = append(podsList, v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-%d", clusterName, i),
+				Name:      fmt.Sprintf("%s-%d", cluster.Name, i),
 				Namespace: namespace,
 				Labels: map[string]string{
 					"application":  "spilo",
-					"cluster-name": clusterName,
+					"cluster-name": cluster.Name,
 					"spilo-role":   string(role),
 				},
 			},
 		})
 		podsList = append(podsList, v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-pooler-%s", clusterName, role),
+				Name:      fmt.Sprintf("%s-pooler-%s", cluster.Name, role),
 				Namespace: namespace,
 				Labels:    cluster.connectionPoolerLabels(role, true).MatchLabels,
 			},

@@ -573,6 +573,31 @@ func (c *Cluster) syncStatefulSet() error {
 					}
 				}
 			}
+			metadataReq := map[string]map[string]map[string]*string{"metadata": {"annotations": {}}}
+			for anno := range c.Statefulset.Spec.Template.Annotations {
+				if _, ok := desiredSts.Spec.Template.Annotations[anno]; !ok {
+					// template annotation was removed
+					for _, ignore := range c.OpConfig.IgnoredAnnotations {
+						if anno == ignore {
+							continue
+						}
+					}
+					metadataReq["metadata"]["annotations"][anno] = nil
+				}
+			}
+			if len(metadataReq["metadata"]["annotations"]) != 0 {
+				for _, pod := range pods {
+					patch, err := json.Marshal(metadataReq)
+					if err != nil {
+						return fmt.Errorf("could not marshal ObjectMeta for pod %s: %v", pod.Name, err)
+					}
+					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.Background(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+					if err != nil {
+						c.logger.Errorf("failed to remove annotations from pod %s: %v", pod.Name, err)
+						return err
+					}
+				}
+			}
 		}
 		if !cmp.match {
 			if cmp.rollingUpdate {
@@ -1593,6 +1618,27 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			)
 			if reason != "" {
 				c.logger.Infof("reason: %s", reason)
+			}
+			if strings.Contains(reason, "annotations do not match") {
+				annotationToRemoveTemplate := `{"spec":{"jobTemplate":{"spec":{"template":{"metadata":{"annotations":{`
+				for anno := range job.Spec.JobTemplate.Spec.Template.Annotations {
+					if _, ok := desiredJob.Spec.JobTemplate.Spec.Template.Annotations[anno]; !ok {
+						// template annotation was removed
+						for _, ignore := range c.OpConfig.IgnoredAnnotations {
+							if anno == ignore {
+								continue
+							}
+						}
+						annotationToRemoveTemplate += fmt.Sprintf(`"%s":null,`, anno)
+					}
+				}
+				annotationToRemoveTemplate = strings.TrimSuffix(annotationToRemoveTemplate, ",") + `}}}}}}}`
+				job, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(),
+					jobName, types.StrategicMergePatchType, []byte(annotationToRemoveTemplate), metav1.PatchOptions{}, "")
+				if err != nil {
+					c.logger.Errorf("failed to remove annotations from the logical backup job %q pod template: %v", jobName, err)
+					return err
+				}
 			}
 			if err = c.patchLogicalBackupJob(desiredJob); err != nil {
 				return fmt.Errorf("could not update logical backup job to match desired state: %v", err)
