@@ -573,7 +573,7 @@ func (c *Cluster) syncStatefulSet() error {
 					}
 				}
 			}
-			annotationToRemove := ""
+			metadataReq := map[string]map[string]map[string]*string{"metadata": {"annotations": {}}}
 			for anno := range c.Statefulset.Spec.Template.Annotations {
 				if _, ok := desiredSts.Spec.Template.Annotations[anno]; !ok {
 					// template annotation was removed
@@ -582,18 +582,16 @@ func (c *Cluster) syncStatefulSet() error {
 							continue
 						}
 					}
-					if annotationToRemove != "" {
-						annotationToRemove = `{"metadata":{"annotations":{`
-					}
-					annotationToRemove += fmt.Sprintf(`"%s":null,`, anno)
-					// annotationToRemove := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":null}}}`, anno))
+					metadataReq["metadata"]["annotations"][anno] = nil
 				}
 			}
-			if annotationToRemove != "" {
-				annotationToRemove = strings.TrimSuffix(annotationToRemove, ",") + `}}}`
+			if len(metadataReq["metadata"]["annotations"]) != 0 {
 				for _, pod := range pods {
-					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.Background(), pod.Name,
-						types.StrategicMergePatchType, []byte(annotationToRemove), metav1.PatchOptions{})
+					patch, err := json.Marshal(metadataReq)
+					if err != nil {
+						return fmt.Errorf("could not marshal ObjectMeta for pod %s: %v", pod.Name, err)
+					}
+					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.Background(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
 					if err != nil {
 						c.logger.Errorf("failed to remove annotations from pod %s: %v", pod.Name, err)
 						return err

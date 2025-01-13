@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -1047,8 +1048,8 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			syncReason = append(syncReason, []string{"new connection pooler's pod template annotations do not match the current ones: " + reason}...)
 
 			if strings.Contains(reason, "Removed") {
-				annotationToRemove := `{"metadata":{"annotations":{`
-				annotationToRemoveTemplate := `{"spec":{"template":{"metadata":{"annotations":{`
+				metadataReq := map[string]map[string]map[string]*string{"metadata": {"annotations": {}}}
+				templateMetadataReq := map[string]map[string]map[string]map[string]map[string]*string{"spec": {"template": {"metadata": {"annotations": {}}}}}
 				for anno := range deployment.Spec.Template.Annotations {
 					if _, ok := newPodAnnotations[anno]; !ok {
 						// template annotation was removed
@@ -1057,21 +1058,26 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 								continue
 							}
 						}
-						annotationToRemove += fmt.Sprintf(`"%s":null,`, anno)
-						annotationToRemoveTemplate += fmt.Sprintf(`"%s":null,`, anno)
+						metadataReq["metadata"]["annotations"][anno] = nil
+						templateMetadataReq["spec"]["template"]["metadata"]["annotations"][anno] = nil
 					}
 				}
-				annotationToRemove = strings.TrimSuffix(annotationToRemove, ",") + `}}}`
-				annotationToRemoveTemplate = strings.TrimSuffix(annotationToRemoveTemplate, ",") + `}}}}}`
+				patch, err := json.Marshal(templateMetadataReq)
+				if err != nil {
+					return nil, fmt.Errorf("could not marshal ObjectMeta for %s connection pooler's pod template: %v", role, err)
+				}
 				deployment, err = c.KubeClient.Deployments(c.Namespace).Patch(context.TODO(),
-					deployment.Name, types.StrategicMergePatchType, []byte(annotationToRemoveTemplate), metav1.PatchOptions{}, "")
+					deployment.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "")
 				if err != nil {
 					c.logger.Errorf("failed to remove annotations from %s connection pooler's pod template: %v", role, err)
 					return nil, err
 				}
 				for _, pod := range pods {
-					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name,
-						types.StrategicMergePatchType, []byte(annotationToRemove), metav1.PatchOptions{})
+					patch, err := json.Marshal(metadataReq)
+					if err != nil {
+						return nil, fmt.Errorf("could not marshal ObjectMeta for pod %s: %v", pod.Name, err)
+					}
+					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
 					if err != nil {
 						c.logger.Errorf("failed to remove annotations from pod %s: %v", pod.Name, err)
 						return nil, err
@@ -1097,6 +1103,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			if err != nil {
 				return syncReason, err
 			}
+			c.ConnectionPooler[role].Deployment = deployment
 		}
 
 		newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(nil)) // including the downscaling annotations
@@ -1105,6 +1112,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			if err != nil {
 				return nil, err
 			}
+			c.ConnectionPooler[role].Deployment = deployment
 		}
 	}
 
@@ -1142,8 +1150,6 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			}
 		}
 	}
-
-	c.ConnectionPooler[role].Deployment = deployment
 
 	if service, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
 		c.ConnectionPooler[role].Service = service
