@@ -162,8 +162,8 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 		return fmt.Errorf("pod %q does not belong to cluster", podName)
 	}
 
-	if err := c.patroni.Switchover(&masterPod[0], masterCandidatePod.Name); err != nil {
-		return fmt.Errorf("could not failover: %v", err)
+	if err := c.patroni.Switchover(&masterPod[0], masterCandidatePod.Name, ""); err != nil {
+		return fmt.Errorf("could not switchover: %v", err)
 	}
 
 	return nil

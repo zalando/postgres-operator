@@ -497,6 +497,7 @@ func (c *Cluster) syncStatefulSet() error {
 	)
 	podsToRecreate := make([]v1.Pod, 0)
 	isSafeToRecreatePods := true
+	postponeReasons := make([]string, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
 
 	pods, err := c.listPods()
@@ -646,12 +647,19 @@ func (c *Cluster) syncStatefulSet() error {
 	c.logger.Debug("syncing Patroni config")
 	if configPatched, restartPrimaryFirst, restartWait, err = c.syncPatroniConfig(pods, c.Spec.Patroni, requiredPgParameters); err != nil {
 		c.logger.Warningf("Patroni config updated? %v - errors during config sync: %v", configPatched, err)
+		postponeReasons = append(postponeReasons, "errors during Patroni config sync")
 		isSafeToRecreatePods = false
 	}
 
 	// restart Postgres where it is still pending
 	if err = c.restartInstances(pods, restartWait, restartPrimaryFirst); err != nil {
 		c.logger.Errorf("errors while restarting Postgres in pods via Patroni API: %v", err)
+		postponeReasons = append(postponeReasons, "errors while restarting Postgres via Patroni API")
+		isSafeToRecreatePods = false
+	}
+
+	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+		postponeReasons = append(postponeReasons, "not in maintenance window")
 		isSafeToRecreatePods = false
 	}
 
@@ -666,7 +674,7 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 		} else {
-			c.logger.Warningf("postpone pod recreation until next sync because of errors during config sync")
+			c.logger.Warningf("postpone pod recreation until next sync - reason: %s", strings.Join(postponeReasons, `', '`))
 		}
 	}
 

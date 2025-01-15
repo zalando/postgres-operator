@@ -1731,18 +1731,58 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 	return status
 }
 
+func (c *Cluster) GetSwitchoverSchedule() string {
+	var possibleSwitchover, schedule time.Time
+
+	now := time.Now().UTC()
+	for _, window := range c.Spec.MaintenanceWindows {
+		// in the best case it is possible today
+		possibleSwitchover = time.Date(now.Year(), now.Month(), now.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
+		if window.Everyday {
+			if now.After(possibleSwitchover) {
+				// we are already past the time for today, try tomorrow
+				possibleSwitchover = possibleSwitchover.AddDate(0, 0, 1)
+			}
+		} else {
+			if now.Weekday() != window.Weekday {
+				// get closest possible time for this window
+				possibleSwitchover = possibleSwitchover.AddDate(0, 0, int((7+window.Weekday-now.Weekday())%7))
+			} else if now.After(possibleSwitchover) {
+				// we are already past the time for today, try next week
+				possibleSwitchover = possibleSwitchover.AddDate(0, 0, 7)
+			}
+		}
+
+		if (schedule == time.Time{}) || possibleSwitchover.Before(schedule) {
+			schedule = possibleSwitchover
+		}
+	}
+	return schedule.Format("2006-01-02T15:04+00")
+}
+
 // Switchover does a switchover (via Patroni) to a candidate pod
 func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
-
 	var err error
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
+
+	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+		c.logger.Infof("postponing switchover, not in maintenance window")
+		schedule := c.GetSwitchoverSchedule()
+
+		if err := c.patroni.Switchover(curMaster, candidate.Name, schedule); err != nil {
+			return fmt.Errorf("could not schedule switchover: %v", err)
+		}
+		c.logger.Infof("switchover is scheduled at %s", schedule)
+		return nil
+	}
+
 	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
 	stopCh := make(chan struct{})
 	ch := c.registerPodSubscriber(candidate)
 	defer c.unregisterPodSubscriber(candidate)
 	defer close(stopCh)
 
-	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
+	if err = c.patroni.Switchover(curMaster, candidate.Name, ""); err == nil {
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
 		_, err = c.waitForPodLabel(ch, stopCh, nil)

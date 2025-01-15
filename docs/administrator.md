@@ -208,6 +208,9 @@ Note that, changes in `SPILO_CONFIGURATION` env variable under `bootstrap.dcs`
 path are ignored for the diff. They will be applied through Patroni's rest api
 interface, following a restart of all instances.
 
+Rolling update is postponed until the next maintenance window if any is defined
+under the `maintenanceWindows` cluster manifest parameter.
+
 The operator also support lazy updates of the Spilo image. In this case the
 StatefulSet is only updated, but no rolling update follows. This feature saves
 you a switchover - and hence downtime - when you know pods are re-started later
