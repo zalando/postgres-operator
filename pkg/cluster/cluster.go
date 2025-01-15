@@ -1741,18 +1741,15 @@ func (c *Cluster) GetSwitchoverSchedule() string {
 		if window.Everyday {
 			if now.After(possibleSwitchover) {
 				// we are already past the time for today, try tomorrow
-				day := now.AddDate(0, 0, 1)
-				possibleSwitchover = time.Date(day.Year(), day.Month(), day.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
+				possibleSwitchover = possibleSwitchover.AddDate(0, 0, 1)
 			}
 		} else {
 			if now.Weekday() != window.Weekday {
 				// get closest possible time for this window
-				date := now.AddDate(0, 0, int((7+window.Weekday-now.Weekday())%7))
-				possibleSwitchover = time.Date(date.Year(), date.Month(), date.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
+				possibleSwitchover = possibleSwitchover.AddDate(0, 0, int((7+window.Weekday-now.Weekday())%7))
 			} else if now.After(possibleSwitchover) {
 				// we are already past the time for today, try next week
-				day := now.AddDate(0, 0, 7)
-				possibleSwitchover = time.Date(day.Year(), day.Month(), day.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
+				possibleSwitchover = possibleSwitchover.AddDate(0, 0, 7)
 			}
 		}
 
