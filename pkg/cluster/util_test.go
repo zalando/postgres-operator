@@ -650,7 +650,7 @@ func Test_trimCronjobName(t *testing.T) {
 	}
 }
 
-func TestIsInMaintenanceWindow(t *testing.T) {
+func TestisInMaintenanceWindow(t *testing.T) {
 	now := time.Now()
 	futureTimeStart := now.Add(1 * time.Hour)
 	futureTimeStartFormatted := futureTimeStart.Format("15:04")
@@ -705,8 +705,8 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster.Spec.MaintenanceWindows = tt.windows
-			if isInMainternanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
-				t.Errorf("Expected isInMainternanceWindow to return %t", tt.expected)
+			if isInMaintenanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
+				t.Errorf("Expected isInMaintenanceWindow to return %t", tt.expected)
 			}
 		})
 	}
