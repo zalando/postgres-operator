@@ -129,17 +129,13 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
-	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
-		c.logger.Infof("skipping major version upgrade, not in maintenance window")
-		return nil
-	}
-
 	pods, err := c.listPods()
 	if err != nil {
 		return err
 	}
 
 	allRunning := true
+	isStandbyCluster := false
 
 	var masterPod *v1.Pod
 
@@ -147,8 +143,9 @@ func (c *Cluster) majorVersionUpgrade() error {
 		ps, _ := c.patroni.GetMemberData(&pod)
 
 		if ps.Role == "standby_leader" {
-			c.logger.Errorf("skipping major version upgrade for %s/%s standby cluster. Re-deploy standby cluster with the required Postgres version specified", c.Namespace, c.Name)
-			return nil
+			isStandbyCluster = true
+			c.currentMajorVersion = ps.ServerVersion
+			break
 		}
 
 		if ps.State != "running" {
@@ -175,10 +172,18 @@ func (c *Cluster) majorVersionUpgrade() error {
 		}
 		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
 		return nil
+	} else if isStandbyCluster {
+		c.logger.Warnf("skipping major version upgrade for %s/%s standby cluster. Re-deploy standby cluster with the required Postgres version specified", c.Namespace, c.Name)
+		return nil
 	}
 
 	if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists {
 		c.logger.Infof("last major upgrade failed, skipping upgrade")
+		return nil
+	}
+
+	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+		c.logger.Infof("skipping major version upgrade, not in maintenance window")
 		return nil
 	}
 
