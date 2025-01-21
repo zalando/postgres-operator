@@ -230,7 +230,7 @@ func (c *Cluster) syncPatroniConfigMap(suffix string) error {
 		maps.Copy(annotations, cm.Annotations)
 		// Patroni can add extra annotations so incl. current annotations in desired annotations
 		desiredAnnotations := c.annotationsSet(cm.Annotations)
-		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for %s config map: %v", configMapName, err)
@@ -275,7 +275,7 @@ func (c *Cluster) syncPatroniEndpoint(suffix string) error {
 		maps.Copy(annotations, ep.Annotations)
 		// Patroni can add extra annotations so incl. current annotations in desired annotations
 		desiredAnnotations := c.annotationsSet(ep.Annotations)
-		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for %s endpoint: %v", endpointName, err)
@@ -320,7 +320,7 @@ func (c *Cluster) syncPatroniService() error {
 		maps.Copy(annotations, svc.Annotations)
 		// Patroni can add extra annotations so incl. current annotations in desired annotations
 		desiredAnnotations := c.annotationsSet(svc.Annotations)
-		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for %s service: %v", serviceName, err)
@@ -412,7 +412,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 				return fmt.Errorf("could not update %s endpoint: %v", role, err)
 			}
 		} else {
-			if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations); changed {
+			if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations, nil); changed {
 				patchData, err := metaAnnotationsPatch(desiredEp.Annotations)
 				if err != nil {
 					return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
@@ -559,42 +559,27 @@ func (c *Cluster) syncStatefulSet() error {
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 
-		cmp := c.compareStatefulSetWith(desiredSts)
+		deletedPodAnnotations := []string{}
+		cmp := c.compareStatefulSetWith(desiredSts, &deletedPodAnnotations)
 		if !cmp.rollingUpdate {
+			updatedPodAnnotations := map[string]*string{}
+			for _, anno := range deletedPodAnnotations {
+				updatedPodAnnotations[anno] = nil
+			}
+			for anno, val := range desiredSts.Spec.Template.Annotations {
+				updatedPodAnnotations[anno] = &val
+			}
+			metadataReq := map[string]map[string]map[string]*string{"metadata": {"annotations": updatedPodAnnotations}}
+			patch, err := json.Marshal(metadataReq)
+			if err != nil {
+				return fmt.Errorf("could not form patch for pod annotations: %v", err)
+			}
+
 			for _, pod := range pods {
-				if changed, _ := c.compareAnnotations(pod.Annotations, desiredSts.Spec.Template.Annotations); changed {
-					patchData, err := metaAnnotationsPatch(desiredSts.Spec.Template.Annotations)
-					if err != nil {
-						return fmt.Errorf("could not form patch for pod %q annotations: %v", pod.Name, err)
-					}
-					_, err = c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+				if changed, _ := c.compareAnnotations(pod.Annotations, desiredSts.Spec.Template.Annotations, nil); changed {
+					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
 					if err != nil {
 						return fmt.Errorf("could not patch annotations for pod %q: %v", pod.Name, err)
-					}
-				}
-			}
-			metadataReq := map[string]map[string]map[string]*string{"metadata": {"annotations": {}}}
-			for anno := range c.Statefulset.Spec.Template.Annotations {
-				if _, ok := desiredSts.Spec.Template.Annotations[anno]; !ok {
-					// template annotation was removed
-					for _, ignore := range c.OpConfig.IgnoredAnnotations {
-						if anno == ignore {
-							continue
-						}
-					}
-					metadataReq["metadata"]["annotations"][anno] = nil
-				}
-			}
-			if len(metadataReq["metadata"]["annotations"]) != 0 {
-				for _, pod := range pods {
-					patch, err := json.Marshal(metadataReq)
-					if err != nil {
-						return fmt.Errorf("could not marshal ObjectMeta for pod %s: %v", pod.Name, err)
-					}
-					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.Background(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
-					if err != nil {
-						c.logger.Errorf("failed to remove annotations from pod %s: %v", pod.Name, err)
-						return err
 					}
 				}
 			}
@@ -1167,7 +1152,7 @@ func (c *Cluster) updateSecret(
 		c.Secrets[secret.UID] = secret
 	}
 
-	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations); changed {
+	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations, nil); changed {
 		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
 		if err != nil {
 			return fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
@@ -1612,33 +1597,26 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			}
 			c.logger.Infof("logical backup job %s updated", c.getLogicalBackupJobName())
 		}
-		if match, reason := c.compareLogicalBackupJob(job, desiredJob); !match {
+		deletedPodAnnotations := []string{}
+		if match, reason := c.compareLogicalBackupJob(job, desiredJob, &deletedPodAnnotations); !match {
 			c.logger.Infof("logical job %s is not in the desired state and needs to be updated",
 				c.getLogicalBackupJobName(),
 			)
 			if reason != "" {
 				c.logger.Infof("reason: %s", reason)
 			}
-			if strings.Contains(reason, "annotations do not match") {
+			if len(deletedPodAnnotations) == 0 {
 				templateMetadataReq := map[string]map[string]map[string]map[string]map[string]map[string]map[string]*string{
 					"spec": {"jobTemplate": {"spec": {"template": {"metadata": {"annotations": {}}}}}}}
-				for anno := range job.Spec.JobTemplate.Spec.Template.Annotations {
-					if _, ok := desiredJob.Spec.JobTemplate.Spec.Template.Annotations[anno]; !ok {
-						// template annotation was removed
-						for _, ignore := range c.OpConfig.IgnoredAnnotations {
-							if anno == ignore {
-								continue
-							}
-						}
-						templateMetadataReq["spec"]["jobTemplate"]["spec"]["template"]["metadata"]["annotations"][anno] = nil
-					}
+				for _, anno := range deletedPodAnnotations {
+					templateMetadataReq["spec"]["jobTemplate"]["spec"]["template"]["metadata"]["annotations"][anno] = nil
 				}
 				patch, err := json.Marshal(templateMetadataReq)
 				if err != nil {
 					return fmt.Errorf("could not marshal ObjectMeta for logical backup job %q pod template: %v", jobName, err)
 				}
-				job, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(),
-					jobName, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "")
+
+				job, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "")
 				if err != nil {
 					c.logger.Errorf("failed to remove annotations from the logical backup job %q pod template: %v", jobName, err)
 					return err
@@ -1649,7 +1627,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			}
 			c.logger.Info("the logical backup job is synced")
 		}
-		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations); changed {
+		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredJob.Annotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for the logical backup job %q: %v", jobName, err)

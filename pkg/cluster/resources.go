@@ -329,7 +329,7 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 		}
 	}
 
-	if changed, _ := c.compareAnnotations(oldService.Annotations, newService.Annotations); changed {
+	if changed, _ := c.compareAnnotations(oldService.Annotations, newService.Annotations, nil); changed {
 		patchData, err := metaAnnotationsPatch(newService.Annotations)
 		if err != nil {
 			return nil, fmt.Errorf("could not form patch for service %q annotations: %v", oldService.Name, err)

@@ -1680,7 +1680,7 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 				}
 			}
 
-			match, reason := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob)
+			match, reason := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob, nil)
 			if match != tt.match {
 				t.Errorf("%s - unexpected match result %t when comparing cronjobs %#v and %#v", t.Name(), match, currentCronJob, desiredCronJob)
 			} else {

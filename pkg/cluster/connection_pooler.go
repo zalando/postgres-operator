@@ -978,7 +978,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		err           error
 	)
 
-	updatedAnnotations := map[string]*string{}
+	updatedPodAnnotations := map[string]*string{}
 	syncReason := make([]string, 0)
 	deployment, err = c.KubeClient.
 		Deployments(c.Namespace).
@@ -1040,35 +1040,27 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		}
 
 		newPodAnnotations := c.annotationsSet(c.generatePodAnnotations(&c.Spec))
-		if changed, reason := c.compareAnnotations(deployment.Spec.Template.Annotations, newPodAnnotations); changed {
+		deletedPodAnnotations := []string{}
+		if changed, reason := c.compareAnnotations(deployment.Spec.Template.Annotations, newPodAnnotations, &deletedPodAnnotations); changed {
 			specSync = true
 			syncReason = append(syncReason, []string{"new connection pooler's pod template annotations do not match the current ones: " + reason}...)
 
-			if strings.Contains(reason, "Removed") {
-				templateMetadataReq := map[string]map[string]map[string]map[string]map[string]*string{"spec": {"template": {"metadata": {"annotations": {}}}}}
-				for anno := range deployment.Spec.Template.Annotations {
-					if _, ok := newPodAnnotations[anno]; !ok {
-						// template annotation was removed
-						for _, ignore := range c.OpConfig.IgnoredAnnotations {
-							if anno == ignore {
-								continue
-							}
-						}
-						updatedAnnotations[anno] = nil
-					}
-				}
-				templateMetadataReq["spec"]["template"]["metadata"]["annotations"] = updatedAnnotations
-				patch, err := json.Marshal(templateMetadataReq)
-				if err != nil {
-					return nil, fmt.Errorf("could not marshal ObjectMeta for %s connection pooler's pod template: %v", role, err)
-				}
-				deployment, err = c.KubeClient.Deployments(c.Namespace).Patch(context.TODO(),
-					deployment.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "")
-				if err != nil {
-					c.logger.Errorf("failed to remove annotations from %s connection pooler's pod template: %v", role, err)
-					return nil, err
-				}
+			for _, anno := range deletedPodAnnotations {
+				updatedPodAnnotations[anno] = nil
 			}
+			templateMetadataReq := map[string]map[string]map[string]map[string]map[string]*string{
+				"spec": {"template": {"metadata": {"annotations": updatedPodAnnotations}}}}
+			patch, err := json.Marshal(templateMetadataReq)
+			if err != nil {
+				return nil, fmt.Errorf("could not marshal ObjectMeta for %s connection pooler's pod template: %v", role, err)
+			}
+			deployment, err = c.KubeClient.Deployments(c.Namespace).Patch(context.TODO(),
+				deployment.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "")
+			if err != nil {
+				c.logger.Errorf("failed to patch %s connection pooler's pod template: %v", role, err)
+				return nil, err
+			}
+
 			deployment.Spec.Template.Annotations = newPodAnnotations
 		}
 
@@ -1092,7 +1084,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		}
 
 		newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(nil)) // including the downscaling annotations
-		if changed, _ := c.compareAnnotations(deployment.Annotations, newAnnotations); changed {
+		if changed, _ := c.compareAnnotations(deployment.Annotations, newAnnotations, nil); changed {
 			deployment, err = patchConnectionPoolerAnnotations(c.KubeClient, deployment, newAnnotations)
 			if err != nil {
 				return nil, err
@@ -1126,13 +1118,13 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			if err != nil {
 				return nil, fmt.Errorf("could not delete pooler pod: %v", err)
 			}
-		} else if changed, _ := c.compareAnnotations(pod.Annotations, deployment.Spec.Template.Annotations); changed {
+		} else if changed, _ := c.compareAnnotations(pod.Annotations, deployment.Spec.Template.Annotations, nil); changed {
 			metadataReq := map[string]map[string]map[string]*string{"metadata": {}}
 
 			for anno, val := range deployment.Spec.Template.Annotations {
-				updatedAnnotations[anno] = &val
+				updatedPodAnnotations[anno] = &val
 			}
-			metadataReq["metadata"]["annotations"] = updatedAnnotations
+			metadataReq["metadata"]["annotations"] = updatedPodAnnotations
 			patch, err := json.Marshal(metadataReq)
 			if err != nil {
 				return nil, fmt.Errorf("could not marshal ObjectMeta for %s connection pooler's pods: %v", role, err)

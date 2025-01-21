@@ -545,7 +545,7 @@ func (c *Cluster) compareStreams(curEventStreams, newEventStreams *zalandov1.Fab
 	for newKey, newValue := range newEventStreams.Annotations {
 		desiredAnnotations[newKey] = newValue
 	}
-	if changed, reason := c.compareAnnotations(curEventStreams.ObjectMeta.Annotations, desiredAnnotations); changed {
+	if changed, reason := c.compareAnnotations(curEventStreams.ObjectMeta.Annotations, desiredAnnotations, nil); changed {
 		match = false
 		reasons = append(reasons, fmt.Sprintf("new streams annotations do not match: %s", reason))
 	}
