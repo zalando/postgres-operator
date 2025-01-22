@@ -147,6 +147,8 @@ func TestPodAnnotationsSync(t *testing.T) {
 	namespace := "default"
 	podAnnotation := "no-scale-down"
 	podAnnotations := map[string]string{podAnnotation: "true"}
+	customPodAnnotation := "foo"
+	customPodAnnotations := map[string]string{customPodAnnotation: "true"}
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -176,6 +178,7 @@ func TestPodAnnotationsSync(t *testing.T) {
 				PatroniAPICheckInterval: time.Duration(1),
 				PatroniAPICheckTimeout:  time.Duration(5),
 				PodManagementPolicy:     "ordered_ready",
+				CustomPodAnnotations:    customPodAnnotations,
 				ConnectionPooler: config.ConnectionPooler{
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
@@ -234,68 +237,82 @@ func TestPodAnnotationsSync(t *testing.T) {
 	stsList, err := cluster.KubeClient.StatefulSets(namespace).List(context.TODO(), clusterOptions)
 	assert.NoError(t, err)
 	for _, sts := range stsList.Items {
-		assert.Contains(t, sts.Spec.Template.Annotations, podAnnotation)
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.Contains(t, sts.Spec.Template.Annotations, annotation)
+		}
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
 		deploy, err := cluster.KubeClient.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(role), metav1.GetOptions{})
 		assert.NoError(t, err)
-		assert.Contains(t, deploy.Spec.Template.Annotations, podAnnotation,
-			fmt.Sprintf("pooler deployment pod template %s should contain annotation %s, found %#v",
-				deploy.Name, podAnnotation, deploy.Spec.Template.Annotations))
-		assert.NoError(t, err)
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.Contains(t, deploy.Spec.Template.Annotations, annotation,
+				fmt.Sprintf("pooler deployment pod template %s should contain annotation %s, found %#v",
+					deploy.Name, annotation, deploy.Spec.Template.Annotations))
+		}
 	}
 
 	podList, err := cluster.KubeClient.Pods(namespace).List(context.TODO(), clusterOptions)
 	assert.NoError(t, err)
 	for _, pod := range podList.Items {
-		assert.Contains(t, pod.Annotations, podAnnotation,
-			fmt.Sprintf("pod %s should contain annotation %s, found %#v", pod.Name, podAnnotation, pod.Annotations))
-		assert.NoError(t, err)
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.Contains(t, pod.Annotations, annotation,
+				fmt.Sprintf("pod %s should contain annotation %s, found %#v", pod.Name, annotation, pod.Annotations))
+		}
 	}
 
 	cronJobList, err := cluster.KubeClient.CronJobs(namespace).List(context.TODO(), clusterOptions)
 	assert.NoError(t, err)
 	for _, cronJob := range cronJobList.Items {
-		assert.Contains(t, cronJob.Spec.JobTemplate.Spec.Template.Annotations, podAnnotation,
-			fmt.Sprintf("logical backup cron job's pod template should contain annotation %s, found %#v",
-				podAnnotation, cronJob.Spec.JobTemplate.Spec.Template.Annotations))
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.Contains(t, cronJob.Spec.JobTemplate.Spec.Template.Annotations, annotation,
+				fmt.Sprintf("logical backup cron job's pod template should contain annotation %s, found %#v",
+					annotation, cronJob.Spec.JobTemplate.Spec.Template.Annotations))
+		}
 	}
 
 	// 2 PodAnnotations removed
 	newSpec := cluster.Postgresql.DeepCopy()
 	newSpec.Spec.PodAnnotations = nil
+	cluster.OpConfig.CustomPodAnnotations = nil
 	err = cluster.Sync(newSpec)
 	assert.NoError(t, err)
 
 	stsList, err = cluster.KubeClient.StatefulSets(namespace).List(context.TODO(), clusterOptions)
 	assert.NoError(t, err)
 	for _, sts := range stsList.Items {
-		assert.NotContains(t, sts.Spec.Template.Annotations, podAnnotation)
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.NotContains(t, sts.Spec.Template.Annotations, annotation)
+		}
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
 		deploy, err := cluster.KubeClient.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(role), metav1.GetOptions{})
 		assert.NoError(t, err)
-		assert.NotContains(t, deploy.Spec.Template.Annotations, podAnnotation,
-			fmt.Sprintf("pooler deployment pod template %s should not contain annotation %s, found %#v",
-				deploy.Name, podAnnotation, deploy.Spec.Template.Annotations))
-		assert.NoError(t, err)
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.NotContains(t, deploy.Spec.Template.Annotations, annotation,
+				fmt.Sprintf("pooler deployment pod template %s should not contain annotation %s, found %#v",
+					deploy.Name, annotation, deploy.Spec.Template.Annotations))
+		}
 	}
 
 	podList, err = cluster.KubeClient.Pods(namespace).List(context.TODO(), clusterOptions)
 	assert.NoError(t, err)
 	for _, pod := range podList.Items {
-		assert.NotContains(t, pod.Annotations, podAnnotation,
-			fmt.Sprintf("pod %s should not contain annotation %s, found %#v", pod.Name, podAnnotation, pod.Annotations))
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.NotContains(t, pod.Annotations, annotation,
+				fmt.Sprintf("pod %s should not contain annotation %s, found %#v", pod.Name, annotation, pod.Annotations))
+		}
 	}
 
 	cronJobList, err = cluster.KubeClient.CronJobs(namespace).List(context.TODO(), clusterOptions)
 	assert.NoError(t, err)
 	for _, cronJob := range cronJobList.Items {
-		assert.NotContains(t, cronJob.Annotations, podAnnotation,
-			fmt.Sprintf("logical backup cron job's pod template should not contain annotation %s, found %#v",
-				podAnnotation, cronJob.Spec.JobTemplate.Spec.Template.Annotations))
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.NotContains(t, cronJob.Annotations, annotation,
+				fmt.Sprintf("logical backup cron job's pod template should not contain annotation %s, found %#v",
+					annotation, cronJob.Spec.JobTemplate.Spec.Template.Annotations))
+		}
 	}
 }
 
