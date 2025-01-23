@@ -97,6 +97,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
+
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
@@ -655,11 +660,6 @@ func (c *Cluster) syncStatefulSet() error {
 	if err = c.restartInstances(pods, restartWait, restartPrimaryFirst); err != nil {
 		c.logger.Errorf("errors while restarting Postgres in pods via Patroni API: %v", err)
 		postponeReasons = append(postponeReasons, "errors while restarting Postgres via Patroni API")
-		isSafeToRecreatePods = false
-	}
-
-	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
-		postponeReasons = append(postponeReasons, "not in maintenance window")
 		isSafeToRecreatePods = false
 	}
 

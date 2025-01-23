@@ -957,6 +957,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	defer c.mu.Unlock()
 
 	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdating)
+
+	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -1761,28 +1766,28 @@ func (c *Cluster) GetSwitchoverSchedule() string {
 }
 
 // Switchover does a switchover (via Patroni) to a candidate pod
-func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
+func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName, scheduled bool) error {
 	var err error
-	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
 
-	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
-		c.logger.Infof("postponing switchover, not in maintenance window")
-		schedule := c.GetSwitchoverSchedule()
-
-		if err := c.patroni.Switchover(curMaster, candidate.Name, schedule); err != nil {
-			return fmt.Errorf("could not schedule switchover: %v", err)
-		}
-		c.logger.Infof("switchover is scheduled at %s", schedule)
-		return nil
-	}
-
-	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
 	stopCh := make(chan struct{})
 	ch := c.registerPodSubscriber(candidate)
 	defer c.unregisterPodSubscriber(candidate)
 	defer close(stopCh)
 
-	if err = c.patroni.Switchover(curMaster, candidate.Name, ""); err == nil {
+	var scheduled_at string
+	if scheduled {
+		scheduled_at = c.GetSwitchoverSchedule()
+	} else {
+		c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
+		scheduled_at = ""
+	}
+
+	if err = c.patroni.Switchover(curMaster, candidate.Name, scheduled_at); err == nil {
+		if scheduled {
+			c.logger.Infof("switchover from %q to %q is scheduled at %s", curMaster.Name, candidate, scheduled_at)
+			return nil
+		}
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
 		_, err = c.waitForPodLabel(ch, stopCh, nil)
@@ -1790,6 +1795,9 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
+		if scheduled {
+			return fmt.Errorf("could not schedule switchover: %v", err)
+		}
 		err = fmt.Errorf("could not switch over from %q to %q: %v", curMaster.Name, candidate, err)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	}
