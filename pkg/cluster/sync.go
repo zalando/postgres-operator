@@ -559,11 +559,10 @@ func (c *Cluster) syncStatefulSet() error {
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 
-		deletedPodAnnotations := []string{}
-		cmp := c.compareStatefulSetWith(desiredSts, &deletedPodAnnotations)
+		cmp := c.compareStatefulSetWith(desiredSts)
 		if !cmp.rollingUpdate {
 			updatedPodAnnotations := map[string]*string{}
-			for _, anno := range deletedPodAnnotations {
+			for _, anno := range cmp.deletedPodAnnotations {
 				updatedPodAnnotations[anno] = nil
 			}
 			for anno, val := range desiredSts.Spec.Template.Annotations {

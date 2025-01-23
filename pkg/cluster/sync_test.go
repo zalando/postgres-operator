@@ -122,7 +122,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 	desiredSts, err := cluster.generateStatefulSet(&cluster.Postgresql.Spec)
 	assert.NoError(t, err)
 
-	cmp := cluster.compareStatefulSetWith(desiredSts, nil)
+	cmp := cluster.compareStatefulSetWith(desiredSts)
 	if cmp.match {
 		t.Errorf("%s: match between current and desired statefulsets albeit differences: %#v", testName, cmp)
 	}
@@ -131,7 +131,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 	cluster.syncStatefulSet()
 
 	// compare again after the SYNC - must be identical to the desired state
-	cmp = cluster.compareStatefulSetWith(desiredSts, nil)
+	cmp = cluster.compareStatefulSetWith(desiredSts)
 	if !cmp.match {
 		t.Errorf("%s: current and desired statefulsets are not matching %#v", testName, cmp)
 	}

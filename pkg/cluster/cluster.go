@@ -105,10 +105,11 @@ type Cluster struct {
 }
 
 type compareStatefulsetResult struct {
-	match         bool
-	replace       bool
-	rollingUpdate bool
-	reasons       []string
+	match                 bool
+	replace               bool
+	rollingUpdate         bool
+	reasons               []string
+	deletedPodAnnotations []string
 }
 
 // New creates a new cluster. This function should be called from a controller.
@@ -430,7 +431,8 @@ func (c *Cluster) Create() (err error) {
 	return nil
 }
 
-func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet, deltePodAnnotations *[]string) *compareStatefulsetResult {
+func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compareStatefulsetResult {
+	deletedPodAnnotations := []string{}
 	reasons := make([]string, 0)
 	var match, needsRollUpdate, needsReplace bool
 
@@ -519,7 +521,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet, delteP
 		}
 	}
 
-	if changed, reason := c.compareAnnotations(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations, deltePodAnnotations); changed {
+	if changed, reason := c.compareAnnotations(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations, &deletedPodAnnotations); changed {
 		match = false
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's pod template metadata annotations does not match "+reason)
@@ -579,7 +581,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet, delteP
 		match = false
 	}
 
-	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
+	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace, deletedPodAnnotations: deletedPodAnnotations}
 }
 
 type containerCondition func(a, b v1.Container) bool
