@@ -1766,7 +1766,7 @@ func (c *Cluster) GetSwitchoverSchedule() string {
 }
 
 // Switchover does a switchover (via Patroni) to a candidate pod
-func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName, inMaintWindow bool) error {
+func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName, scheduled bool) error {
 	var err error
 
 	stopCh := make(chan struct{})
@@ -1775,18 +1775,17 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName, i
 	defer close(stopCh)
 
 	var scheduled_at string
-	if inMaintWindow {
-		c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
-
+	if scheduled {
 		scheduled_at = c.GetSwitchoverSchedule()
 	} else {
+		c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
 		scheduled_at = ""
 	}
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name, scheduled_at); err == nil {
-		if inMaintWindow {
-			c.logger.Infof("switchover is scheduled at %s", scheduled_at)
+		if scheduled {
+			c.logger.Infof("switchover from %q to %q is scheduled at %s", curMaster.Name, candidate, scheduled_at)
 			return nil
 		}
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
@@ -1796,7 +1795,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName, i
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
-		if inMaintWindow {
+		if scheduled {
 			return fmt.Errorf("could not schedule switchover: %v", err)
 		}
 		err = fmt.Errorf("could not switch over from %q to %q: %v", curMaster.Name, candidate, err)
