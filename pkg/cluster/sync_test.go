@@ -193,6 +193,7 @@ func TestPodAnnotationsSync(t *testing.T) {
 					DefaultCPULimit:       "300m",
 					DefaultMemoryRequest:  "300Mi",
 					DefaultMemoryLimit:    "300Mi",
+					MaxInstances:          -1,
 					PodRoleLabel:          "spilo-role",
 					ResourceCheckInterval: time.Duration(3),
 					ResourceCheckTimeout:  time.Duration(10),
@@ -309,7 +310,7 @@ func TestPodAnnotationsSync(t *testing.T) {
 	assert.NoError(t, err)
 	for _, cronJob := range cronJobList.Items {
 		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
-			assert.NotContains(t, cronJob.Annotations, annotation,
+			assert.NotContains(t, cronJob.Spec.JobTemplate.Spec.Template.Annotations, annotation,
 				fmt.Sprintf("logical backup cron job's pod template should not contain annotation %s, found %#v",
 					annotation, cronJob.Spec.JobTemplate.Spec.Template.Annotations))
 		}

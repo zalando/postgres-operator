@@ -112,6 +112,12 @@ type compareStatefulsetResult struct {
 	deletedPodAnnotations []string
 }
 
+type compareLogicalBackupJobResult struct {
+	match                 bool
+	reasons               []string
+	deletedPodAnnotations []string
+}
+
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
@@ -841,41 +847,46 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	return true, ""
 }
 
-func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob, deletedPodAnnotations *[]string) (match bool, reason string) {
+func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) *compareLogicalBackupJobResult {
+	deletedPodAnnotations := []string{}
+	reasons := make([]string, 0)
+	match := true
 
 	if cur.Spec.Schedule != new.Spec.Schedule {
-		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
-			new.Spec.Schedule, cur.Spec.Schedule)
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's schedule %q does not match the current one %q", new.Spec.Schedule, cur.Spec.Schedule))
 	}
 
 	newImage := new.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 	curImage := cur.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 	if newImage != curImage {
-		return false, fmt.Sprintf("new job's image %q does not match the current one %q",
-			newImage, curImage)
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's image %q does not match the current one %q", newImage, curImage))
 	}
 
 	newPodAnnotation := new.Spec.JobTemplate.Spec.Template.Annotations
 	curPodAnnotation := cur.Spec.JobTemplate.Spec.Template.Annotations
-	if changed, reason := c.compareAnnotations(curPodAnnotation, newPodAnnotation, deletedPodAnnotations); changed {
-		return false, fmt.Sprint("new job's pod template metadata annotations do not match " + reason)
+	if changed, reason := c.compareAnnotations(curPodAnnotation, newPodAnnotation, &deletedPodAnnotations); changed {
+		match = false
+		reasons = append(reasons, fmt.Sprint("new job's pod template metadata annotations do not match "+reason))
 	}
 
 	newPgVersion := getPgVersion(new)
 	curPgVersion := getPgVersion(cur)
 	if newPgVersion != curPgVersion {
-		return false, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q",
-			newPgVersion, curPgVersion)
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q", newPgVersion, curPgVersion))
 	}
 
 	needsReplace := false
-	reasons := make([]string, 0)
-	needsReplace, reasons = c.compareContainers("cronjob container", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, needsReplace, reasons)
+	contReasons := make([]string, 0)
+	needsReplace, contReasons = c.compareContainers("cronjob container", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, needsReplace, contReasons)
 	if needsReplace {
-		return false, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(reasons, `', '`))
+		match = false
+		reasons = append(reasons, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(contReasons, `', '`)))
 	}
 
-	return true, ""
+	return &compareLogicalBackupJobResult{match: match, reasons: reasons, deletedPodAnnotations: deletedPodAnnotations}
 }
 
 func (c *Cluster) comparePodDisruptionBudget(cur, new *policyv1.PodDisruptionBudget) (bool, string) {

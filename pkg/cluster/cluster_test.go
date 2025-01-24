@@ -1680,12 +1680,20 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 				}
 			}
 
-			match, reason := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob, nil)
-			if match != tt.match {
-				t.Errorf("%s - unexpected match result %t when comparing cronjobs %#v and %#v", t.Name(), match, currentCronJob, desiredCronJob)
-			} else {
-				if !strings.HasPrefix(reason, tt.reason) {
-					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
+			cmp := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob)
+			if cmp.match != tt.match {
+				t.Errorf("%s - unexpected match result %t when comparing cronjobs %#v and %#v", t.Name(), cmp.match, currentCronJob, desiredCronJob)
+			} else if !cmp.match {
+				found := false
+				for _, reason := range cmp.reasons {
+					if strings.HasPrefix(reason, tt.reason) {
+						found = true
+						break
+					}
+					found = false
+				}
+				if !found {
+					t.Errorf("%s - expected reason prefix %s, not found in %#v", t.Name(), tt.reason, cmp.reasons)
 				}
 			}
 		})

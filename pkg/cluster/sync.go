@@ -1596,18 +1596,19 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			}
 			c.logger.Infof("logical backup job %s updated", c.getLogicalBackupJobName())
 		}
-		deletedPodAnnotations := []string{}
-		if match, reason := c.compareLogicalBackupJob(job, desiredJob, &deletedPodAnnotations); !match {
+		if cmp := c.compareLogicalBackupJob(job, desiredJob); !cmp.match {
 			c.logger.Infof("logical job %s is not in the desired state and needs to be updated",
 				c.getLogicalBackupJobName(),
 			)
-			if reason != "" {
-				c.logger.Infof("reason: %s", reason)
+			if len(cmp.reasons) != 0 {
+				for _, reason := range cmp.reasons {
+					c.logger.Infof("reason: %s", reason)
+				}
 			}
-			if len(deletedPodAnnotations) == 0 {
+			if len(cmp.deletedPodAnnotations) != 0 {
 				templateMetadataReq := map[string]map[string]map[string]map[string]map[string]map[string]map[string]*string{
 					"spec": {"jobTemplate": {"spec": {"template": {"metadata": {"annotations": {}}}}}}}
-				for _, anno := range deletedPodAnnotations {
+				for _, anno := range cmp.deletedPodAnnotations {
 					templateMetadataReq["spec"]["jobTemplate"]["spec"]["template"]["metadata"]["annotations"][anno] = nil
 				}
 				patch, err := json.Marshal(templateMetadataReq)
