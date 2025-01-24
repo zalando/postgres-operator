@@ -65,6 +65,7 @@ configuration:
     enable_pod_disruption_budget: true
     enable_readiness_probe: false
     enable_secrets_deletion: true
+    # enable_secrets_deletion_key: enable-secrets-deletion
     enable_sidecars: true
     # ignored_annotations:
     # - k8s.v1.cni.cncf.io/network-status
