@@ -425,7 +425,8 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 func (c *Cluster) createPrimaryPodDisruptionBudget() error {
 	c.logger.Debug("creating primary pod disruption budget")
 	if c.PrimaryPodDisruptionBudget != nil {
-		return fmt.Errorf("primary pod disruption budget already exists in the cluster")
+		c.logger.Warning("primary pod disruption budget already exists in the cluster")
+		return nil
 	}
 
 	podDisruptionBudgetSpec := c.generatePrimaryPodDisruptionBudget()
@@ -445,7 +446,8 @@ func (c *Cluster) createPrimaryPodDisruptionBudget() error {
 func (c *Cluster) createCriticalOpPodDisruptionBudget() error {
 	c.logger.Debug("creating pod disruption budget for critical operations")
 	if c.CriticalOpPodDisruptionBudget != nil {
-		return fmt.Errorf("pod disruption budget for critical operations already exists in the cluster")
+		c.logger.Warning("pod disruption budget for critical operations already exists in the cluster")
+		return nil
 	}
 
 	podDisruptionBudgetSpec := c.generateCriticalOpPodDisruptionBudget()
