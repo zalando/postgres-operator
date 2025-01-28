@@ -106,18 +106,17 @@ func (c *Cluster) removeFailuresAnnotation() error {
 	return nil
 }
 
-func (c *Cluster) criticalOperationLabel(pods []v1.Pod, remove bool) error {
+func (c *Cluster) criticalOperationLabel(pods []v1.Pod, active bool) error {
 	var action string
 	var metadataReq map[string]map[string]map[string]*string
 
-	if remove {
-		action = "remove"
-		metadataReq = map[string]map[string]map[string]*string{"metadata": {"labels": {"critical-operaton": nil}}}
-
-	} else {
+	if active {
 		action = "assign"
 		val := "true"
-		metadataReq = map[string]map[string]map[string]*string{"metadata": {"labels": {"critical-operaton": &val}}}
+		metadataReq = map[string]map[string]map[string]*string{"metadata": {"labels": {"critical-operation": &val}}}
+	} else {
+		action = "remove"
+		metadataReq = map[string]map[string]map[string]*string{"metadata": {"labels": {"critical-operation": nil}}}
 	}
 
 	patchReq, err := json.Marshal(metadataReq)
@@ -253,12 +252,12 @@ func (c *Cluster) majorVersionUpgrade() error {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
 			defer func() error {
-				if err = c.criticalOperationLabel(pods, true); err != nil {
+				if err = c.criticalOperationLabel(pods, false); err != nil {
 					return fmt.Errorf("failed to remove critical-operation label: %s", err)
 				}
 				return nil
 			}()
-			if err = c.criticalOperationLabel(pods, false); err != nil {
+			if err = c.criticalOperationLabel(pods, true); err != nil {
 				return fmt.Errorf("failed to assign critical-operation label: %s", err)
 			}
 
