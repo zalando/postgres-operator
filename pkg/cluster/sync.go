@@ -488,9 +488,6 @@ func (c *Cluster) syncPrimaryPodDisruptionBudget(isUpdate bool) error {
 		}
 	}
 
-	c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
-	c.PrimaryPodDisruptionBudget = pdb
-
 	return nil
 }
 
@@ -529,9 +526,6 @@ func (c *Cluster) syncCriticalOpPodDisruptionBudget(isUpdate bool) error {
 			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
 		}
 	}
-
-	c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
-	c.CriticalOpPodDisruptionBudget = pdb
 
 	return nil
 }
