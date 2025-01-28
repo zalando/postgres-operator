@@ -66,7 +66,7 @@ type kubeResources struct {
 	Secrets                       map[types.UID]*v1.Secret
 	Statefulset                   *appsv1.StatefulSet
 	VolumeClaims                  map[types.UID]*v1.PersistentVolumeClaim
-	GeneralPodDisruptionBudget    *policyv1.PodDisruptionBudget
+	PrimaryPodDisruptionBudget    *policyv1.PodDisruptionBudget
 	CriticalOpPodDisruptionBudget *policyv1.PodDisruptionBudget
 	LogicalBackupJob              *batchv1.CronJob
 	Streams                       map[string]*zalandov1.FabricEventStream
@@ -1735,7 +1735,7 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 		MasterService:                 c.GetServiceMaster(),
 		ReplicaService:                c.GetServiceReplica(),
 		StatefulSet:                   c.GetStatefulSet(),
-		GeneralPodDisruptionBudget:    c.GetGeneralPodDisruptionBudget(),
+		PrimaryPodDisruptionBudget:    c.GetPrimaryPodDisruptionBudget(),
 		CriticalOpPodDisruptionBudget: c.GetCriticalOpPodDisruptionBudget(),
 		CurrentProcess:                c.GetCurrentProcess(),
 

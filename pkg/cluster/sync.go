@@ -452,22 +452,22 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	return nil
 }
 
-func (c *Cluster) syncGeneralPodDisruptionBudget(isUpdate bool) error {
+func (c *Cluster) syncPrimaryPodDisruptionBudget(isUpdate bool) error {
 	var (
 		pdb *policyv1.PodDisruptionBudget
 		err error
 	)
-	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.generalPodDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
-		c.GeneralPodDisruptionBudget = pdb
-		newPDB := c.generateGeneralPodDisruptionBudget()
+	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.PrimaryPodDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
+		c.PrimaryPodDisruptionBudget = pdb
+		newPDB := c.generatePrimaryPodDisruptionBudget()
 		match, reason := c.comparePodDisruptionBudget(pdb, newPDB)
 		if !match {
 			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
-			if err = c.updateGeneralPodDisruptionBudget(newPDB); err != nil {
+			if err = c.updatePrimaryPodDisruptionBudget(newPDB); err != nil {
 				return err
 			}
 		} else {
-			c.GeneralPodDisruptionBudget = pdb
+			c.PrimaryPodDisruptionBudget = pdb
 		}
 		return nil
 
@@ -476,20 +476,20 @@ func (c *Cluster) syncGeneralPodDisruptionBudget(isUpdate bool) error {
 		return fmt.Errorf("could not get pod disruption budget: %v", err)
 	}
 	// no existing pod disruption budget, create new one
-	c.logger.Infof("could not find the general pod disruption budget")
+	c.logger.Infof("could not find the primary pod disruption budget")
 
-	if err = c.createGeneralPodDisruptionBudget(); err != nil {
+	if err = c.createPrimaryPodDisruptionBudget(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not create general pod disruption budget: %v", err)
+			return fmt.Errorf("could not create primary pod disruption budget: %v", err)
 		}
 		c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
-		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.generalPodDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
+		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.PrimaryPodDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
 		}
 	}
 
 	c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
-	c.GeneralPodDisruptionBudget = pdb
+	c.PrimaryPodDisruptionBudget = pdb
 
 	return nil
 }
@@ -539,7 +539,7 @@ func (c *Cluster) syncCriticalOpPodDisruptionBudget(isUpdate bool) error {
 func (c *Cluster) syncPodDisruptionBudgets(isUpdate bool) error {
 	errors := make([]string, 0)
 
-	if err := c.syncGeneralPodDisruptionBudget(isUpdate); err != nil {
+	if err := c.syncPrimaryPodDisruptionBudget(isUpdate); err != nil {
 		errors = append(errors, fmt.Sprintf("%v", err))
 	}
 

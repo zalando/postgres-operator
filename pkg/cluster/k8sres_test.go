@@ -2349,7 +2349,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		}
 	}
 
-	testLabelsAndSelectors := func(isGeneral bool) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+	testLabelsAndSelectors := func(isPrimary bool) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
 		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
 			masterLabelSelectorDisabled := cluster.OpConfig.PDBMasterLabelSelector != nil && !*cluster.OpConfig.PDBMasterLabelSelector
 			if podDisruptionBudget.ObjectMeta.Namespace != "myapp" {
@@ -2360,7 +2360,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				return fmt.Errorf("Labels incorrect, got %#v, expected %#v", podDisruptionBudget.Labels, expectedLabels)
 			}
 			if !masterLabelSelectorDisabled {
-				if isGeneral {
+				if isPrimary {
 					expectedLabels := &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"}}
 					if !reflect.DeepEqual(podDisruptionBudget.Spec.Selector, expectedLabels) {
@@ -2368,7 +2368,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					}
 				} else {
 					expectedLabels := &metav1.LabelSelector{
-						MatchLabels: map[string]string{"cluster-name": "myapp-database", "critical-operaton": "true"}}
+						MatchLabels: map[string]string{"cluster-name": "myapp-database", "critical-operation": "true"}}
 					if !reflect.DeepEqual(podDisruptionBudget.Spec.Selector, expectedLabels) {
 						return fmt.Errorf("MatchLabels incorrect, got %#v, expected %#v", podDisruptionBudget.Spec.Selector, expectedLabels)
 					}
@@ -2503,7 +2503,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := tt.spec.generateGeneralPodDisruptionBudget()
+		result := tt.spec.generatePrimaryPodDisruptionBudget()
 		for _, check := range tt.check {
 			err := check(tt.spec, result)
 			if err != nil {
@@ -2530,7 +2530,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
-				hasName("postgres-myapp-database-critical-operation-pdb"),
+				hasName("postgres-myapp-database-critical-op-pdb"),
 				hasMinAvailable(3),
 				testLabelsAndSelectors(false),
 			},
@@ -2547,7 +2547,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
-				hasName("postgres-myapp-database-critical-operation-pdb"),
+				hasName("postgres-myapp-database-critical-op-pdb"),
 				hasMinAvailable(0),
 				testLabelsAndSelectors(false),
 			},
@@ -2564,7 +2564,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
-				hasName("postgres-myapp-database-critical-operation-pdb"),
+				hasName("postgres-myapp-database-critical-op-pdb"),
 				hasMinAvailable(0),
 				testLabelsAndSelectors(false),
 			},
@@ -2581,7 +2581,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
-				hasName("postgres-myapp-database-critical-operation-pdb"),
+				hasName("postgres-myapp-database-critical-op-pdb"),
 				hasMinAvailable(3),
 				testLabelsAndSelectors(false),
 			},

@@ -109,12 +109,12 @@ func (c *Cluster) servicePort(role PostgresRole) int32 {
 	return pgPort
 }
 
-func (c *Cluster) generalPodDisruptionBudgetName() string {
+func (c *Cluster) PrimaryPodDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
 
 func (c *Cluster) criticalOpPodDisruptionBudgetName() string {
-	pdbTemplate := config.StringTemplate("postgres-{cluster}-critical-operation-pdb")
+	pdbTemplate := config.StringTemplate("postgres-{cluster}-critical-op-pdb")
 	return pdbTemplate.Format("cluster", c.Name)
 }
 
@@ -2212,7 +2212,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	return result
 }
 
-func (c *Cluster) generateGeneralPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+func (c *Cluster) generatePrimaryPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 	pdbMasterLabelSelector := c.OpConfig.PDBMasterLabelSelector
@@ -2230,7 +2230,7 @@ func (c *Cluster) generateGeneralPodDisruptionBudget() *policyv1.PodDisruptionBu
 
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            c.generalPodDisruptionBudgetName(),
+			Name:            c.PrimaryPodDisruptionBudgetName(),
 			Namespace:       c.Namespace,
 			Labels:          c.labelsSet(true),
 			Annotations:     c.annotationsSet(nil),
@@ -2255,7 +2255,7 @@ func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptio
 	}
 
 	labels := c.labelsSet(false)
-	labels["critical-operaton"] = "true"
+	labels["critical-operation"] = "true"
 
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{

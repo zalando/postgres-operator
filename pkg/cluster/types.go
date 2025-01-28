@@ -66,7 +66,7 @@ type ClusterStatus struct {
 	MasterEndpoint                *v1.Endpoints
 	ReplicaEndpoint               *v1.Endpoints
 	StatefulSet                   *appsv1.StatefulSet
-	GeneralPodDisruptionBudget    *policyv1.PodDisruptionBudget
+	PrimaryPodDisruptionBudget    *policyv1.PodDisruptionBudget
 	CriticalOpPodDisruptionBudget *policyv1.PodDisruptionBudget
 
 	CurrentProcess Process
