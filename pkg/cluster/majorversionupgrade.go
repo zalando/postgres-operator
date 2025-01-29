@@ -106,27 +106,16 @@ func (c *Cluster) removeFailuresAnnotation() error {
 	return nil
 }
 
-func (c *Cluster) criticalOperationLabel(pods []v1.Pod, active bool) error {
-	var action string
-	var metadataReq map[string]map[string]map[string]*string
-
-	if active {
-		action = "assign"
-		val := "true"
-		metadataReq = map[string]map[string]map[string]*string{"metadata": {"labels": {"critical-operation": &val}}}
-	} else {
-		action = "remove"
-		metadataReq = map[string]map[string]map[string]*string{"metadata": {"labels": {"critical-operation": nil}}}
-	}
+func (c *Cluster) criticalOperationLabel(pods []v1.Pod, value *string) error {
+	metadataReq := map[string]map[string]map[string]*string{"metadata": {"labels": {"critical-operation": value}}}
 
 	patchReq, err := json.Marshal(metadataReq)
 	if err != nil {
-		return fmt.Errorf("could not marshal ObjectMeta to %s critical operation label: %v", action, err)
+		return fmt.Errorf("could not marshal ObjectMeta: %v", err)
 	}
 	for _, pod := range pods {
 		_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patchReq, metav1.PatchOptions{})
 		if err != nil {
-			c.logger.Errorf("failed to %s critical operation label for pod %s: %v", action, pod.Name, err)
 			return err
 		}
 	}
@@ -252,12 +241,13 @@ func (c *Cluster) majorVersionUpgrade() error {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
 			defer func() error {
-				if err = c.criticalOperationLabel(pods, false); err != nil {
+				if err = c.criticalOperationLabel(pods, nil); err != nil {
 					return fmt.Errorf("failed to remove critical-operation label: %s", err)
 				}
 				return nil
 			}()
-			if err = c.criticalOperationLabel(pods, true); err != nil {
+			val := "true"
+			if err = c.criticalOperationLabel(pods, &val); err != nil {
 				return fmt.Errorf("failed to assign critical-operation label: %s", err)
 			}
 
