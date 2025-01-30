@@ -106,6 +106,22 @@ func (c *Cluster) removeFailuresAnnotation() error {
 	return nil
 }
 
+func (c *Cluster) criticalOperationLabel(pods []v1.Pod, value *string) error {
+	metadataReq := map[string]map[string]map[string]*string{"metadata": {"labels": {"critical-operation": value}}}
+
+	patchReq, err := json.Marshal(metadataReq)
+	if err != nil {
+		return fmt.Errorf("could not marshal ObjectMeta: %v", err)
+	}
+	for _, pod := range pods {
+		_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patchReq, metav1.PatchOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 /*
 Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
 
@@ -224,6 +240,17 @@ func (c *Cluster) majorVersionUpgrade() error {
 	if allRunning && masterPod != nil {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
+			defer func() error {
+				if err = c.criticalOperationLabel(pods, nil); err != nil {
+					return fmt.Errorf("failed to remove critical-operation label: %s", err)
+				}
+				return nil
+			}()
+			val := "true"
+			if err = c.criticalOperationLabel(pods, &val); err != nil {
+				return fmt.Errorf("failed to assign critical-operation label: %s", err)
+			}
+
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
