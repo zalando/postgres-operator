@@ -1860,13 +1860,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database_with_user(leader.metadata.name, "postgres", "SELECT 1", "foo_user")), 1,
             "Could not connect to the database with rotation user {}".format(rotation_user), 10, 5)
 
-        # check if rotation has been ignored for user from test_cross_namespace_secrets test
-        db_user_secret = k8s.get_secret(username="test.db_user", namespace="test")
-        secret_username = str(base64.b64decode(db_user_secret.data["username"]), 'utf-8')
-        self.assertEqual("test.db_user", secret_username,
-                        "Unexpected username in secret of test.db_user: expected {}, got {}".format("test.db_user", secret_username))
-
-        # do a cluster update which syncs secrets but not not init users
+        # add annotation which triggers syncSecrets call
         pg_annotation_patch = {
             "metadata": {
                 "annotations": {
@@ -1877,9 +1871,17 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_annotation_patch)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
         time.sleep(10)
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), secret_count, "Unexpected number of secrets")
+
+        # check if rotation has been ignored for user from test_cross_namespace_secrets test
+        db_user_secret = k8s.get_secret(username="test.db_user", namespace="test")
+        secret_username = str(base64.b64decode(db_user_secret.data["username"]), 'utf-8')
+        self.assertEqual("test.db_user", secret_username,
+                        "Unexpected username in secret of test.db_user: expected {}, got {}".format("test.db_user", secret_username))
+
+        # check if annotation for secret has been updated
+        self.assertTrue("deployment-time" in db_user_secret.metadata.annotations, "Added annotation was not propagated to secret")
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped 
