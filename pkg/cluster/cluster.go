@@ -1037,7 +1037,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		annotationsChanged, _ := c.compareAnnotations(oldSpec.Annotations, newSpec.Annotations, nil)
 
 		initUsers := !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser
-		if initUsers {
+		if initUsers || annotationsChanged {
 			c.logger.Debug("initialize users")
 			if err := c.initUsers(); err != nil {
 				c.logger.Errorf("could not init users - skipping sync of secrets and databases: %v", err)
@@ -1045,8 +1045,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 				updateFailed = true
 				return
 			}
-		}
-		if initUsers || annotationsChanged {
+
 			c.logger.Debug("syncing secrets")
 			//TODO: mind the secrets of the deleted/new users
 			if err := c.syncSecrets(); err != nil {
