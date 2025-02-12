@@ -1900,7 +1900,12 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 }
 
 func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
-	//Skip users with no password i.e. human users (they'll be authenticated using pam)
+	// skip rotation users (not now to check if e2e test fails)
+	//if pgUser.Rotated {
+	//	return nil
+	//}
+
+	// skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
 		if pgUser.Origin != spec.RoleOriginTeamsAPI {
 			c.logger.Warningf("could not generate secret for a non-teamsAPI role %q: role has no password",
@@ -1909,7 +1914,7 @@ func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 		return nil
 	}
 
-	//skip NOLOGIN users
+	// skip NOLOGIN users
 	for _, flag := range pgUser.Flags {
 		if flag == constants.RoleFlagNoLogin {
 			return nil

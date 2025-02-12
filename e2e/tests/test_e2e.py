@@ -1752,8 +1752,12 @@ class EndToEndTestCase(unittest.TestCase):
            Test password rotation and removal of users due to retention policy
         '''
         k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
         leader = k8s.get_cluster_leader_pod()
         today = date.today()
+
+        # remember number of secrets to make sure it stays the same
+        secret_count = k8s.count_secrets_with_label(cluster_label)
 
         # enable password rotation for owner of foo database
         pg_patch_rotation_single_users = {
@@ -1859,9 +1863,23 @@ class EndToEndTestCase(unittest.TestCase):
         # check if rotation has been ignored for user from test_cross_namespace_secrets test
         db_user_secret = k8s.get_secret(username="test.db_user", namespace="test")
         secret_username = str(base64.b64decode(db_user_secret.data["username"]), 'utf-8')
-
         self.assertEqual("test.db_user", secret_username,
                         "Unexpected username in secret of test.db_user: expected {}, got {}".format("test.db_user", secret_username))
+
+        # do a cluster update which syncs secrets but not not init users
+        pg_annotation_patch = {
+            "metadata": {
+                "annotations": {
+                    "deployment-time": "2020-04-01 12:00:00",
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_annotation_patch)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        time.sleep(10)
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), secret_count, "Unexpected number of secrets")
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped 
