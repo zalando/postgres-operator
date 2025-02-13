@@ -1814,6 +1814,7 @@ class EndToEndTestCase(unittest.TestCase):
         enable_password_rotation = {
             "data": {
                 "enable_password_rotation": "true",
+                "inherited_annotations": "environment",
                 "password_rotation_interval": "30",
                 "password_rotation_user_retention": "30",  # should be set to 60 
             },
@@ -1864,7 +1865,7 @@ class EndToEndTestCase(unittest.TestCase):
         pg_annotation_patch = {
             "metadata": {
                 "annotations": {
-                    "deployment-time": "2020-04-01 12:00:00",
+                    "environment": "test",
                 }
             }
         }
@@ -1881,7 +1882,7 @@ class EndToEndTestCase(unittest.TestCase):
                         "Unexpected username in secret of test.db_user: expected {}, got {}".format("test.db_user", secret_username))
 
         # check if annotation for secret has been updated
-        self.assertTrue("deployment-time" in db_user_secret.metadata.annotations, "Added annotation was not propagated to secret")
+        self.assertTrue("environment" in db_user_secret.metadata.annotations, "Added annotation was not propagated to secret")
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped 
@@ -2120,7 +2121,7 @@ class EndToEndTestCase(unittest.TestCase):
         patch_sset_propagate_annotations = {
             "data": {
                 "downscaler_annotations": "deployment-time,downscaler/*",
-                "inherited_annotations": "owned-by",
+                "inherited_annotations": "environment,owned-by",
             }
         }
         k8s.update_config(patch_sset_propagate_annotations)
