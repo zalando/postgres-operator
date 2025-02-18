@@ -23,8 +23,13 @@ const (
 )
 
 func (c *Cluster) listResources() error {
-	if c.PodDisruptionBudget != nil {
-		c.logger.Infof("found pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta), c.PodDisruptionBudget.UID)
+	if c.PrimaryPodDisruptionBudget != nil {
+		c.logger.Infof("found primary pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.PrimaryPodDisruptionBudget.ObjectMeta), c.PrimaryPodDisruptionBudget.UID)
+	}
+
+	if c.CriticalOpPodDisruptionBudget != nil {
+		c.logger.Infof("found pod disruption budget for critical operations: %q (uid: %q)", util.NameFromMeta(c.CriticalOpPodDisruptionBudget.ObjectMeta), c.CriticalOpPodDisruptionBudget.UID)
+
 	}
 
 	if c.Statefulset != nil {
@@ -417,59 +422,128 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	return result
 }
 
-func (c *Cluster) createPodDisruptionBudget() (*policyv1.PodDisruptionBudget, error) {
-	podDisruptionBudgetSpec := c.generatePodDisruptionBudget()
+func (c *Cluster) createPrimaryPodDisruptionBudget() error {
+	c.logger.Debug("creating primary pod disruption budget")
+	if c.PrimaryPodDisruptionBudget != nil {
+		c.logger.Warning("primary pod disruption budget already exists in the cluster")
+		return nil
+	}
+
+	podDisruptionBudgetSpec := c.generatePrimaryPodDisruptionBudget()
 	podDisruptionBudget, err := c.KubeClient.
 		PodDisruptionBudgets(podDisruptionBudgetSpec.Namespace).
 		Create(context.TODO(), podDisruptionBudgetSpec, metav1.CreateOptions{})
 
 	if err != nil {
-		return nil, err
+		return err
 	}
-	c.PodDisruptionBudget = podDisruptionBudget
+	c.logger.Infof("primary pod disruption budget %q has been successfully created", util.NameFromMeta(podDisruptionBudget.ObjectMeta))
+	c.PrimaryPodDisruptionBudget = podDisruptionBudget
 
-	return podDisruptionBudget, nil
+	return nil
 }
 
-func (c *Cluster) updatePodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
-	if c.PodDisruptionBudget == nil {
-		return fmt.Errorf("there is no pod disruption budget in the cluster")
+func (c *Cluster) createCriticalOpPodDisruptionBudget() error {
+	c.logger.Debug("creating pod disruption budget for critical operations")
+	if c.CriticalOpPodDisruptionBudget != nil {
+		c.logger.Warning("pod disruption budget for critical operations already exists in the cluster")
+		return nil
 	}
 
-	if err := c.deletePodDisruptionBudget(); err != nil {
-		return fmt.Errorf("could not delete pod disruption budget: %v", err)
+	podDisruptionBudgetSpec := c.generateCriticalOpPodDisruptionBudget()
+	podDisruptionBudget, err := c.KubeClient.
+		PodDisruptionBudgets(podDisruptionBudgetSpec.Namespace).
+		Create(context.TODO(), podDisruptionBudgetSpec, metav1.CreateOptions{})
+
+	if err != nil {
+		return err
+	}
+	c.logger.Infof("pod disruption budget for critical operations %q has been successfully created", util.NameFromMeta(podDisruptionBudget.ObjectMeta))
+	c.CriticalOpPodDisruptionBudget = podDisruptionBudget
+
+	return nil
+}
+
+func (c *Cluster) createPodDisruptionBudgets() error {
+	errors := make([]string, 0)
+
+	err := c.createPrimaryPodDisruptionBudget()
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("could not create primary pod disruption budget: %v", err))
+	}
+
+	err = c.createCriticalOpPodDisruptionBudget()
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("could not create pod disruption budget for critical operations: %v", err))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
+	return nil
+}
+
+func (c *Cluster) updatePrimaryPodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
+	c.logger.Debug("updating primary pod disruption budget")
+	if c.PrimaryPodDisruptionBudget == nil {
+		return fmt.Errorf("there is no primary pod disruption budget in the cluster")
+	}
+
+	if err := c.deletePrimaryPodDisruptionBudget(); err != nil {
+		return fmt.Errorf("could not delete primary pod disruption budget: %v", err)
 	}
 
 	newPdb, err := c.KubeClient.
 		PodDisruptionBudgets(pdb.Namespace).
 		Create(context.TODO(), pdb, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("could not create pod disruption budget: %v", err)
+		return fmt.Errorf("could not create primary pod disruption budget: %v", err)
 	}
-	c.PodDisruptionBudget = newPdb
+	c.PrimaryPodDisruptionBudget = newPdb
 
 	return nil
 }
 
-func (c *Cluster) deletePodDisruptionBudget() error {
-	c.logger.Debug("deleting pod disruption budget")
-	if c.PodDisruptionBudget == nil {
-		c.logger.Debug("there is no pod disruption budget in the cluster")
+func (c *Cluster) updateCriticalOpPodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
+	c.logger.Debug("updating pod disruption budget for critical operations")
+	if c.CriticalOpPodDisruptionBudget == nil {
+		return fmt.Errorf("there is no pod disruption budget for critical operations in the cluster")
+	}
+
+	if err := c.deleteCriticalOpPodDisruptionBudget(); err != nil {
+		return fmt.Errorf("could not delete pod disruption budget for critical operations: %v", err)
+	}
+
+	newPdb, err := c.KubeClient.
+		PodDisruptionBudgets(pdb.Namespace).
+		Create(context.TODO(), pdb, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("could not create pod disruption budget for critical operations: %v", err)
+	}
+	c.CriticalOpPodDisruptionBudget = newPdb
+
+	return nil
+}
+
+func (c *Cluster) deletePrimaryPodDisruptionBudget() error {
+	c.logger.Debug("deleting primary pod disruption budget")
+	if c.PrimaryPodDisruptionBudget == nil {
+		c.logger.Debug("there is no primary pod disruption budget in the cluster")
 		return nil
 	}
 
-	pdbName := util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta)
+	pdbName := util.NameFromMeta(c.PrimaryPodDisruptionBudget.ObjectMeta)
 	err := c.KubeClient.
-		PodDisruptionBudgets(c.PodDisruptionBudget.Namespace).
-		Delete(context.TODO(), c.PodDisruptionBudget.Name, c.deleteOptions)
+		PodDisruptionBudgets(c.PrimaryPodDisruptionBudget.Namespace).
+		Delete(context.TODO(), c.PrimaryPodDisruptionBudget.Name, c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta))
+		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.PrimaryPodDisruptionBudget.ObjectMeta))
 	} else if err != nil {
-		return fmt.Errorf("could not delete PodDisruptionBudget: %v", err)
+		return fmt.Errorf("could not delete primary pod disruption budget: %v", err)
 	}
 
-	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta))
-	c.PodDisruptionBudget = nil
+	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.PrimaryPodDisruptionBudget.ObjectMeta))
+	c.PrimaryPodDisruptionBudget = nil
 
 	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
@@ -483,9 +557,64 @@ func (c *Cluster) deletePodDisruptionBudget() error {
 			return false, err2
 		})
 	if err != nil {
-		return fmt.Errorf("could not delete pod disruption budget: %v", err)
+		return fmt.Errorf("could not delete primary pod disruption budget: %v", err)
 	}
 
+	return nil
+}
+
+func (c *Cluster) deleteCriticalOpPodDisruptionBudget() error {
+	c.logger.Debug("deleting pod disruption budget for critical operations")
+	if c.CriticalOpPodDisruptionBudget == nil {
+		c.logger.Debug("there is no pod disruption budget for critical operations in the cluster")
+		return nil
+	}
+
+	pdbName := util.NameFromMeta(c.CriticalOpPodDisruptionBudget.ObjectMeta)
+	err := c.KubeClient.
+		PodDisruptionBudgets(c.CriticalOpPodDisruptionBudget.Namespace).
+		Delete(context.TODO(), c.CriticalOpPodDisruptionBudget.Name, c.deleteOptions)
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.CriticalOpPodDisruptionBudget.ObjectMeta))
+	} else if err != nil {
+		return fmt.Errorf("could not delete pod disruption budget for critical operations: %v", err)
+	}
+
+	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.CriticalOpPodDisruptionBudget.ObjectMeta))
+	c.CriticalOpPodDisruptionBudget = nil
+
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+		func() (bool, error) {
+			_, err2 := c.KubeClient.PodDisruptionBudgets(pdbName.Namespace).Get(context.TODO(), pdbName.Name, metav1.GetOptions{})
+			if err2 == nil {
+				return false, nil
+			}
+			if k8sutil.ResourceNotFound(err2) {
+				return true, nil
+			}
+			return false, err2
+		})
+	if err != nil {
+		return fmt.Errorf("could not delete pod disruption budget for critical operations: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) deletePodDisruptionBudgets() error {
+	errors := make([]string, 0)
+
+	if err := c.deletePrimaryPodDisruptionBudget(); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	if err := c.deleteCriticalOpPodDisruptionBudget(); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
 	return nil
 }
 
@@ -705,7 +834,12 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 	return c.Statefulset
 }
 
-// GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget
-func (c *Cluster) GetPodDisruptionBudget() *policyv1.PodDisruptionBudget {
-	return c.PodDisruptionBudget
+// GetPrimaryPodDisruptionBudget returns cluster's primary kubernetes PodDisruptionBudget
+func (c *Cluster) GetPrimaryPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+	return c.PrimaryPodDisruptionBudget
+}
+
+// GetCriticalOpPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget for critical operations
+func (c *Cluster) GetCriticalOpPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+	return c.CriticalOpPodDisruptionBudget
 }

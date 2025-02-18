@@ -334,13 +334,13 @@ configuration they are grouped under the `kubernetes` key.
   pod namespace).
 
 * **pdb_name_format**
-  defines the template for PDB (Pod Disruption Budget) names created by the
+  defines the template for primary PDB (Pod Disruption Budget) name created by the
   operator. The default is `postgres-{cluster}-pdb`, where `{cluster}` is
   replaced by the cluster name. Only the `{cluster}` placeholders is allowed in
   the template.
 
 * **pdb_master_label_selector**
-  By default the PDB will match the master role hence preventing nodes to be
+  By default the primary PDB will match the master role hence preventing nodes to be
   drained if the node_readiness_label is not used. If this option if set to
   `false` the `spilo-role=master` selector will not be added to the PDB.
 

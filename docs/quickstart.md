@@ -230,7 +230,7 @@ kubectl delete postgresql acid-minimal-cluster
 ```
 
 This should remove the associated StatefulSet, database Pods, Services and
-Endpoints. The PersistentVolumes are released and the PodDisruptionBudget is
+Endpoints. The PersistentVolumes are released and the PodDisruptionBudgets are
 deleted. Secrets however are not deleted and backups will remain in place.
 
 When deleting a cluster while it is still starting up or got stuck during that
