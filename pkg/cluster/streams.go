@@ -114,10 +114,10 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 	}
 
 	for slotName, slotAndPublication := range databaseSlotsList {
-		tables := slotAndPublication.Publication
-		tableNames := make([]string, len(tables))
+		newTables := slotAndPublication.Publication
+		tableNames := make([]string, len(newTables))
 		i := 0
-		for t := range tables {
+		for t := range newTables {
 			tableName, schemaName := getTableSchema(t)
 			tableNames[i] = fmt.Sprintf("%s.%s", schemaName, tableName)
 			i++
@@ -126,6 +126,12 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 		tableList := strings.Join(tableNames, ", ")
 
 		currentTables, exists := currentPublications[slotName]
+		// if newTables is empty it means that it's definition was removed from streams section
+		// but when slot is defined in manifest we should sync publications, too
+		// by reusing current tables we make sure it is not
+		if len(newTables) == 0 {
+			tableList = currentTables
+		}
 		if !exists {
 			createPublications[slotName] = tableList
 		} else if currentTables != tableList {
@@ -351,15 +357,6 @@ func (c *Cluster) syncStreams() error {
 	}
 
 	databaseSlots := make(map[string]map[string]zalandov1.Slot)
-	slotsToSync := make(map[string]map[string]string)
-	requiredPatroniConfig := c.Spec.Patroni
-
-	if len(requiredPatroniConfig.Slots) > 0 {
-		for slotName, slotConfig := range requiredPatroniConfig.Slots {
-			slotsToSync[slotName] = slotConfig
-		}
-	}
-
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
 	}
@@ -376,6 +373,18 @@ func (c *Cluster) syncStreams() error {
 	for dbName := range listDatabases {
 		if dbName != "template0" && dbName != "template1" {
 			databaseSlots[dbName] = map[string]zalandov1.Slot{}
+		}
+	}
+
+	// need to take explicitly defined slots into account whey syncing Patroni config
+	slotsToSync := make(map[string]map[string]string)
+	requiredPatroniConfig := c.Spec.Patroni
+	if len(requiredPatroniConfig.Slots) > 0 {
+		for slotName, slotConfig := range requiredPatroniConfig.Slots {
+			slotsToSync[slotName] = slotConfig
+			if _, exists := databaseSlots[slotConfig["database"]]; exists {
+				databaseSlots[slotConfig["database"]][slotName] = zalandov1.Slot{Slot: slotConfig}
+			}
 		}
 	}
 
