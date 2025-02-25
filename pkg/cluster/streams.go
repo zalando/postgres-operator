@@ -356,7 +356,8 @@ func (c *Cluster) syncStreams() error {
 		return nil
 	}
 
-	databaseSlots := make(map[string]map[string]zalandov1.Slot)
+	// create map with every database and empty slot defintion
+	// we need it to detect removal of streams from databases
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
 	}
@@ -369,7 +370,7 @@ func (c *Cluster) syncStreams() error {
 	if err != nil {
 		return fmt.Errorf("could not get list of databases: %v", err)
 	}
-	// get database name with empty list of slot, except template0 and template1
+	databaseSlots := make(map[string]map[string]zalandov1.Slot)
 	for dbName := range listDatabases {
 		if dbName != "template0" && dbName != "template1" {
 			databaseSlots[dbName] = map[string]zalandov1.Slot{}
