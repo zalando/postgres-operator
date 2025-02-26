@@ -505,16 +505,17 @@ func (c *Cluster) syncStream(appId string) error {
 			continue
 		}
 		streamExists = true
+		c.Streams[appId] = &stream
 		desiredStreams := c.generateFabricEventStream(appId)
 		if !reflect.DeepEqual(stream.ObjectMeta.OwnerReferences, desiredStreams.ObjectMeta.OwnerReferences) {
 			c.logger.Infof("owner references of event streams with applicationId %s do not match the current ones", appId)
 			stream.ObjectMeta.OwnerReferences = desiredStreams.ObjectMeta.OwnerReferences
 			c.setProcessName("updating event streams with applicationId %s", appId)
-			stream, err := c.KubeClient.FabricEventStreams(stream.Namespace).Update(context.TODO(), &stream, metav1.UpdateOptions{})
+			updatedStream, err := c.KubeClient.FabricEventStreams(stream.Namespace).Update(context.TODO(), &stream, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("could not update event streams with applicationId %s: %v", appId, err)
 			}
-			c.Streams[appId] = stream
+			c.Streams[appId] = updatedStream
 		}
 		if match, reason := c.compareStreams(&stream, desiredStreams); !match {
 			c.logger.Infof("updating event streams with applicationId %s: %s", appId, reason)
