@@ -114,10 +114,10 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 	}
 
 	for slotName, slotAndPublication := range databaseSlotsList {
-		tables := slotAndPublication.Publication
-		tableNames := make([]string, len(tables))
+		newTables := slotAndPublication.Publication
+		tableNames := make([]string, len(newTables))
 		i := 0
-		for t := range tables {
+		for t := range newTables {
 			tableName, schemaName := getTableSchema(t)
 			tableNames[i] = fmt.Sprintf("%s.%s", schemaName, tableName)
 			i++
@@ -126,6 +126,12 @@ func (c *Cluster) syncPublication(dbName string, databaseSlotsList map[string]za
 		tableList := strings.Join(tableNames, ", ")
 
 		currentTables, exists := currentPublications[slotName]
+		// if newTables is empty it means that it's definition was removed from streams section
+		// but when slot is defined in manifest we should sync publications, too
+		// by reusing current tables we make sure it is not
+		if len(newTables) == 0 {
+			tableList = currentTables
+		}
 		if !exists {
 			createPublications[slotName] = tableList
 		} else if currentTables != tableList {
@@ -350,16 +356,8 @@ func (c *Cluster) syncStreams() error {
 		return nil
 	}
 
-	databaseSlots := make(map[string]map[string]zalandov1.Slot)
-	slotsToSync := make(map[string]map[string]string)
-	requiredPatroniConfig := c.Spec.Patroni
-
-	if len(requiredPatroniConfig.Slots) > 0 {
-		for slotName, slotConfig := range requiredPatroniConfig.Slots {
-			slotsToSync[slotName] = slotConfig
-		}
-	}
-
+	// create map with every database and empty slot defintion
+	// we need it to detect removal of streams from databases
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
 	}
@@ -372,10 +370,25 @@ func (c *Cluster) syncStreams() error {
 	if err != nil {
 		return fmt.Errorf("could not get list of databases: %v", err)
 	}
-	// get database name with empty list of slot, except template0 and template1
+	databaseSlots := make(map[string]map[string]zalandov1.Slot)
 	for dbName := range listDatabases {
 		if dbName != "template0" && dbName != "template1" {
 			databaseSlots[dbName] = map[string]zalandov1.Slot{}
+		}
+	}
+
+	// need to take explicitly defined slots into account whey syncing Patroni config
+	slotsToSync := make(map[string]map[string]string)
+	requiredPatroniConfig := c.Spec.Patroni
+	if len(requiredPatroniConfig.Slots) > 0 {
+		for slotName, slotConfig := range requiredPatroniConfig.Slots {
+			slotsToSync[slotName] = slotConfig
+			if _, exists := databaseSlots[slotConfig["database"]]; exists {
+				databaseSlots[slotConfig["database"]][slotName] = zalandov1.Slot{
+					Slot:        slotConfig,
+					Publication: make(map[string]acidv1.StreamTable),
+				}
+			}
 		}
 	}
 
@@ -391,13 +404,13 @@ func (c *Cluster) syncStreams() error {
 			"type":     "logical",
 		}
 		slotName := getSlotName(stream.Database, stream.ApplicationId)
-		if _, exists := databaseSlots[stream.Database][slotName]; !exists {
+		slotAndPublication, exists := databaseSlots[stream.Database][slotName]
+		if !exists {
 			databaseSlots[stream.Database][slotName] = zalandov1.Slot{
 				Slot:        slot,
 				Publication: stream.Tables,
 			}
 		} else {
-			slotAndPublication := databaseSlots[stream.Database][slotName]
 			streamTables := slotAndPublication.Publication
 			for tableName, table := range stream.Tables {
 				if _, exists := streamTables[tableName]; !exists {
@@ -492,16 +505,17 @@ func (c *Cluster) syncStream(appId string) error {
 			continue
 		}
 		streamExists = true
+		c.Streams[appId] = &stream
 		desiredStreams := c.generateFabricEventStream(appId)
 		if !reflect.DeepEqual(stream.ObjectMeta.OwnerReferences, desiredStreams.ObjectMeta.OwnerReferences) {
 			c.logger.Infof("owner references of event streams with applicationId %s do not match the current ones", appId)
 			stream.ObjectMeta.OwnerReferences = desiredStreams.ObjectMeta.OwnerReferences
 			c.setProcessName("updating event streams with applicationId %s", appId)
-			stream, err := c.KubeClient.FabricEventStreams(stream.Namespace).Update(context.TODO(), &stream, metav1.UpdateOptions{})
+			updatedStream, err := c.KubeClient.FabricEventStreams(stream.Namespace).Update(context.TODO(), &stream, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("could not update event streams with applicationId %s: %v", appId, err)
 			}
-			c.Streams[appId] = stream
+			c.Streams[appId] = updatedStream
 		}
 		if match, reason := c.compareStreams(&stream, desiredStreams); !match {
 			c.logger.Infof("updating event streams with applicationId %s: %s", appId, reason)
