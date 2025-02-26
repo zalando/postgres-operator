@@ -384,7 +384,10 @@ func (c *Cluster) syncStreams() error {
 		for slotName, slotConfig := range requiredPatroniConfig.Slots {
 			slotsToSync[slotName] = slotConfig
 			if _, exists := databaseSlots[slotConfig["database"]]; exists {
-				databaseSlots[slotConfig["database"]][slotName] = zalandov1.Slot{Slot: slotConfig}
+				databaseSlots[slotConfig["database"]][slotName] = zalandov1.Slot{
+					Slot:        slotConfig,
+					Publication: make(map[string]acidv1.StreamTable),
+				}
 			}
 		}
 	}
@@ -401,13 +404,13 @@ func (c *Cluster) syncStreams() error {
 			"type":     "logical",
 		}
 		slotName := getSlotName(stream.Database, stream.ApplicationId)
-		if _, exists := databaseSlots[stream.Database][slotName]; !exists {
+		slotAndPublication, exists := databaseSlots[stream.Database][slotName]
+		if !exists {
 			databaseSlots[stream.Database][slotName] = zalandov1.Slot{
 				Slot:        slot,
 				Publication: stream.Tables,
 			}
 		} else {
-			slotAndPublication := databaseSlots[stream.Database][slotName]
 			streamTables := slotAndPublication.Publication
 			for tableName, table := range stream.Tables {
 				if _, exists := streamTables[tableName]; !exists {
