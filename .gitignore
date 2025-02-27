@@ -10,6 +10,7 @@ _manifests
 _tmp
 github.com
 
+
 # Architecture specific extensions/prefixes
 *.[568vq]
 [568vq].out
