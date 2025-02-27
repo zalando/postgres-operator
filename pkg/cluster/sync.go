@@ -153,7 +153,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
-	if len(c.Spec.Streams) > 0 {
+	// sync if manifest stream count is different from stream CR count
+	// it can be that they are always different due to grouping of manifest streams
+	// but we would catch missed removals on update
+	if len(c.Spec.Streams) != len(c.Streams) {
 		c.logger.Debug("syncing streams")
 		if err = c.syncStreams(); err != nil {
 			err = fmt.Errorf("could not sync streams: %v", err)

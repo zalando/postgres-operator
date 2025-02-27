@@ -650,7 +650,7 @@ func Test_trimCronjobName(t *testing.T) {
 	}
 }
 
-func TestisInMaintenanceWindow(t *testing.T) {
+func TestIsInMaintenanceWindow(t *testing.T) {
 	now := time.Now()
 	futureTimeStart := now.Add(1 * time.Hour)
 	futureTimeStartFormatted := futureTimeStart.Format("15:04")
