@@ -4062,7 +4062,17 @@ spec:
                 nullable: true
                 items:
                   type: object
-                  x-kubernetes-preserve-unknown-fields: true
+                  properties:
+                    maxSkew:
+                      type: integer
+                      format: int32
+                    topologyKey:
+                      type: string
+                    whenUnsatisfiable:
+                      type: string
+                      enum:
+                        - DoNotSchedule
+                        - ScheduleAnyway
               useLoadBalancer:
                 description: |-
                   deprecated load balancer settings maintained for backward compatibility
