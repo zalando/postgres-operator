@@ -2359,6 +2359,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 
+	topologySpreadConstraintsSpec := generateTopologySpreadConstraints(labels, spec.TopologySpreadConstraints)
+
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
@@ -2368,7 +2370,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.Container{},
 		[]v1.Container{},
 		util.False(),
-		[]v1.TopologySpreadConstraint{},
+		topologySpreadConstraintsSpec,
 		&tolerationsSpec,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		nil,
