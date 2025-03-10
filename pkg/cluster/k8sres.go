@@ -1010,7 +1010,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 
 	if c.patroniUsesKubernetes() {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
-		if c.OpConfig.EnablePodDisruptionBudget != nil && !(*c.OpConfig.EnablePodDisruptionBudget) {
+		if c.OpConfig.EnablePodDisruptionBudget != nil && *c.OpConfig.EnablePodDisruptionBudget {
 			envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_BOOTSTRAP_LABELS", Value: "{\"critical-operation\":\"true\"}"})
 		}
 	} else {
