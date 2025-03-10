@@ -604,6 +604,13 @@ func generatePodAntiAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuring
 	return podAntiAffinity
 }
 
+func generateTopologySpreadConstraints(labels labels.Set, topologySpreadConstraints []v1.TopologySpreadConstraint) []v1.TopologySpreadConstraint {
+	for _, topologySpreadConstraint := range topologySpreadConstraints {
+		topologySpreadConstraint.LabelSelector = &metav1.LabelSelector{MatchLabels: labels}
+	}
+	return topologySpreadConstraints
+}
+
 func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
 	// allow to override tolerations by postgresql manifest
 	if len(*tolerationsSpec) > 0 {
@@ -809,6 +816,7 @@ func (c *Cluster) generatePodTemplate(
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
 	sharePgSocketWithSidecars *bool,
+	topologySpreadConstraintsSpec []v1.TopologySpreadConstraint,
 	tolerationsSpec *[]v1.Toleration,
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
@@ -876,6 +884,10 @@ func (c *Cluster) generatePodTemplate(
 
 	if priorityClassName != "" {
 		podSpec.PriorityClassName = priorityClassName
+	}
+
+	if len(topologySpreadConstraintsSpec) > 0 {
+		podSpec.TopologySpreadConstraints = generateTopologySpreadConstraints(labels, topologySpreadConstraintsSpec)
 	}
 
 	if sharePgSocketWithSidecars != nil && *sharePgSocketWithSidecars {
@@ -1469,6 +1481,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers,
 		sidecarContainers,
 		c.OpConfig.SharePgSocketWithSidecars,
+		spec.TopologySpreadConstraints,
 		&tolerationSpec,
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
@@ -2347,6 +2360,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 
+	topologySpreadConstraintsSpec := generateTopologySpreadConstraints(labels, spec.TopologySpreadConstraints)
+
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
@@ -2356,6 +2371,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.Container{},
 		[]v1.Container{},
 		util.False(),
+		topologySpreadConstraintsSpec,
 		&tolerationsSpec,
 		nil,
 		nil,
