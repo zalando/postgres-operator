@@ -92,13 +92,13 @@ They only work only with Helm v3. Helm v2 support was dropped with v1.8.0.
 
 ```bash
 # add repo for postgres-operator
-helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+helm repo add postgres-operator-charts https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator
 
 # install the postgres-operator
 helm install postgres-operator postgres-operator-charts/postgres-operator
 
 # add repo for postgres-operator-ui
-helm repo add postgres-operator-ui-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui
+helm repo add postgres-operator-ui-charts https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator-ui
 
 # install the postgres-operator-ui
 helm install postgres-operator-ui postgres-operator-ui-charts/postgres-operator-ui
