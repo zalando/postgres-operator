@@ -277,6 +277,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 				isUpgradeSuccess = false
 				c.annotatePostgresResource(isUpgradeSuccess)
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, scriptErrMsg)
+				c.logger.Errorf("upgrade action triggered and command failed: %s", err)
 				return fmt.Errorf(scriptErrMsg)
 			}
 
