@@ -1878,6 +1878,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"logging_rest_api": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"api_address": {
+								Type: "string",
+							},
 							"api_port": {
 								Type: "integer",
 							},

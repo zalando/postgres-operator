@@ -978,6 +978,9 @@ key.
 Parameters affecting logging and REST API listener. In the CRD-based
 configuration they are grouped under the `logging_rest_api` key.
 
+* **api_address**
+  REST API listener binds to this address. The default is empty.
+
 * **api_port**
   REST API listener listens to this port. The default is `8080`.
 
