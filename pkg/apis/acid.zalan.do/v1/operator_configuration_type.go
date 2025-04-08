@@ -244,6 +244,7 @@ type OperatorLogicalBackupConfiguration struct {
 	MemoryRequest                string `json:"logical_backup_memory_request,omitempty"`
 	CPULimit                     string `json:"logical_backup_cpu_limit,omitempty"`
 	MemoryLimit                  string `json:"logical_backup_memory_limit,omitempty"`
+	FilenameDateFormat           string `json:"logical_backup_filename_date_format,omitempty"`
 }
 
 // PatroniConfiguration defines configuration for Patroni

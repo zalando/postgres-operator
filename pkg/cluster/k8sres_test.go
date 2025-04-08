@@ -3784,21 +3784,26 @@ func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
 		},
 		{
 			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_FILENAME_DATE_FORMAT",
+			envVarValue:    "+%s",
+		},
+		{
+			envIndex:       14,
 			envVarConstant: "LOGICAL_BACKUP_S3_REGION",
 			envVarValue:    "eu-central-1",
 		},
 		{
-			envIndex:       14,
+			envIndex:       15,
 			envVarConstant: "LOGICAL_BACKUP_S3_ENDPOINT",
 			envVarValue:    "",
 		},
 		{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "LOGICAL_BACKUP_S3_SSE",
 			envVarValue:    "",
 		},
 		{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "LOGICAL_BACKUP_S3_RETENTION_TIME",
 			envVarValue:    "1 month",
 		},
@@ -3811,7 +3816,7 @@ func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
 			envVarValue:    "gcs",
 		},
 		{
-			envIndex:       13,
+			envIndex:       14,
 			envVarConstant: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
 			envVarValue:    "some-path-to-credentials",
 		},
@@ -3824,17 +3829,17 @@ func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
 			envVarValue:    "az",
 		},
 		{
-			envIndex:       13,
+			envIndex:       14,
 			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
 			envVarValue:    "some-azure-storage-account-name",
 		},
 		{
-			envIndex:       14,
+			envIndex:       15,
 			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
 			envVarValue:    "some-azure-storage-container",
 		},
 		{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
 			envVarValue:    "some-azure-storage-account-key",
 		},
@@ -3842,7 +3847,7 @@ func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
 
 	expectedLogicalBackupRetentionTime := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "LOGICAL_BACKUP_S3_RETENTION_TIME",
 			envVarValue:    "3 months",
 		},
@@ -3861,6 +3866,7 @@ func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
 					LogicalBackupProvider:        "s3",
 					LogicalBackupS3Bucket:        dummyBucket,
 					LogicalBackupS3BucketPrefix:  "spilo",
+					LogicalBackupFilenameDateFormat: "+%s",
 					LogicalBackupS3Region:        "eu-central-1",
 					LogicalBackupS3RetentionTime: "1 month",
 				},

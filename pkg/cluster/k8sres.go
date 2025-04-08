@@ -2486,6 +2486,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
 			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
 		},
+		{
+			Name:  "LOGICAL_BACKUP_FILENAME_DATE_FORMAT",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupFilenameDateFormat,
+		},
 	}
 
 	switch backupProvider {
