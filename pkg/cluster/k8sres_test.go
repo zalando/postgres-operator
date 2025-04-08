@@ -3863,12 +3863,12 @@ func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
 			subTest: "logical backup with provider: s3",
 			opConfig: config.Config{
 				LogicalBackup: config.LogicalBackup{
-					LogicalBackupProvider:        "s3",
-					LogicalBackupS3Bucket:        dummyBucket,
-					LogicalBackupS3BucketPrefix:  "spilo",
+					LogicalBackupProvider:           "s3",
+					LogicalBackupS3Bucket:           dummyBucket,
+					LogicalBackupS3BucketPrefix:     "spilo",
 					LogicalBackupFilenameDateFormat: "+%s",
-					LogicalBackupS3Region:        "eu-central-1",
-					LogicalBackupS3RetentionTime: "1 month",
+					LogicalBackupS3Region:           "eu-central-1",
+					LogicalBackupS3RetentionTime:    "1 month",
 				},
 			},
 			expectedValues: expectedLogicalBackupS3Bucket,
