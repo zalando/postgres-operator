@@ -10,7 +10,7 @@ ALL_DB_SIZE_QUERY="select sum(pg_database_size(datname)::numeric) from pg_databa
 PG_BIN=$PG_DIR/$PG_VERSION/bin
 DUMP_SIZE_COEFF=5
 ERRORCOUNT=0
-TIMESTAMP=$(eval time $LOGICAL_BACKUP_FILENAME_DATE_FORMAT)
+TIMESTAMP=$(eval date $LOGICAL_BACKUP_FILENAME_DATE_FORMAT)
 
 TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 KUBERNETES_SERVICE_PORT=${KUBERNETES_SERVICE_PORT:-443}
