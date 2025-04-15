@@ -94,9 +94,6 @@ Those are top-level keys, containing both leaf keys and groups.
 * **enable_pgversion_env_var**
   With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `true`.
 
-* **enable_spilo_wal_path_compat**
-  enables backwards compatible path between Spilo 12 and Spilo 13+ images. The default is `false`.
-
 * **enable_team_id_clustername_prefix**
   To lower the risk of name clashes between clusters of different teams you
   can turn on this flag and the operator will sync only clusters where the
@@ -242,7 +239,7 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
   `"manual"` = manifest triggers action,
   `"full"` = manifest and minimal version violation trigger upgrade.
   Note, that with all three modes increasing the version in the manifest will
-  trigger a rolling update of the pods. The default is `"off"`.
+  trigger a rolling update of the pods. The default is `"manual"`.
 
 * **major_version_upgrade_team_allow_list**
   Upgrades will only be carried out for clusters of listed teams when mode is
@@ -250,18 +247,43 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
-  when `major_version_upgrade_mode` is set to `"full"`. The default is `"12"`.
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"13"`.
 
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
   which violate the configured allowed `minimal_major_version` when
-  `major_version_upgrade_mode` is set to `"full"`. The default is `"16"`.
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"17"`.
 
 ## Kubernetes resources
 
 Parameters to configure cluster-related Kubernetes objects created by the
 operator, as well as some timeouts associated with them. In a CRD-based
 configuration they are grouped under the `kubernetes` key.
+
+* **enable_finalizers**
+  By default, a deletion of the Postgresql resource will trigger an event
+  that leads to a cleanup of all child resources. However, if the database
+  cluster is in a broken state (e.g. failed initialization) and the operator
+  cannot fully sync it, there can be leftovers. By enabling finalizers the
+  operator will ensure all managed resources are deleted prior to the
+  Postgresql resource. See also [admin docs](../administrator.md#owner-references-and-finalizers)
+  for more information The default is `false`.
+
+* **enable_owner_references**
+  The operator can set owner references on its child resources (except PVCs,
+  Patroni config service/endpoint, cross-namespace secrets) to improve cluster
+  monitoring and enable cascading deletion. The default is `false`. Warning,
+  enabling this option disables configured delete protection checks (see below).
+
+* **delete_annotation_date_key**
+  key name for annotation that compares manifest value with current date in the
+  YYYY-MM-DD format. Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`.
+  The default is empty which also disables this delete protection check.
+
+* **delete_annotation_name_key**
+  key name for annotation that compares manifest value with Postgres cluster name.
+  Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`. The default is
+  empty which also disables this delete protection check.
 
 * **pod_service_account_name**
   service account used by Patroni running on individual Pods to communicate
@@ -293,16 +315,6 @@ configuration they are grouped under the `kubernetes` key.
   of a database created by the operator. If the annotation key is also provided
   by the database definition, the database definition value is used.
 
-* **delete_annotation_date_key**
-  key name for annotation that compares manifest value with current date in the
-  YYYY-MM-DD format. Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`.
-  The default is empty which also disables this delete protection check.
-
-* **delete_annotation_name_key**
-  key name for annotation that compares manifest value with Postgres cluster name.
-  Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`. The default is
-  empty which also disables this delete protection check.
-
 * **downscaler_annotations**
   An array of annotations that should be passed from Postgres CRD on to the
   statefulset and, if exists, to the connection pooler deployment as well.
@@ -322,29 +334,15 @@ configuration they are grouped under the `kubernetes` key.
   pod namespace).
 
 * **pdb_name_format**
-  defines the template for PDB (Pod Disruption Budget) names created by the
+  defines the template for primary PDB (Pod Disruption Budget) name created by the
   operator. The default is `postgres-{cluster}-pdb`, where `{cluster}` is
   replaced by the cluster name. Only the `{cluster}` placeholders is allowed in
   the template.
 
 * **pdb_master_label_selector**
-  By default the PDB will match the master role hence preventing nodes to be
-  drained if the node_readiness_label is not used. This option if set to `false`
-  will not add the `spilo-role=master` selector to the PDB.
-
-* **enable_finalizers**
-  By default, a deletion of the Postgresql resource will trigger an event
-  that leads to a cleanup of all child resources. However, if the database
-  cluster is in a broken state (e.g. failed initialization) and the operator
-  cannot fully sync it, there can be leftovers. By enabling finalizers the
-  operator will ensure all managed resources are deleted prior to the
-  Postgresql resource. There is a trade-off though: The deletion is only
-  performed after the next two SYNC cycles with the first one updating the
-  internal spec and the latter reacting on the `deletionTimestamp` while
-  processing the SYNC event. The final removal of the custom resource will
-  add a DELETE event to the worker queue but the child resources are already
-  gone at this point.
-  The default is `false`.
+  By default the primary PDB will match the master role hence preventing nodes to be
+  drained if the node_readiness_label is not used. If this option if set to
+  `false` the `spilo-role=master` selector will not be added to the PDB.
 
 * **persistent_volume_claim_retention_policy**
   The operator tries to protect volumes as much as possible. If somebody
@@ -360,8 +358,12 @@ configuration they are grouped under the `kubernetes` key.
   `"retain"` - or `when_scaled` - default is also `"retain"`. The other possible
   option is `delete`.
 
+* **enable_secrets_deletion**
+  By default, the operator deletes secrets when removing the Postgres cluster
+  manifest. To keep secrets, set this option to `false`. The default is `true`.
+
 * **enable_persistent_volume_claim_deletion**
-  By default, the operator deletes PersistentVolumeClaims when removing the
+  By default, the operator deletes persistent volume claims when removing the
   Postgres cluster manifest, no matter if `persistent_volume_claim_retention_policy`
   on the statefulset is set to `retain`. To keep PVCs set this option to `false`.
   The default is `true`.
@@ -813,11 +815,11 @@ grouped under the `logical_backup` key.
   default values from `postgres_pod_resources` will be used.
 
 * **logical_backup_docker_image**
-  An image for pods of the logical backup job. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile)
+  An image for pods of the logical backup job. The [example image](https://github.com/zalando/postgres-operator/blob/master/logical-backup/Dockerfile)
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
-  an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
+  an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -844,6 +846,9 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
+
+* **logical_backup_s3_bucket_prefix**
+  S3 bucket prefix to use in configured bucket. Default: "spilo"
 
 * **logical_backup_s3_endpoint**
   When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.

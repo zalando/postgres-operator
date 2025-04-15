@@ -2,7 +2,6 @@ from boto3 import client
 from datetime import datetime, timezone
 from furl import furl
 from json import dumps, loads
-from logging import getLogger
 from os import environ, getenv
 from requests import Session
 from urllib.parse import urljoin
@@ -10,9 +9,7 @@ from uuid import UUID
 from wal_e.cmd import configure_backup_cxt
 
 from .utils import Attrs, defaulting, these
-
-
-logger = getLogger(__name__)
+from operator_ui.adapters.logger import logger
 
 session = Session()
 
@@ -308,7 +305,7 @@ def read_versions(
         if uid == 'wal' or defaulting(lambda: UUID(uid))
     ]
 
-BACKUP_VERSION_PREFIXES = ['', '9.6/', '10/', '11/', '12/', '13/', '14/', '15/', '16/']
+BACKUP_VERSION_PREFIXES = ['', '10/', '11/', '12/', '13/', '14/', '15/', '16/', '17/']
 
 def read_basebackups(
     pg_cluster,

@@ -1,6 +1,6 @@
 {
   "name": "postgres-operator-ui",
-  "version": "1.11.0",
+  "version": "1.14.0",
   "description": "PostgreSQL Operator UI",
   "main": "src/app.js",
   "config": {

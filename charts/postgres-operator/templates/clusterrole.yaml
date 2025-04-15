@@ -120,6 +120,7 @@ rules:
   - create
   - delete
   - get
+  - patch
   - update
 # to check nodes for node readiness label
 - apiGroups:
@@ -139,8 +140,8 @@ rules:
   - delete
   - get
   - list
-{{- if toString .Values.configKubernetes.storage_resize_mode | eq "pvc" }}
   - patch
+{{- if or (toString .Values.configKubernetes.storage_resize_mode | eq "pvc") (toString .Values.configKubernetes.storage_resize_mode | eq "mixed") }}
   - update
 {{- end }}
  # to read existing PVs. Creation should be done via dynamic provisioning
@@ -196,6 +197,7 @@ rules:
   - get
   - list
   - patch
+  - update
 # to CRUD cron jobs for logical backups
 - apiGroups:
   - batch

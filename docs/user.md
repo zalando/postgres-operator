@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "16"
+    version: "17"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -109,7 +109,7 @@ metadata:
 spec:
   [...]
   postgresql:
-    version: "16"
+    version: "17"
     parameters:
       password_encryption: scram-sha-256
 ```
@@ -517,7 +517,7 @@ Postgres Operator will create the following NOLOGIN roles:
 
 The `<dbname>_owner` role is the database owner and should be used when creating
 new database objects. All members of the `admin` role, e.g. teams API roles, can
-become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/16/sql-alterdefaultprivileges.html)
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/17/sql-alterdefaultprivileges.html)
 are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
@@ -594,7 +594,7 @@ spec:
 
 ### Schema `search_path` for default roles
 
-The schema [`search_path`](https://www.postgresql.org/docs/16/ddl-schemas.html#DDL-SCHEMAS-PATH)
+The schema [`search_path`](https://www.postgresql.org/docs/17/ddl-schemas.html#DDL-SCHEMAS-PATH)
 for each role will include the role name and the schemas, this role should have
 access to. So `foo_bar_writer` does not have to schema-qualify tables from
 schemas `foo_bar_writer, bar`, while `foo_writer` can look up `foo_writer` and
@@ -695,7 +695,7 @@ handle it.
 
 ### HugePages support
 
-The operator supports [HugePages](https://www.postgresql.org/docs/16/kernel-resources.html#LINUX-HUGEPAGES).
+The operator supports [HugePages](https://www.postgresql.org/docs/17/kernel-resources.html#LINUX-HUGEPAGES).
 To enable HugePages, set the matching resource requests and/or limits in the manifest:
 
 ```yaml
@@ -758,7 +758,7 @@ If you need to define a `nodeAffinity` for all your Postgres clusters use the
 ## In-place major version upgrade
 
 Starting with Spilo 13, operator supports in-place major version upgrade to a
-higher major version (e.g. from PG 11 to PG 13). To trigger the upgrade,
+higher major version (e.g. from PG 14 to PG 16). To trigger the upgrade,
 simply increase the version in the manifest. It is your responsibility to test
 your applications against the new version before the upgrade; downgrading is
 not supported. The easiest way to do so is to try the upgrade on the cloned
@@ -838,7 +838,7 @@ spec:
 ### Clone directly
 
 Another way to get a fresh copy of your source DB cluster is via
-[pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html). To
+[pg_basebackup](https://www.postgresql.org/docs/17/app-pgbasebackup.html). To
 use this feature simply leave out the timestamp field from the clone section.
 The operator will connect to the service of the source cluster by name. If the
 cluster is called test, then the connection string will look like host=test
@@ -1005,6 +1005,7 @@ spec:
       env:
         - name: "ENV_VAR_NAME"
           value: "any-k8s-env-things"
+      command: ['sh', '-c', 'echo "logging" > /opt/logs.txt']
 ```
 
 In addition to any environment variables you specify, the following environment

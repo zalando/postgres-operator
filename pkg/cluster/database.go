@@ -46,12 +46,15 @@ const (
 	createExtensionSQL      = `CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
 	alterExtensionSQL       = `ALTER EXTENSION "%s" SET SCHEMA "%s"`
 
-	getPublicationsSQL = `SELECT p.pubname, string_agg(pt.schemaname || '.' || pt.tablename, ', ' ORDER BY pt.schemaname, pt.tablename)
+	getPublicationsSQL = `SELECT p.pubname, COALESCE(string_agg(pt.schemaname || '.' || pt.tablename, ', ' ORDER BY pt.schemaname, pt.tablename), '') AS pubtables
 	        FROM pg_publication p
 			LEFT JOIN pg_publication_tables pt ON pt.pubname = p.pubname
+			WHERE p.pubowner = 'postgres'::regrole
+			AND p.pubname LIKE 'fes_%'
 			GROUP BY p.pubname;`
 	createPublicationSQL = `CREATE PUBLICATION "%s" FOR TABLE %s WITH (publish = 'insert, update');`
 	alterPublicationSQL  = `ALTER PUBLICATION "%s" SET TABLE %s;`
+	dropPublicationSQL   = `DROP PUBLICATION "%s";`
 
 	globalDefaultPrivilegesSQL = `SET ROLE TO "%s";
 			ALTER DEFAULT PRIVILEGES GRANT USAGE ON SCHEMAS TO "%s","%s";
@@ -108,7 +111,7 @@ func (c *Cluster) pgConnectionString(dbname string) string {
 
 func (c *Cluster) databaseAccessDisabled() bool {
 	if !c.OpConfig.EnableDBAccess {
-		c.logger.Debugf("database access is disabled")
+		c.logger.Debug("database access is disabled")
 	}
 
 	return !c.OpConfig.EnableDBAccess
@@ -626,6 +629,14 @@ func (c *Cluster) getPublications() (publications map[string]string, err error) 
 	}
 
 	return dbPublications, err
+}
+
+func (c *Cluster) executeDropPublication(pubName string) error {
+	c.logger.Infof("dropping publication %q", pubName)
+	if _, err := c.pgDb.Exec(fmt.Sprintf(dropPublicationSQL, pubName)); err != nil {
+		return fmt.Errorf("could not execute drop publication: %v", err)
+	}
+	return nil
 }
 
 // executeCreatePublication creates new publication for given tables

@@ -35,6 +35,8 @@ func init() {
 	flag.BoolVar(&outOfCluster, "outofcluster", false, "Whether the operator runs in- our outside of the Kubernetes cluster.")
 	flag.BoolVar(&config.NoDatabaseAccess, "nodatabaseaccess", false, "Disable all access to the database from the operator side.")
 	flag.BoolVar(&config.NoTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
+	flag.IntVar(&config.KubeQPS, "kubeqps", 10, "Kubernetes api requests per second.")
+	flag.IntVar(&config.KubeBurst, "kubeburst", 20, "Kubernetes api requests burst limit.")
 	flag.Parse()
 
 	config.EnableJsonLogging = os.Getenv("ENABLE_JSON_LOGGING") == "true"
@@ -82,6 +84,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("couldn't get REST config: %v", err)
 	}
+
+	config.RestConfig.QPS = float32(config.KubeQPS)
+	config.RestConfig.Burst = config.KubeBurst
 
 	c := controller.NewController(&config, "")
 

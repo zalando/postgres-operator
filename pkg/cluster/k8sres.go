@@ -47,11 +47,6 @@ const (
 	operatorPort                   = 8080
 )
 
-type pgUser struct {
-	Password string   `json:"password"`
-	Options  []string `json:"options"`
-}
-
 type patroniDCS struct {
 	TTL                      uint32                       `json:"ttl,omitempty"`
 	LoopWait                 uint32                       `json:"loop_wait,omitempty"`
@@ -79,19 +74,13 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
-func (c *Cluster) endpointName(role PostgresRole) string {
-	name := c.Name
-	if role == Replica {
-		name = fmt.Sprintf("%s-%s", name, "repl")
-	}
-
-	return name
-}
-
 func (c *Cluster) serviceName(role PostgresRole) string {
 	name := c.Name
-	if role == Replica {
+	switch role {
+	case Replica:
 		name = fmt.Sprintf("%s-%s", name, "repl")
+	case Patroni:
+		name = fmt.Sprintf("%s-%s", name, "config")
 	}
 
 	return name
@@ -120,8 +109,13 @@ func (c *Cluster) servicePort(role PostgresRole) int32 {
 	return pgPort
 }
 
-func (c *Cluster) podDisruptionBudgetName() string {
+func (c *Cluster) PrimaryPodDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
+}
+
+func (c *Cluster) criticalOpPodDisruptionBudgetName() string {
+	pdbTemplate := config.StringTemplate("postgres-{cluster}-critical-op-pdb")
+	return pdbTemplate.Format("cluster", c.Name)
 }
 
 func makeDefaultResources(config *config.Config) acidv1.Resources {
@@ -668,13 +662,19 @@ func isBootstrapOnlyParameter(param string) bool {
 }
 
 func generateVolumeMounts(volume acidv1.Volume) []v1.VolumeMount {
-	return []v1.VolumeMount{
+	volumeMount := []v1.VolumeMount{
 		{
 			Name:      constants.DataVolumeName,
 			MountPath: constants.PostgresDataMount, //TODO: fetch from manifest
-			SubPath:   volume.SubPath,
 		},
 	}
+
+	if volume.IsSubPathExpr != nil && *volume.IsSubPathExpr {
+		volumeMount[0].SubPathExpr = volume.SubPath
+	} else {
+		volumeMount[0].SubPath = volume.SubPath
+	}
+	return volumeMount
 }
 
 func generateContainer(
@@ -744,7 +744,7 @@ func (c *Cluster) generateSidecarContainers(sidecars []acidv1.Sidecar,
 }
 
 // adds common fields to sidecars
-func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string, logger *logrus.Entry) []v1.Container {
+func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string) []v1.Container {
 	result := []v1.Container{}
 
 	for _, container := range in {
@@ -886,7 +886,7 @@ func (c *Cluster) generatePodTemplate(
 		addSecretVolume(&podSpec, additionalSecretMount, additionalSecretMountPath)
 	}
 
-	if additionalVolumes != nil {
+	if len(additionalVolumes) > 0 {
 		c.addAdditionalVolumes(&podSpec, additionalVolumes)
 	}
 
@@ -1010,6 +1010,9 @@ func (c *Cluster) generateSpiloPodEnvVars(
 
 	if c.patroniUsesKubernetes() {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
+		if c.OpConfig.EnablePodDisruptionBudget != nil && *c.OpConfig.EnablePodDisruptionBudget {
+			envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_BOOTSTRAP_LABELS", Value: "{\"critical-operation\":\"true\"}"})
+		}
 	} else {
 		envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
 	}
@@ -1227,6 +1230,7 @@ func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.Resour
 		Resources:       *resources,
 		Env:             sidecar.Env,
 		Ports:           sidecar.Ports,
+		Command:         sidecar.Command,
 	}
 }
 
@@ -1449,7 +1453,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			containerName, containerName)
 	}
 
-	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
+	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername))
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
@@ -1524,10 +1528,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.statefulSetName(),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
+			Name:            c.statefulSetName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.AnnotationsToPropagate(c.annotationsSet(nil)),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:                             &numberOfInstances,
@@ -1602,7 +1607,7 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 	for k, v := range c.OpConfig.CustomPodAnnotations {
 		annotations[k] = v
 	}
-	if spec != nil || spec.PodAnnotations != nil {
+	if spec.PodAnnotations != nil {
 		for k, v := range spec.PodAnnotations {
 			annotations[k] = v
 		}
@@ -1820,11 +1825,18 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 		for _, additionalVolume := range additionalVolumes {
 			for _, target := range additionalVolume.TargetContainers {
 				if podSpec.Containers[i].Name == target || target == "all" {
-					mounts = append(mounts, v1.VolumeMount{
+					v := v1.VolumeMount{
 						Name:      additionalVolume.Name,
 						MountPath: additionalVolume.MountPath,
-						SubPath:   additionalVolume.SubPath,
-					})
+					}
+
+					if additionalVolume.IsSubPathExpr != nil && *additionalVolume.IsSubPathExpr {
+						v.SubPathExpr = additionalVolume.SubPath
+					} else {
+						v.SubPath = additionalVolume.SubPath
+					}
+
+					mounts = append(mounts, v)
 				}
 			}
 		}
@@ -1856,7 +1868,7 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: quantity,
 				},
@@ -1872,18 +1884,16 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 
 func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	secrets := make(map[string]*v1.Secret, len(c.pgUsers)+len(c.systemUsers))
-	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		secret := c.generateSingleUserSecret(pgUser.Namespace, pgUser)
+		secret := c.generateSingleUserSecret(pgUser)
 		if secret != nil {
 			secrets[username] = secret
 		}
-		namespace = pgUser.Namespace
 	}
 	/* special case for the system user */
 	for _, systemUser := range c.systemUsers {
-		secret := c.generateSingleUserSecret(namespace, systemUser)
+		secret := c.generateSingleUserSecret(systemUser)
 		if secret != nil {
 			secrets[systemUser.Name] = secret
 		}
@@ -1892,7 +1902,7 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	return secrets
 }
 
-func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
+func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
 		if pgUser.Origin != spec.RoleOriginTeamsAPI {
@@ -1916,12 +1926,21 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 		lbls = c.connectionPoolerLabels("", false).MatchLabels
 	}
 
+	// if secret lives in another namespace we cannot set ownerReferences
+	var ownerReferences []metav1.OwnerReference
+	if c.Config.OpConfig.EnableCrossNamespaceSecret && strings.Contains(username, ".") {
+		ownerReferences = nil
+	} else {
+		ownerReferences = c.ownerReferences()
+	}
+
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.credentialSecretName(username),
-			Namespace:   pgUser.Namespace,
-			Labels:      lbls,
-			Annotations: c.annotationsSet(nil),
+			Name:            c.credentialSecretName(username),
+			Namespace:       pgUser.Namespace,
+			Labels:          lbls,
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: ownerReferences,
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -1979,10 +1998,11 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.serviceName(role),
-			Namespace:   c.Namespace,
-			Labels:      c.roleLabelsSet(true, role),
-			Annotations: c.annotationsSet(c.generateServiceAnnotations(role, spec)),
+			Name:            c.serviceName(role),
+			Namespace:       c.Namespace,
+			Labels:          c.roleLabelsSet(true, role),
+			Annotations:     c.annotationsSet(c.generateServiceAnnotations(role, spec)),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: serviceSpec,
 	}
@@ -2048,9 +2068,11 @@ func (c *Cluster) getCustomServiceAnnotations(role PostgresRole, spec *acidv1.Po
 func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.endpointName(role),
-			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(true, role),
+			Name:            c.serviceName(role),
+			Namespace:       c.Namespace,
+			Annotations:     c.annotationsSet(nil),
+			Labels:          c.roleLabelsSet(true, role),
+			OwnerReferences: c.ownerReferences(),
 		},
 	}
 	if len(subsets) > 0 {
@@ -2193,7 +2215,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	return result
 }
 
-func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
+func (c *Cluster) generatePrimaryPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 	pdbMasterLabelSelector := c.OpConfig.PDBMasterLabelSelector
@@ -2211,10 +2233,40 @@ func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.podDisruptionBudgetName(),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.annotationsSet(nil),
+			Name:            c.PrimaryPodDisruptionBudgetName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: policyv1.PodDisruptionBudgetSpec{
+			MinAvailable: &minAvailable,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+		},
+	}
+}
+
+func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+	minAvailable := intstr.FromInt32(c.Spec.NumberOfInstances)
+	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
+
+	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
+	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
+		minAvailable = intstr.FromInt(0)
+	}
+
+	labels := c.labelsSet(false)
+	labels["critical-operation"] = "true"
+
+	return &policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            c.criticalOpPodDisruptionBudgetName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
@@ -2241,6 +2293,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		podTemplate          *v1.PodTemplateSpec
 		resourceRequirements *v1.ResourceRequirements
 	)
+
+	spec := &c.Spec
 
 	// NB: a cron job creates standard batch jobs according to schedule; these batch jobs manage pods and clean-up
 
@@ -2291,6 +2345,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	annotations := c.generatePodAnnotations(&c.Spec)
 
+	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
@@ -2300,7 +2356,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.Container{},
 		[]v1.Container{},
 		util.False(),
-		&[]v1.Toleration{},
+		&tolerationsSpec,
 		nil,
 		nil,
 		nil,
@@ -2343,10 +2399,11 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.getLogicalBackupJobName(),
-			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
-			Annotations: c.annotationsSet(nil),
+			Name:            c.getLogicalBackupJobName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
@@ -2359,6 +2416,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 }
 
 func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
+
+	backupProvider := c.OpConfig.LogicalBackup.LogicalBackupProvider
 
 	envVars := []v1.EnvVar{
 		{
@@ -2377,51 +2436,6 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 					FieldPath:  "metadata.namespace",
 				},
 			},
-		},
-		// Bucket env vars
-		{
-			Name:  "LOGICAL_BACKUP_PROVIDER",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupProvider,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_BUCKET",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_REGION",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Region,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_ENDPOINT",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_SSE",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_RETENTION_TIME",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3RetentionTime,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
-			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
-		},
-		{
-			Name:  "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountName,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageContainer,
-		},
-		{
-			Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey,
 		},
 		// Postgres env vars
 		{
@@ -2455,17 +2469,83 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 				},
 			},
 		},
+		// Bucket env vars
+		{
+			Name:  "LOGICAL_BACKUP_PROVIDER",
+			Value: backupProvider,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET_PREFIX",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3BucketPrefix,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
+			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
 	}
 
-	if c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "AWS_ACCESS_KEY_ID", Value: c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID})
-	}
+	switch backupProvider {
+	case "s3":
+		envVars = appendEnvVars(envVars, []v1.EnvVar{
+			{
+				Name:  "LOGICAL_BACKUP_S3_REGION",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupS3Region,
+			},
+			{
+				Name:  "LOGICAL_BACKUP_S3_ENDPOINT",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
+			},
+			{
+				Name:  "LOGICAL_BACKUP_S3_SSE",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE,
+			},
+			{
+				Name:  "LOGICAL_BACKUP_S3_RETENTION_TIME",
+				Value: c.getLogicalBackupRetentionTime(),
+			}}...)
 
-	if c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
+		if c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "AWS_ACCESS_KEY_ID", Value: c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID})
+		}
+
+		if c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
+		}
+
+	case "gcs":
+		if c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials})
+		}
+
+	case "az":
+		envVars = appendEnvVars(envVars, []v1.EnvVar{
+			{
+				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountName,
+			},
+			{
+				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
+				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageContainer,
+			}}...)
+
+		if c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey != "" {
+			envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountKey})
+		}
 	}
 
 	return envVars
+}
+
+func (c *Cluster) getLogicalBackupRetentionTime() (retentionTime string) {
+	if c.Spec.LogicalBackupRetention != "" {
+		return c.Spec.LogicalBackupRetention
+	}
+
+	return c.OpConfig.LogicalBackup.LogicalBackupS3RetentionTime
 }
 
 // getLogicalBackupJobName returns the name; the job itself may not exists
@@ -2480,22 +2560,26 @@ func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 // survived, we can't delete an object because it will affect the functioning
 // cluster).
 func (c *Cluster) ownerReferences() []metav1.OwnerReference {
-	controller := true
-
-	if c.Statefulset == nil {
-		c.logger.Warning("Cannot get owner reference, no statefulset")
-		return []metav1.OwnerReference{}
+	currentOwnerReferences := c.ObjectMeta.OwnerReferences
+	if c.OpConfig.EnableOwnerReferences == nil || !*c.OpConfig.EnableOwnerReferences {
+		return currentOwnerReferences
 	}
 
-	return []metav1.OwnerReference{
-		{
-			UID:        c.Statefulset.ObjectMeta.UID,
-			APIVersion: "apps/v1",
-			Kind:       "StatefulSet",
-			Name:       c.Statefulset.ObjectMeta.Name,
-			Controller: &controller,
-		},
+	for _, ownerRef := range currentOwnerReferences {
+		if ownerRef.UID == c.Postgresql.ObjectMeta.UID {
+			return currentOwnerReferences
+		}
 	}
+
+	controllerReference := metav1.OwnerReference{
+		UID:        c.Postgresql.ObjectMeta.UID,
+		APIVersion: acidv1.SchemeGroupVersion.Identifier(),
+		Kind:       acidv1.PostgresCRDResourceKind,
+		Name:       c.Postgresql.ObjectMeta.Name,
+		Controller: util.True(),
+	}
+
+	return append(currentOwnerReferences, controllerReference)
 }
 
 func ensurePath(file string, defaultDir string, defaultFile string) string {

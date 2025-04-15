@@ -23,26 +23,47 @@ const (
 )
 
 func (c *Cluster) listResources() error {
-	if c.PodDisruptionBudget != nil {
-		c.logger.Infof("found pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta), c.PodDisruptionBudget.UID)
+	if c.PrimaryPodDisruptionBudget != nil {
+		c.logger.Infof("found primary pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.PrimaryPodDisruptionBudget.ObjectMeta), c.PrimaryPodDisruptionBudget.UID)
+	}
+
+	if c.CriticalOpPodDisruptionBudget != nil {
+		c.logger.Infof("found pod disruption budget for critical operations: %q (uid: %q)", util.NameFromMeta(c.CriticalOpPodDisruptionBudget.ObjectMeta), c.CriticalOpPodDisruptionBudget.UID)
+
 	}
 
 	if c.Statefulset != nil {
 		c.logger.Infof("found statefulset: %q (uid: %q)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 	}
 
-	for _, obj := range c.Secrets {
-		c.logger.Infof("found secret: %q (uid: %q) namesapce: %s", util.NameFromMeta(obj.ObjectMeta), obj.UID, obj.ObjectMeta.Namespace)
+	for appId, stream := range c.Streams {
+		c.logger.Infof("found stream: %q with application id %q (uid: %q)", util.NameFromMeta(stream.ObjectMeta), appId, stream.UID)
 	}
 
-	if !c.patroniKubernetesUseConfigMaps() {
-		for role, endpoint := range c.Endpoints {
-			c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
-		}
+	if c.LogicalBackupJob != nil {
+		c.logger.Infof("found logical backup job: %q (uid: %q)", util.NameFromMeta(c.LogicalBackupJob.ObjectMeta), c.LogicalBackupJob.UID)
+	}
+
+	for uid, secret := range c.Secrets {
+		c.logger.Infof("found secret: %q (uid: %q) namespace: %s", util.NameFromMeta(secret.ObjectMeta), uid, secret.ObjectMeta.Namespace)
 	}
 
 	for role, service := range c.Services {
 		c.logger.Infof("found %s service: %q (uid: %q)", role, util.NameFromMeta(service.ObjectMeta), service.UID)
+	}
+
+	for role, endpoint := range c.Endpoints {
+		c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+	}
+
+	if c.patroniKubernetesUseConfigMaps() {
+		for suffix, configmap := range c.PatroniConfigMaps {
+			c.logger.Infof("found %s Patroni config map: %q (uid: %q)", suffix, util.NameFromMeta(configmap.ObjectMeta), configmap.UID)
+		}
+	} else {
+		for suffix, endpoint := range c.PatroniEndpoints {
+			c.logger.Infof("found %s Patroni endpoint: %q (uid: %q)", suffix, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
+		}
 	}
 
 	pods, err := c.listPods()
@@ -54,13 +75,17 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found pod: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
-	pvcs, err := c.listPersistentVolumeClaims()
-	if err != nil {
-		return fmt.Errorf("could not get the list of PVCs: %v", err)
+	for uid, pvc := range c.VolumeClaims {
+		c.logger.Infof("found persistent volume claim: %q (uid: %q)", util.NameFromMeta(pvc.ObjectMeta), uid)
 	}
 
-	for _, obj := range pvcs {
-		c.logger.Infof("found PVC: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+	for role, poolerObjs := range c.ConnectionPooler {
+		if poolerObjs.Deployment != nil {
+			c.logger.Infof("found %s pooler deployment: %q (uid: %q) ", role, util.NameFromMeta(poolerObjs.Deployment.ObjectMeta), poolerObjs.Deployment.UID)
+		}
+		if poolerObjs.Service != nil {
+			c.logger.Infof("found %s pooler service: %q (uid: %q) ", role, util.NameFromMeta(poolerObjs.Service.ObjectMeta), poolerObjs.Service.UID)
+		}
 	}
 
 	return nil
@@ -142,8 +167,8 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 		return fmt.Errorf("pod %q does not belong to cluster", podName)
 	}
 
-	if err := c.patroni.Switchover(&masterPod[0], masterCandidatePod.Name); err != nil {
-		return fmt.Errorf("could not failover: %v", err)
+	if err := c.patroni.Switchover(&masterPod[0], masterCandidatePod.Name, ""); err != nil {
+		return fmt.Errorf("could not switchover: %v", err)
 	}
 
 	return nil
@@ -162,7 +187,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 			c.logger.Warningf("could not scale down: %v", err)
 		}
 	}
-	c.logger.Debugf("updating statefulset")
+	c.logger.Debug("updating statefulset")
 
 	patchData, err := specPatch(newStatefulSet.Spec)
 	if err != nil {
@@ -193,7 +218,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	}
 
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
-	c.logger.Debugf("replacing statefulset")
+	c.logger.Debug("replacing statefulset")
 
 	// Delete the current statefulset without deleting the pods
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
@@ -207,7 +232,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	// make sure we clear the stored statefulset status if the subsequent create fails.
 	c.Statefulset = nil
 	// wait until the statefulset is truly deleted
-	c.logger.Debugf("waiting for the statefulset to be deleted")
+	c.logger.Debug("waiting for the statefulset to be deleted")
 
 	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
@@ -241,7 +266,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 
 func (c *Cluster) deleteStatefulSet() error {
 	c.setProcessName("deleting statefulset")
-	c.logger.Debugln("deleting statefulset")
+	c.logger.Debug("deleting statefulset")
 	if c.Statefulset == nil {
 		c.logger.Debug("there is no statefulset in the cluster")
 		return nil
@@ -263,10 +288,10 @@ func (c *Cluster) deleteStatefulSet() error {
 
 	if c.OpConfig.EnablePersistentVolumeClaimDeletion != nil && *c.OpConfig.EnablePersistentVolumeClaimDeletion {
 		if err := c.deletePersistentVolumeClaims(); err != nil {
-			return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
+			return fmt.Errorf("could not delete persistent volume claims: %v", err)
 		}
 	} else {
-		c.logger.Info("not deleting PersistentVolumeClaims because disabled in configuration")
+		c.logger.Info("not deleting persistent volume claims because disabled in configuration")
 	}
 
 	return nil
@@ -286,55 +311,37 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 }
 
 func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newService *v1.Service) (*v1.Service, error) {
-	var (
-		svc *v1.Service
-		err error
-	)
-
-	c.setProcessName("updating %v service", role)
+	var err error
+	svc := oldService
 
 	serviceName := util.NameFromMeta(oldService.ObjectMeta)
+	match, reason := c.compareServices(oldService, newService)
+	if !match {
+		c.logServiceChanges(role, oldService, newService, false, reason)
+		c.setProcessName("updating %v service", role)
 
-	// update the service annotation in order to propagate ELB notation.
-	if len(newService.ObjectMeta.Annotations) > 0 {
-		if annotationsPatchData, err := metaAnnotationsPatch(newService.ObjectMeta.Annotations); err == nil {
-			_, err = c.KubeClient.Services(serviceName.Namespace).Patch(
-				context.TODO(),
-				serviceName.Name,
-				types.MergePatchType,
-				[]byte(annotationsPatchData),
-				metav1.PatchOptions{},
-				"")
-
-			if err != nil {
-				return nil, fmt.Errorf("could not replace annotations for the service %q: %v", serviceName, err)
-			}
-		} else {
-			return nil, fmt.Errorf("could not form patch for the service metadata: %v", err)
+		// now, patch the service spec, but when disabling LoadBalancers do update instead
+		// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
+		oldServiceType := oldService.Spec.Type
+		newServiceType := newService.Spec.Type
+		if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
+			newService.ResourceVersion = oldService.ResourceVersion
+			newService.Spec.ClusterIP = oldService.Spec.ClusterIP
 		}
-	}
-
-	// now, patch the service spec, but when disabling LoadBalancers do update instead
-	// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
-	oldServiceType := oldService.Spec.Type
-	newServiceType := newService.Spec.Type
-	if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
-		newService.ResourceVersion = oldService.ResourceVersion
-		newService.Spec.ClusterIP = oldService.Spec.ClusterIP
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("could not update service %q: %v", serviceName, err)
 		}
-	} else {
-		patchData, err := specPatch(newService.Spec)
-		if err != nil {
-			return nil, fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
-		}
+	}
 
-		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(
-			context.TODO(), serviceName.Name, types.MergePatchType, patchData, metav1.PatchOptions{}, "")
+	if changed, _ := c.compareAnnotations(oldService.Annotations, newService.Annotations, nil); changed {
+		patchData, err := metaAnnotationsPatch(newService.Annotations)
 		if err != nil {
-			return nil, fmt.Errorf("could not patch service %q: %v", serviceName, err)
+			return nil, fmt.Errorf("could not form patch for service %q annotations: %v", oldService.Name, err)
+		}
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(context.TODO(), newService.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not patch annotations for service %q: %v", oldService.Name, err)
 		}
 	}
 
@@ -342,7 +349,8 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 }
 
 func (c *Cluster) deleteService(role PostgresRole) error {
-	c.logger.Debugf("deleting service %s", role)
+	c.setProcessName("deleting service")
+	c.logger.Debugf("deleting %s service", role)
 
 	if c.Services[role] == nil {
 		c.logger.Debugf("No service for %s role was found, nothing to delete", role)
@@ -350,11 +358,10 @@ func (c *Cluster) deleteService(role PostgresRole) error {
 	}
 
 	if err := c.KubeClient.Services(c.Services[role].Namespace).Delete(context.TODO(), c.Services[role].Name, c.deleteOptions); err != nil {
-		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("%s service has already been deleted", role)
-		} else if err != nil {
-			return err
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not delete %s service: %v", role, err)
 		}
+		c.logger.Debugf("%s service has already been deleted", role)
 	}
 
 	c.logger.Infof("%s service %q has been deleted", role, util.NameFromMeta(c.Services[role].ObjectMeta))
@@ -415,59 +422,128 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	return result
 }
 
-func (c *Cluster) createPodDisruptionBudget() (*policyv1.PodDisruptionBudget, error) {
-	podDisruptionBudgetSpec := c.generatePodDisruptionBudget()
+func (c *Cluster) createPrimaryPodDisruptionBudget() error {
+	c.logger.Debug("creating primary pod disruption budget")
+	if c.PrimaryPodDisruptionBudget != nil {
+		c.logger.Warning("primary pod disruption budget already exists in the cluster")
+		return nil
+	}
+
+	podDisruptionBudgetSpec := c.generatePrimaryPodDisruptionBudget()
 	podDisruptionBudget, err := c.KubeClient.
 		PodDisruptionBudgets(podDisruptionBudgetSpec.Namespace).
 		Create(context.TODO(), podDisruptionBudgetSpec, metav1.CreateOptions{})
 
 	if err != nil {
-		return nil, err
+		return err
 	}
-	c.PodDisruptionBudget = podDisruptionBudget
+	c.logger.Infof("primary pod disruption budget %q has been successfully created", util.NameFromMeta(podDisruptionBudget.ObjectMeta))
+	c.PrimaryPodDisruptionBudget = podDisruptionBudget
 
-	return podDisruptionBudget, nil
+	return nil
 }
 
-func (c *Cluster) updatePodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
-	if c.PodDisruptionBudget == nil {
-		return fmt.Errorf("there is no pod disruption budget in the cluster")
+func (c *Cluster) createCriticalOpPodDisruptionBudget() error {
+	c.logger.Debug("creating pod disruption budget for critical operations")
+	if c.CriticalOpPodDisruptionBudget != nil {
+		c.logger.Warning("pod disruption budget for critical operations already exists in the cluster")
+		return nil
 	}
 
-	if err := c.deletePodDisruptionBudget(); err != nil {
-		return fmt.Errorf("could not delete pod disruption budget: %v", err)
+	podDisruptionBudgetSpec := c.generateCriticalOpPodDisruptionBudget()
+	podDisruptionBudget, err := c.KubeClient.
+		PodDisruptionBudgets(podDisruptionBudgetSpec.Namespace).
+		Create(context.TODO(), podDisruptionBudgetSpec, metav1.CreateOptions{})
+
+	if err != nil {
+		return err
+	}
+	c.logger.Infof("pod disruption budget for critical operations %q has been successfully created", util.NameFromMeta(podDisruptionBudget.ObjectMeta))
+	c.CriticalOpPodDisruptionBudget = podDisruptionBudget
+
+	return nil
+}
+
+func (c *Cluster) createPodDisruptionBudgets() error {
+	errors := make([]string, 0)
+
+	err := c.createPrimaryPodDisruptionBudget()
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("could not create primary pod disruption budget: %v", err))
+	}
+
+	err = c.createCriticalOpPodDisruptionBudget()
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("could not create pod disruption budget for critical operations: %v", err))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
+	return nil
+}
+
+func (c *Cluster) updatePrimaryPodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
+	c.logger.Debug("updating primary pod disruption budget")
+	if c.PrimaryPodDisruptionBudget == nil {
+		return fmt.Errorf("there is no primary pod disruption budget in the cluster")
+	}
+
+	if err := c.deletePrimaryPodDisruptionBudget(); err != nil {
+		return fmt.Errorf("could not delete primary pod disruption budget: %v", err)
 	}
 
 	newPdb, err := c.KubeClient.
 		PodDisruptionBudgets(pdb.Namespace).
 		Create(context.TODO(), pdb, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("could not create pod disruption budget: %v", err)
+		return fmt.Errorf("could not create primary pod disruption budget: %v", err)
 	}
-	c.PodDisruptionBudget = newPdb
+	c.PrimaryPodDisruptionBudget = newPdb
 
 	return nil
 }
 
-func (c *Cluster) deletePodDisruptionBudget() error {
-	c.logger.Debug("deleting pod disruption budget")
-	if c.PodDisruptionBudget == nil {
-		c.logger.Debug("there is no pod disruption budget in the cluster")
+func (c *Cluster) updateCriticalOpPodDisruptionBudget(pdb *policyv1.PodDisruptionBudget) error {
+	c.logger.Debug("updating pod disruption budget for critical operations")
+	if c.CriticalOpPodDisruptionBudget == nil {
+		return fmt.Errorf("there is no pod disruption budget for critical operations in the cluster")
+	}
+
+	if err := c.deleteCriticalOpPodDisruptionBudget(); err != nil {
+		return fmt.Errorf("could not delete pod disruption budget for critical operations: %v", err)
+	}
+
+	newPdb, err := c.KubeClient.
+		PodDisruptionBudgets(pdb.Namespace).
+		Create(context.TODO(), pdb, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("could not create pod disruption budget for critical operations: %v", err)
+	}
+	c.CriticalOpPodDisruptionBudget = newPdb
+
+	return nil
+}
+
+func (c *Cluster) deletePrimaryPodDisruptionBudget() error {
+	c.logger.Debug("deleting primary pod disruption budget")
+	if c.PrimaryPodDisruptionBudget == nil {
+		c.logger.Debug("there is no primary pod disruption budget in the cluster")
 		return nil
 	}
 
-	pdbName := util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta)
+	pdbName := util.NameFromMeta(c.PrimaryPodDisruptionBudget.ObjectMeta)
 	err := c.KubeClient.
-		PodDisruptionBudgets(c.PodDisruptionBudget.Namespace).
-		Delete(context.TODO(), c.PodDisruptionBudget.Name, c.deleteOptions)
+		PodDisruptionBudgets(c.PrimaryPodDisruptionBudget.Namespace).
+		Delete(context.TODO(), c.PrimaryPodDisruptionBudget.Name, c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta))
+		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.PrimaryPodDisruptionBudget.ObjectMeta))
 	} else if err != nil {
-		return fmt.Errorf("could not delete PodDisruptionBudget: %v", err)
+		return fmt.Errorf("could not delete primary pod disruption budget: %v", err)
 	}
 
-	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta))
-	c.PodDisruptionBudget = nil
+	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.PrimaryPodDisruptionBudget.ObjectMeta))
+	c.PrimaryPodDisruptionBudget = nil
 
 	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
@@ -481,26 +557,80 @@ func (c *Cluster) deletePodDisruptionBudget() error {
 			return false, err2
 		})
 	if err != nil {
-		return fmt.Errorf("could not delete pod disruption budget: %v", err)
+		return fmt.Errorf("could not delete primary pod disruption budget: %v", err)
 	}
 
 	return nil
 }
 
+func (c *Cluster) deleteCriticalOpPodDisruptionBudget() error {
+	c.logger.Debug("deleting pod disruption budget for critical operations")
+	if c.CriticalOpPodDisruptionBudget == nil {
+		c.logger.Debug("there is no pod disruption budget for critical operations in the cluster")
+		return nil
+	}
+
+	pdbName := util.NameFromMeta(c.CriticalOpPodDisruptionBudget.ObjectMeta)
+	err := c.KubeClient.
+		PodDisruptionBudgets(c.CriticalOpPodDisruptionBudget.Namespace).
+		Delete(context.TODO(), c.CriticalOpPodDisruptionBudget.Name, c.deleteOptions)
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("PodDisruptionBudget %q has already been deleted", util.NameFromMeta(c.CriticalOpPodDisruptionBudget.ObjectMeta))
+	} else if err != nil {
+		return fmt.Errorf("could not delete pod disruption budget for critical operations: %v", err)
+	}
+
+	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.CriticalOpPodDisruptionBudget.ObjectMeta))
+	c.CriticalOpPodDisruptionBudget = nil
+
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+		func() (bool, error) {
+			_, err2 := c.KubeClient.PodDisruptionBudgets(pdbName.Namespace).Get(context.TODO(), pdbName.Name, metav1.GetOptions{})
+			if err2 == nil {
+				return false, nil
+			}
+			if k8sutil.ResourceNotFound(err2) {
+				return true, nil
+			}
+			return false, err2
+		})
+	if err != nil {
+		return fmt.Errorf("could not delete pod disruption budget for critical operations: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) deletePodDisruptionBudgets() error {
+	errors := make([]string, 0)
+
+	if err := c.deletePrimaryPodDisruptionBudget(); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	if err := c.deleteCriticalOpPodDisruptionBudget(); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
+	return nil
+}
+
 func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	c.setProcessName("deleting endpoint")
-	c.logger.Debugln("deleting endpoint")
+	c.logger.Debugf("deleting %s endpoint", role)
 	if c.Endpoints[role] == nil {
 		c.logger.Debugf("there is no %s endpoint in the cluster", role)
 		return nil
 	}
 
 	if err := c.KubeClient.Endpoints(c.Endpoints[role].Namespace).Delete(context.TODO(), c.Endpoints[role].Name, c.deleteOptions); err != nil {
-		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("%s endpoint has already been deleted", role)
-		} else if err != nil {
-			return fmt.Errorf("could not delete endpoint: %v", err)
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not delete %s endpoint: %v", role, err)
 		}
+		c.logger.Debugf("%s endpoint has already been deleted", role)
 	}
 
 	c.logger.Infof("%s endpoint %q has been deleted", role, util.NameFromMeta(c.Endpoints[role].ObjectMeta))
@@ -509,12 +639,83 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	return nil
 }
 
+func (c *Cluster) deletePatroniResources() error {
+	c.setProcessName("deleting Patroni resources")
+	errors := make([]string, 0)
+
+	if err := c.deleteService(Patroni); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	for _, suffix := range patroniObjectSuffixes {
+		if c.patroniKubernetesUseConfigMaps() {
+			if err := c.deletePatroniConfigMap(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("%v", err))
+			}
+		} else {
+			if err := c.deletePatroniEndpoint(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("%v", err))
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
+
+	return nil
+}
+
+func (c *Cluster) deletePatroniConfigMap(suffix string) error {
+	c.setProcessName("deleting Patroni config map")
+	c.logger.Debugf("deleting %s Patroni config map", suffix)
+	cm := c.PatroniConfigMaps[suffix]
+	if cm == nil {
+		c.logger.Debugf("there is no %s Patroni config map in the cluster", suffix)
+		return nil
+	}
+
+	if err := c.KubeClient.ConfigMaps(cm.Namespace).Delete(context.TODO(), cm.Name, c.deleteOptions); err != nil {
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not delete %s Patroni config map %q: %v", suffix, cm.Name, err)
+		}
+		c.logger.Debugf("%s Patroni config map has already been deleted", suffix)
+	}
+
+	c.logger.Infof("%s Patroni config map %q has been deleted", suffix, util.NameFromMeta(cm.ObjectMeta))
+	delete(c.PatroniConfigMaps, suffix)
+
+	return nil
+}
+
+func (c *Cluster) deletePatroniEndpoint(suffix string) error {
+	c.setProcessName("deleting Patroni endpoint")
+	c.logger.Debugf("deleting %s Patroni endpoint", suffix)
+	ep := c.PatroniEndpoints[suffix]
+	if ep == nil {
+		c.logger.Debugf("there is no %s Patroni endpoint in the cluster", suffix)
+		return nil
+	}
+
+	if err := c.KubeClient.Endpoints(ep.Namespace).Delete(context.TODO(), ep.Name, c.deleteOptions); err != nil {
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not delete %s Patroni endpoint %q: %v", suffix, ep.Name, err)
+		}
+		c.logger.Debugf("%s Patroni endpoint has already been deleted", suffix)
+	}
+
+	c.logger.Infof("%s Patroni endpoint %q has been deleted", suffix, util.NameFromMeta(ep.ObjectMeta))
+	delete(c.PatroniEndpoints, suffix)
+
+	return nil
+}
+
 func (c *Cluster) deleteSecrets() error {
 	c.setProcessName("deleting secrets")
 	errors := make([]string, 0)
 
-	for uid, secret := range c.Secrets {
-		err := c.deleteSecret(uid, *secret)
+	for uid := range c.Secrets {
+		err := c.deleteSecret(uid)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("%v", err))
 		}
@@ -527,8 +728,9 @@ func (c *Cluster) deleteSecrets() error {
 	return nil
 }
 
-func (c *Cluster) deleteSecret(uid types.UID, secret v1.Secret) error {
+func (c *Cluster) deleteSecret(uid types.UID) error {
 	c.setProcessName("deleting secret")
+	secret := c.Secrets[uid]
 	secretName := util.NameFromMeta(secret.ObjectMeta)
 	c.logger.Debugf("deleting secret %q", secretName)
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
@@ -556,12 +758,12 @@ func (c *Cluster) createLogicalBackupJob() (err error) {
 	if err != nil {
 		return fmt.Errorf("could not generate k8s cron job spec: %v", err)
 	}
-	c.logger.Debugf("Generated cronJobSpec: %v", logicalBackupJobSpec)
 
-	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(context.TODO(), logicalBackupJobSpec, metav1.CreateOptions{})
+	cronJob, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(context.TODO(), logicalBackupJobSpec, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("could not create k8s cron job: %v", err)
 	}
+	c.LogicalBackupJob = cronJob
 
 	return nil
 }
@@ -575,7 +777,7 @@ func (c *Cluster) patchLogicalBackupJob(newJob *batchv1.CronJob) error {
 	}
 
 	// update the backup job spec
-	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Patch(
+	cronJob, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Patch(
 		context.TODO(),
 		c.getLogicalBackupJobName(),
 		types.MergePatchType,
@@ -585,20 +787,24 @@ func (c *Cluster) patchLogicalBackupJob(newJob *batchv1.CronJob) error {
 	if err != nil {
 		return fmt.Errorf("could not patch logical backup job: %v", err)
 	}
+	c.LogicalBackupJob = cronJob
 
 	return nil
 }
 
 func (c *Cluster) deleteLogicalBackupJob() error {
-
+	if c.LogicalBackupJob == nil {
+		return nil
+	}
 	c.logger.Info("removing the logical backup job")
 
-	err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(context.TODO(), c.getLogicalBackupJobName(), c.deleteOptions)
+	err := c.KubeClient.CronJobsGetter.CronJobs(c.LogicalBackupJob.Namespace).Delete(context.TODO(), c.getLogicalBackupJobName(), c.deleteOptions)
 	if k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("logical backup cron job %q has already been deleted", c.getLogicalBackupJobName())
 	} else if err != nil {
 		return err
 	}
+	c.LogicalBackupJob = nil
 
 	return nil
 }
@@ -628,7 +834,12 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 	return c.Statefulset
 }
 
-// GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget
-func (c *Cluster) GetPodDisruptionBudget() *policyv1.PodDisruptionBudget {
-	return c.PodDisruptionBudget
+// GetPrimaryPodDisruptionBudget returns cluster's primary kubernetes PodDisruptionBudget
+func (c *Cluster) GetPrimaryPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+	return c.PrimaryPodDisruptionBudget
+}
+
+// GetCriticalOpPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget for critical operations
+func (c *Cluster) GetCriticalOpPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+	return c.CriticalOpPodDisruptionBudget
 }

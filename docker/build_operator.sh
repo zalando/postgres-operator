@@ -13,7 +13,7 @@ apt-get install -y wget
 
 (
     cd /tmp
-    wget -q "https://storage.googleapis.com/golang/go1.21.7.linux-${arch}.tar.gz" -O go.tar.gz
+    wget -q "https://storage.googleapis.com/golang/go1.23.4.linux-${arch}.tar.gz" -O go.tar.gz
     tar -xf go.tar.gz
     mv go /usr/local
     ln -s /usr/local/go/bin/go /usr/bin/go

@@ -18,8 +18,11 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
@@ -68,11 +71,11 @@ var cl = New(
 		Spec: acidv1.PostgresSpec{
 			EnableConnectionPooler: util.True(),
 			Streams: []acidv1.Stream{
-				acidv1.Stream{
+				{
 					ApplicationId: "test-app",
 					Database:      "test_db",
 					Tables: map[string]acidv1.StreamTable{
-						"test_table": acidv1.StreamTable{
+						"test_table": {
 							EventType: "test-app.test",
 						},
 					},
@@ -92,6 +95,7 @@ func TestCreate(t *testing.T) {
 
 	client := k8sutil.KubernetesClient{
 		DeploymentsGetter:            clientSet.AppsV1(),
+		CronJobsGetter:               clientSet.BatchV1(),
 		EndpointsGetter:              clientSet.CoreV1(),
 		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
 		PodDisruptionBudgetsGetter:   clientSet.PolicyV1(),
@@ -108,6 +112,7 @@ func TestCreate(t *testing.T) {
 			Namespace: clusterNamespace,
 		},
 		Spec: acidv1.PostgresSpec{
+			EnableLogicalBackup: true,
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
@@ -1360,6 +1365,23 @@ func TestCompareServices(t *testing.T) {
 		},
 	}
 
+	serviceWithOwnerReference := newService(
+		map[string]string{
+			constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
+			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+		},
+		v1.ServiceTypeClusterIP,
+		[]string{"128.141.0.0/16", "137.138.0.0/16"})
+
+	ownerRef := metav1.OwnerReference{
+		APIVersion: "acid.zalan.do/v1",
+		Controller: boolToPointer(true),
+		Kind:       "Postgresql",
+		Name:       "clstr",
+	}
+
+	serviceWithOwnerReference.ObjectMeta.OwnerReferences = append(serviceWithOwnerReference.ObjectMeta.OwnerReferences, ownerRef)
+
 	tests := []struct {
 		about   string
 		current *v1.Service
@@ -1443,203 +1465,16 @@ func TestCompareServices(t *testing.T) {
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
 		{
-			about: "services differ on DNS annotation",
+			about: "new service doesn't have owner references",
 			current: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
-				v1.ServiceTypeLoadBalancer,
+				v1.ServiceTypeClusterIP,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "new_clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: "external-dns.alpha.kubernetes.io/hostname" changed from "clstr.acid.zalan.do" to "new_clstr.acid.zalan.do".`,
-		},
-		{
-			about: "services differ on AWS ELB annotation",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: "1800",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout" changed from "3600" to "1800".`,
-		},
-		{
-			about: "service changes existing annotation",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "baz",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: "foo" changed from "bar" to "baz".`,
-		},
-		{
-			about: "service changes multiple existing annotations",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-					"bar":                              "foo",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "baz",
-					"bar":                              "fooz",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+			new:   serviceWithOwnerReference,
 			match: false,
-			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations does not match the current one:`,
-		},
-		{
-			about: "service adds a new custom annotation",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: Added "foo" with value "bar".`,
-		},
-		{
-			about: "service removes a custom annotation",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: Removed "foo".`,
-		},
-		{
-			about: "service removes a custom annotation and adds a new one",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"bar":                              "foo",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations does not match the current one: Removed "foo". Added "bar" with value "foo".`,
-		},
-		{
-			about: "service removes a custom annotation, adds a new one and change another",
-			current: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"foo":                              "bar",
-					"zalan":                            "do",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-					"bar":                              "foo",
-					"zalan":                            "do.com",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match: false,
-			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations does not match the current one: Removed "foo".`,
-		},
-		{
-			about: "service add annotations",
-			current: newService(
-				map[string]string{},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match: false,
-			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations does not match the current one: Added `,
-		},
-		{
-			about: "ignored annotations",
-			current: newService(
-				map[string]string{},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			new: newService(
-				map[string]string{
-					"k8s.v1.cni.cncf.io/network-status": "up",
-				},
-				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match: true,
 		},
 	}
 
@@ -1649,16 +1484,216 @@ func TestCompareServices(t *testing.T) {
 			if match && !tt.match {
 				t.Logf("match=%v current=%v, old=%v reason=%s", match, tt.current.Annotations, tt.new.Annotations, reason)
 				t.Errorf("%s - expected services to do not match: %q and %q", t.Name(), tt.current, tt.new)
-				return
 			}
 			if !match && tt.match {
 				t.Errorf("%s - expected services to be the same: %q and %q", t.Name(), tt.current, tt.new)
-				return
 			}
 			if !match && !tt.match {
 				if !strings.HasPrefix(reason, tt.reason) {
 					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
-					return
+				}
+			}
+		})
+	}
+}
+
+func newCronJob(image, schedule string, vars []v1.EnvVar, mounts []v1.VolumeMount) *batchv1.CronJob {
+	cron := &batchv1.CronJob{
+		Spec: batchv1.CronJobSpec{
+			Schedule: schedule,
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "logical-backup",
+									Image: image,
+									Env:   vars,
+									Ports: []v1.ContainerPort{
+										{
+											ContainerPort: patroni.ApiPort,
+											Protocol:      v1.ProtocolTCP,
+										},
+										{
+											ContainerPort: pgPort,
+											Protocol:      v1.ProtocolTCP,
+										},
+										{
+											ContainerPort: operatorPort,
+											Protocol:      v1.ProtocolTCP,
+										},
+									},
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+									},
+									SecurityContext: &v1.SecurityContext{
+										AllowPrivilegeEscalation: nil,
+										Privileged:               util.False(),
+										ReadOnlyRootFilesystem:   util.False(),
+										Capabilities:             nil,
+									},
+									VolumeMounts: mounts,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return cron
+}
+
+func TestCompareLogicalBackupJob(t *testing.T) {
+
+	img1 := "registry.opensource.zalan.do/acid/logical-backup:v1.0"
+	img2 := "registry.opensource.zalan.do/acid/logical-backup:v2.0"
+
+	clientSet := fake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	namespace := "default"
+
+	client := k8sutil.KubernetesClient{
+		CronJobsGetter:    clientSet.BatchV1(),
+		PostgresqlsGetter: acidClientSet.AcidV1(),
+	}
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "acid-cron-cluster",
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+			EnableLogicalBackup:    true,
+			LogicalBackupSchedule:  "0 0 * * *",
+			LogicalBackupRetention: "3 months",
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+				},
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupSchedule:                 "30 00 * * *",
+					LogicalBackupDockerImage:              img1,
+					LogicalBackupJobPrefix:                "logical-backup-",
+					LogicalBackupCPURequest:               "100m",
+					LogicalBackupCPULimit:                 "100m",
+					LogicalBackupMemoryRequest:            "100Mi",
+					LogicalBackupMemoryLimit:              "100Mi",
+					LogicalBackupProvider:                 "s3",
+					LogicalBackupS3Bucket:                 "testBucket",
+					LogicalBackupS3BucketPrefix:           "spilo",
+					LogicalBackupS3Region:                 "eu-central-1",
+					LogicalBackupS3Endpoint:               "https://s3.amazonaws.com",
+					LogicalBackupS3AccessKeyID:            "access",
+					LogicalBackupS3SecretAccessKey:        "secret",
+					LogicalBackupS3SSE:                    "aws:kms",
+					LogicalBackupS3RetentionTime:          "3 months",
+					LogicalBackupCronjobEnvironmentSecret: "",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	desiredCronJob, err := cluster.generateLogicalBackupJob()
+	if err != nil {
+		t.Errorf("Could not generate logical backup job with error: %v", err)
+	}
+
+	err = cluster.createLogicalBackupJob()
+	if err != nil {
+		t.Errorf("Could not create logical backup job with error: %v", err)
+	}
+
+	currentCronJob, err := cluster.KubeClient.CronJobs(namespace).Get(context.TODO(), cluster.getLogicalBackupJobName(), metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Could not create logical backup job with error: %v", err)
+	}
+
+	tests := []struct {
+		about   string
+		cronjob *batchv1.CronJob
+		match   bool
+		reason  string
+	}{
+		{
+			about:   "two equal cronjobs",
+			cronjob: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}, []v1.VolumeMount{}),
+			match:   true,
+		},
+		{
+			about:   "two cronjobs with different image",
+			cronjob: newCronJob(img2, "0 0 * * *", []v1.EnvVar{}, []v1.VolumeMount{}),
+			match:   false,
+			reason:  fmt.Sprintf("new job's image %q does not match the current one %q", img2, img1),
+		},
+		{
+			about:   "two cronjobs with different schedule",
+			cronjob: newCronJob(img1, "0 * * * *", []v1.EnvVar{}, []v1.VolumeMount{}),
+			match:   false,
+			reason:  fmt.Sprintf("new job's schedule %q does not match the current one %q", "0 * * * *", "0 0 * * *"),
+		},
+		{
+			about:   "two cronjobs with empty and nil volume mounts",
+			cronjob: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}, nil),
+			match:   true,
+		},
+		{
+			about:   "two cronjobs with different environment variables",
+			cronjob: newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "logical-backup"}}, []v1.VolumeMount{}),
+			match:   false,
+			reason:  "logical backup container specs do not match: new cronjob container's logical-backup (index 0) environment does not match the current one",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.about, func(t *testing.T) {
+			desiredCronJob.Spec.Schedule = tt.cronjob.Spec.Schedule
+			desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image = tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+			desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts
+
+			for _, testEnv := range tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+				for i, env := range desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+					if env.Name == testEnv.Name {
+						desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i] = testEnv
+					}
+				}
+			}
+
+			cmp := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob)
+			if cmp.match != tt.match {
+				t.Errorf("%s - unexpected match result %t when comparing cronjobs %#v and %#v", t.Name(), cmp.match, currentCronJob, desiredCronJob)
+			} else if !cmp.match {
+				found := false
+				for _, reason := range cmp.reasons {
+					if strings.HasPrefix(reason, tt.reason) {
+						found = true
+						break
+					}
+					found = false
+				}
+				if !found {
+					t.Errorf("%s - expected reason prefix %s, not found in %#v", t.Name(), tt.reason, cmp.reasons)
 				}
 			}
 		})
@@ -1847,6 +1882,274 @@ func TestComparePorts(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			got := comparePorts(testCase.setA, testCase.setB)
 			assert.Equal(t, testCase.expected, got)
+		})
+	}
+}
+
+func TestCompareVolumeMounts(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mountsA  []v1.VolumeMount
+		mountsB  []v1.VolumeMount
+		expected bool
+	}{
+		{
+			name:     "empty vs nil",
+			mountsA:  []v1.VolumeMount{},
+			mountsB:  nil,
+			expected: true,
+		},
+		{
+			name:     "both empty",
+			mountsA:  []v1.VolumeMount{},
+			mountsB:  []v1.VolumeMount{},
+			expected: true,
+		},
+		{
+			name: "same mounts",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "different mounts",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:        "data",
+					ReadOnly:    false,
+					MountPath:   "/data",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "one equal mount one different",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:        "poddata",
+					ReadOnly:    false,
+					MountPath:   "/poddata",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "same mounts, different order",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "new mounts added",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "one mount removed",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareVolumeMounts(tt.mountsA, tt.mountsB)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestGetSwitchoverSchedule(t *testing.T) {
+	now := time.Now()
+
+	futureTimeStart := now.Add(1 * time.Hour)
+	futureWindowTimeStart := futureTimeStart.Format("15:04")
+	futureWindowTimeEnd := now.Add(2 * time.Hour).Format("15:04")
+	pastTimeStart := now.Add(-2 * time.Hour)
+	pastWindowTimeStart := pastTimeStart.Format("15:04")
+	pastWindowTimeEnd := now.Add(-1 * time.Hour).Format("15:04")
+
+	tests := []struct {
+		name     string
+		windows  []acidv1.MaintenanceWindow
+		expected string
+	}{
+		{
+			name: "everyday maintenance windows is later today",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Everyday:  true,
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+			},
+			expected: futureTimeStart.Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "everyday maintenance window is tomorrow",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Everyday:  true,
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "weekday maintenance windows is later today",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+			},
+			expected: futureTimeStart.Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "weekday maintenance windows is passed for today",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 7).Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "choose the earliest window",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.AddDate(0, 0, 2).Weekday(),
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+				{
+					Everyday:  true,
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster.Spec.MaintenanceWindows = tt.windows
+			schedule := cluster.GetSwitchoverSchedule()
+			if schedule != tt.expected {
+				t.Errorf("Expected GetSwitchoverSchedule to return %s, returned: %s", tt.expected, schedule)
+			}
 		})
 	}
 }

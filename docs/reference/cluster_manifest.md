@@ -114,6 +114,12 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   this parameter. Optional, when empty the load balancer service becomes
   inaccessible from outside of the Kubernetes cluster.
 
+* **maintenanceWindows**
+  a list which defines specific time frames when certain maintenance operations
+  such as automatic major upgrades or master pod migration. Accepted formats
+  are "01:00-06:00" for daily maintenance windows or "Sat:00:00-04:00" for specific
+  days, with all times in UTC.
+
 * **users**
   a map of usernames to user flags for the users that should be created in the
   cluster by the operator. User flags are a list, allowed elements are
@@ -223,10 +229,17 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   Determines if the logical backup of this cluster should be taken and uploaded
   to S3. Default: false. Optional.
 
+* **logicalBackupRetention**
+  You can set a retention time for the logical backup cron job to remove old backup
+  files after a new backup has been uploaded. Example values are "3 days", "2 weeks", or
+  "1 month". It takes precedence over the global `logical_backup_s3_retention_time`
+  configuration. Currently only supported for AWS. Optional.
+
 * **logicalBackupSchedule**
   Schedule for the logical backup K8s cron job. Please take
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
-  into account. Optional. Default is: "30 00 \* \* \*"
+  into account. It takes precedence over the global `logical_backup_schedule`
+  configuration. Optional.
 
 * **additionalVolumes**
   List of additional volumes to mount in each container of the statefulset pod.
@@ -235,6 +248,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   It allows you to mount existing PersistentVolumeClaims, ConfigMaps and Secrets inside the StatefulSet.
   Also an `emptyDir` volume can be shared between initContainer and statefulSet.
   Additionaly, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
+  Set `isSubPathExpr` to true if you want to include [API environment variables](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath-expanded-environment).
   You can also specify in which container the additional Volumes will be mounted with the `targetContainers` array option.
   If `targetContainers` is empty, additional volumes will be mounted only in the `postgres` container.
   If you set the `all` special item, it will be mounted in all containers (postgres + sidecars).
@@ -477,6 +491,9 @@ properties of the persistent storage that stores Postgres data.
 * **subPath**
   Subpath to use when mounting volume into Spilo container. Optional.
 
+* **isSubPathExpr**
+  Set it to true if the specified subPath is an expression. Optional.
+
 * **iops**
   When running the operator on AWS the latest generation of EBS volumes (`gp3`)
   allows for configuring the number of IOPS. Maximum is 16000. Optional.
@@ -621,7 +638,7 @@ the global configuration before adding the `tls` section'.
 ## Change data capture streams
 
 This sections enables change data capture (CDC) streams via Postgres' 
-[logical decoding](https://www.postgresql.org/docs/16/logicaldecoding.html)
+[logical decoding](https://www.postgresql.org/docs/17/logicaldecoding.html)
 feature and `pgoutput` plugin. While the Postgres operator takes responsibility
 for providing the setup to publish change events, it relies on external tools
 to consume them. At Zalando, we are using a workflow based on
@@ -635,11 +652,11 @@ can have the following properties:
 
 * **applicationId**
   The application name to which the database and CDC belongs to. For each
-  set of streams with a distinct `applicationId` a separate stream CR as well
-  as a separate logical replication slot will be created. This means there can
-  be different streams in the same database and streams with the same
-  `applicationId` are bundled in one stream CR. The stream CR will be called
-  like the Postgres cluster plus "-<applicationId>" suffix. Required.
+  set of streams with a distinct `applicationId` a separate stream resource as
+  well as a separate logical replication slot will be created. This means there
+  can be different streams in the same database and streams with the same
+  `applicationId` are bundled in one stream resource. The stream resource will
+  be called like the Postgres cluster plus "-<applicationId>" suffix. Required.
 
 * **database**
   Name of the database from where events will be published via Postgres'
@@ -650,21 +667,37 @@ can have the following properties:
 
 * **tables**
   Defines a map of table names and their properties (`eventType`, `idColumn`
-  and `payloadColumn`). The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
+  and `payloadColumn`). Required.
+  The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
   The application is responsible for putting events into a (JSON/B or VARCHAR)
   payload column of the outbox table in the structure of the specified target
-  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/16/logical-replication-publication.html)
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/17/logical-replication-publication.html)
   in Postgres for all tables specified for one `database` and `applicationId`.
   The CDC operator will consume from it shortly after transactions are
   committed to the outbox table. The `idColumn` will be used in telemetry for
   the CDC operator. The names for `idColumn` and `payloadColumn` can be
   configured. Defaults are `id` and `payload`. The target `eventType` has to
-  be defined. Required.
+  be defined. One can also specify a `recoveryEventType` that will be used
+  for a dead letter queue. By enabling `ignoreRecovery`, you can choose to
+  ignore failing events.
 
 * **filter**
   Streamed events can be filtered by a jsonpath expression for each table.
   Optional.
 
+* **enableRecovery**
+  Flag to enable a dead letter queue recovery for all streams tables.
+  Alternatively, recovery can also be enable for single outbox tables by only
+  specifying a `recoveryEventType` and no `enableRecovery` flag. When set to
+  false or missing, events will be retried until consuming succeeded. You can
+  use a `filter` expression to get rid of poison pills. Optional.
+
 * **batchSize**
   Defines the size of batches in which events are consumed. Optional.
   Defaults to 1.
+
+* **cpu**
+  CPU requests to be set as an annotation on the stream resource. Optional.
+
+* **memory**
+  memory requests to be set as an annotation on the stream resource. Optional.

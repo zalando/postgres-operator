@@ -3,13 +3,9 @@ package k8sutil
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	b64 "encoding/base64"
 	"encoding/json"
-
-	batchv1 "k8s.io/api/batch/v1"
-	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 
 	apiacidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	zalandoclient "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
@@ -18,14 +14,15 @@ import (
 	"github.com/zalando/postgres-operator/pkg/spec"
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apipolicyv1 "k8s.io/api/policy/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	apiextv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
@@ -61,9 +58,9 @@ type KubernetesClient struct {
 	appsv1.StatefulSetsGetter
 	appsv1.DeploymentsGetter
 	rbacv1.RoleBindingsGetter
+	batchv1.CronJobsGetter
 	policyv1.PodDisruptionBudgetsGetter
-	apiextv1.CustomResourceDefinitionsGetter
-	clientbatchv1.CronJobsGetter
+	apiextv1client.CustomResourceDefinitionsGetter
 	acidv1.OperatorConfigurationsGetter
 	acidv1.PostgresTeamsGetter
 	acidv1.PostgresqlsGetter
@@ -72,6 +69,13 @@ type KubernetesClient struct {
 	RESTClient         rest.Interface
 	AcidV1ClientSet    *zalandoclient.Clientset
 	Zalandov1ClientSet *zalandoclient.Clientset
+}
+
+type mockCustomResourceDefinition struct {
+	apiextv1client.CustomResourceDefinitionInterface
+}
+
+type MockCustomResourceDefinitionsGetter struct {
 }
 
 type mockSecret struct {
@@ -243,54 +247,16 @@ func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg
 	return updatedPg, nil
 }
 
-// SamePDB compares the PodDisruptionBudgets
-func SamePDB(cur, new *apipolicyv1.PodDisruptionBudget) (match bool, reason string) {
-	//TODO: improve comparison
-	match = reflect.DeepEqual(new.Spec, cur.Spec)
-	if !match {
-		reason = "new PDB spec does not match the current one"
-	}
-
-	return
+func (c *mockCustomResourceDefinition) Get(ctx context.Context, name string, options metav1.GetOptions) (*apiextv1.CustomResourceDefinition, error) {
+	return &apiextv1.CustomResourceDefinition{}, nil
 }
 
-func getJobImage(cronJob *batchv1.CronJob) string {
-	return cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+func (c *mockCustomResourceDefinition) Create(ctx context.Context, crd *apiextv1.CustomResourceDefinition, options metav1.CreateOptions) (*apiextv1.CustomResourceDefinition, error) {
+	return &apiextv1.CustomResourceDefinition{}, nil
 }
 
-func getPgVersion(cronJob *batchv1.CronJob) string {
-	envs := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env
-	for _, env := range envs {
-		if env.Name == "PG_VERSION" {
-			return env.Value
-		}
-	}
-	return ""
-}
-
-// SameLogicalBackupJob compares Specs of logical backup cron jobs
-func SameLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string) {
-
-	if cur.Spec.Schedule != new.Spec.Schedule {
-		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
-			new.Spec.Schedule, cur.Spec.Schedule)
-	}
-
-	newImage := getJobImage(new)
-	curImage := getJobImage(cur)
-	if newImage != curImage {
-		return false, fmt.Sprintf("new job's image %q does not match the current one %q",
-			newImage, curImage)
-	}
-
-	newPgVersion := getPgVersion(new)
-	curPgVersion := getPgVersion(cur)
-	if newPgVersion != curPgVersion {
-		return false, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q",
-			newPgVersion, curPgVersion)
-	}
-
-	return true, ""
+func (mock *MockCustomResourceDefinitionsGetter) CustomResourceDefinitions() apiextv1client.CustomResourceDefinitionInterface {
+	return &mockCustomResourceDefinition{}
 }
 
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
@@ -406,7 +372,7 @@ func (mock *mockDeployment) Get(ctx context.Context, name string, opts metav1.Ge
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
-						v1.Container{
+						{
 							Image: "pooler:1.0",
 						},
 					},
@@ -497,6 +463,8 @@ func NewMockKubernetesClient() KubernetesClient {
 		ConfigMapsGetter:  &MockConfigMapsGetter{},
 		DeploymentsGetter: &MockDeploymentGetter{},
 		ServicesGetter:    &MockServiceGetter{},
+
+		CustomResourceDefinitionsGetter: &MockCustomResourceDefinitionsGetter{},
 	}
 }
 

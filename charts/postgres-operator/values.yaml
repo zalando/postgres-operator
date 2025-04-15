@@ -1,7 +1,7 @@
 image:
-  registry: registry.opensource.zalan.do
-  repository: acid/postgres-operator
-  tag: v1.11.0
+  registry: ghcr.io
+  repository: zalando/postgres-operator
+  tag: v1.14.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -38,7 +38,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: ghcr.io/zalando/spilo-16:3.2-p2
+  docker_image: ghcr.io/zalando/spilo-17:4.0-p2
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
@@ -83,15 +83,15 @@ configUsers:
 
 configMajorVersionUpgrade:
   # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
-  major_version_upgrade_mode: "off"
+  major_version_upgrade_mode: "manual"
   # upgrades will only be carried out for clusters of listed teams when mode is "off"
   # major_version_upgrade_team_allow_list:
   # - acid
 
   # minimal Postgres major version that will not automatically be upgraded
-  minimal_major_version: "12"
+  minimal_major_version: "13"
   # target Postgres major version when upgrading clusters automatically
-  target_major_version: "16"
+  target_major_version: "17"
 
 configKubernetes:
   # list of additional capabilities for postgres container
@@ -129,6 +129,8 @@ configKubernetes:
   enable_finalizers: false
   # enables initContainers to run actions before Spilo is started
   enable_init_containers: true
+  # toggles if child resources should have an owner reference to the postgresql CR
+  enable_owner_references: false
   # toggles if operator should delete PVCs on cluster deletion
   enable_persistent_volume_claim_deletion: true
   # toggles pod anti affinity on the Postgres pods
@@ -137,6 +139,8 @@ configKubernetes:
   enable_pod_disruption_budget: true
   # toogles readiness probe for database pods
   enable_readiness_probe: false
+  # toggles if operator should delete secrets on cluster deletion
+  enable_secrets_deletion: true
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
 
@@ -169,7 +173,9 @@ configKubernetes:
   # namespaced name of the secret containing the OAuth2 token to pass to the teams API
   # oauth_token_secret_name: postgresql-operator
 
-  # defines the template for PDB (Pod Disruption Budget) names
+  # toggle if `spilo-role=master` selector should be added to the PDB (Pod Disruption Budget)
+  pdb_master_label_selector: true
+  # defines the template for PDB names
   pdb_name_format: "postgres-{cluster}-pdb"
   # specify the PVC retention policy when scaling down and/or deleting
   persistent_volume_claim_retention_policy:
@@ -358,7 +364,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.11.0"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -370,6 +376,8 @@ configLogicalBackup:
   logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
   logical_backup_s3_bucket: "my-bucket-url"
+  # S3 bucket prefix to use
+  logical_backup_s3_bucket_prefix: "spilo"
   # S3 region of bucket
   logical_backup_s3_region: ""
   # S3 endpoint url when not using AWS
@@ -472,7 +480,7 @@ priorityClassName: ""
 # priority class for database pods
 podPriorityClassName:
   # If create is false with no name set, no podPriorityClassName is specified.
-  # Hence, the pod priorityClass is the one with globalDefault set. 
+  # Hence, the pod priorityClass is the one with globalDefault set.
   # If there is no PriorityClass with globalDefault set, the priority of Pods with no priorityClassName is zero.
   create: true
   # If not set a name is generated using the fullname template and "-pod" suffix
@@ -497,6 +505,24 @@ securityContext:
 readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 10
+
+# configure extra environment variables
+# Extra environment variables are writen in kubernetes format and added "as is" to the pod's env variables
+# https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
+# https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#environment-variables
+extraEnvs:
+  []
+  # Exemple of settings maximum amount of memory / cpu that can be used by go process (to match resources.limits)
+  # - name: MY_VAR
+  #   value: my-value
+  # - name: GOMAXPROCS
+  #   valueFrom:
+  #     resourceFieldRef:
+  #       resource: limits.cpu
+  # - name: GOMEMLIMIT
+  #   valueFrom:
+  #     resourceFieldRef:
+  #       resource: limits.memory
 
 # Affinity for pod assignment
 # Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity

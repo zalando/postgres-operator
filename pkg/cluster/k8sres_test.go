@@ -72,18 +72,18 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 	}{
 		{
 			subtest: "Patroni default configuration",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				Auth: config.Auth{
 					PamRoleName: "zalandos",
 				},
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				InitDB: map[string]string{
 					"encoding":       "UTF8",
@@ -102,38 +102,38 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				FailsafeMode:          util.True(),
 			},
 			opConfig: &config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"synchronous_node_count":1,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}},"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode configured globally, disabled for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.False(),
 			},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.True(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":false}}}`,
 		},
 		{
 			subtest: "Patroni failsafe_mode disabled globally, configured for cluster",
-			pgParam: &acidv1.PostgresqlParam{PgVersion: "16"},
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
 			patroni: &acidv1.Patroni{
 				FailsafeMode: util.True(),
 			},
 			opConfig: &config.Config{
 				EnablePatroniFailsafeMode: util.False(),
 			},
-			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/16/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -164,15 +164,15 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 		},
 		{
 			subTest:  "test current bin path against hard coded template",
-			binPath:  "/usr/lib/postgresql/16/bin",
+			binPath:  "/usr/lib/postgresql/17/bin",
 			template: pgBinariesLocationTemplate,
-			expected: "16",
+			expected: "17",
 		},
 		{
 			subTest:  "test alternative bin path against a matching template",
-			binPath:  "/usr/pgsql-16/bin",
+			binPath:  "/usr/pgsql-17/bin",
 			template: "/usr/pgsql-%v/bin",
-			expected: "16",
+			expected: "17",
 		},
 	}
 
@@ -1451,9 +1451,9 @@ func TestNodeAffinity(t *testing.T) {
 	nodeAff := &v1.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				v1.NodeSelectorTerm{
+				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
-						v1.NodeSelectorRequirement{
+						{
 							Key:      "test-label",
 							Operator: v1.NodeSelectorOpIn,
 							Values: []string{
@@ -1566,22 +1566,28 @@ func TestPodAffinity(t *testing.T) {
 }
 
 func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
+	if len(deployment.ObjectMeta.OwnerReferences) == 0 {
+		return nil
+	}
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
-	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
-		return fmt.Errorf("Ownere reference is incorrect, got %s, expected %s",
-			owner.Name, cluster.Statefulset.ObjectMeta.Name)
+	if owner.Name != cluster.Postgresql.ObjectMeta.Name {
+		return fmt.Errorf("Owner reference is incorrect, got %s, expected %s",
+			owner.Name, cluster.Postgresql.ObjectMeta.Name)
 	}
 
 	return nil
 }
 
 func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role PostgresRole) error {
+	if len(service.ObjectMeta.OwnerReferences) == 0 {
+		return nil
+	}
 	owner := service.ObjectMeta.OwnerReferences[0]
 
-	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
-		return fmt.Errorf("Ownere reference is incorrect, got %s, expected %s",
-			owner.Name, cluster.Statefulset.ObjectMeta.Name)
+	if owner.Name != cluster.Postgresql.ObjectMeta.Name {
+		return fmt.Errorf("Owner reference is incorrect, got %s, expected %s",
+			owner.Name, cluster.Postgresql.ObjectMeta.Name)
 	}
 
 	return nil
@@ -1667,7 +1673,7 @@ func TestTLS(t *testing.T) {
 			TLS: &acidv1.TLSDescription{
 				SecretName: tlsSecretName, CAFile: "ca.crt"},
 			AdditionalVolumes: []acidv1.AdditionalVolume{
-				acidv1.AdditionalVolume{
+				{
 					Name:      tlsSecretName,
 					MountPath: mountPath,
 					VolumeSource: v1.VolumeSource{
@@ -1889,6 +1895,25 @@ func TestAdditionalVolume(t *testing.T) {
 				EmptyDir: &v1.EmptyDirVolumeSource{},
 			},
 		},
+		{
+			Name:             "test5",
+			MountPath:        "/test5",
+			SubPath:          "subpath",
+			TargetContainers: nil, // should mount only to postgres
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name:             "test6",
+			MountPath:        "/test6",
+			SubPath:          "$(POD_NAME)",
+			IsSubPathExpr:    util.True(),
+			TargetContainers: nil, // should mount only to postgres
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
 	}
 
 	pg := acidv1.Postgresql{
@@ -1903,7 +1928,9 @@ func TestAdditionalVolume(t *testing.T) {
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
 			},
 			Volume: acidv1.Volume{
-				Size: "1G",
+				Size:          "1G",
+				SubPath:       "$(POD_NAME)",
+				IsSubPathExpr: util.True(),
 			},
 			AdditionalVolumes: additionalVolumes,
 			Sidecars: []acidv1.Sidecar{
@@ -1935,19 +1962,25 @@ func TestAdditionalVolume(t *testing.T) {
 	assert.NoError(t, err)
 
 	tests := []struct {
-		subTest        string
-		container      string
-		expectedMounts []string
+		subTest              string
+		container            string
+		expectedMounts       []string
+		expectedSubPaths     []string
+		expectedSubPathExprs []string
 	}{
 		{
-			subTest:        "checking volume mounts of postgres container",
-			container:      constants.PostgresContainerName,
-			expectedMounts: []string{"pgdata", "test1", "test3", "test4"},
+			subTest:              "checking volume mounts of postgres container",
+			container:            constants.PostgresContainerName,
+			expectedMounts:       []string{"pgdata", "test1", "test3", "test4", "test5", "test6"},
+			expectedSubPaths:     []string{"", "", "", "", "subpath", ""},
+			expectedSubPathExprs: []string{"$(POD_NAME)", "", "", "", "", "$(POD_NAME)"},
 		},
 		{
-			subTest:        "checking volume mounts of sidecar container",
-			container:      "sidecar",
-			expectedMounts: []string{"pgdata", "test1", "test2"},
+			subTest:              "checking volume mounts of sidecar container",
+			container:            "sidecar",
+			expectedMounts:       []string{"pgdata", "test1", "test2"},
+			expectedSubPaths:     []string{"", "", ""},
+			expectedSubPathExprs: []string{"$(POD_NAME)", "", ""},
 		},
 	}
 
@@ -1957,13 +1990,28 @@ func TestAdditionalVolume(t *testing.T) {
 				continue
 			}
 			mounts := []string{}
+			subPaths := []string{}
+			subPathExprs := []string{}
+
 			for _, volumeMounts := range container.VolumeMounts {
 				mounts = append(mounts, volumeMounts.Name)
+				subPaths = append(subPaths, volumeMounts.SubPath)
+				subPathExprs = append(subPathExprs, volumeMounts.SubPathExpr)
 			}
 
 			if !util.IsEqualIgnoreOrder(mounts, tt.expectedMounts) {
-				t.Errorf("%s %s: different volume mounts: got %v, epxected %v",
+				t.Errorf("%s %s: different volume mounts: got %v, expected %v",
 					t.Name(), tt.subTest, mounts, tt.expectedMounts)
+			}
+
+			if !util.IsEqualIgnoreOrder(subPaths, tt.expectedSubPaths) {
+				t.Errorf("%s %s: different volume subPaths: got %v, expected %v",
+					t.Name(), tt.subTest, subPaths, tt.expectedSubPaths)
+			}
+
+			if !util.IsEqualIgnoreOrder(subPathExprs, tt.expectedSubPathExprs) {
+				t.Errorf("%s %s: different volume subPathExprs: got %v, expected %v",
+					t.Name(), tt.subTest, subPathExprs, tt.expectedSubPathExprs)
 			}
 		}
 	}
@@ -2100,7 +2148,7 @@ func TestSidecars(t *testing.T) {
 
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
-			PgVersion: "16",
+			PgVersion: "17",
 			Parameters: map[string]string{
 				"max_connections": "100",
 			},
@@ -2114,17 +2162,17 @@ func TestSidecars(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("210m"), Memory: k8sutil.StringToPointer("0.8Gi")},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("510m"), Memory: k8sutil.StringToPointer("1.4Gi")},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
 			},
@@ -2152,11 +2200,11 @@ func TestSidecars(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -2211,7 +2259,7 @@ func TestSidecars(t *testing.T) {
 		},
 	}
 	mounts := []v1.VolumeMount{
-		v1.VolumeMount{
+		{
 			Name:      "pgdata",
 			MountPath: "/home/postgres/pgdata",
 		},
@@ -2278,13 +2326,81 @@ func TestSidecars(t *testing.T) {
 }
 
 func TestGeneratePodDisruptionBudget(t *testing.T) {
+	testName := "Test PodDisruptionBudget spec generation"
+
+	hasName := func(pdbName string) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+			if pdbName != podDisruptionBudget.ObjectMeta.Name {
+				return fmt.Errorf("PodDisruptionBudget name is incorrect, got %s, expected %s",
+					podDisruptionBudget.ObjectMeta.Name, pdbName)
+			}
+			return nil
+		}
+	}
+
+	hasMinAvailable := func(expectedMinAvailable int) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+			actual := podDisruptionBudget.Spec.MinAvailable.IntVal
+			if actual != int32(expectedMinAvailable) {
+				return fmt.Errorf("PodDisruptionBudget MinAvailable is incorrect, got %d, expected %d",
+					actual, expectedMinAvailable)
+			}
+			return nil
+		}
+	}
+
+	testLabelsAndSelectors := func(isPrimary bool) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+			masterLabelSelectorDisabled := cluster.OpConfig.PDBMasterLabelSelector != nil && !*cluster.OpConfig.PDBMasterLabelSelector
+			if podDisruptionBudget.ObjectMeta.Namespace != "myapp" {
+				return fmt.Errorf("Object Namespace incorrect.")
+			}
+			expectedLabels := map[string]string{"team": "myapp", "cluster-name": "myapp-database"}
+			if !reflect.DeepEqual(podDisruptionBudget.Labels, expectedLabels) {
+				return fmt.Errorf("Labels incorrect, got %#v, expected %#v", podDisruptionBudget.Labels, expectedLabels)
+			}
+			if !masterLabelSelectorDisabled {
+				if isPrimary {
+					expectedLabels := &metav1.LabelSelector{
+						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"}}
+					if !reflect.DeepEqual(podDisruptionBudget.Spec.Selector, expectedLabels) {
+						return fmt.Errorf("MatchLabels incorrect, got %#v, expected %#v", podDisruptionBudget.Spec.Selector, expectedLabels)
+					}
+				} else {
+					expectedLabels := &metav1.LabelSelector{
+						MatchLabels: map[string]string{"cluster-name": "myapp-database", "critical-operation": "true"}}
+					if !reflect.DeepEqual(podDisruptionBudget.Spec.Selector, expectedLabels) {
+						return fmt.Errorf("MatchLabels incorrect, got %#v, expected %#v", podDisruptionBudget.Spec.Selector, expectedLabels)
+					}
+				}
+			}
+
+			return nil
+		}
+	}
+
+	testPodDisruptionBudgetOwnerReference := func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		if len(podDisruptionBudget.ObjectMeta.OwnerReferences) == 0 {
+			return nil
+		}
+		owner := podDisruptionBudget.ObjectMeta.OwnerReferences[0]
+
+		if owner.Name != cluster.Postgresql.ObjectMeta.Name {
+			return fmt.Errorf("Owner reference is incorrect, got %s, expected %s",
+				owner.Name, cluster.Postgresql.ObjectMeta.Name)
+		}
+
+		return nil
+	}
+
 	tests := []struct {
-		c   *Cluster
-		out policyv1.PodDisruptionBudget
+		scenario string
+		spec     *Cluster
+		check    []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error
 	}{
-		// With multiple instances.
 		{
-			New(
+			scenario: "With multiple instances",
+			spec: New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2292,23 +2408,16 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-pdb",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(1),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(1),
+				testLabelsAndSelectors(true),
 			},
 		},
-		// With zero instances.
 		{
-			New(
+			scenario: "With zero instances",
+			spec: New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2316,23 +2425,16 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-pdb",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(0),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(0),
+				testLabelsAndSelectors(true),
 			},
 		},
-		// With PodDisruptionBudget disabled.
 		{
-			New(
+			scenario: "With PodDisruptionBudget disabled",
+			spec: New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2340,23 +2442,16 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-pdb",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(0),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(0),
+				testLabelsAndSelectors(true),
 			},
 		},
-		// With non-default PDBNameFormat and PodDisruptionBudget explicitly enabled.
 		{
-			New(
+			scenario: "With non-default PDBNameFormat and PodDisruptionBudget explicitly enabled",
+			spec: New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2364,50 +2459,143 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-databass-budget",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(1),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-databass-budget"),
+				hasMinAvailable(1),
+				testLabelsAndSelectors(true),
 			},
 		},
-		// With PDBMasterLabelSelector disabled.
 		{
-			New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", PDBMasterLabelSelector: util.False()}},
+			scenario: "With PDBMasterLabelSelector disabled",
+			spec: New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
 				logger,
 				eventRecorder),
-			policyv1.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "postgres-myapp-database-pdb",
-					Namespace: "myapp",
-					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
-				},
-				Spec: policyv1.PodDisruptionBudgetSpec{
-					MinAvailable: util.ToIntStr(1),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"cluster-name": "myapp-database"},
-					},
-				},
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(1),
+				testLabelsAndSelectors(true),
+			},
+		},
+		{
+			scenario: "With OwnerReference enabled",
+			spec: New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+				logger,
+				eventRecorder),
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-pdb"),
+				hasMinAvailable(1),
+				testLabelsAndSelectors(true),
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		result := tt.c.generatePodDisruptionBudget()
-		if !reflect.DeepEqual(*result, tt.out) {
-			t.Errorf("Expected PodDisruptionBudget: %#v, got %#v", tt.out, *result)
+		result := tt.spec.generatePrimaryPodDisruptionBudget()
+		for _, check := range tt.check {
+			err := check(tt.spec, result)
+			if err != nil {
+				t.Errorf("%s [%s]: PodDisruptionBudget spec is incorrect, %+v",
+					testName, tt.scenario, err)
+			}
+		}
+	}
+
+	testCriticalOp := []struct {
+		scenario string
+		spec     *Cluster
+		check    []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error
+	}{
+		{
+			scenario: "With multiple instances",
+			spec: New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+				logger,
+				eventRecorder),
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-critical-op-pdb"),
+				hasMinAvailable(3),
+				testLabelsAndSelectors(false),
+			},
+		},
+		{
+			scenario: "With zero instances",
+			spec: New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
+				logger,
+				eventRecorder),
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-critical-op-pdb"),
+				hasMinAvailable(0),
+				testLabelsAndSelectors(false),
+			},
+		},
+		{
+			scenario: "With PodDisruptionBudget disabled",
+			spec: New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+				logger,
+				eventRecorder),
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-critical-op-pdb"),
+				hasMinAvailable(0),
+				testLabelsAndSelectors(false),
+			},
+		},
+		{
+			scenario: "With OwnerReference enabled",
+			spec: New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+				logger,
+				eventRecorder),
+			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
+				testPodDisruptionBudgetOwnerReference,
+				hasName("postgres-myapp-database-critical-op-pdb"),
+				hasMinAvailable(3),
+				testLabelsAndSelectors(false),
+			},
+		},
+	}
+
+	for _, tt := range testCriticalOp {
+		result := tt.spec.generateCriticalOpPodDisruptionBudget()
+		for _, check := range tt.check {
+			err := check(tt.spec, result)
+			if err != nil {
+				t.Errorf("%s [%s]: PodDisruptionBudget spec is incorrect, %+v",
+					testName, tt.scenario, err)
+			}
 		}
 	}
 }
@@ -2426,17 +2614,17 @@ func TestGenerateService(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("210m"), Memory: k8sutil.StringToPointer("0.8Gi")},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("510m"), Memory: k8sutil.StringToPointer("1.4Gi")},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "override-image",
 			},
@@ -2465,11 +2653,11 @@ func TestGenerateService(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -2564,27 +2752,27 @@ func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 
 func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPolicy, clusterName string) []v1.ServiceSpec {
 	return []v1.ServiceSpec{
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler"},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			Selector:                 map[string]string{"spilo-role": "replica", "application": "spilo", "cluster-name": clusterName},
 			Type:                     serviceType,
 		},
-		v1.ServiceSpec{
+		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
@@ -2804,7 +2992,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 						},
 					},
@@ -2901,6 +3089,44 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			},
 			expectedResources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+			},
+		},
+		{
+			subTest: "test generation of resources when min limits are all set to zero",
+			config: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     clusterNameLabel,
+					DefaultCPURequest:    "0",
+					DefaultCPULimit:      "0",
+					MaxCPURequest:        "0",
+					MinCPULimit:          "0",
+					DefaultMemoryRequest: "0",
+					DefaultMemoryLimit:   "0",
+					MaxMemoryRequest:     "0",
+					MinMemoryLimit:       "0",
+					PodRoleLabel:         "spilo-role",
+				},
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceLimits: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("5m"), Memory: k8sutil.StringToPointer("5Mi")},
 			},
 		},
 		{
@@ -3005,7 +3231,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
 								ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("10Mi")},
@@ -3094,7 +3320,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 				},
 				Spec: acidv1.PostgresSpec{
 					Sidecars: []acidv1.Sidecar{
-						acidv1.Sidecar{
+						{
 							Name: sidecarName,
 							Resources: &acidv1.Resources{
 								ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("10Mi")},
@@ -3499,6 +3725,11 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 		cluster.Spec.LogicalBackupSchedule = tt.specSchedule
 		cronJob, err := cluster.generateLogicalBackupJob()
 		assert.NoError(t, err)
+
+		if !reflect.DeepEqual(cronJob.ObjectMeta.OwnerReferences, cluster.ownerReferences()) {
+			t.Errorf("%s - %s: expected owner references %#v, got %#v", t.Name(), tt.subTest, cluster.ownerReferences(), cronJob.ObjectMeta.OwnerReferences)
+		}
+
 		if cronJob.Spec.Schedule != tt.expectedSchedule {
 			t.Errorf("%s - %s: expected schedule %s, got %s", t.Name(), tt.subTest, tt.expectedSchedule, cronJob.Spec.Schedule)
 		}
@@ -3520,6 +3751,191 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 		assert.NoError(t, err)
 		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
 			t.Errorf("%s - %s: expected resources %#v, got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
+		}
+	}
+}
+
+func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
+	var (
+		dummyUUID   = "efd12e58-5786-11e8-b5a7-06148230260c"
+		dummyBucket = "dummy-backup-location"
+	)
+
+	expectedLogicalBackupS3Bucket := []ExpectedValue{
+		{
+			envIndex:       9,
+			envVarConstant: "LOGICAL_BACKUP_PROVIDER",
+			envVarValue:    "s3",
+		},
+		{
+			envIndex:       10,
+			envVarConstant: "LOGICAL_BACKUP_S3_BUCKET",
+			envVarValue:    dummyBucket,
+		},
+		{
+			envIndex:       11,
+			envVarConstant: "LOGICAL_BACKUP_S3_BUCKET_PREFIX",
+			envVarValue:    "spilo",
+		},
+		{
+			envIndex:       12,
+			envVarConstant: "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "/" + dummyUUID,
+		},
+		{
+			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_S3_REGION",
+			envVarValue:    "eu-central-1",
+		},
+		{
+			envIndex:       14,
+			envVarConstant: "LOGICAL_BACKUP_S3_ENDPOINT",
+			envVarValue:    "",
+		},
+		{
+			envIndex:       15,
+			envVarConstant: "LOGICAL_BACKUP_S3_SSE",
+			envVarValue:    "",
+		},
+		{
+			envIndex:       16,
+			envVarConstant: "LOGICAL_BACKUP_S3_RETENTION_TIME",
+			envVarValue:    "1 month",
+		},
+	}
+
+	expectedLogicalBackupGCPCreds := []ExpectedValue{
+		{
+			envIndex:       9,
+			envVarConstant: "LOGICAL_BACKUP_PROVIDER",
+			envVarValue:    "gcs",
+		},
+		{
+			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
+			envVarValue:    "some-path-to-credentials",
+		},
+	}
+
+	expectedLogicalBackupAzureStorage := []ExpectedValue{
+		{
+			envIndex:       9,
+			envVarConstant: "LOGICAL_BACKUP_PROVIDER",
+			envVarValue:    "az",
+		},
+		{
+			envIndex:       13,
+			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
+			envVarValue:    "some-azure-storage-account-name",
+		},
+		{
+			envIndex:       14,
+			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER",
+			envVarValue:    "some-azure-storage-container",
+		},
+		{
+			envIndex:       15,
+			envVarConstant: "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY",
+			envVarValue:    "some-azure-storage-account-key",
+		},
+	}
+
+	expectedLogicalBackupRetentionTime := []ExpectedValue{
+		{
+			envIndex:       16,
+			envVarConstant: "LOGICAL_BACKUP_S3_RETENTION_TIME",
+			envVarValue:    "3 months",
+		},
+	}
+
+	tests := []struct {
+		subTest        string
+		opConfig       config.Config
+		expectedValues []ExpectedValue
+		pgsql          acidv1.Postgresql
+	}{
+		{
+			subTest: "logical backup with provider: s3",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:        "s3",
+					LogicalBackupS3Bucket:        dummyBucket,
+					LogicalBackupS3BucketPrefix:  "spilo",
+					LogicalBackupS3Region:        "eu-central-1",
+					LogicalBackupS3RetentionTime: "1 month",
+				},
+			},
+			expectedValues: expectedLogicalBackupS3Bucket,
+		},
+		{
+			subTest: "logical backup with provider: gcs",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:                     "gcs",
+					LogicalBackupS3Bucket:                     dummyBucket,
+					LogicalBackupGoogleApplicationCredentials: "some-path-to-credentials",
+				},
+			},
+			expectedValues: expectedLogicalBackupGCPCreds,
+		},
+		{
+			subTest: "logical backup with provider: az",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:                "az",
+					LogicalBackupS3Bucket:                dummyBucket,
+					LogicalBackupAzureStorageAccountName: "some-azure-storage-account-name",
+					LogicalBackupAzureStorageContainer:   "some-azure-storage-container",
+					LogicalBackupAzureStorageAccountKey:  "some-azure-storage-account-key",
+				},
+			},
+			expectedValues: expectedLogicalBackupAzureStorage,
+		},
+		{
+			subTest: "will override retention time parameter",
+			opConfig: config.Config{
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupProvider:        "s3",
+					LogicalBackupS3RetentionTime: "1 month",
+				},
+			},
+			expectedValues: expectedLogicalBackupRetentionTime,
+			pgsql: acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					LogicalBackupRetention: "3 months",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		pgsql := tt.pgsql
+		c.Postgresql = pgsql
+		c.UID = types.UID(dummyUUID)
+
+		actualEnvs := c.generateLogicalBackupPodEnvVars()
+
+		for _, ev := range tt.expectedValues {
+			env := actualEnvs[ev.envIndex]
+
+			if env.Name != ev.envVarConstant {
+				t.Errorf("%s %s: expected env name %s, have %s instead",
+					t.Name(), tt.subTest, ev.envVarConstant, env.Name)
+			}
+
+			if ev.envVarValueRef != nil {
+				if !reflect.DeepEqual(env.ValueFrom, ev.envVarValueRef) {
+					t.Errorf("%s %s: expected env value reference %#v, have %#v instead",
+						t.Name(), tt.subTest, ev.envVarValueRef, env.ValueFrom)
+				}
+				continue
+			}
+
+			if env.Value != ev.envVarValue {
+				t.Errorf("%s %s: expected env value %s, have %s instead",
+					t.Name(), tt.subTest, ev.envVarValue, env.Value)
+			}
 		}
 	}
 }

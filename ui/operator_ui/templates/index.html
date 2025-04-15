@@ -3,7 +3,13 @@
   <head>
     <meta charset="utf-8">
     <title>PostgreSQL Operator UI</title>
-
+    <script>
+      const hash = localStorage.getItem("original-location-hash");
+      if (null !== hash) {
+        localStorage.removeItem("original-location-hash");
+        location.replace("/" + hash)
+      }
+    </script>
 
     <!-- fonts -->
 
