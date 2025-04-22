@@ -1035,22 +1035,19 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	}
 
 	// fetch variables from custom environment Secret
-	// that will override all subsequent global variables
 	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
 	if err != nil {
 		return nil, err
 	}
-	envVars = appendIfNotPresent(envVars, secretEnvVarsList...)
 
 	// fetch variables from custom environment ConfigMap
-	// that will override all subsequent global variables
 	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
 	if err != nil {
 		return nil, err
 	}
-	envVars = appendIfNotPresent(envVars, configMapEnvVarsList...)
 
 	// global variables derived from operator configuration
+	// that do not override custom environment variables
 	opConfigEnvVars := make([]v1.EnvVar, 0)
 	if c.OpConfig.WALES3Bucket != "" {
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
@@ -1080,7 +1077,15 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
-	envVars = appendIfNotPresent(envVars, opConfigEnvVars...)
+	for _, env := range opConfigEnvVars {
+		if !isEnvVarPresent(secretEnvVarsList, env.Name) && !isEnvVarPresent(configMapEnvVarsList, env.Name) {
+			envVars = appendIfNotPresent(envVars, env)
+		}
+	}
+
+	// append custom environment variables last to allow chained referencing
+	envVars = appendIfNotPresent(envVars, secretEnvVarsList...)
+	envVars = appendIfNotPresent(envVars, configMapEnvVarsList...)
 
 	return envVars, nil
 }
