@@ -784,7 +784,7 @@ func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, su
 				},
 			},
 		}
-		container.Env = appendEnvVars(env, container.Env...)
+		container.Env = appendIfNotPresent(env, container.Env...)
 		result = append(result, container)
 	}
 
@@ -1023,7 +1023,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 
 	// fetch cluster-specific variables that will override all subsequent global variables
 	if len(spec.Env) > 0 {
-		envVars = appendEnvVars(envVars, spec.Env...)
+		envVars = appendIfNotPresent(envVars, spec.Env...)
 	}
 
 	if spec.Clone != nil && spec.Clone.ClusterName != "" {
@@ -1040,7 +1040,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	if err != nil {
 		return nil, err
 	}
-	envVars = appendEnvVars(envVars, secretEnvVarsList...)
+	envVars = appendIfNotPresent(envVars, secretEnvVarsList...)
 
 	// fetch variables from custom environment ConfigMap
 	// that will override all subsequent global variables
@@ -1048,7 +1048,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	if err != nil {
 		return nil, err
 	}
-	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
+	envVars = appendIfNotPresent(envVars, configMapEnvVarsList...)
 
 	// global variables derived from operator configuration
 	opConfigEnvVars := make([]v1.EnvVar, 0)
@@ -1080,12 +1080,12 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
-	envVars = appendEnvVars(envVars, opConfigEnvVars...)
+	envVars = appendIfNotPresent(envVars, opConfigEnvVars...)
 
 	return envVars, nil
 }
 
-func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
+func appendIfNotPresent(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
 	collectedEnvs := envs
 	for _, env := range appEnv {
 		if !isEnvVarPresent(collectedEnvs, env.Name) {
@@ -1378,7 +1378,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 		tlsEnv, tlsVolumes := generateTlsMounts(spec, getSpiloTLSEnv)
 		for _, env := range tlsEnv {
-			spiloEnvVars = appendEnvVars(spiloEnvVars, env)
+			spiloEnvVars = appendIfNotPresent(spiloEnvVars, env)
 		}
 		additionalVolumes = append(additionalVolumes, tlsVolumes...)
 	}
@@ -2490,7 +2490,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
 	switch backupProvider {
 	case "s3":
-		envVars = appendEnvVars(envVars, []v1.EnvVar{
+		envVars = appendIfNotPresent(envVars, []v1.EnvVar{
 			{
 				Name:  "LOGICAL_BACKUP_S3_REGION",
 				Value: c.OpConfig.LogicalBackup.LogicalBackupS3Region,
@@ -2522,7 +2522,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		}
 
 	case "az":
-		envVars = appendEnvVars(envVars, []v1.EnvVar{
+		envVars = appendIfNotPresent(envVars, []v1.EnvVar{
 			{
 				Name:  "LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME",
 				Value: c.OpConfig.LogicalBackup.LogicalBackupAzureStorageAccountName,

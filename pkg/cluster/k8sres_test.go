@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -1168,6 +1169,7 @@ func TestCloneEnv(t *testing.T) {
 		cloneOpts *acidv1.CloneDescription
 		env       v1.EnvVar
 		envPos    int
+		envLen    int
 	}{
 		{
 			subTest: "custom s3 path",
@@ -1181,6 +1183,7 @@ func TestCloneEnv(t *testing.T) {
 				Value: "s3://some/path/",
 			},
 			envPos: 1,
+			envLen: 5,
 		},
 		{
 			subTest: "generated s3 path, bucket",
@@ -1194,6 +1197,7 @@ func TestCloneEnv(t *testing.T) {
 				Value: "wale-bucket",
 			},
 			envPos: 1,
+			envLen: 6,
 		},
 		{
 			subTest: "generated s3 path, target time",
@@ -1207,6 +1211,7 @@ func TestCloneEnv(t *testing.T) {
 				Value: "somewhen",
 			},
 			envPos: 4,
+			envLen: 6,
 		},
 	}
 
@@ -1225,6 +1230,19 @@ func TestCloneEnv(t *testing.T) {
 	for _, tt := range tests {
 		envs := cluster.generateCloneEnvironment(tt.cloneOpts)
 
+		if len(envs) != tt.envLen {
+			t.Errorf("%s %s: Expected number of env variables %d, have %d instead",
+				t.Name(), tt.subTest, tt.envLen, len(envs))
+		}
+
+		// verify all env var names start with CLONE_
+		for _, env := range envs {
+			if !strings.HasPrefix(env.Name, "CLONE_") {
+				t.Errorf("%s %s: env var name %q does not start with CLONE_",
+					t.Name(), tt.subTest, env.Name)
+			}
+		}
+
 		env := envs[tt.envPos]
 
 		if env.Name != tt.env.Name {
@@ -1239,7 +1257,7 @@ func TestCloneEnv(t *testing.T) {
 	}
 }
 
-func TestAppendEnvVar(t *testing.T) {
+func TestAppendIfNotPresent(t *testing.T) {
 	tests := []struct {
 		subTest      string
 		envs         []v1.EnvVar
@@ -1291,7 +1309,7 @@ func TestAppendEnvVar(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		finalEnvs := appendEnvVars(tt.envs, tt.envsToAppend...)
+		finalEnvs := appendIfNotPresent(tt.envs, tt.envsToAppend...)
 
 		if len(finalEnvs) != tt.expectedSize {
 			t.Errorf("%s %s: expected %d env variables, got %d",
@@ -1390,6 +1408,19 @@ func TestStandbyEnv(t *testing.T) {
 	for _, tt := range tests {
 		envs := cluster.generateStandbyEnvironment(tt.standbyOpts)
 
+		if len(envs) != tt.envLen {
+			t.Errorf("%s %s: Expected number of env variables %d, have %d instead",
+				t.Name(), tt.subTest, tt.envLen, len(envs))
+		}
+
+		// verify all env var names start with STANDBY_
+		for _, env := range envs {
+			if !strings.HasPrefix(env.Name, "STANDBY_") {
+				t.Errorf("%s %s: env var name %q does not start with STANDBY_",
+					t.Name(), tt.subTest, env.Name)
+			}
+		}
+
 		env := envs[tt.envPos]
 
 		if env.Name != tt.env.Name {
@@ -1400,11 +1431,6 @@ func TestStandbyEnv(t *testing.T) {
 		if env.Value != tt.env.Value {
 			t.Errorf("%s %s: Expected env value %s, have %s instead",
 				t.Name(), tt.subTest, tt.env.Value, env.Value)
-		}
-
-		if len(envs) != tt.envLen {
-			t.Errorf("%s %s: Expected number of env variables %d, have %d instead",
-				t.Name(), tt.subTest, tt.envLen, len(envs))
 		}
 	}
 }
