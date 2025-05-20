@@ -876,6 +876,9 @@ grouped under the `logical_backup` key.
 * **logical_backup_cronjob_environment_secret**
   Reference to a Kubernetes secret, which keys will be added as environment variables to the cronjob. Default: ""
 
+* **logical_backup_filename_date_format**
+  Date format to use for the logical backup filename. Uses date linux utility. Default: "+%s"
+
 ## Debugging the operator
 
 Options to aid debugging of the operator itself. Grouped under the `debug` key.
