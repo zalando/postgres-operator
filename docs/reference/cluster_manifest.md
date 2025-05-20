@@ -247,7 +247,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   [kubernetes volumeSource](https://godoc.org/k8s.io/api/core/v1#VolumeSource).
   It allows you to mount existing PersistentVolumeClaims, ConfigMaps and Secrets inside the StatefulSet.
   Also an `emptyDir` volume can be shared between initContainer and statefulSet.
-  Additionaly, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
+  Additionally, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
   Set `isSubPathExpr` to true if you want to include [API environment variables](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath-expanded-environment).
   You can also specify in which container the additional Volumes will be mounted with the `targetContainers` array option.
   If `targetContainers` is empty, additional volumes will be mounted only in the `postgres` container.
@@ -257,7 +257,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
 ## Prepared Databases
 
 The operator can create databases with default owner, reader and writer roles
-without the need to specifiy them under `users` or `databases` sections. Those
+without the need to specify them under `users` or `databases` sections. Those
 parameters are grouped under the `preparedDatabases` top-level key. For more
 information, see [user docs](../user.md#prepared-databases-with-roles-and-default-privileges).
 

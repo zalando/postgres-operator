@@ -384,7 +384,7 @@ exceptions:
 The interval of days can be set with `password_rotation_interval` (default
 `90` = 90 days, minimum 1). On each rotation the user name and password values
 are replaced in the K8s secret. They belong to a newly created user named after
-the original role plus rotation date in YYMMDD format. All priviliges are
+the original role plus rotation date in YYMMDD format. All privileges are
 inherited meaning that migration scripts should still grant and revoke rights
 against the original role. The timestamp of the next rotation (in RFC 3339
 format, UTC timezone) is written to the secret as well. Note, if the rotation
@@ -564,7 +564,7 @@ manifest affinity.
 ```
 
 If `node_readiness_label_merge` is set to `"OR"` (default) the readiness label
-affinty will be appended with its own expressions block:
+affinity will be appended with its own expressions block:
 
 ```yaml
   affinity:
@@ -1140,7 +1140,7 @@ metadata:
     iam.gke.io/gcp-service-account: <GCP_SERVICE_ACCOUNT_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com
 ```
 
-2. Specify the new custom service account in your [operator paramaters](./reference/operator_parameters.md)
+2. Specify the new custom service account in your [operator parameters](./reference/operator_parameters.md)
 
 If using manual deployment or kustomize, this is done by setting
 `pod_service_account_name` in your configuration file specified in the

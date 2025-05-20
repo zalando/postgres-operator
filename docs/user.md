@@ -900,7 +900,7 @@ the PostgreSQL version between source and target cluster has to be the same.
 
 To start a cluster as standby, add the following `standby` section in the YAML
 file. You can stream changes from archived WAL files (AWS S3 or Google Cloud
-Storage) or from a remote primary. Only one option can be specfied in the
+Storage) or from a remote primary. Only one option can be specified in the
 manifest:
 
 ```yaml
@@ -911,7 +911,7 @@ spec:
 
 For GCS, you have to define STANDBY_GOOGLE_APPLICATION_CREDENTIALS as a
 [custom pod environment variable](administrator.md#custom-pod-environment-variables).
-It is not set from the config to allow for overridding.
+It is not set from the config to allow for overriding.
 
 ```yaml
 spec:
@@ -1282,7 +1282,7 @@ minutes if the certificates have changed and reloads postgres accordingly.
 ### TLS certificates for connection pooler
 
 By default, the pgBouncer image generates its own TLS certificate like Spilo.
-When the `tls` section is specfied in the manifest it will be used for the
+When the `tls` section is specified in the manifest it will be used for the
 connection pooler pod(s) as well. The security context options are hard coded
 to `runAsUser: 100` and `runAsGroup: 101`. The `fsGroup` will be the same
 like for Spilo.

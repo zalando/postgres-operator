@@ -209,7 +209,7 @@ under the `users` key.
   For all `LOGIN` roles that are not database owners the operator can rotate
   credentials in the corresponding K8s secrets by replacing the username and
   password. This means, new users will be added on each rotation inheriting
-  all priviliges from the original roles. The rotation date (in YYMMDD format)
+  all privileges from the original roles. The rotation date (in YYMMDD format)
   is appended to the names of the new user. The timestamp of the next rotation
   is written to the secret. The default is `false`.
 
@@ -552,7 +552,7 @@ configuration they are grouped under the `kubernetes` key.
   pods with `InitialDelaySeconds: 6`, `PeriodSeconds: 10`, `TimeoutSeconds: 5`,
   `SuccessThreshold: 1` and `FailureThreshold: 3`. When enabling readiness
   probes it is recommended to switch the `pod_management_policy` to `parallel`
-  to avoid unneccesary waiting times in case of multiple instances failing.
+  to avoid unnecessary waiting times in case of multiple instances failing.
   The default is `false`.
 
 * **storage_resize_mode**
@@ -701,7 +701,7 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   replaced by the cluster name, `{namespace}` is replaced with the namespace
   and `{hostedzone}` is replaced with the hosted zone (the value of the
   `db_hosted_zone` parameter). The `{team}` placeholder can still be used,
-  although it is not recommened because the team of a cluster can change.
+  although it is not recommended because the team of a cluster can change.
   If the cluster name starts with the `teamId` it will also be part of the
   DNS, aynway. No other placeholders are allowed!
 
@@ -720,7 +720,7 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   is replaced by the cluster name, `{namespace}` is replaced with the
   namespace and `{hostedzone}` is replaced with the hosted zone (the value of
   the `db_hosted_zone` parameter). The `{team}` placeholder can still be used,
-  although it is not recommened because the team of a cluster can change.
+  although it is not recommended because the team of a cluster can change.
   If the cluster name starts with the `teamId` it will also be part of the
   DNS, aynway. No other placeholders are allowed!
 
