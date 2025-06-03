@@ -1928,7 +1928,7 @@ func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 
 	// if secret lives in another namespace we cannot set ownerReferences
 	var ownerReferences []metav1.OwnerReference
-	if c.Config.OpConfig.EnableCrossNamespaceSecret && strings.Contains(username, ".") {
+	if c.Config.OpConfig.EnableCrossNamespaceSecret && c.Postgresql.ObjectMeta.Namespace != pgUser.Namespace {
 		ownerReferences = nil
 	} else {
 		ownerReferences = c.ownerReferences()
