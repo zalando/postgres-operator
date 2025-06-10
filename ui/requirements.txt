@@ -9,6 +9,6 @@ jq==1.7.0
 json_delta>=2.0.2
 kubernetes==11.0.0
 python-json-logger==2.0.7
-requests==2.32.2
+requests==2.32.4
 stups-tokens>=1.1.19
 werkzeug==3.0.6
