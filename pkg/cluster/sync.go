@@ -97,6 +97,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
+
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
@@ -112,8 +117,8 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	c.logger.Debug("syncing pod disruption budgets")
-	if err = c.syncPodDisruptionBudget(false); err != nil {
-		err = fmt.Errorf("could not sync pod disruption budget: %v", err)
+	if err = c.syncPodDisruptionBudgets(false); err != nil {
+		err = fmt.Errorf("could not sync pod disruption budgets: %v", err)
 		return err
 	}
 
@@ -148,7 +153,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
-	if len(c.Spec.Streams) > 0 {
+	// sync if manifest stream count is different from stream CR count
+	// it can be that they are always different due to grouping of manifest streams
+	// but we would catch missed removals on update
+	if len(c.Spec.Streams) != len(c.Streams) {
 		c.logger.Debug("syncing streams")
 		if err = c.syncStreams(); err != nil {
 			err = fmt.Errorf("could not sync streams: %v", err)
@@ -230,7 +238,7 @@ func (c *Cluster) syncPatroniConfigMap(suffix string) error {
 		maps.Copy(annotations, cm.Annotations)
 		// Patroni can add extra annotations so incl. current annotations in desired annotations
 		desiredAnnotations := c.annotationsSet(cm.Annotations)
-		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for %s config map: %v", configMapName, err)
@@ -275,7 +283,7 @@ func (c *Cluster) syncPatroniEndpoint(suffix string) error {
 		maps.Copy(annotations, ep.Annotations)
 		// Patroni can add extra annotations so incl. current annotations in desired annotations
 		desiredAnnotations := c.annotationsSet(ep.Annotations)
-		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for %s endpoint: %v", endpointName, err)
@@ -320,7 +328,7 @@ func (c *Cluster) syncPatroniService() error {
 		maps.Copy(annotations, svc.Annotations)
 		// Patroni can add extra annotations so incl. current annotations in desired annotations
 		desiredAnnotations := c.annotationsSet(svc.Annotations)
-		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations); changed {
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for %s service: %v", serviceName, err)
@@ -412,7 +420,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 				return fmt.Errorf("could not update %s endpoint: %v", role, err)
 			}
 		} else {
-			if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations); changed {
+			if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations, nil); changed {
 				patchData, err := metaAnnotationsPatch(desiredEp.Annotations)
 				if err != nil {
 					return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
@@ -447,22 +455,22 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	return nil
 }
 
-func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
+func (c *Cluster) syncPrimaryPodDisruptionBudget(isUpdate bool) error {
 	var (
 		pdb *policyv1.PodDisruptionBudget
 		err error
 	)
-	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
-		c.PodDisruptionBudget = pdb
-		newPDB := c.generatePodDisruptionBudget()
+	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.PrimaryPodDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
+		c.PrimaryPodDisruptionBudget = pdb
+		newPDB := c.generatePrimaryPodDisruptionBudget()
 		match, reason := c.comparePodDisruptionBudget(pdb, newPDB)
 		if !match {
 			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
-			if err = c.updatePodDisruptionBudget(newPDB); err != nil {
+			if err = c.updatePrimaryPodDisruptionBudget(newPDB); err != nil {
 				return err
 			}
 		} else {
-			c.PodDisruptionBudget = pdb
+			c.PrimaryPodDisruptionBudget = pdb
 		}
 		return nil
 
@@ -471,21 +479,74 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 		return fmt.Errorf("could not get pod disruption budget: %v", err)
 	}
 	// no existing pod disruption budget, create new one
-	c.logger.Infof("could not find the cluster's pod disruption budget")
+	c.logger.Infof("could not find the primary pod disruption budget")
 
-	if pdb, err = c.createPodDisruptionBudget(); err != nil {
+	if err = c.createPrimaryPodDisruptionBudget(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not create pod disruption budget: %v", err)
+			return fmt.Errorf("could not create primary pod disruption budget: %v", err)
 		}
 		c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
-		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
+		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.PrimaryPodDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
 		}
 	}
 
-	c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
-	c.PodDisruptionBudget = pdb
+	return nil
+}
 
+func (c *Cluster) syncCriticalOpPodDisruptionBudget(isUpdate bool) error {
+	var (
+		pdb *policyv1.PodDisruptionBudget
+		err error
+	)
+	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
+		c.CriticalOpPodDisruptionBudget = pdb
+		newPDB := c.generateCriticalOpPodDisruptionBudget()
+		match, reason := c.comparePodDisruptionBudget(pdb, newPDB)
+		if !match {
+			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
+			if err = c.updateCriticalOpPodDisruptionBudget(newPDB); err != nil {
+				return err
+			}
+		} else {
+			c.CriticalOpPodDisruptionBudget = pdb
+		}
+		return nil
+
+	}
+	if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get pod disruption budget: %v", err)
+	}
+	// no existing pod disruption budget, create new one
+	c.logger.Infof("could not find pod disruption budget for critical operations")
+
+	if err = c.createCriticalOpPodDisruptionBudget(); err != nil {
+		if !k8sutil.ResourceAlreadyExists(err) {
+			return fmt.Errorf("could not create pod disruption budget for critical operations: %v", err)
+		}
+		c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
+		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPodDisruptionBudgets(isUpdate bool) error {
+	errors := make([]string, 0)
+
+	if err := c.syncPrimaryPodDisruptionBudget(isUpdate); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	if err := c.syncCriticalOpPodDisruptionBudget(isUpdate); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
 	return nil
 }
 
@@ -497,6 +558,7 @@ func (c *Cluster) syncStatefulSet() error {
 	)
 	podsToRecreate := make([]v1.Pod, 0)
 	isSafeToRecreatePods := true
+	postponeReasons := make([]string, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
 
 	pods, err := c.listPods()
@@ -561,13 +623,22 @@ func (c *Cluster) syncStatefulSet() error {
 
 		cmp := c.compareStatefulSetWith(desiredSts)
 		if !cmp.rollingUpdate {
+			updatedPodAnnotations := map[string]*string{}
+			for _, anno := range cmp.deletedPodAnnotations {
+				updatedPodAnnotations[anno] = nil
+			}
+			for anno, val := range desiredSts.Spec.Template.Annotations {
+				updatedPodAnnotations[anno] = &val
+			}
+			metadataReq := map[string]map[string]map[string]*string{"metadata": {"annotations": updatedPodAnnotations}}
+			patch, err := json.Marshal(metadataReq)
+			if err != nil {
+				return fmt.Errorf("could not form patch for pod annotations: %v", err)
+			}
+
 			for _, pod := range pods {
-				if changed, _ := c.compareAnnotations(pod.Annotations, desiredSts.Spec.Template.Annotations); changed {
-					patchData, err := metaAnnotationsPatch(desiredSts.Spec.Template.Annotations)
-					if err != nil {
-						return fmt.Errorf("could not form patch for pod %q annotations: %v", pod.Name, err)
-					}
-					_, err = c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+				if changed, _ := c.compareAnnotations(pod.Annotations, desiredSts.Spec.Template.Annotations, nil); changed {
+					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
 					if err != nil {
 						return fmt.Errorf("could not patch annotations for pod %q: %v", pod.Name, err)
 					}
@@ -646,12 +717,14 @@ func (c *Cluster) syncStatefulSet() error {
 	c.logger.Debug("syncing Patroni config")
 	if configPatched, restartPrimaryFirst, restartWait, err = c.syncPatroniConfig(pods, c.Spec.Patroni, requiredPgParameters); err != nil {
 		c.logger.Warningf("Patroni config updated? %v - errors during config sync: %v", configPatched, err)
+		postponeReasons = append(postponeReasons, "errors during Patroni config sync")
 		isSafeToRecreatePods = false
 	}
 
 	// restart Postgres where it is still pending
 	if err = c.restartInstances(pods, restartWait, restartPrimaryFirst); err != nil {
 		c.logger.Errorf("errors while restarting Postgres in pods via Patroni API: %v", err)
+		postponeReasons = append(postponeReasons, "errors while restarting Postgres via Patroni API")
 		isSafeToRecreatePods = false
 	}
 
@@ -666,7 +739,7 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 		} else {
-			c.logger.Warningf("postpone pod recreation until next sync because of errors during config sync")
+			c.logger.Warningf("postpone pod recreation until next sync - reason: %s", strings.Join(postponeReasons, `', '`))
 		}
 	}
 
@@ -1142,7 +1215,7 @@ func (c *Cluster) updateSecret(
 		c.Secrets[secret.UID] = secret
 	}
 
-	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations); changed {
+	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations, nil); changed {
 		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
 		if err != nil {
 			return fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
@@ -1587,19 +1660,38 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			}
 			c.logger.Infof("logical backup job %s updated", c.getLogicalBackupJobName())
 		}
-		if match, reason := c.compareLogicalBackupJob(job, desiredJob); !match {
+		if cmp := c.compareLogicalBackupJob(job, desiredJob); !cmp.match {
 			c.logger.Infof("logical job %s is not in the desired state and needs to be updated",
 				c.getLogicalBackupJobName(),
 			)
-			if reason != "" {
-				c.logger.Infof("reason: %s", reason)
+			if len(cmp.reasons) != 0 {
+				for _, reason := range cmp.reasons {
+					c.logger.Infof("reason: %s", reason)
+				}
+			}
+			if len(cmp.deletedPodAnnotations) != 0 {
+				templateMetadataReq := map[string]map[string]map[string]map[string]map[string]map[string]map[string]*string{
+					"spec": {"jobTemplate": {"spec": {"template": {"metadata": {"annotations": {}}}}}}}
+				for _, anno := range cmp.deletedPodAnnotations {
+					templateMetadataReq["spec"]["jobTemplate"]["spec"]["template"]["metadata"]["annotations"][anno] = nil
+				}
+				patch, err := json.Marshal(templateMetadataReq)
+				if err != nil {
+					return fmt.Errorf("could not marshal ObjectMeta for logical backup job %q pod template: %v", jobName, err)
+				}
+
+				job, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "")
+				if err != nil {
+					c.logger.Errorf("failed to remove annotations from the logical backup job %q pod template: %v", jobName, err)
+					return err
+				}
 			}
 			if err = c.patchLogicalBackupJob(desiredJob); err != nil {
 				return fmt.Errorf("could not update logical backup job to match desired state: %v", err)
 			}
 			c.logger.Info("the logical backup job is synced")
 		}
-		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations); changed {
+		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredJob.Annotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for the logical backup job %q: %v", jobName, err)

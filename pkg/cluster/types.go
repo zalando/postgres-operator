@@ -58,15 +58,16 @@ type WorkerStatus struct {
 
 // ClusterStatus describes status of the cluster
 type ClusterStatus struct {
-	Team                string
-	Cluster             string
-	Namespace           string
-	MasterService       *v1.Service
-	ReplicaService      *v1.Service
-	MasterEndpoint      *v1.Endpoints
-	ReplicaEndpoint     *v1.Endpoints
-	StatefulSet         *appsv1.StatefulSet
-	PodDisruptionBudget *policyv1.PodDisruptionBudget
+	Team                          string
+	Cluster                       string
+	Namespace                     string
+	MasterService                 *v1.Service
+	ReplicaService                *v1.Service
+	MasterEndpoint                *v1.Endpoints
+	ReplicaEndpoint               *v1.Endpoints
+	StatefulSet                   *appsv1.StatefulSet
+	PrimaryPodDisruptionBudget    *policyv1.PodDisruptionBudget
+	CriticalOpPodDisruptionBudget *policyv1.PodDisruptionBudget
 
 	CurrentProcess Process
 	Worker         uint32

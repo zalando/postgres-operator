@@ -247,18 +247,18 @@ func createPods(cluster *Cluster) []v1.Pod {
 	for i, role := range []PostgresRole{Master, Replica} {
 		podsList = append(podsList, v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-%d", clusterName, i),
+				Name:      fmt.Sprintf("%s-%d", cluster.Name, i),
 				Namespace: namespace,
 				Labels: map[string]string{
 					"application":  "spilo",
-					"cluster-name": clusterName,
+					"cluster-name": cluster.Name,
 					"spilo-role":   string(role),
 				},
 			},
 		})
 		podsList = append(podsList, v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-pooler-%s", clusterName, role),
+				Name:      fmt.Sprintf("%s-pooler-%s", cluster.Name, role),
 				Namespace: namespace,
 				Labels:    cluster.connectionPoolerLabels(role, true).MatchLabels,
 			},
@@ -329,7 +329,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 	if err != nil {
 		return nil, err
 	}
-	_, err = cluster.createPodDisruptionBudget()
+	err = cluster.createPodDisruptionBudgets()
 	if err != nil {
 		return nil, err
 	}
@@ -705,8 +705,8 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster.Spec.MaintenanceWindows = tt.windows
-			if isInMainternanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
-				t.Errorf("Expected isInMainternanceWindow to return %t", tt.expected)
+			if isInMaintenanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
+				t.Errorf("Expected isInMaintenanceWindow to return %t", tt.expected)
 			}
 		})
 	}
