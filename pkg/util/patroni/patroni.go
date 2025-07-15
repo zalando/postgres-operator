@@ -26,6 +26,7 @@ const (
 	statusPath     = "/patroni"
 	restartPath    = "/restart"
 	ApiPort        = 8008
+	ApiPortName    = "patroni"
 	timeout        = 30 * time.Second
 )
 
