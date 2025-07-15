@@ -122,6 +122,9 @@ type ControllerConfig struct {
 	IgnoredAnnotations   []string
 
 	EnableJsonLogging bool
+
+	KubeQPS   int
+	KubeBurst int
 }
 
 // cached value for the GetOperatorNamespace

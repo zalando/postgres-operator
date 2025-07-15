@@ -134,7 +134,7 @@ type Volume struct {
 	Size          string                `json:"size"`
 	StorageClass  string                `json:"storageClass,omitempty"`
 	SubPath       string                `json:"subPath,omitempty"`
-	IsSubPathExpr *bool                 `json:"isSubPathExpr,omitemtpy"`
+	IsSubPathExpr *bool                 `json:"isSubPathExpr,omitempty"`
 	Iops          *int64                `json:"iops,omitempty"`
 	Throughput    *int64                `json:"throughput,omitempty"`
 	VolumeType    string                `json:"type,omitempty"`
@@ -145,7 +145,7 @@ type AdditionalVolume struct {
 	Name             string          `json:"name"`
 	MountPath        string          `json:"mountPath"`
 	SubPath          string          `json:"subPath,omitempty"`
-	IsSubPathExpr    *bool           `json:"isSubPathExpr,omitemtpy"`
+	IsSubPathExpr    *bool           `json:"isSubPathExpr,omitempty"`
 	TargetContainers []string        `json:"targetContainers"`
 	VolumeSource     v1.VolumeSource `json:"volumeSource"`
 }
@@ -221,6 +221,7 @@ type Sidecar struct {
 	DockerImage string             `json:"image,omitempty"`
 	Ports       []v1.ContainerPort `json:"ports,omitempty"`
 	Env         []v1.EnvVar        `json:"env,omitempty"`
+	Command     []string           `json:"command,omitempty"`
 }
 
 // UserFlags defines flags (such as superuser, nologin) that could be assigned to individual users
@@ -298,6 +299,8 @@ type Stream struct {
 	Tables         map[string]StreamTable `json:"tables"`
 	Filter         map[string]*string     `json:"filter,omitempty"`
 	BatchSize      *uint32                `json:"batchSize,omitempty"`
+	CPU            *string                `json:"cpu,omitempty"`
+	Memory         *string                `json:"memory,omitempty"`
 	EnableRecovery *bool                  `json:"enableRecovery,omitempty"`
 }
 
@@ -305,6 +308,7 @@ type Stream struct {
 type StreamTable struct {
 	EventType         string  `json:"eventType"`
 	RecoveryEventType string  `json:"recoveryEventType,omitempty"`
+	IgnoreRecovery    *bool   `json:"ignoreRecovery,omitempty"`
 	IdColumn          *string `json:"idColumn,omitempty"`
 	PayloadColumn     *string `json:"payloadColumn,omitempty"`
 }

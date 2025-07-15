@@ -16,16 +16,27 @@ import (
 	"github.com/zalando/postgres-operator/mocks"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	k8sFake "k8s.io/client-go/kubernetes/fake"
 )
 
 var externalAnnotations = map[string]string{"existing": "annotation"}
+
+func mustParseTime(s string) metav1.Time {
+	v, err := time.Parse("15:04", s)
+	if err != nil {
+		panic(err)
+	}
+
+	return metav1.Time{Time: v.UTC()}
+}
 
 func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset) {
 	clientSet := k8sFake.NewSimpleClientset()
@@ -40,8 +51,10 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset
 		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
 		PersistentVolumesGetter:      clientSet.CoreV1(),
 		EndpointsGetter:              clientSet.CoreV1(),
+		ConfigMapsGetter:             clientSet.CoreV1(),
 		PodsGetter:                   clientSet.CoreV1(),
 		DeploymentsGetter:            clientSet.AppsV1(),
+		CronJobsGetter:               clientSet.BatchV1(),
 	}, clientSet
 }
 
@@ -56,12 +69,8 @@ func checkResourcesInheritedAnnotations(cluster *Cluster, resultAnnotations map[
 	clusterOptions := clusterLabelsOptions(cluster)
 	// helper functions
 	containsAnnotations := func(expected map[string]string, actual map[string]string, objName string, objType string) error {
-		if expected == nil {
-			if len(actual) != 0 {
-				return fmt.Errorf("%s %v expected not to have any annotations, got: %#v", objType, objName, actual)
-			}
-		} else if !(reflect.DeepEqual(expected, actual)) {
-			return fmt.Errorf("%s %v expected annotations: %#v, got: %#v", objType, objName, expected, actual)
+		if !util.MapContains(actual, expected) {
+			return fmt.Errorf("%s %v expected annotations %#v to be contained in %#v", objType, objName, expected, actual)
 		}
 		return nil
 	}
@@ -167,6 +176,22 @@ func checkResourcesInheritedAnnotations(cluster *Cluster, resultAnnotations map[
 		return nil
 	}
 
+	checkCronJob := func(annotations map[string]string) error {
+		cronJobList, err := cluster.KubeClient.CronJobs(namespace).List(context.TODO(), clusterOptions)
+		if err != nil {
+			return err
+		}
+		for _, cronJob := range cronJobList.Items {
+			if err := containsAnnotations(annotations, cronJob.Annotations, cronJob.ObjectMeta.Name, "Logical backup cron job"); err != nil {
+				return err
+			}
+			if err := containsAnnotations(updateAnnotations(annotations), cronJob.Spec.JobTemplate.Spec.Template.Annotations, cronJob.Name, "Logical backup cron job pod template"); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	checkSecrets := func(annotations map[string]string) error {
 		secretList, err := cluster.KubeClient.Secrets(namespace).List(context.TODO(), clusterOptions)
 		if err != nil {
@@ -193,8 +218,21 @@ func checkResourcesInheritedAnnotations(cluster *Cluster, resultAnnotations map[
 		return nil
 	}
 
+	checkConfigMaps := func(annotations map[string]string) error {
+		cmList, err := cluster.KubeClient.ConfigMaps(namespace).List(context.TODO(), clusterOptions)
+		if err != nil {
+			return err
+		}
+		for _, cm := range cmList.Items {
+			if err := containsAnnotations(annotations, cm.Annotations, cm.ObjectMeta.Name, "ConfigMap"); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	checkFuncs := []func(map[string]string) error{
-		checkSts, checkPods, checkSvc, checkPdb, checkPooler, checkPvc, checkSecrets, checkEndpoints,
+		checkSts, checkPods, checkSvc, checkPdb, checkPooler, checkCronJob, checkPvc, checkSecrets, checkEndpoints, checkConfigMaps,
 	}
 	for _, f := range checkFuncs {
 		if err := f(resultAnnotations); err != nil {
@@ -209,18 +247,18 @@ func createPods(cluster *Cluster) []v1.Pod {
 	for i, role := range []PostgresRole{Master, Replica} {
 		podsList = append(podsList, v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-%d", clusterName, i),
+				Name:      fmt.Sprintf("%s-%d", cluster.Name, i),
 				Namespace: namespace,
 				Labels: map[string]string{
 					"application":  "spilo",
-					"cluster-name": clusterName,
+					"cluster-name": cluster.Name,
 					"spilo-role":   string(role),
 				},
 			},
 		})
 		podsList = append(podsList, v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-pooler-%s", clusterName, role),
+				Name:      fmt.Sprintf("%s-pooler-%s", cluster.Name, role),
 				Namespace: namespace,
 				Labels:    cluster.connectionPoolerLabels(role, true).MatchLabels,
 			},
@@ -242,6 +280,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		Spec: acidv1.PostgresSpec{
 			EnableConnectionPooler:        boolToPointer(true),
 			EnableReplicaConnectionPooler: boolToPointer(true),
+			EnableLogicalBackup:           true,
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
@@ -254,6 +293,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 			OpConfig: config.Config{
 				PatroniAPICheckInterval: time.Duration(1),
 				PatroniAPICheckTimeout:  time.Duration(5),
+				KubernetesUseConfigMaps: true,
 				ConnectionPooler: config.ConnectionPooler{
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
@@ -289,11 +329,15 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 	if err != nil {
 		return nil, err
 	}
-	_, err = cluster.createPodDisruptionBudget()
+	err = cluster.createPodDisruptionBudgets()
 	if err != nil {
 		return nil, err
 	}
 	_, err = cluster.createConnectionPooler(mockInstallLookupFunction)
+	if err != nil {
+		return nil, err
+	}
+	err = cluster.createLogicalBackupJob()
 	if err != nil {
 		return nil, err
 	}
@@ -312,11 +356,60 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		}
 	}
 
+	// resources which Patroni creates
+	if err = createPatroniResources(cluster); err != nil {
+		return nil, err
+	}
+
 	return cluster, nil
+}
+
+func createPatroniResources(cluster *Cluster) error {
+	patroniService := cluster.generateService(Replica, &pg.Spec)
+	patroniService.ObjectMeta.Name = cluster.serviceName(Patroni)
+	_, err := cluster.KubeClient.Services(namespace).Create(context.TODO(), patroniService, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, suffix := range patroniObjectSuffixes {
+		metadata := metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%s", clusterName, suffix),
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"initialize": "123456789",
+			},
+			Labels: cluster.labelsSet(false),
+		}
+
+		if cluster.OpConfig.KubernetesUseConfigMaps {
+			configMap := v1.ConfigMap{
+				ObjectMeta: metadata,
+			}
+			_, err := cluster.KubeClient.ConfigMaps(namespace).Create(context.TODO(), &configMap, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+		} else {
+			endpoints := v1.Endpoints{
+				ObjectMeta: metadata,
+			}
+			_, err := cluster.KubeClient.Endpoints(namespace).Create(context.TODO(), &endpoints, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func annotateResources(cluster *Cluster) error {
 	clusterOptions := clusterLabelsOptions(cluster)
+	patchData, err := metaAnnotationsPatch(externalAnnotations)
+	if err != nil {
+		return err
+	}
 
 	stsList, err := cluster.KubeClient.StatefulSets(namespace).List(context.TODO(), clusterOptions)
 	if err != nil {
@@ -324,7 +417,7 @@ func annotateResources(cluster *Cluster) error {
 	}
 	for _, sts := range stsList.Items {
 		sts.Annotations = externalAnnotations
-		if _, err = cluster.KubeClient.StatefulSets(namespace).Update(context.TODO(), &sts, metav1.UpdateOptions{}); err != nil {
+		if _, err = cluster.KubeClient.StatefulSets(namespace).Patch(context.TODO(), sts.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}
@@ -335,7 +428,7 @@ func annotateResources(cluster *Cluster) error {
 	}
 	for _, pod := range podList.Items {
 		pod.Annotations = externalAnnotations
-		if _, err = cluster.KubeClient.Pods(namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{}); err != nil {
+		if _, err = cluster.KubeClient.Pods(namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}
@@ -346,7 +439,7 @@ func annotateResources(cluster *Cluster) error {
 	}
 	for _, svc := range svcList.Items {
 		svc.Annotations = externalAnnotations
-		if _, err = cluster.KubeClient.Services(namespace).Update(context.TODO(), &svc, metav1.UpdateOptions{}); err != nil {
+		if _, err = cluster.KubeClient.Services(namespace).Patch(context.TODO(), svc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}
@@ -357,7 +450,19 @@ func annotateResources(cluster *Cluster) error {
 	}
 	for _, pdb := range pdbList.Items {
 		pdb.Annotations = externalAnnotations
-		_, err = cluster.KubeClient.PodDisruptionBudgets(namespace).Update(context.TODO(), &pdb, metav1.UpdateOptions{})
+		_, err = cluster.KubeClient.PodDisruptionBudgets(namespace).Patch(context.TODO(), pdb.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if err != nil {
+			return err
+		}
+	}
+
+	cronJobList, err := cluster.KubeClient.CronJobs(namespace).List(context.TODO(), clusterOptions)
+	if err != nil {
+		return err
+	}
+	for _, cronJob := range cronJobList.Items {
+		cronJob.Annotations = externalAnnotations
+		_, err = cluster.KubeClient.CronJobs(namespace).Patch(context.TODO(), cronJob.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
 			return err
 		}
@@ -369,7 +474,7 @@ func annotateResources(cluster *Cluster) error {
 	}
 	for _, pvc := range pvcList.Items {
 		pvc.Annotations = externalAnnotations
-		if _, err = cluster.KubeClient.PersistentVolumeClaims(namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{}); err != nil {
+		if _, err = cluster.KubeClient.PersistentVolumeClaims(namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}
@@ -380,7 +485,7 @@ func annotateResources(cluster *Cluster) error {
 			return err
 		}
 		deploy.Annotations = externalAnnotations
-		if _, err = cluster.KubeClient.Deployments(namespace).Update(context.TODO(), deploy, metav1.UpdateOptions{}); err != nil {
+		if _, err = cluster.KubeClient.Deployments(namespace).Patch(context.TODO(), deploy.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}
@@ -391,7 +496,7 @@ func annotateResources(cluster *Cluster) error {
 	}
 	for _, secret := range secrets.Items {
 		secret.Annotations = externalAnnotations
-		if _, err = cluster.KubeClient.Secrets(namespace).Update(context.TODO(), &secret, metav1.UpdateOptions{}); err != nil {
+		if _, err = cluster.KubeClient.Secrets(namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}
@@ -402,10 +507,22 @@ func annotateResources(cluster *Cluster) error {
 	}
 	for _, ep := range endpoints.Items {
 		ep.Annotations = externalAnnotations
-		if _, err = cluster.KubeClient.Endpoints(namespace).Update(context.TODO(), &ep, metav1.UpdateOptions{}); err != nil {
+		if _, err = cluster.KubeClient.Endpoints(namespace).Patch(context.TODO(), ep.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}
+
+	configMaps, err := cluster.KubeClient.ConfigMaps(namespace).List(context.TODO(), clusterOptions)
+	if err != nil {
+		return err
+	}
+	for _, cm := range configMaps.Items {
+		cm.Annotations = externalAnnotations
+		if _, err = cluster.KubeClient.ConfigMaps(namespace).Patch(context.TODO(), cm.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{}); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -472,7 +589,18 @@ func TestInheritedAnnotations(t *testing.T) {
 	err = checkResourcesInheritedAnnotations(cluster, result)
 	assert.NoError(t, err)
 
-	// 3. Existing annotations (should not be removed)
+	// 3. Change from ConfigMaps to Endpoints
+	err = cluster.deletePatroniResources()
+	assert.NoError(t, err)
+	cluster.OpConfig.KubernetesUseConfigMaps = false
+	err = createPatroniResources(cluster)
+	assert.NoError(t, err)
+	err = cluster.Sync(newSpec.DeepCopy())
+	assert.NoError(t, err)
+	err = checkResourcesInheritedAnnotations(cluster, result)
+	assert.NoError(t, err)
+
+	// 4. Existing annotations (should not be removed)
 	err = annotateResources(cluster)
 	assert.NoError(t, err)
 	maps.Copy(result, externalAnnotations)
@@ -517,6 +645,68 @@ func Test_trimCronjobName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := trimCronjobName(tt.args.name); got != tt.want {
 				t.Errorf("trimCronjobName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsInMaintenanceWindow(t *testing.T) {
+	now := time.Now()
+	futureTimeStart := now.Add(1 * time.Hour)
+	futureTimeStartFormatted := futureTimeStart.Format("15:04")
+	futureTimeEnd := now.Add(2 * time.Hour)
+	futureTimeEndFormatted := futureTimeEnd.Format("15:04")
+
+	tests := []struct {
+		name     string
+		windows  []acidv1.MaintenanceWindow
+		expected bool
+	}{
+		{
+			name:     "no maintenance windows",
+			windows:  nil,
+			expected: true,
+		},
+		{
+			name: "maintenance windows with everyday",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Everyday:  true,
+					StartTime: mustParseTime("00:00"),
+					EndTime:   mustParseTime("23:59"),
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "maintenance windows with weekday",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime("00:00"),
+					EndTime:   mustParseTime("23:59"),
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "maintenance windows with future interval time",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime(futureTimeStartFormatted),
+					EndTime:   mustParseTime(futureTimeEndFormatted),
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster.Spec.MaintenanceWindows = tt.windows
+			if isInMaintenanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
+				t.Errorf("Expected isInMaintenanceWindow to return %t", tt.expected)
 			}
 		})
 	}

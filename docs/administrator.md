@@ -63,14 +63,17 @@ the `PGVERSION` environment variable is set for the database pods. Since
 `v1.6.0` the related option `enable_pgversion_env_var` is enabled by default.
 
 In-place major version upgrades can be configured to be executed by the
-operator with the `major_version_upgrade_mode` option. By default it is set
-to `off` which means the cluster version will not change when increased in
-the manifest. Still, a rolling update would be triggered updating the
-`PGVERSION` variable. But Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
-script will notice the version mismatch and start the old version again.
+operator with the `major_version_upgrade_mode` option. By default, it is
+enabled (mode: `manual`). In any case, altering the version in the manifest
+will trigger a rolling update of pods to update the `PGVERSION` env variable.
+Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
+script will notice the version mismatch but start the current version again.
 
-In this scenario the major version could then be run by a user from within the
-master pod. Exec into the container and run:
+Next, the operator would call an updage script inside Spilo. When automatic
+upgrades are disabled (mode: `off`) the upgrade could still be run by a user
+from within the primary pod. This gives you full control about the point in
+time when the upgrade can be started (check also maintenance windows below).
+Exec into the container and run:
 ```bash
 python3 /scripts/inplace_upgrade.py N
 ```
@@ -79,8 +82,32 @@ The upgrade is usually fast, well under one minute for most DBs. Note, that
 changes become irrevertible once `pg_upgrade` is called. To understand the
 upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/zalando/spilo/pull/488).
 
-When `major_version_upgrade_mode` is set to `manual` the operator will run
-the upgrade script for you after the manifest is updated and pods are rotated.
+When `major_version_upgrade_mode` is set to `full` the operator will compare
+the version in the manifest with the configured `minimal_major_version`. If it
+is lower the operator would start an automatic upgrade as described above. The
+configured `major_target_version` will be used as the new version. This option
+can be useful if you have to get rid of outdated major versions in your fleet.
+Please note, that the operator does not patch the version in the manifest.
+Thus, the `full` mode can create drift between desired and actual state.
+
+### Upgrade during maintenance windows
+
+When `maintenanceWindows` are defined in the Postgres manifest the operator
+will trigger a major version upgrade only during these periods. Make sure they
+are at least twice as long as your configured `resync_period` to guarantee
+that operator actions can be triggered.
+
+### Upgrade annotations
+
+When an upgrade is executed, the operator sets an annotation in the PostgreSQL
+resource, either `last-major-upgrade-success` if the upgrade succeeds, or
+`last-major-upgrade-failure` if it fails. The value of the annotation is a
+timestamp indicating when the upgrade occurred.
+
+If a PostgreSQL resource contains a failure annotation, the operator will not
+attempt to retry the upgrade during a sync event. To remove the failure
+annotation, you can revert the PostgreSQL version back to the current version.
+This action will trigger the removal of the failure annotation.
 
 ## Non-default cluster domain
 
@@ -223,9 +250,9 @@ configuration:
 
 Now, every cluster manifest must contain the configured annotation keys to
 trigger the delete process when running `kubectl delete pg`. Note, that the
-`Postgresql` resource would still get deleted as K8s' API server does not
-block it. Only the operator logs will tell, that the delete criteria wasn't
-met.
+`Postgresql` resource would still get deleted because the operator does not
+instruct K8s' API server to block it. Only the operator logs will tell, that
+the delete criteria was not met.
 
 **cluster manifest**
 
@@ -243,11 +270,64 @@ spec:
 
 In case, the resource has been deleted accidentally or the annotations were
 simply forgotten, it's safe to recreate the cluster with `kubectl create`.
-Existing Postgres cluster are not replaced by the operator. But, as the
-original cluster still exists the status will show `CreateFailed` at first.
-On the next sync event it should change to `Running`. However, as it is in
-fact a new resource for K8s, the UID will differ which can trigger a rolling
-update of the pods because the UID is used as part of backup path to S3.
+Existing Postgres cluster are not replaced by the operator. But, when the
+original cluster still exists the status will be `CreateFailed` at first. On
+the next sync event it should change to `Running`. However, because it is in
+fact a new resource for K8s, the UID and therefore, the backup path to S3,
+will differ and trigger a rolling update of the pods.
+
+## Owner References and Finalizers
+
+The Postgres Operator can set [owner references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/) to most of a cluster's child resources to improve
+monitoring with GitOps tools and enable cascading deletes. There are two
+exceptions:
+
+* Persistent Volume Claims, because they are handled by the [PV Reclaim Policy]https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/ of the Stateful Set
+* Cross-namespace secrets, because owner references are not allowed across namespaces by design
+
+The operator would clean these resources up with its regular delete loop
+unless they got synced correctly. If for some reason the initial cluster sync
+fails, e.g. after a cluster creation or operator restart, a deletion of the
+cluster manifest might leave orphaned resources behind which the user has to
+clean up manually.
+
+Another option is to enable finalizers which first ensures the deletion of all
+child resources before the cluster manifest gets removed. There is a trade-off
+though: The deletion is only performed after the next two operator SYNC cycles
+with the first one setting a `deletionTimestamp` and the latter reacting to it.
+The final removal of the custom resource will add a DELETE event to the worker
+queue but the child resources are already gone at this point. If you do not
+desire this behavior consider enabling owner references instead.
+
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  enable_finalizers: "false"
+  enable_owner_references: "true"
+```
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    enable_finalizers: false
+    enable_owner_references: true
+```
+
+:warning: Please note, both options are disabled by default. When enabling owner
+references the operator cannot block cascading deletes, even when the [delete protection annotations](administrator.md#delete-protection-via-annotations)
+are in place. You would need an K8s admission controller that blocks the actual
+`kubectl delete` API call e.g. based on existing annotations.
 
 ## Role-based access control for the operator
 
@@ -304,7 +384,7 @@ exceptions:
 The interval of days can be set with `password_rotation_interval` (default
 `90` = 90 days, minimum 1). On each rotation the user name and password values
 are replaced in the K8s secret. They belong to a newly created user named after
-the original role plus rotation date in YYMMDD format. All priviliges are
+the original role plus rotation date in YYMMDD format. All privileges are
 inherited meaning that migration scripts should still grant and revoke rights
 against the original role. The timestamp of the next rotation (in RFC 3339
 format, UTC timezone) is written to the secret as well. Note, if the rotation
@@ -484,7 +564,7 @@ manifest affinity.
 ```
 
 If `node_readiness_label_merge` is set to `"OR"` (default) the readiness label
-affinty will be appended with its own expressions block:
+affinity will be appended with its own expressions block:
 
 ```yaml
   affinity:
@@ -540,22 +620,34 @@ By default the topology key for the pod anti affinity is set to
 `kubernetes.io/hostname`, you can set another topology key e.g.
 `failure-domain.beta.kubernetes.io/zone`. See [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys.
 
-## Pod Disruption Budget
+## Pod Disruption Budgets
 
-By default the operator uses a PodDisruptionBudget (PDB) to protect the cluster
-from voluntarily disruptions and hence unwanted DB downtime. The `MinAvailable`
-parameter of the PDB is set to `1` which prevents killing masters in single-node
-clusters and/or the last remaining running instance in a multi-node cluster.
+By default the operator creates two PodDisruptionBudgets (PDB) to protect the cluster
+from voluntarily disruptions and hence unwanted DB downtime: so-called primary PDB and
+and PDB for critical operations.
+
+### Primary PDB
+The `MinAvailable` parameter of this PDB is set to `1` and, if `pdb_master_label_selector`
+is enabled, label selector includes `spilo-role=master` condition, which prevents killing
+masters in single-node clusters and/or the last remaining running instance in a multi-node
+cluster.
+
+## PDB for critical operations
+The `MinAvailable` parameter of this PDB is equal to the `numberOfInstances` set in the
+cluster manifest, while label selector includes `critical-operation=true` condition. This
+allows to protect all pods of a cluster, given they are labeled accordingly.
+For example, Operator labels all Spilo pods with `critical-operation=true` during the major
+version upgrade run. You may want to protect cluster pods during other critical operations
+by assigning the label to pods yourself or using other means of automation.
 
 The PDB is only relaxed in two scenarios:
 
 * If a cluster is scaled down to `0` instances (e.g. for draining nodes)
 * If the PDB is disabled in the configuration (`enable_pod_disruption_budget`)
 
-The PDB is still in place having `MinAvailable` set to `0`. If enabled it will
-be automatically set to `1` on scale up. Disabling PDBs helps avoiding blocking
-Kubernetes upgrades in managed K8s environments at the cost of prolonged DB
-downtime. See PR [#384](https://github.com/zalando/postgres-operator/pull/384)
+The PDBs are still in place having `MinAvailable` set to `0`. Disabling PDBs
+helps avoiding blocking Kubernetes upgrades in managed K8s environments at the
+cost of prolonged DB downtime. See PR [#384](https://github.com/zalando/postgres-operator/pull/384)
 for the use case.
 
 ## Add cluster-specific labels
@@ -1048,7 +1140,7 @@ metadata:
     iam.gke.io/gcp-service-account: <GCP_SERVICE_ACCOUNT_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com
 ```
 
-2. Specify the new custom service account in your [operator paramaters](./reference/operator_parameters.md)
+2. Specify the new custom service account in your [operator parameters](./reference/operator_parameters.md)
 
 If using manual deployment or kustomize, this is done by setting
 `pod_service_account_name` in your configuration file specified in the
@@ -1217,7 +1309,7 @@ aws_or_gcp:
 
 If cluster members have to be (re)initialized restoring physical backups
 happens automatically either from the backup location or by running
-[pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html)
+[pg_basebackup](https://www.postgresql.org/docs/17/app-pgbasebackup.html)
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.
@@ -1325,6 +1417,10 @@ configuration:
     volumeMounts:
     - mountPath: /custom-pgdata-mountpoint
       name: pgdata
+    env:
+      - name: "ENV_VAR_NAME"
+        value: "any-k8s-env-things"
+    command: ['sh', '-c', 'echo "logging" > /opt/logs.txt']
   - ...
 ```
 
@@ -1399,7 +1495,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t ghcr.io/zalando/postgres-operator-ui:v1.12.2 .
+docker build -t ghcr.io/zalando/postgres-operator-ui:v1.13.0 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/
