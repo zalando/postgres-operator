@@ -11,7 +11,6 @@ endif
 LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS)
 LDFLAGS ?= -X=main.version=$(VERSION)
 DOCKERDIR = docker
-DOCKER_CLI := docker
 
 IMAGE ?= registry.opensource.zalan.do/acid/$(BINARY)
 TAG ?= $(VERSION)
