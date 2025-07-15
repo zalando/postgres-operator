@@ -3,10 +3,11 @@ package v1
 import (
 	"fmt"
 
-	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
-	"github.com/zalando/postgres-operator/pkg/util"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
+	"github.com/zalando/postgres-operator/pkg/util"
 )
 
 // CRDResource* define names necesssary for the k8s CRD API
@@ -145,10 +146,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type:     "object",
 								Required: []string{"name", "mountPath", "volumeSource"},
 								Properties: map[string]apiextv1.JSONSchemaProps{
+									"isSubPathExpr": {
+										Type: "boolean",
+									},
 									"name": {
 										Type: "string",
 									},
 									"mountPath": {
+										Type: "string",
+									},
+									"subPath": {
 										Type: "string",
 									},
 									"targetContainers": {
@@ -163,9 +170,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									"volumeSource": {
 										Type:                   "object",
 										XPreserveUnknownFields: util.True(),
-									},
-									"subPath": {
-										Type: "string",
 									},
 								},
 							},
@@ -341,6 +345,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								XPreserveUnknownFields: util.True(),
 							},
 						},
+					},
+					"logicalBackupRetention": {
+						Type: "string",
 					},
 					"logicalBackupSchedule": {
 						Type:    "string",
@@ -589,15 +596,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 								Enum: []apiextv1.JSON{
 									{
-										Raw: []byte(`"10"`),
-									},
-									{
-										Raw: []byte(`"11"`),
-									},
-									{
-										Raw: []byte(`"12"`),
-									},
-									{
 										Raw: []byte(`"13"`),
 									},
 									{
@@ -605,6 +603,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									{
 										Raw: []byte(`"15"`),
+									},
+									{
+										Raw: []byte(`"16"`),
+									},
+									{
+										Raw: []byte(`"17"`),
 									},
 								},
 							},
@@ -684,6 +688,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type:    "string",
 										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 									},
+									"hugepages-2Mi": {
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+									},
+									"hugepages-1Gi": {
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+									},
 								},
 							},
 							"requests": {
@@ -694,6 +706,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 									},
 									"memory": {
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+									},
+									"hugepages-2Mi": {
+										Type:    "string",
+										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+									},
+									"hugepages-1Gi": {
 										Type:    "string",
 										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 									},
@@ -979,6 +999,15 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"usersIgnoringSecretRotation": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type: "string",
+							},
+						},
+					},
 					"usersWithInPlaceSecretRotation": {
 						Type:     "array",
 						Nullable: true,
@@ -1001,6 +1030,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type:     "object",
 						Required: []string{"size"},
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"isSubPathExpr": {
+								Type: "boolean",
+							},
 							"iops": {
 								Type: "integer",
 							},
@@ -1132,7 +1164,8 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "boolean",
 					},
 					"enable_spilo_wal_path_compat": {
-						Type: "boolean",
+						Type:        "boolean",
+						Description: "deprecated",
 					},
 					"enable_team_id_clustername_prefix": {
 						Type: "boolean",
@@ -1288,7 +1321,16 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_cross_namespace_secret": {
 								Type: "boolean",
 							},
+							"enable_finalizers": {
+								Type: "boolean",
+							},
 							"enable_init_containers": {
+								Type: "boolean",
+							},
+							"enable_owner_references": {
+								Type: "boolean",
+							},
+							"enable_persistent_volume_claim_deletion": {
 								Type: "boolean",
 							},
 							"enable_pod_antiaffinity": {
@@ -1298,6 +1340,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "boolean",
 							},
 							"enable_readiness_probe": {
+								Type: "boolean",
+							},
+							"enable_secrets_deletion": {
 								Type: "boolean",
 							},
 							"enable_sidecars": {
@@ -1393,6 +1438,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"pdb_name_format": {
 								Type: "string",
+							},
+							"pdb_master_label_selector": {
+								Type: "boolean",
 							},
 							"persistent_volume_claim_retention_policy": {
 								Type: "object",
@@ -1526,35 +1574,35 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Properties: map[string]apiextv1.JSONSchemaProps{
 							"default_cpu_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"default_cpu_request": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"default_memory_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 							"default_memory_request": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 							"max_cpu_request": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"max_memory_request": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 							"min_cpu_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$|^$",
 							},
 							"min_memory_limit": {
 								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$|^$",
 							},
 						},
 					},
@@ -1725,6 +1773,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 							},
 							"logical_backup_s3_bucket": {
+								Type: "string",
+							},
+							"logical_backup_s3_bucket_prefix": {
 								Type: "string",
 							},
 							"logical_backup_s3_endpoint": {

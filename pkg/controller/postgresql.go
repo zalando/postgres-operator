@@ -143,7 +143,7 @@ func (c *Controller) acquireInitialListOfClusters() error {
 	if list, err = c.listClusters(metav1.ListOptions{ResourceVersion: "0"}); err != nil {
 		return err
 	}
-	c.logger.Debugf("acquiring initial list of clusters")
+	c.logger.Debug("acquiring initial list of clusters")
 	for _, pg := range list.Items {
 		// XXX: check the cluster status field instead
 		if pg.Error != "" {
@@ -285,14 +285,18 @@ func (c *Controller) processEvent(event ClusterEvent) {
 			lg.Errorf("unknown cluster: %q", clusterName)
 			return
 		}
-		lg.Infoln("deletion of the cluster started")
 
 		teamName := strings.ToLower(cl.Spec.TeamID)
-
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		cl.Delete()
-		// Fixme - no error handling for delete ?
-		// c.eventRecorder.Eventf(cl.GetReference, v1.EventTypeWarning, "Delete", "%v", cl.Error)
+
+		// when using finalizers the deletion already happened
+		if c.opConfig.EnableFinalizers == nil || !*c.opConfig.EnableFinalizers {
+			lg.Infoln("deletion of the cluster started")
+			if err := cl.Delete(); err != nil {
+				cl.Error = fmt.Sprintf("could not delete cluster: %v", err)
+				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Delete", "%v", cl.Error)
+			}
+		}
 
 		func() {
 			defer c.clustersMu.Unlock()
@@ -325,16 +329,26 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		err = cl.Sync(event.NewSpec)
-		if err != nil {
-			cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
-			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Sync", "%v", cl.Error)
-			lg.Error(cl.Error)
-			return
+
+		// has this cluster been marked as deleted already, then we shall start cleaning up
+		if !cl.ObjectMeta.DeletionTimestamp.IsZero() {
+			lg.Infof("cluster has a DeletionTimestamp of %s, starting deletion now.", cl.ObjectMeta.DeletionTimestamp.Format(time.RFC3339))
+			if err = cl.Delete(); err != nil {
+				cl.Error = fmt.Sprintf("error deleting cluster and its resources: %v", err)
+				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Delete", "%v", cl.Error)
+				lg.Error(cl.Error)
+				return
+			}
+		} else {
+			if err = cl.Sync(event.NewSpec); err != nil {
+				cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
+				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Sync", "%v", cl.Error)
+				lg.Error(cl.Error)
+				return
+			}
+			lg.Infof("cluster has been synced")
 		}
 		cl.Error = ""
-
-		lg.Infof("cluster has been synced")
 	}
 }
 
@@ -347,7 +361,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	for {
-		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}) error { return nil }))
+		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}, bool) error { return nil }))
 		if err != nil {
 			if err == cache.ErrFIFOClosed {
 				return
@@ -370,19 +384,11 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.Postg
 		c.logger.Warningf("parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
 	}
 
-	noeffect := func(param string, explanation string) {
-		c.logger.Warningf("parameter %q takes no effect. %s", param, explanation)
-	}
-
 	if spec.UseLoadBalancer != nil {
 		deprecate("useLoadBalancer", "enableMasterLoadBalancer")
 	}
 	if spec.ReplicaLoadBalancer != nil {
 		deprecate("replicaLoadBalancer", "enableReplicaLoadBalancer")
-	}
-
-	if len(spec.MaintenanceWindows) > 0 {
-		noeffect("maintenanceWindows", "Not implemented.")
 	}
 
 	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
@@ -440,19 +446,22 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		clusterError = informerNewSpec.Error
 	}
 
-	// only allow deletion if delete annotations are set and conditions are met
 	if eventType == EventDelete {
-		if err := c.meetsClusterDeleteAnnotations(informerOldSpec); err != nil {
-			c.logger.WithField("cluster-name", clusterName).Warnf(
-				"ignoring %q event for cluster %q - manifest does not fulfill delete requirements: %s", eventType, clusterName, err)
-			c.logger.WithField("cluster-name", clusterName).Warnf(
-				"please, recreate Postgresql resource %q and set annotations to delete properly", clusterName)
-			if currentManifest, marshalErr := json.Marshal(informerOldSpec); marshalErr != nil {
-				c.logger.WithField("cluster-name", clusterName).Warnf("could not marshal current manifest:\n%+v", informerOldSpec)
-			} else {
-				c.logger.WithField("cluster-name", clusterName).Warnf("%s\n", string(currentManifest))
+		// when owner references are used operator cannot block deletion
+		if c.opConfig.EnableOwnerReferences == nil || !*c.opConfig.EnableOwnerReferences {
+			// only allow deletion if delete annotations are set and conditions are met
+			if err := c.meetsClusterDeleteAnnotations(informerOldSpec); err != nil {
+				c.logger.WithField("cluster-name", clusterName).Warnf(
+					"ignoring %q event for cluster %q - manifest does not fulfill delete requirements: %s", eventType, clusterName, err)
+				c.logger.WithField("cluster-name", clusterName).Warnf(
+					"please, recreate Postgresql resource %q and set annotations to delete properly", clusterName)
+				if currentManifest, marshalErr := json.Marshal(informerOldSpec); marshalErr != nil {
+					c.logger.WithField("cluster-name", clusterName).Warnf("could not marshal current manifest:\n%+v", informerOldSpec)
+				} else {
+					c.logger.WithField("cluster-name", clusterName).Warnf("%s\n", string(currentManifest))
+				}
+				return
 			}
-			return
 		}
 	}
 
@@ -560,13 +569,13 @@ func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
 }
 
 /*
-  Ensures the pod service account and role bindings exists in a namespace
-  before a PG cluster is created there so that a user does not have to deploy
-  these credentials manually.  StatefulSets require the service account to
-  create pods; Patroni requires relevant RBAC bindings to access endpoints
-  or config maps.
+Ensures the pod service account and role bindings exists in a namespace
+before a PG cluster is created there so that a user does not have to deploy
+these credentials manually.  StatefulSets require the service account to
+create pods; Patroni requires relevant RBAC bindings to access endpoints
+or config maps.
 
-  The operator does not sync accounts/role bindings after creation.
+The operator does not sync accounts/role bindings after creation.
 */
 func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 

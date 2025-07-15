@@ -102,3 +102,7 @@ e2e/tls
 *.pot
 
 mocks
+
+ui/.npm/
+
+.DS_Store

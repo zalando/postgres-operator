@@ -25,6 +25,7 @@ type CRD struct {
 
 // Resources describes kubernetes resource specific configuration parameters
 type Resources struct {
+	EnableOwnerReferences         *bool               `name:"enable_owner_references" default:"false"`
 	ResourceCheckInterval         time.Duration       `name:"resource_check_interval" default:"3s"`
 	ResourceCheckTimeout          time.Duration       `name:"resource_check_timeout" default:"10m"`
 	PodLabelWaitTimeout           time.Duration       `name:"pod_label_wait_timeout" default:"10m"`
@@ -48,12 +49,12 @@ type Resources struct {
 	DeleteAnnotationNameKey       string              `name:"delete_annotation_name_key"`
 	PodRoleLabel                  string              `name:"pod_role_label" default:"spilo-role"`
 	PodToleration                 map[string]string   `name:"toleration" default:""`
-	DefaultCPURequest             string              `name:"default_cpu_request" default:"100m"`
-	DefaultMemoryRequest          string              `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit               string              `name:"default_cpu_limit" default:"1"`
-	DefaultMemoryLimit            string              `name:"default_memory_limit" default:"500Mi"`
-	MinCPULimit                   string              `name:"min_cpu_limit" default:"250m"`
-	MinMemoryLimit                string              `name:"min_memory_limit" default:"250Mi"`
+	DefaultCPURequest             string              `name:"default_cpu_request"`
+	DefaultMemoryRequest          string              `name:"default_memory_request"`
+	DefaultCPULimit               string              `name:"default_cpu_limit"`
+	DefaultMemoryLimit            string              `name:"default_memory_limit"`
+	MinCPULimit                   string              `name:"min_cpu_limit"`
+	MinMemoryLimit                string              `name:"min_memory_limit"`
 	MaxCPURequest                 string              `name:"max_cpu_request"`
 	MaxMemoryRequest              string              `name:"max_memory_request"`
 	PodEnvironmentConfigMap       spec.NamespacedName `name:"pod_environment_configmap"`
@@ -70,17 +71,17 @@ type Resources struct {
 type InfrastructureRole struct {
 	// Name of a secret which describes the role, and optionally name of a
 	// configmap with an extra information
-	SecretName spec.NamespacedName
+	SecretName spec.NamespacedName `json:"secretname,omitempty"`
 
-	UserKey     string
-	PasswordKey string
-	RoleKey     string
+	UserKey     string `json:"userkey,omitempty"`
+	PasswordKey string `json:"passwordkey,omitempty"`
+	RoleKey     string `json:"rolekey,omitempty"`
 
-	DefaultUserValue string
-	DefaultRoleValue string
+	DefaultUserValue string `json:"defaultuservalue,omitempty"`
+	DefaultRoleValue string `json:"defaultrolevalue,omitempty"`
 
 	// This field point out the detailed yaml definition of the role, if exists
-	Details string
+	Details string `json:"details,omitempty"`
 
 	// Specify if a secret contains multiple fields in the following format:
 	//
@@ -91,7 +92,7 @@ type InfrastructureRole struct {
 	// If it does, Name/Password/Role are interpreted not as unique field
 	// names, but as a template.
 
-	Template bool
+	Template bool `json:"template,omitempty"`
 }
 
 // Auth describes authentication specific configuration parameters
@@ -126,12 +127,13 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.10.1"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
 	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
 	LogicalBackupAzureStorageAccountKey       string `name:"logical_backup_azure_storage_account_key" default:""`
 	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3BucketPrefix               string `name:"logical_backup_s3_bucket_prefix" default:"spilo"`
 	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
 	LogicalBackupS3Endpoint                   string `name:"logical_backup_s3_endpoint" default:""`
 	LogicalBackupS3AccessKeyID                string `name:"logical_backup_s3_access_key_id" default:""`
@@ -155,10 +157,10 @@ type ConnectionPooler struct {
 	Image                                string `name:"connection_pooler_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
 	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
 	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
-	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request" default:"500m"`
-	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request" default:"100Mi"`
-	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit" default:"1"`
-	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit" default:"100Mi"`
+	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request"`
+	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request"`
+	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit"`
+	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit"`
 }
 
 // Config describes operator config
@@ -173,7 +175,7 @@ type Config struct {
 	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
 	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"ghcr.io/zalando/spilo-15:3.0-p1"`
+	DockerImage             string            `name:"docker_image" default:"ghcr.io/zalando/spilo-17:4.0-p2"`
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
@@ -190,7 +192,7 @@ type Config struct {
 	GCPCredentials                           string            `name:"gcp_credentials"`
 	WALAZStorageAccount                      string            `name:"wal_az_storage_account"`
 	AdditionalSecretMount                    string            `name:"additional_secret_mount"`
-	AdditionalSecretMountPath                string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
+	AdditionalSecretMountPath                string            `name:"additional_secret_mount_path"`
 	EnableEBSGp3Migration                    bool              `name:"enable_ebs_gp3_migration" default:"false"`
 	EnableEBSGp3MigrationMaxSize             int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
 	DebugLogging                             bool              `name:"debug_logging" default:"true"`
@@ -220,6 +222,7 @@ type Config struct {
 	ReplicaDNSNameFormat                     StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{namespace}.{hostedzone}"`
 	ReplicaLegacyDNSNameFormat               StringTemplate    `name:"replica_legacy_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat                            StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	PDBMasterLabelSelector                   *bool             `name:"pdb_master_label_selector" default:"true"`
 	EnablePodDisruptionBudget                *bool             `name:"enable_pod_disruption_budget" default:"true"`
 	EnableInitContainers                     *bool             `name:"enable_init_containers" default:"true"`
 	EnableSidecars                           *bool             `name:"enable_sidecars" default:"true"`
@@ -237,16 +240,19 @@ type Config struct {
 	SetMemoryRequestToLimit                  bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                   bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 	EnableCrossNamespaceSecret               bool              `name:"enable_cross_namespace_secret" default:"false"`
+	EnableFinalizers                         *bool             `name:"enable_finalizers" default:"false"`
 	EnablePgVersionEnvVar                    bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat                 bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`
-	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"off"`
+	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"manual"`
 	MajorVersionUpgradeTeamAllowList         []string          `name:"major_version_upgrade_team_allow_list" default:""`
-	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"11"`
-	TargetMajorVersion                       string            `name:"target_major_version" default:"15"`
+	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"13"`
+	TargetMajorVersion                       string            `name:"target_major_version" default:"17"`
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
+	EnableSecretsDeletion                    *bool             `name:"enable_secrets_deletion" default:"true"`
+	EnablePersistentVolumeClaimDeletion      *bool             `name:"enable_persistent_volume_claim_deletion" default:"true"`
 	PersistentVolumeClaimRetentionPolicy     map[string]string `name:"persistent_volume_claim_retention_policy" default:"when_deleted:retain,when_scaled:retain"`
 }
 

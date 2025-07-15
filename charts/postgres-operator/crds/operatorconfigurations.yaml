@@ -68,7 +68,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "ghcr.io/zalando/spilo-15:3.0-p1"
+                default: "ghcr.io/zalando/spilo-17:4.0-p2"
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -160,17 +160,17 @@ spec:
                 properties:
                   major_version_upgrade_mode:
                     type: string
-                    default: "off"
+                    default: "manual"
                   major_version_upgrade_team_allow_list:
                     type: array
                     items:
                       type: string
                   minimal_major_version:
                     type: string
-                    default: "11"
+                    default: "13"
                   target_major_version:
                     type: string
-                    default: "15"
+                    default: "17"
               kubernetes:
                 type: object
                 properties:
@@ -205,7 +205,16 @@ spec:
                   enable_cross_namespace_secret:
                     type: boolean
                     default: false
+                  enable_finalizers:
+                    type: boolean
+                    default: false
                   enable_init_containers:
+                    type: boolean
+                    default: true
+                  enable_owner_references:
+                    type: boolean
+                    default: false
+                  enable_persistent_volume_claim_deletion:
                     type: boolean
                     default: true
                   enable_pod_antiaffinity:
@@ -217,6 +226,9 @@ spec:
                   enable_readiness_probe:
                     type: boolean
                     default: false
+                  enable_secrets_deletion:
+                    type: boolean
+                    default: true
                   enable_sidecars:
                     type: boolean
                     default: true
@@ -275,6 +287,9 @@ spec:
                   oauth_token_secret_name:
                     type: string
                     default: "postgresql-operator"
+                  pdb_master_label_selector:
+                    type: boolean
+                    default: true
                   pdb_name_format:
                     type: string
                     default: "postgres-{cluster}-pdb"
@@ -361,34 +376,28 @@ spec:
                 properties:
                   default_cpu_limit:
                     type: string
-                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "1"
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$|^$'
                   default_cpu_request:
                     type: string
-                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "100m"
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$|^$'
                   default_memory_limit:
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "500Mi"
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$|^$'
                   default_memory_request:
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "100Mi"
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$|^$'
                   max_cpu_request:
                     type: string
-                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$|^$'
                   max_memory_request:
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$|^$'
                   min_cpu_limit:
                     type: string
-                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "250m"
+                    pattern: '^(\d+m|\d+(\.\d{1,3})?)$|^$'
                   min_memory_limit:
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "250Mi"
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$|^$'
               timeouts:
                 type: object
                 properties:
@@ -463,7 +472,6 @@ spec:
                     type: string
                   additional_secret_mount_path:
                     type: string
-                    default: "/meta/credentials"
                   aws_region:
                     type: string
                     default: "eu-central-1"
@@ -502,7 +510,7 @@ spec:
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.10.1"
+                    default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
@@ -524,6 +532,8 @@ spec:
                   logical_backup_s3_access_key_id:
                     type: string
                   logical_backup_s3_bucket:
+                    type: string
+                  logical_backup_s3_bucket_prefix:
                     type: string
                   logical_backup_s3_endpoint:
                     type: string
@@ -652,7 +662,7 @@ spec:
                     default: "pooler"
                   connection_pooler_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-27"
+                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-32"
                   connection_pooler_max_db_connections:
                     type: integer
                     default: 60
@@ -669,19 +679,15 @@ spec:
                   connection_pooler_default_cpu_limit:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "1"
                   connection_pooler_default_cpu_request:
                     type: string
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default: "500m"
                   connection_pooler_default_memory_limit:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "100Mi"
                   connection_pooler_default_memory_request:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default: "100Mi"
               patroni:
                 type: object
                 properties:

@@ -6,9 +6,9 @@ replicaCount: 1
 
 # configure ui image
 image:
-  registry: registry.opensource.zalan.do
-  repository: acid/postgres-operator-ui
-  tag: v1.10.1
+  registry: ghcr.io
+  repository: zalando/postgres-operator-ui
+  tag: v1.14.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -62,8 +62,6 @@ podAnnotations:
 extraEnvs:
   []
   # Exemple of settings to make snapshot view working in the ui when using AWS
-  # - name: WALE_S3_ENDPOINT
-  #   value: https+path://s3.us-east-1.amazonaws.com:443
   # - name: SPILO_S3_BACKUP_PREFIX
   #   value: spilo/
   # - name: AWS_ACCESS_KEY_ID
@@ -83,8 +81,6 @@ extraEnvs:
   #       key: AWS_DEFAULT_REGION
   # - name: SPILO_S3_BACKUP_BUCKET
   #   value: <s3 bucket used by the operator>
-  # - name: "USE_AWS_INSTANCE_PROFILE"
-  #   value: "true"
 
 # configure UI service
 service:
@@ -111,3 +107,18 @@ ingress:
   #  - secretName: ui-tls
   #    hosts:
   #      - ui.exmaple.org
+
+# priority class for operator-ui pod
+priorityClassName: ""
+
+# Affinity for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+affinity: {}
+
+# Node labels for pod assignment
+# Ref: https://kubernetes.io/docs/user-guide/node-selection/
+nodeSelector: {}
+
+# Tolerations for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+tolerations: []

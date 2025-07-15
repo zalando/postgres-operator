@@ -59,26 +59,28 @@ type PostgresSpec struct {
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
 	Users                          map[string]UserFlags `json:"users,omitempty"`
+	UsersIgnoringSecretRotation    []string             `json:"usersIgnoringSecretRotation,omitempty"`
 	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
 	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
 
-	NumberOfInstances     int32                       `json:"numberOfInstances"`
-	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                 *CloneDescription           `json:"clone,omitempty"`
-	Databases             map[string]string           `json:"databases,omitempty"`
-	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
-	SchedulerName         *string                     `json:"schedulerName,omitempty"`
-	NodeAffinity          *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
-	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
-	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
-	InitContainers        []v1.Container              `json:"initContainers,omitempty"`
-	PodPriorityClassName  string                      `json:"podPriorityClassName,omitempty"`
-	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
-	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
-	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster        *StandbyDescription         `json:"standby,omitempty"`
-	PodAnnotations        map[string]string           `json:"podAnnotations,omitempty"`
-	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
+	NumberOfInstances      int32                       `json:"numberOfInstances"`
+	MaintenanceWindows     []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
+	Clone                  *CloneDescription           `json:"clone,omitempty"`
+	Databases              map[string]string           `json:"databases,omitempty"`
+	PreparedDatabases      map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
+	SchedulerName          *string                     `json:"schedulerName,omitempty"`
+	NodeAffinity           *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
+	Tolerations            []v1.Toleration             `json:"tolerations,omitempty"`
+	Sidecars               []Sidecar                   `json:"sidecars,omitempty"`
+	InitContainers         []v1.Container              `json:"initContainers,omitempty"`
+	PodPriorityClassName   string                      `json:"podPriorityClassName,omitempty"`
+	ShmVolume              *bool                       `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup    bool                        `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupRetention string                      `json:"logicalBackupRetention,omitempty"`
+	LogicalBackupSchedule  string                      `json:"logicalBackupSchedule,omitempty"`
+	StandbyCluster         *StandbyDescription         `json:"standby,omitempty"`
+	PodAnnotations         map[string]string           `json:"podAnnotations,omitempty"`
+	ServiceAnnotations     map[string]string           `json:"serviceAnnotations,omitempty"`
 	// MasterServiceAnnotations takes precedence over ServiceAnnotations for master role if not empty
 	MasterServiceAnnotations map[string]string `json:"masterServiceAnnotations,omitempty"`
 	// ReplicaServiceAnnotations takes precedence over ServiceAnnotations for replica role if not empty
@@ -127,13 +129,14 @@ type MaintenanceWindow struct {
 
 // Volume describes a single volume in the manifest.
 type Volume struct {
-	Selector     *metav1.LabelSelector `json:"selector,omitempty"`
-	Size         string                `json:"size"`
-	StorageClass string                `json:"storageClass,omitempty"`
-	SubPath      string                `json:"subPath,omitempty"`
-	Iops         *int64                `json:"iops,omitempty"`
-	Throughput   *int64                `json:"throughput,omitempty"`
-	VolumeType   string                `json:"type,omitempty"`
+	Selector      *metav1.LabelSelector `json:"selector,omitempty"`
+	Size          string                `json:"size"`
+	StorageClass  string                `json:"storageClass,omitempty"`
+	SubPath       string                `json:"subPath,omitempty"`
+	IsSubPathExpr *bool                 `json:"isSubPathExpr,omitempty"`
+	Iops          *int64                `json:"iops,omitempty"`
+	Throughput    *int64                `json:"throughput,omitempty"`
+	VolumeType    string                `json:"type,omitempty"`
 }
 
 // AdditionalVolume specs additional optional volumes for statefulset
@@ -141,6 +144,7 @@ type AdditionalVolume struct {
 	Name             string          `json:"name"`
 	MountPath        string          `json:"mountPath"`
 	SubPath          string          `json:"subPath,omitempty"`
+	IsSubPathExpr    *bool           `json:"isSubPathExpr,omitempty"`
 	TargetContainers []string        `json:"targetContainers"`
 	VolumeSource     v1.VolumeSource `json:"volumeSource"`
 }
@@ -153,8 +157,10 @@ type PostgresqlParam struct {
 
 // ResourceDescription describes CPU and memory resources defined for a cluster.
 type ResourceDescription struct {
-	CPU    string `json:"cpu"`
-	Memory string `json:"memory"`
+	CPU          *string `json:"cpu,omitempty"`
+	Memory       *string `json:"memory,omitempty"`
+	HugePages2Mi *string `json:"hugepages-2Mi,omitempty"`
+	HugePages1Gi *string `json:"hugepages-1Gi,omitempty"`
 }
 
 // Resources describes requests and limits for the cluster resouces.
@@ -214,6 +220,7 @@ type Sidecar struct {
 	DockerImage string             `json:"image,omitempty"`
 	Ports       []v1.ContainerPort `json:"ports,omitempty"`
 	Env         []v1.EnvVar        `json:"env,omitempty"`
+	Command     []string           `json:"command,omitempty"`
 }
 
 // UserFlags defines flags (such as superuser, nologin) that could be assigned to individual users
@@ -252,13 +259,16 @@ type Stream struct {
 	Tables         map[string]StreamTable `json:"tables"`
 	Filter         map[string]*string     `json:"filter,omitempty"`
 	BatchSize      *uint32                `json:"batchSize,omitempty"`
+	CPU            *string                `json:"cpu,omitempty"`
+	Memory         *string                `json:"memory,omitempty"`
 	EnableRecovery *bool                  `json:"enableRecovery,omitempty"`
 }
 
 // StreamTable defines properties of outbox tables for FabricEventStreams
 type StreamTable struct {
 	EventType         string  `json:"eventType"`
-	RecoveryEventType string  `json:"recoveryEventType"`
+	RecoveryEventType string  `json:"recoveryEventType,omitempty"`
+	IgnoreRecovery    *bool   `json:"ignoreRecovery,omitempty"`
 	IdColumn          *string `json:"idColumn,omitempty"`
 	PayloadColumn     *string `json:"payloadColumn,omitempty"`
 }

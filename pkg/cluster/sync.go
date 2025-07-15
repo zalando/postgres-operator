@@ -15,10 +15,13 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var requirePrimaryRestartWhenDecreased = []string{
@@ -40,13 +43,27 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.setSpec(newSpec)
 
 	defer func() {
+		var (
+			pgUpdatedStatus *acidv1.Postgresql
+			errStatus       error
+		)
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
 		} else if !c.Status.Running() {
-			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+		}
+		if errStatus != nil {
+			c.logger.Warningf("could not set cluster status: %v", errStatus)
+		}
+		if pgUpdatedStatus != nil {
+			c.setSpec(pgUpdatedStatus)
 		}
 	}()
+
+	if err = c.syncFinalizer(); err != nil {
+		c.logger.Debugf("could not sync finalizers: %v", err)
+	}
 
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
@@ -64,6 +81,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
+	if err = c.syncPatroniResources(); err != nil {
+		c.logger.Errorf("could not sync Patroni resources: %v", err)
+	}
+
 	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
 	if err = c.syncVolumes(); err != nil {
 		return err
@@ -76,7 +97,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	c.logger.Debug("syncing statefulsets")
+	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
+
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
@@ -85,15 +110,15 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	// add or remove standby_cluster section from Patroni config depending on changes in standby section
-	if reflect.DeepEqual(oldSpec.Spec.StandbyCluster, newSpec.Spec.StandbyCluster) {
+	if !reflect.DeepEqual(oldSpec.Spec.StandbyCluster, newSpec.Spec.StandbyCluster) {
 		if err := c.syncStandbyClusterConfiguration(); err != nil {
 			return fmt.Errorf("could not sync StandbyCluster configuration: %v", err)
 		}
 	}
 
 	c.logger.Debug("syncing pod disruption budgets")
-	if err = c.syncPodDisruptionBudget(false); err != nil {
-		err = fmt.Errorf("could not sync pod disruption budget: %v", err)
+	if err = c.syncPodDisruptionBudgets(false); err != nil {
+		err = fmt.Errorf("could not sync pod disruption budgets: %v", err)
 		return err
 	}
 
@@ -128,7 +153,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
-	if len(c.Spec.Streams) > 0 {
+	// sync if manifest stream count is different from stream CR count
+	// it can be that they are always different due to grouping of manifest streams
+	// but we would catch missed removals on update
+	if len(c.Spec.Streams) != len(c.Streams) {
 		c.logger.Debug("syncing streams")
 		if err = c.syncStreams(); err != nil {
 			err = fmt.Errorf("could not sync streams: %v", err)
@@ -142,6 +170,181 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	return err
+}
+
+func (c *Cluster) syncFinalizer() error {
+	var err error
+	if c.OpConfig.EnableFinalizers != nil && *c.OpConfig.EnableFinalizers {
+		err = c.addFinalizer()
+	} else {
+		err = c.removeFinalizer()
+	}
+	if err != nil {
+		return fmt.Errorf("could not sync finalizer: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPatroniResources() error {
+	errors := make([]string, 0)
+
+	if err := c.syncPatroniService(); err != nil {
+		errors = append(errors, fmt.Sprintf("could not sync %s service: %v", Patroni, err))
+	}
+
+	for _, suffix := range patroniObjectSuffixes {
+		if c.patroniKubernetesUseConfigMaps() {
+			if err := c.syncPatroniConfigMap(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("could not sync %s Patroni config map: %v", suffix, err))
+			}
+		} else {
+			if err := c.syncPatroniEndpoint(suffix); err != nil {
+				errors = append(errors, fmt.Sprintf("could not sync %s Patroni endpoint: %v", suffix, err))
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPatroniConfigMap(suffix string) error {
+	var (
+		cm  *v1.ConfigMap
+		err error
+	)
+	configMapName := fmt.Sprintf("%s-%s", c.Name, suffix)
+	c.logger.Debugf("syncing %s config map", configMapName)
+	c.setProcessName("syncing %s config map", configMapName)
+
+	if cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), configMapName, metav1.GetOptions{}); err == nil {
+		c.PatroniConfigMaps[suffix] = cm
+		desiredOwnerRefs := c.ownerReferences()
+		if !reflect.DeepEqual(cm.ObjectMeta.OwnerReferences, desiredOwnerRefs) {
+			c.logger.Infof("new %s config map's owner references do not match the current ones", configMapName)
+			cm.ObjectMeta.OwnerReferences = desiredOwnerRefs
+			c.setProcessName("updating %s config map", configMapName)
+			cm, err = c.KubeClient.ConfigMaps(c.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update %s config map: %v", configMapName, err)
+			}
+			c.PatroniConfigMaps[suffix] = cm
+		}
+		annotations := make(map[string]string)
+		maps.Copy(annotations, cm.Annotations)
+		// Patroni can add extra annotations so incl. current annotations in desired annotations
+		desiredAnnotations := c.annotationsSet(cm.Annotations)
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations, nil); changed {
+			patchData, err := metaAnnotationsPatch(desiredAnnotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s config map: %v", configMapName, err)
+			}
+			cm, err = c.KubeClient.ConfigMaps(c.Namespace).Patch(context.TODO(), configMapName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of %s config map: %v", configMapName, err)
+			}
+			c.PatroniConfigMaps[suffix] = cm
+		}
+	} else if !k8sutil.ResourceNotFound(err) {
+		// if config map does not exist yet, Patroni should create it
+		return fmt.Errorf("could not get %s config map: %v", configMapName, err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPatroniEndpoint(suffix string) error {
+	var (
+		ep  *v1.Endpoints
+		err error
+	)
+	endpointName := fmt.Sprintf("%s-%s", c.Name, suffix)
+	c.logger.Debugf("syncing %s endpoint", endpointName)
+	c.setProcessName("syncing %s endpoint", endpointName)
+
+	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), endpointName, metav1.GetOptions{}); err == nil {
+		c.PatroniEndpoints[suffix] = ep
+		desiredOwnerRefs := c.ownerReferences()
+		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredOwnerRefs) {
+			c.logger.Infof("new %s endpoints's owner references do not match the current ones", endpointName)
+			ep.ObjectMeta.OwnerReferences = desiredOwnerRefs
+			c.setProcessName("updating %s endpoint", endpointName)
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Update(context.TODO(), ep, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update %s endpoint: %v", endpointName, err)
+			}
+			c.PatroniEndpoints[suffix] = ep
+		}
+		annotations := make(map[string]string)
+		maps.Copy(annotations, ep.Annotations)
+		// Patroni can add extra annotations so incl. current annotations in desired annotations
+		desiredAnnotations := c.annotationsSet(ep.Annotations)
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations, nil); changed {
+			patchData, err := metaAnnotationsPatch(desiredAnnotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s endpoint: %v", endpointName, err)
+			}
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), endpointName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of %s endpoint: %v", endpointName, err)
+			}
+			c.PatroniEndpoints[suffix] = ep
+		}
+	} else if !k8sutil.ResourceNotFound(err) {
+		// if endpoint does not exist yet, Patroni should create it
+		return fmt.Errorf("could not get %s endpoint: %v", endpointName, err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPatroniService() error {
+	var (
+		svc *v1.Service
+		err error
+	)
+	serviceName := fmt.Sprintf("%s-%s", c.Name, Patroni)
+	c.logger.Debugf("syncing %s service", serviceName)
+	c.setProcessName("syncing %s service", serviceName)
+
+	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), serviceName, metav1.GetOptions{}); err == nil {
+		c.Services[Patroni] = svc
+		desiredOwnerRefs := c.ownerReferences()
+		if !reflect.DeepEqual(svc.ObjectMeta.OwnerReferences, desiredOwnerRefs) {
+			c.logger.Infof("new %s service's owner references do not match the current ones", serviceName)
+			svc.ObjectMeta.OwnerReferences = desiredOwnerRefs
+			c.setProcessName("updating %v service", serviceName)
+			svc, err = c.KubeClient.Services(c.Namespace).Update(context.TODO(), svc, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update %s service: %v", serviceName, err)
+			}
+			c.Services[Patroni] = svc
+		}
+		annotations := make(map[string]string)
+		maps.Copy(annotations, svc.Annotations)
+		// Patroni can add extra annotations so incl. current annotations in desired annotations
+		desiredAnnotations := c.annotationsSet(svc.Annotations)
+		if changed, _ := c.compareAnnotations(annotations, desiredAnnotations, nil); changed {
+			patchData, err := metaAnnotationsPatch(desiredAnnotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for %s service: %v", serviceName, err)
+			}
+			svc, err = c.KubeClient.Services(c.Namespace).Patch(context.TODO(), serviceName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of %s service: %v", serviceName, err)
+			}
+			c.Services[Patroni] = svc
+		}
+	} else if !k8sutil.ResourceNotFound(err) {
+		// if config service does not exist yet, Patroni should create it
+		return fmt.Errorf("could not get %s service: %v", serviceName, err)
+	}
+
+	return nil
 }
 
 func (c *Cluster) syncServices() error {
@@ -171,22 +374,17 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		if match, reason := c.compareServices(svc, desiredSvc); !match {
-			c.logServiceChanges(role, svc, desiredSvc, false, reason)
-			updatedSvc, err := c.updateService(role, svc, desiredSvc)
-			if err != nil {
-				return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
-			}
-			c.Services[role] = updatedSvc
-			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
+		updatedSvc, err := c.updateService(role, svc, desiredSvc)
+		if err != nil {
+			return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
+		c.Services[role] = updatedSvc
 		return nil
 	}
 	if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s service: %v", role, err)
 	}
 	// no existing service, create new one
-	c.Services[role] = nil
 	c.logger.Infof("could not find the cluster's %s service", role)
 
 	if svc, err = c.createService(role); err == nil {
@@ -211,8 +409,28 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	)
 	c.setProcessName("syncing %s endpoint", role)
 
-	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.endpointName(role), metav1.GetOptions{}); err == nil {
-		// TODO: No syncing of endpoints here, is this covered completely by updateService?
+	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
+		desiredEp := c.generateEndpoint(role, ep.Subsets)
+		// if owner references differ we update which would also change annotations
+		if !reflect.DeepEqual(ep.ObjectMeta.OwnerReferences, desiredEp.ObjectMeta.OwnerReferences) {
+			c.logger.Infof("new %s endpoints's owner references do not match the current ones", role)
+			c.setProcessName("updating %v endpoint", role)
+			ep, err = c.KubeClient.Endpoints(c.Namespace).Update(context.TODO(), desiredEp, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update %s endpoint: %v", role, err)
+			}
+		} else {
+			if changed, _ := c.compareAnnotations(ep.Annotations, desiredEp.Annotations, nil); changed {
+				patchData, err := metaAnnotationsPatch(desiredEp.Annotations)
+				if err != nil {
+					return fmt.Errorf("could not form patch for %s endpoint: %v", role, err)
+				}
+				ep, err = c.KubeClient.Endpoints(c.Namespace).Patch(context.TODO(), c.serviceName(role), types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+				if err != nil {
+					return fmt.Errorf("could not patch annotations of %s endpoint: %v", role, err)
+				}
+			}
+		}
 		c.Endpoints[role] = ep
 		return nil
 	}
@@ -220,7 +438,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 		return fmt.Errorf("could not get %s endpoint: %v", role, err)
 	}
 	// no existing endpoint, create new one
-	c.Endpoints[role] = nil
 	c.logger.Infof("could not find the cluster's %s endpoint", role)
 
 	if ep, err = c.createEndpoint(role); err == nil {
@@ -230,7 +447,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 			return fmt.Errorf("could not create missing %s endpoint: %v", role, err)
 		}
 		c.logger.Infof("%s endpoint %q already exists", role, util.NameFromMeta(ep.ObjectMeta))
-		if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.endpointName(role), metav1.GetOptions{}); err != nil {
+		if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing %s endpoint: %v", role, err)
 		}
 	}
@@ -238,21 +455,22 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	return nil
 }
 
-func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
+func (c *Cluster) syncPrimaryPodDisruptionBudget(isUpdate bool) error {
 	var (
 		pdb *policyv1.PodDisruptionBudget
 		err error
 	)
-	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
-		c.PodDisruptionBudget = pdb
-		newPDB := c.generatePodDisruptionBudget()
-		if match, reason := k8sutil.SamePDB(pdb, newPDB); !match {
+	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.PrimaryPodDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
+		c.PrimaryPodDisruptionBudget = pdb
+		newPDB := c.generatePrimaryPodDisruptionBudget()
+		match, reason := c.comparePodDisruptionBudget(pdb, newPDB)
+		if !match {
 			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
-			if err = c.updatePodDisruptionBudget(newPDB); err != nil {
+			if err = c.updatePrimaryPodDisruptionBudget(newPDB); err != nil {
 				return err
 			}
 		} else {
-			c.PodDisruptionBudget = pdb
+			c.PrimaryPodDisruptionBudget = pdb
 		}
 		return nil
 
@@ -261,22 +479,74 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 		return fmt.Errorf("could not get pod disruption budget: %v", err)
 	}
 	// no existing pod disruption budget, create new one
-	c.PodDisruptionBudget = nil
-	c.logger.Infof("could not find the cluster's pod disruption budget")
+	c.logger.Infof("could not find the primary pod disruption budget")
 
-	if pdb, err = c.createPodDisruptionBudget(); err != nil {
+	if err = c.createPrimaryPodDisruptionBudget(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not create pod disruption budget: %v", err)
+			return fmt.Errorf("could not create primary pod disruption budget: %v", err)
 		}
 		c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
-		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
+		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.PrimaryPodDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
 		}
 	}
 
-	c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
-	c.PodDisruptionBudget = pdb
+	return nil
+}
 
+func (c *Cluster) syncCriticalOpPodDisruptionBudget(isUpdate bool) error {
+	var (
+		pdb *policyv1.PodDisruptionBudget
+		err error
+	)
+	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
+		c.CriticalOpPodDisruptionBudget = pdb
+		newPDB := c.generateCriticalOpPodDisruptionBudget()
+		match, reason := c.comparePodDisruptionBudget(pdb, newPDB)
+		if !match {
+			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
+			if err = c.updateCriticalOpPodDisruptionBudget(newPDB); err != nil {
+				return err
+			}
+		} else {
+			c.CriticalOpPodDisruptionBudget = pdb
+		}
+		return nil
+
+	}
+	if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get pod disruption budget: %v", err)
+	}
+	// no existing pod disruption budget, create new one
+	c.logger.Infof("could not find pod disruption budget for critical operations")
+
+	if err = c.createCriticalOpPodDisruptionBudget(); err != nil {
+		if !k8sutil.ResourceAlreadyExists(err) {
+			return fmt.Errorf("could not create pod disruption budget for critical operations: %v", err)
+		}
+		c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
+		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPodDisruptionBudgets(isUpdate bool) error {
+	errors := make([]string, 0)
+
+	if err := c.syncPrimaryPodDisruptionBudget(isUpdate); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	if err := c.syncCriticalOpPodDisruptionBudget(isUpdate); err != nil {
+		errors = append(errors, fmt.Sprintf("%v", err))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+	}
 	return nil
 }
 
@@ -288,6 +558,7 @@ func (c *Cluster) syncStatefulSet() error {
 	)
 	podsToRecreate := make([]v1.Pod, 0)
 	isSafeToRecreatePods := true
+	postponeReasons := make([]string, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
 
 	pods, err := c.listPods()
@@ -297,12 +568,12 @@ func (c *Cluster) syncStatefulSet() error {
 
 	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
 	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(context.TODO(), c.statefulSetName(), metav1.GetOptions{})
+	if err != nil && !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("error during reading of statefulset: %v", err)
+	}
+
 	if err != nil {
-		if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("error during reading of statefulset: %v", err)
-		}
 		// statefulset does not exist, try to re-create it
-		c.Statefulset = nil
 		c.logger.Infof("cluster's statefulset does not exist")
 
 		sset, err = c.createStatefulSet()
@@ -325,6 +596,11 @@ func (c *Cluster) syncStatefulSet() error {
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))
 
 	} else {
+		desiredSts, err := c.generateStatefulSet(&c.Spec)
+		if err != nil {
+			return fmt.Errorf("could not generate statefulset: %v", err)
+		}
+		c.logger.Debug("syncing statefulsets")
 		// check if there are still pods with a rolling update flag
 		for _, pod := range pods {
 			if c.getRollingUpdateFlagFromPod(&pod) {
@@ -339,18 +615,36 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 
 		if len(podsToRecreate) > 0 {
-			c.logger.Debugf("%d / %d pod(s) still need to be rotated", len(podsToRecreate), len(pods))
+			c.logger.Infof("%d / %d pod(s) still need to be rotated", len(podsToRecreate), len(pods))
 		}
 
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 
-		desiredSts, err := c.generateStatefulSet(&c.Spec)
-		if err != nil {
-			return fmt.Errorf("could not generate statefulset: %v", err)
-		}
-
 		cmp := c.compareStatefulSetWith(desiredSts)
+		if !cmp.rollingUpdate {
+			updatedPodAnnotations := map[string]*string{}
+			for _, anno := range cmp.deletedPodAnnotations {
+				updatedPodAnnotations[anno] = nil
+			}
+			for anno, val := range desiredSts.Spec.Template.Annotations {
+				updatedPodAnnotations[anno] = &val
+			}
+			metadataReq := map[string]map[string]map[string]*string{"metadata": {"annotations": updatedPodAnnotations}}
+			patch, err := json.Marshal(metadataReq)
+			if err != nil {
+				return fmt.Errorf("could not form patch for pod annotations: %v", err)
+			}
+
+			for _, pod := range pods {
+				if changed, _ := c.compareAnnotations(pod.Annotations, desiredSts.Spec.Template.Annotations, nil); changed {
+					_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+					if err != nil {
+						return fmt.Errorf("could not patch annotations for pod %q: %v", pod.Name, err)
+					}
+				}
+			}
+		}
 		if !cmp.match {
 			if cmp.rollingUpdate {
 				podsToRecreate = make([]v1.Pod, 0)
@@ -423,12 +717,14 @@ func (c *Cluster) syncStatefulSet() error {
 	c.logger.Debug("syncing Patroni config")
 	if configPatched, restartPrimaryFirst, restartWait, err = c.syncPatroniConfig(pods, c.Spec.Patroni, requiredPgParameters); err != nil {
 		c.logger.Warningf("Patroni config updated? %v - errors during config sync: %v", configPatched, err)
+		postponeReasons = append(postponeReasons, "errors during Patroni config sync")
 		isSafeToRecreatePods = false
 	}
 
 	// restart Postgres where it is still pending
 	if err = c.restartInstances(pods, restartWait, restartPrimaryFirst); err != nil {
 		c.logger.Errorf("errors while restarting Postgres in pods via Patroni API: %v", err)
+		postponeReasons = append(postponeReasons, "errors while restarting Postgres via Patroni API")
 		isSafeToRecreatePods = false
 	}
 
@@ -436,14 +732,14 @@ func (c *Cluster) syncStatefulSet() error {
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if len(podsToRecreate) > 0 {
 		if isSafeToRecreatePods {
-			c.logger.Debugln("performing rolling update")
+			c.logger.Info("performing rolling update")
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
 			if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
 				return fmt.Errorf("could not recreate pods: %v", err)
 			}
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 		} else {
-			c.logger.Warningf("postpone pod recreation until next sync because of errors during config sync")
+			c.logger.Warningf("postpone pod recreation until next sync - reason: %s", strings.Join(postponeReasons, `', '`))
 		}
 	}
 
@@ -617,6 +913,9 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	if desiredPatroniConfig.SynchronousModeStrict != effectivePatroniConfig.SynchronousModeStrict {
 		configToSet["synchronous_mode_strict"] = desiredPatroniConfig.SynchronousModeStrict
 	}
+	if desiredPatroniConfig.SynchronousNodeCount != effectivePatroniConfig.SynchronousNodeCount {
+		configToSet["synchronous_node_count"] = desiredPatroniConfig.SynchronousNodeCount
+	}
 	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != effectivePatroniConfig.TTL {
 		configToSet["ttl"] = desiredPatroniConfig.TTL
 	}
@@ -650,7 +949,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	// check if specified slots exist in config and if they differ
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
 		// only add slots specified in manifest to c.replicationSlots
-		for manifestSlotName, _ := range c.Spec.Patroni.Slots {
+		for manifestSlotName := range c.Spec.Patroni.Slots {
 			if manifestSlotName == slotName {
 				c.replicationSlots[slotName] = desiredSlot
 			}
@@ -671,7 +970,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 		effectiveValue := effectivePgParameters[desiredOption]
 		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
 			parametersToSet[desiredOption] = desiredValue
-			if util.SliceContains(requirePrimaryRestartWhenDecreased, desiredOption) {
+			if slices.Contains(requirePrimaryRestartWhenDecreased, desiredOption) {
 				effectiveValueNum, errConv := strconv.Atoi(effectiveValue)
 				desiredValueNum, errConv2 := strconv.Atoi(desiredValue)
 				if errConv != nil || errConv2 != nil {
@@ -687,7 +986,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	}
 
 	// check if there exist only config updates that require a restart of the primary
-	if len(restartPrimary) > 0 && !util.SliceContains(restartPrimary, false) && len(configToSet) == 0 {
+	if len(restartPrimary) > 0 && !slices.Contains(restartPrimary, false) && len(configToSet) == 0 {
 		requiresMasterRestart = true
 	}
 
@@ -746,7 +1045,7 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 	// carries the request to change configuration through
 	for _, pod := range pods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
-		c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
+		c.logger.Infof("patching Postgres config via Patroni API on pod %s with following options: %s",
 			podName, standbyOptionsToSet)
 		if err = c.patroni.SetStandbyClusterParameters(&pod, standbyOptionsToSet); err == nil {
 			return nil
@@ -758,7 +1057,7 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 }
 
 func (c *Cluster) syncSecrets() error {
-	c.logger.Info("syncing secrets")
+	c.logger.Debug("syncing secrets")
 	c.setProcessName("syncing secrets")
 	generatedSecrets := c.generateUserSecrets()
 	retentionUsers := make([]string, 0)
@@ -768,7 +1067,7 @@ func (c *Cluster) syncSecrets() error {
 		secret, err := c.KubeClient.Secrets(generatedSecret.Namespace).Create(context.TODO(), generatedSecret, metav1.CreateOptions{})
 		if err == nil {
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), generatedSecret.Namespace, secret.UID)
+			c.logger.Infof("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), generatedSecret.Namespace, secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
@@ -855,14 +1154,17 @@ func (c *Cluster) updateSecret(
 	// if password rotation is enabled update password and username if rotation interval has been passed
 	// rotation can be enabled globally or via the manifest (excluding the Postgres superuser)
 	rotationEnabledInManifest := secretUsername != constants.SuperuserKeyName &&
-		(util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) ||
-			util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
+		(slices.Contains(c.Spec.UsersWithSecretRotation, secretUsername) ||
+			slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
 
 	// globally enabled rotation is only allowed for manifest and bootstrapped roles
 	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
-	rotationAllowed := !pwdUser.IsDbOwner && util.SliceContains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
+	rotationAllowed := !pwdUser.IsDbOwner && slices.Contains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
 
-	if (c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest {
+	// users can ignore any kind of rotation
+	isIgnoringRotation := slices.Contains(c.Spec.UsersIgnoringSecretRotation, secretUsername)
+
+	if ((c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest) && !isIgnoringRotation {
 		updateSecretMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
 		if err != nil {
 			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
@@ -899,10 +1201,28 @@ func (c *Cluster) updateSecret(
 		userMap[userKey] = pwdUser
 	}
 
+	if !reflect.DeepEqual(secret.ObjectMeta.OwnerReferences, generatedSecret.ObjectMeta.OwnerReferences) {
+		updateSecret = true
+		updateSecretMsg = fmt.Sprintf("secret %s owner references do not match the current ones", secretName)
+		secret.ObjectMeta.OwnerReferences = generatedSecret.ObjectMeta.OwnerReferences
+	}
+
 	if updateSecret {
-		c.logger.Debugln(updateSecretMsg)
-		if _, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
+		c.logger.Infof(updateSecretMsg)
+		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("could not update secret %s: %v", secretName, err)
+		}
+		c.Secrets[secret.UID] = secret
+	}
+
+	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations, nil); changed {
+		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
+		if err != nil {
+			return fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
+		}
+		secret, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("could not patch annotations for secret %q: %v", secret.Name, err)
 		}
 		c.Secrets[secret.UID] = secret
 	}
@@ -920,6 +1240,8 @@ func (c *Cluster) rotatePasswordInSecret(
 		err                 error
 		nextRotationDate    time.Time
 		nextRotationDateStr string
+		expectedUsername    string
+		rotationModeChanged bool
 		updateSecretMsg     string
 	)
 
@@ -940,17 +1262,32 @@ func (c *Cluster) rotatePasswordInSecret(
 		nextRotationDate = currentRotationDate
 	}
 
+	// set username and check if it differs from current value in secret
+	currentUsername := string(secret.Data["username"])
+	if !slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+		expectedUsername = fmt.Sprintf("%s%s", secretUsername, currentTime.Format(constants.RotationUserDateFormat))
+	} else {
+		expectedUsername = secretUsername
+	}
+
+	// when changing to in-place rotation update secret immediatly
+	// if currentUsername is longer we know it has a date suffix
+	// the other way around we can wait until the next rotation date
+	if len(currentUsername) > len(expectedUsername) {
+		rotationModeChanged = true
+		c.logger.Infof("updating secret %s after switching to in-place rotation mode for username: %s", secretName, string(secret.Data["username"]))
+	}
+
 	// update password and next rotation date if configured interval has passed
-	if currentTime.After(nextRotationDate) {
+	if currentTime.After(nextRotationDate) || rotationModeChanged {
 		// create rotation user if role is not listed for in-place password update
-		if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
-			rotationUsername := fmt.Sprintf("%s%s", secretUsername, currentTime.Format(constants.RotationUserDateFormat))
-			secret.Data["username"] = []byte(rotationUsername)
-			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, rotationUsername)
+		if !slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+			secret.Data["username"] = []byte(expectedUsername)
+			c.logger.Infof("updating username in secret %s and creating rotation user %s in the database", secretName, expectedUsername)
 			// whenever there is a rotation, check if old rotation users can be deleted
 			*retentionUsers = append(*retentionUsers, secretUsername)
 		} else {
-			// when passwords of system users are rotated in place, pods have to be replaced
+			// when passwords of system users are rotated in-place, pods have to be replaced
 			if roleOrigin == spec.RoleOriginSystem {
 				pods, err := c.listPods()
 				if err != nil {
@@ -964,7 +1301,7 @@ func (c *Cluster) rotatePasswordInSecret(
 				}
 			}
 
-			// when password of connection pooler is rotated in place, pooler pods have to be replaced
+			// when password of connection pooler is rotated in-place, pooler pods have to be replaced
 			if roleOrigin == spec.RoleOriginConnectionPooler {
 				listOptions := metav1.ListOptions{
 					LabelSelector: c.poolerLabelsSet(true).String(),
@@ -981,10 +1318,12 @@ func (c *Cluster) rotatePasswordInSecret(
 				}
 			}
 
-			// when password of stream user is rotated in place, it should trigger rolling update in FES deployment
+			// when password of stream user is rotated in-place, it should trigger rolling update in FES deployment
 			if roleOrigin == spec.RoleOriginStream {
 				c.logger.Warnf("password in secret of stream user %s changed", constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix)
 			}
+
+			secret.Data["username"] = []byte(secretUsername)
 		}
 		secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
 		secret.Data["nextRotation"] = []byte(nextRotationDateStr)
@@ -1313,18 +1652,56 @@ func (c *Cluster) syncLogicalBackupJob() error {
 		if err != nil {
 			return fmt.Errorf("could not generate the desired logical backup job state: %v", err)
 		}
-		if match, reason := k8sutil.SameLogicalBackupJob(job, desiredJob); !match {
+		if !reflect.DeepEqual(job.ObjectMeta.OwnerReferences, desiredJob.ObjectMeta.OwnerReferences) {
+			c.logger.Info("new logical backup job's owner references do not match the current ones")
+			job, err = c.KubeClient.CronJobs(job.Namespace).Update(context.TODO(), desiredJob, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("could not update owner references for logical backup job %q: %v", job.Name, err)
+			}
+			c.logger.Infof("logical backup job %s updated", c.getLogicalBackupJobName())
+		}
+		if cmp := c.compareLogicalBackupJob(job, desiredJob); !cmp.match {
 			c.logger.Infof("logical job %s is not in the desired state and needs to be updated",
 				c.getLogicalBackupJobName(),
 			)
-			if reason != "" {
-				c.logger.Infof("reason: %s", reason)
+			if len(cmp.reasons) != 0 {
+				for _, reason := range cmp.reasons {
+					c.logger.Infof("reason: %s", reason)
+				}
+			}
+			if len(cmp.deletedPodAnnotations) != 0 {
+				templateMetadataReq := map[string]map[string]map[string]map[string]map[string]map[string]map[string]*string{
+					"spec": {"jobTemplate": {"spec": {"template": {"metadata": {"annotations": {}}}}}}}
+				for _, anno := range cmp.deletedPodAnnotations {
+					templateMetadataReq["spec"]["jobTemplate"]["spec"]["template"]["metadata"]["annotations"][anno] = nil
+				}
+				patch, err := json.Marshal(templateMetadataReq)
+				if err != nil {
+					return fmt.Errorf("could not marshal ObjectMeta for logical backup job %q pod template: %v", jobName, err)
+				}
+
+				job, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "")
+				if err != nil {
+					c.logger.Errorf("failed to remove annotations from the logical backup job %q pod template: %v", jobName, err)
+					return err
+				}
 			}
 			if err = c.patchLogicalBackupJob(desiredJob); err != nil {
 				return fmt.Errorf("could not update logical backup job to match desired state: %v", err)
 			}
 			c.logger.Info("the logical backup job is synced")
 		}
+		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations, nil); changed {
+			patchData, err := metaAnnotationsPatch(desiredJob.Annotations)
+			if err != nil {
+				return fmt.Errorf("could not form patch for the logical backup job %q: %v", jobName, err)
+			}
+			_, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch annotations of the logical backup job %q: %v", jobName, err)
+			}
+		}
+		c.LogicalBackupJob = desiredJob
 		return nil
 	}
 	if !k8sutil.ResourceNotFound(err) {

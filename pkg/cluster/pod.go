@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,7 +59,7 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 		return nil
 	}
 
-	c.logger.Debugf("mark rolling update annotation for %s: reason %s", pod.Name, msg)
+	c.logger.Infof("mark rolling update annotation for %s: reason %s", pod.Name, msg)
 	flag := make(map[string]string)
 	flag[rollingUpdatePodAnnotationKey] = strconv.FormatBool(true)
 
@@ -108,7 +110,7 @@ func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod) (flag bool) {
 }
 
 func (c *Cluster) deletePods() error {
-	c.logger.Debugln("deleting pods")
+	c.logger.Debug("deleting pods")
 	pods, err := c.listPods()
 	if err != nil {
 		return err
@@ -125,9 +127,9 @@ func (c *Cluster) deletePods() error {
 		}
 	}
 	if len(pods) > 0 {
-		c.logger.Debugln("pods have been deleted")
+		c.logger.Debug("pods have been deleted")
 	} else {
-		c.logger.Debugln("no pods to delete")
+		c.logger.Debug("no pods to delete")
 	}
 
 	return nil
@@ -228,7 +230,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get node %q: %v", oldMaster.Spec.NodeName, err)
 	}
 	if !eol {
-		c.logger.Debugf("no action needed: master pod is already on a live node")
+		c.logger.Debug("no action needed: master pod is already on a live node")
 		return nil
 	}
 
@@ -278,11 +280,16 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
 
+	scheduleSwitchover := false
+	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+		c.logger.Infof("postponing switchover, not in maintenance window")
+		scheduleSwitchover = true
+	}
 	err = retryutil.Retry(1*time.Minute, 5*time.Minute,
 		func() (bool, error) {
-			err := c.Switchover(oldMaster, masterCandidateName)
+			err := c.Switchover(oldMaster, masterCandidateName, scheduleSwitchover)
 			if err != nil {
-				c.logger.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+				c.logger.Errorf("could not switchover to pod %q: %v", masterCandidateName, err)
 				return false, nil
 			}
 			return true, nil
@@ -443,7 +450,7 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 				// do not recreate master now so it will keep the update flag and switchover will be retried on next sync
 				return fmt.Errorf("skipping switchover: %v", err)
 			}
-			if err := c.Switchover(masterPod, masterCandidate); err != nil {
+			if err := c.Switchover(masterPod, masterCandidate, false); err != nil {
 				return fmt.Errorf("could not perform switch over: %v", err)
 			}
 		} else if newMasterPod == nil && len(replicas) == 0 {
@@ -478,12 +485,21 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 				if PostgresRole(member.Role) == SyncStandby {
 					syncCandidates = append(syncCandidates, member)
 				}
+				if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && slices.Contains([]string{"running", "streaming", "in archive recovery"}, member.State) {
+					candidates = append(candidates, member)
+				}
 			}
 
 			// if synchronous mode is enabled and no SyncStandy was found
 			// return false for retry - cannot failover with no sync candidate
 			if c.Spec.Patroni.SynchronousMode && len(syncCandidates) == 0 {
 				c.logger.Warnf("no sync standby found - retrying fetching cluster members")
+				return false, nil
+			}
+
+			// retry also in asynchronous mode when no replica candidate was found
+			if !c.Spec.Patroni.SynchronousMode && len(candidates) == 0 {
+				c.logger.Warnf("no replica candidate found - retrying fetching cluster members")
 				return false, nil
 			}
 
@@ -500,20 +516,12 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 			return syncCandidates[i].Lag < syncCandidates[j].Lag
 		})
 		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
-	} else {
-		// in asynchronous mode find running replicas
-		for _, member := range members {
-			if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && member.State == "running" {
-				candidates = append(candidates, member)
-			}
-		}
-
-		if len(candidates) > 0 {
-			sort.Slice(candidates, func(i, j int) bool {
-				return candidates[i].Lag < candidates[j].Lag
-			})
-			return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
-		}
+	}
+	if len(candidates) > 0 {
+		sort.Slice(candidates, func(i, j int) bool {
+			return candidates[i].Lag < candidates[j].Lag
+		})
+		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
 	}
 
 	return spec.NamespacedName{}, fmt.Errorf("no switchover candidate found")

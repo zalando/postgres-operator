@@ -87,9 +87,6 @@ postgresql
         .alert.alert-info(if='{ progress.statefulSet && !progress.containerFirst }') Waiting for 1st container to spawn
         .alert.alert-success(if='{ progress.containerFirst }') First PostgreSQL cluster container spawned
 
-        .alert.alert-info(if='{ !progress.postgresql }') PostgreSQL cluster manifest pending
-        .alert.alert-success(if='{ progress.postgresql }') PostgreSQL cluster manifest created
-
         .alert.alert-info(if='{ progress.containerFirst && !progress.masterLabel }') Waiting for master to become available
         .alert.alert-success(if='{ progress.masterLabel }') PostgreSQL master available, label is attached
         .alert.alert-success(if='{ progress.masterLabel && progress.dnsName }') PostgreSQL ready: <strong>{ progress.dnsName }</strong>

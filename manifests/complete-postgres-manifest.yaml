@@ -10,7 +10,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: ghcr.io/zalando/spilo-15:3.0-p1
+  dockerImage: ghcr.io/zalando/spilo-17:4.0-p2
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -19,6 +19,8 @@ spec:
     - createdb
     foo_user: []
 #    flyway: []
+#  usersIgnoringSecretRotation:
+#  - bar_user
 #  usersWithSecretRotation:
 #  - foo_user
 #  usersWithInPlaceSecretRotation:
@@ -46,7 +48,7 @@ spec:
           defaultRoles: true
           defaultUsers: false
   postgresql:
-    version: "15"
+    version: "17"
     parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
@@ -66,6 +68,8 @@ spec:
 #      matchLabels:
 #        environment: dev
 #        service: postgres
+#     subPath: $(NODE_NAME)/$(POD_NAME)
+#     isSubPathExpr: true
   additionalVolumes:
     - name: empty
       mountPath: /opt/empty
@@ -75,6 +79,16 @@ spec:
         emptyDir: {}
 #    - name: data
 #      mountPath: /home/postgres/pgdata/partitions
+#      targetContainers:
+#        - postgres
+#      volumeSource:
+#        PersistentVolumeClaim:
+#          claimName: pvc-postgresql-data-partitions
+#          readyOnly: false
+#    - name: data
+#      mountPath: /home/postgres/pgdata/partitions
+#      subPath: $(NODE_NAME)/$(POD_NAME)
+#      isSubPathExpr: true
 #      targetContainers:
 #        - postgres
 #      volumeSource:
@@ -107,9 +121,13 @@ spec:
     requests:
       cpu: 10m
       memory: 100Mi
+#      hugepages-2Mi: 128Mi
+#      hugepages-1Gi: 1Gi
     limits:
       cpu: 500m
       memory: 500Mi
+#      hugepages-2Mi: 128Mi
+#      hugepages-1Gi: 1Gi
   patroni:
     failsafe_mode: false
     initdb:
@@ -145,6 +163,7 @@ spec:
 
 # run periodic backups with k8s cron jobs
 #  enableLogicalBackup: true
+#  logicalBackupRetention: "3 months"
 #  logicalBackupSchedule: "30 00 * * *"
 
 #  maintenanceWindows:

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -123,6 +122,9 @@ type ControllerConfig struct {
 	IgnoredAnnotations   []string
 
 	EnableJsonLogging bool
+
+	KubeQPS   int
+	KubeBurst int
 }
 
 // cached value for the GetOperatorNamespace
@@ -210,7 +212,7 @@ func GetOperatorNamespace() string {
 		if namespaceFromEnvironment := os.Getenv("OPERATOR_NAMESPACE"); namespaceFromEnvironment != "" {
 			return namespaceFromEnvironment
 		}
-		operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
+		operatorNamespaceBytes, err := os.ReadFile(fileWithNamespace)
 		if err != nil {
 			log.Fatalf("Unable to detect operator namespace from within its pod due to: %v", err)
 		}

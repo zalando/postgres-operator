@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -20,20 +20,20 @@ import (
 )
 
 const (
-	failoverPath = "/failover"
-	configPath   = "/config"
-	clusterPath  = "/cluster"
-	statusPath   = "/patroni"
-	restartPath  = "/restart"
-	ApiPort      = 8008
-	ApiPortName  = "patroni"
-	timeout      = 30 * time.Second
+	switchoverPath = "/switchover"
+	configPath     = "/config"
+	clusterPath    = "/cluster"
+	statusPath     = "/patroni"
+	restartPath    = "/restart"
+	ApiPort        = 8008
+	ApiPortName    = "patroni"
+	timeout        = 30 * time.Second
 )
 
 // Interface describe patroni methods
 type Interface interface {
 	GetClusterMembers(master *v1.Pod) ([]ClusterMember, error)
-	Switchover(master *v1.Pod, candidate string) error
+	Switchover(master *v1.Pod, candidate string, scheduled_at string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
 	SetStandbyClusterParameters(server *v1.Pod, options map[string]interface{}) error
 	GetMemberData(server *v1.Pod) (MemberData, error)
@@ -104,8 +104,8 @@ func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer)
 		}
 	}()
 
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= 300 {
+		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("could not read response: %v", err)
 		}
@@ -124,12 +124,12 @@ func (p *Patroni) httpGet(url string) (string, error) {
 	}
 	defer response.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(response.Body)
+	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("could not read response: %v", err)
 	}
 
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode < http.StatusOK || response.StatusCode >= 300 {
 		return string(bodyBytes), fmt.Errorf("patroni returned '%d'", response.StatusCode)
 	}
 
@@ -137,9 +137,9 @@ func (p *Patroni) httpGet(url string) (string, error) {
 }
 
 // Switchover by calling Patroni REST API
-func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
+func (p *Patroni) Switchover(master *v1.Pod, candidate string, scheduled_at string) error {
 	buf := &bytes.Buffer{}
-	err := json.NewEncoder(buf).Encode(map[string]string{"leader": master.Name, "member": candidate})
+	err := json.NewEncoder(buf).Encode(map[string]string{"leader": master.Name, "member": candidate, "scheduled_at": scheduled_at})
 	if err != nil {
 		return fmt.Errorf("could not encode json: %v", err)
 	}
@@ -147,7 +147,7 @@ func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
 	if err != nil {
 		return err
 	}
-	return p.httpPostOrPatch(http.MethodPost, apiURLString+failoverPath, buf)
+	return p.httpPostOrPatch(http.MethodPost, apiURLString+switchoverPath, buf)
 }
 
 //TODO: add an option call /patroni to check if it is necessary to restart the server

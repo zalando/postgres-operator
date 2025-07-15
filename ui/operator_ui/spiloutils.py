@@ -2,17 +2,13 @@ from boto3 import client
 from datetime import datetime, timezone
 from furl import furl
 from json import dumps, loads
-from logging import getLogger
 from os import environ, getenv
 from requests import Session
 from urllib.parse import urljoin
 from uuid import UUID
-from wal_e.cmd import configure_backup_cxt
 
-from .utils import Attrs, defaulting, these
-
-
-logger = getLogger(__name__)
+from .utils import defaulting, these
+from operator_ui.adapters.logger import logger
 
 session = Session()
 
@@ -287,10 +283,8 @@ def read_stored_clusters(bucket, prefix, delimiter='/'):
 def read_versions(
     pg_cluster,
     bucket,
-    s3_endpoint,
     prefix,
     delimiter='/',
-    use_aws_instance_profile=False,
 ):
     return [
         'base' if uid == 'wal' else uid
@@ -308,35 +302,72 @@ def read_versions(
         if uid == 'wal' or defaulting(lambda: UUID(uid))
     ]
 
-BACKUP_VERSION_PREFIXES = ['', '9.6/', '10/', '11/', '12/', '13/', '14/', '15/']
+def lsn_to_wal_segment_stop(finish_lsn, start_segment, wal_segment_size=16 * 1024 * 1024):
+    timeline = int(start_segment[:8], 16)
+    log_id = finish_lsn >> 32
+    seg_id = (finish_lsn & 0xFFFFFFFF) // wal_segment_size
+    return f"{timeline:08X}{log_id:08X}{seg_id:08X}"
+
+def lsn_to_offset_hex(lsn, wal_segment_size=16 * 1024 * 1024):
+    return f"{lsn % wal_segment_size:08X}"
 
 def read_basebackups(
     pg_cluster,
     uid,
     bucket,
-    s3_endpoint,
     prefix,
-    delimiter='/',
-    use_aws_instance_profile=False,
+    postgresql_versions,
 ):
-    environ['WALE_S3_ENDPOINT'] = s3_endpoint
     suffix = '' if uid == 'base' else '/' + uid
     backups = []
 
-    for vp in BACKUP_VERSION_PREFIXES:
+    for vp in postgresql_versions:
+        backup_prefix = f'{prefix}{pg_cluster}{suffix}/wal/{vp}/basebackups_005/'
+        logger.info(f"{bucket}/{backup_prefix}")
 
-        backups = backups + [
-            {
-                key: value
-                for key, value in basebackup.__dict__.items()
-                if isinstance(value, str) or isinstance(value, int)
-            }
-            for basebackup in Attrs.call(
-                f=configure_backup_cxt,
-                aws_instance_profile=use_aws_instance_profile,
-                s3_prefix=f's3://{bucket}/{prefix}{pg_cluster}{suffix}/wal/{vp}',
-            )._backup_list(detail=True)
-        ]
+        paginator = client('s3').get_paginator('list_objects_v2')
+        pages = paginator.paginate(Bucket=bucket, Prefix=backup_prefix)
+
+        for page in pages:
+            for obj in page.get("Contents", []):
+                key = obj["Key"]
+                if not key.endswith("backup_stop_sentinel.json"):
+                    continue
+
+                response = client('s3').get_object(Bucket=bucket, Key=key)
+                backup_info = loads(response["Body"].read().decode("utf-8"))
+                last_modified = response["LastModified"].astimezone(timezone.utc).isoformat()
+
+                backup_name = key.split("/")[-1].replace("_backup_stop_sentinel.json", "")
+                start_seg, start_offset = backup_name.split("_")[1], backup_name.split("_")[-1] if "_" in backup_name else None
+
+                if "LSN" in backup_info and "FinishLSN" in backup_info:
+                    # WAL-G
+                    lsn = backup_info["LSN"]
+                    finish_lsn = backup_info["FinishLSN"]
+                    backups.append({
+                        "expanded_size_bytes": backup_info.get("UncompressedSize"),
+                        "last_modified": last_modified,
+                        "name": backup_name,
+                        "wal_segment_backup_start": start_seg,
+                        "wal_segment_backup_stop": lsn_to_wal_segment_stop(finish_lsn, start_seg),
+                        "wal_segment_offset_backup_start": lsn_to_offset_hex(lsn),
+                        "wal_segment_offset_backup_stop": lsn_to_offset_hex(finish_lsn),
+                    })
+                elif "wal_segment_backup_stop" in backup_info:
+                    # WAL-E
+                    stop_seg = backup_info["wal_segment_backup_stop"]
+                    stop_offset = backup_info["wal_segment_offset_backup_stop"]
+
+                    backups.append({
+                        "expanded_size_bytes": backup_info.get("expanded_size_bytes"),
+                        "last_modified": last_modified,
+                        "name": backup_name,
+                        "wal_segment_backup_start": start_seg,
+                        "wal_segment_backup_stop": stop_seg,
+                        "wal_segment_offset_backup_start": start_offset,
+                        "wal_segment_offset_backup_stop": stop_offset,
+                    })
 
     return backups
 
