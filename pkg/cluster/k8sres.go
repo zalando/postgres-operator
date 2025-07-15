@@ -109,8 +109,13 @@ func (c *Cluster) servicePort(role PostgresRole) int32 {
 	return pgPort
 }
 
-func (c *Cluster) podDisruptionBudgetName() string {
+func (c *Cluster) PrimaryPodDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
+}
+
+func (c *Cluster) criticalOpPodDisruptionBudgetName() string {
+	pdbTemplate := config.StringTemplate("postgres-{cluster}-critical-op-pdb")
+	return pdbTemplate.Format("cluster", c.Name)
 }
 
 func makeDefaultResources(config *config.Config) acidv1.Resources {
@@ -1005,6 +1010,9 @@ func (c *Cluster) generateSpiloPodEnvVars(
 
 	if c.patroniUsesKubernetes() {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
+		if c.OpConfig.EnablePodDisruptionBudget != nil && *c.OpConfig.EnablePodDisruptionBudget {
+			envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_BOOTSTRAP_LABELS", Value: "{\"critical-operation\":\"true\"}"})
+		}
 	} else {
 		envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
 	}
@@ -2207,7 +2215,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	return result
 }
 
-func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
+func (c *Cluster) generatePrimaryPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 	pdbMasterLabelSelector := c.OpConfig.PDBMasterLabelSelector
@@ -2225,7 +2233,36 @@ func (c *Cluster) generatePodDisruptionBudget() *policyv1.PodDisruptionBudget {
 
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            c.podDisruptionBudgetName(),
+			Name:            c.PrimaryPodDisruptionBudgetName(),
+			Namespace:       c.Namespace,
+			Labels:          c.labelsSet(true),
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: policyv1.PodDisruptionBudgetSpec{
+			MinAvailable: &minAvailable,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+		},
+	}
+}
+
+func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+	minAvailable := intstr.FromInt32(c.Spec.NumberOfInstances)
+	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
+
+	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
+	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
+		minAvailable = intstr.FromInt(0)
+	}
+
+	labels := c.labelsSet(false)
+	labels["critical-operation"] = "true"
+
+	return &policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            c.criticalOpPodDisruptionBudgetName(),
 			Namespace:       c.Namespace,
 			Labels:          c.labelsSet(true),
 			Annotations:     c.annotationsSet(nil),

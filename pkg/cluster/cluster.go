@@ -59,16 +59,17 @@ type Config struct {
 }
 
 type kubeResources struct {
-	Services            map[PostgresRole]*v1.Service
-	Endpoints           map[PostgresRole]*v1.Endpoints
-	PatroniEndpoints    map[string]*v1.Endpoints
-	PatroniConfigMaps   map[string]*v1.ConfigMap
-	Secrets             map[types.UID]*v1.Secret
-	Statefulset         *appsv1.StatefulSet
-	VolumeClaims        map[types.UID]*v1.PersistentVolumeClaim
-	PodDisruptionBudget *policyv1.PodDisruptionBudget
-	LogicalBackupJob    *batchv1.CronJob
-	Streams             map[string]*zalandov1.FabricEventStream
+	Services                      map[PostgresRole]*v1.Service
+	Endpoints                     map[PostgresRole]*v1.Endpoints
+	PatroniEndpoints              map[string]*v1.Endpoints
+	PatroniConfigMaps             map[string]*v1.ConfigMap
+	Secrets                       map[types.UID]*v1.Secret
+	Statefulset                   *appsv1.StatefulSet
+	VolumeClaims                  map[types.UID]*v1.PersistentVolumeClaim
+	PrimaryPodDisruptionBudget    *policyv1.PodDisruptionBudget
+	CriticalOpPodDisruptionBudget *policyv1.PodDisruptionBudget
+	LogicalBackupJob              *batchv1.CronJob
+	Streams                       map[string]*zalandov1.FabricEventStream
 	//Pods are treated separately
 }
 
@@ -105,10 +106,17 @@ type Cluster struct {
 }
 
 type compareStatefulsetResult struct {
-	match         bool
-	replace       bool
-	rollingUpdate bool
-	reasons       []string
+	match                 bool
+	replace               bool
+	rollingUpdate         bool
+	reasons               []string
+	deletedPodAnnotations []string
+}
+
+type compareLogicalBackupJobResult struct {
+	match                 bool
+	reasons               []string
+	deletedPodAnnotations []string
 }
 
 // New creates a new cluster. This function should be called from a controller.
@@ -336,14 +344,10 @@ func (c *Cluster) Create() (err error) {
 	c.logger.Infof("secrets have been successfully created")
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Secrets", "The secrets have been successfully created")
 
-	if c.PodDisruptionBudget != nil {
-		return fmt.Errorf("pod disruption budget already exists in the cluster")
+	if err = c.createPodDisruptionBudgets(); err != nil {
+		return fmt.Errorf("could not create pod disruption budgets: %v", err)
 	}
-	pdb, err := c.createPodDisruptionBudget()
-	if err != nil {
-		return fmt.Errorf("could not create pod disruption budget: %v", err)
-	}
-	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
+	c.logger.Info("pod disruption budgets have been successfully created")
 
 	if c.Statefulset != nil {
 		return fmt.Errorf("statefulset already exists in the cluster")
@@ -431,6 +435,7 @@ func (c *Cluster) Create() (err error) {
 }
 
 func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compareStatefulsetResult {
+	deletedPodAnnotations := []string{}
 	reasons := make([]string, 0)
 	var match, needsRollUpdate, needsReplace bool
 
@@ -445,7 +450,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's ownerReferences do not match")
 	}
-	if changed, reason := c.compareAnnotations(c.Statefulset.Annotations, statefulSet.Annotations); changed {
+	if changed, reason := c.compareAnnotations(c.Statefulset.Annotations, statefulSet.Annotations, nil); changed {
 		match = false
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's annotations do not match: "+reason)
@@ -519,7 +524,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		}
 	}
 
-	if changed, reason := c.compareAnnotations(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations); changed {
+	if changed, reason := c.compareAnnotations(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations, &deletedPodAnnotations); changed {
 		match = false
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's pod template metadata annotations does not match "+reason)
@@ -541,7 +546,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 				reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
 				continue
 			}
-			if changed, reason := c.compareAnnotations(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations); changed {
+			if changed, reason := c.compareAnnotations(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations, nil); changed {
 				needsReplace = true
 				reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q do not match the current ones: %s", name, reason))
 			}
@@ -579,7 +584,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		match = false
 	}
 
-	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
+	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace, deletedPodAnnotations: deletedPodAnnotations}
 }
 
 type containerCondition func(a, b v1.Container) bool
@@ -781,7 +786,7 @@ func volumeMountExists(mount v1.VolumeMount, mounts []v1.VolumeMount) bool {
 	return false
 }
 
-func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) {
+func (c *Cluster) compareAnnotations(old, new map[string]string, removedList *[]string) (bool, string) {
 	reason := ""
 	ignoredAnnotations := make(map[string]bool)
 	for _, ignore := range c.OpConfig.IgnoredAnnotations {
@@ -794,6 +799,9 @@ func (c *Cluster) compareAnnotations(old, new map[string]string) (bool, string) 
 		}
 		if _, ok := new[key]; !ok {
 			reason += fmt.Sprintf(" Removed %q.", key)
+			if removedList != nil {
+				*removedList = append(*removedList, key)
+			}
 		}
 	}
 
@@ -836,41 +844,46 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	return true, ""
 }
 
-func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) (match bool, reason string) {
+func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) *compareLogicalBackupJobResult {
+	deletedPodAnnotations := []string{}
+	reasons := make([]string, 0)
+	match := true
 
 	if cur.Spec.Schedule != new.Spec.Schedule {
-		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
-			new.Spec.Schedule, cur.Spec.Schedule)
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's schedule %q does not match the current one %q", new.Spec.Schedule, cur.Spec.Schedule))
 	}
 
 	newImage := new.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 	curImage := cur.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 	if newImage != curImage {
-		return false, fmt.Sprintf("new job's image %q does not match the current one %q",
-			newImage, curImage)
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's image %q does not match the current one %q", newImage, curImage))
 	}
 
 	newPodAnnotation := new.Spec.JobTemplate.Spec.Template.Annotations
 	curPodAnnotation := cur.Spec.JobTemplate.Spec.Template.Annotations
-	if changed, reason := c.compareAnnotations(curPodAnnotation, newPodAnnotation); changed {
-		return false, fmt.Sprintf("new job's pod template metadata annotations does not match " + reason)
+	if changed, reason := c.compareAnnotations(curPodAnnotation, newPodAnnotation, &deletedPodAnnotations); changed {
+		match = false
+		reasons = append(reasons, fmt.Sprint("new job's pod template metadata annotations do not match "+reason))
 	}
 
 	newPgVersion := getPgVersion(new)
 	curPgVersion := getPgVersion(cur)
 	if newPgVersion != curPgVersion {
-		return false, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q",
-			newPgVersion, curPgVersion)
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q", newPgVersion, curPgVersion))
 	}
 
 	needsReplace := false
-	reasons := make([]string, 0)
-	needsReplace, reasons = c.compareContainers("cronjob container", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, needsReplace, reasons)
+	contReasons := make([]string, 0)
+	needsReplace, contReasons = c.compareContainers("cronjob container", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, needsReplace, contReasons)
 	if needsReplace {
-		return false, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(reasons, `', '`))
+		match = false
+		reasons = append(reasons, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(contReasons, `', '`)))
 	}
 
-	return true, ""
+	return &compareLogicalBackupJobResult{match: match, reasons: reasons, deletedPodAnnotations: deletedPodAnnotations}
 }
 
 func (c *Cluster) comparePodDisruptionBudget(cur, new *policyv1.PodDisruptionBudget) (bool, string) {
@@ -881,7 +894,7 @@ func (c *Cluster) comparePodDisruptionBudget(cur, new *policyv1.PodDisruptionBud
 	if !reflect.DeepEqual(new.ObjectMeta.OwnerReferences, cur.ObjectMeta.OwnerReferences) {
 		return false, "new PDB's owner references do not match the current ones"
 	}
-	if changed, reason := c.compareAnnotations(cur.Annotations, new.Annotations); changed {
+	if changed, reason := c.compareAnnotations(cur.Annotations, new.Annotations, nil); changed {
 		return false, "new PDB's annotations do not match the current ones:" + reason
 	}
 	return true, ""
@@ -957,6 +970,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	defer c.mu.Unlock()
 
 	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdating)
+
+	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -1016,10 +1034,18 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		// only when streams were not specified in oldSpec but in newSpec
 		needStreamUser := len(oldSpec.Spec.Streams) == 0 && len(newSpec.Spec.Streams) > 0
 
-		annotationsChanged, _ := c.compareAnnotations(oldSpec.Annotations, newSpec.Annotations)
-
 		initUsers := !sameUsers || !sameRotatedUsers || needPoolerUser || needStreamUser
-		if initUsers {
+
+		// if inherited annotations differ secrets have to be synced on update
+		newAnnotations := c.annotationsSet(nil)
+		oldAnnotations := make(map[string]string)
+		for _, secret := range c.Secrets {
+			oldAnnotations = secret.ObjectMeta.Annotations
+			break
+		}
+		annotationsChanged, _ := c.compareAnnotations(oldAnnotations, newAnnotations, nil)
+
+		if initUsers || annotationsChanged {
 			c.logger.Debug("initialize users")
 			if err := c.initUsers(); err != nil {
 				c.logger.Errorf("could not init users - skipping sync of secrets and databases: %v", err)
@@ -1027,8 +1053,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 				updateFailed = true
 				return
 			}
-		}
-		if initUsers || annotationsChanged {
+
 			c.logger.Debug("syncing secrets")
 			//TODO: mind the secrets of the deleted/new users
 			if err := c.syncSecrets(); err != nil {
@@ -1060,9 +1085,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// pod disruption budget
-	if err := c.syncPodDisruptionBudget(true); err != nil {
-		c.logger.Errorf("could not sync pod disruption budget: %v", err)
+	// pod disruption budgets
+	if err := c.syncPodDisruptionBudgets(true); err != nil {
+		c.logger.Errorf("could not sync pod disruption budgets: %v", err)
 		updateFailed = true
 	}
 
@@ -1135,6 +1160,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// streams
 	if len(newSpec.Spec.Streams) > 0 || len(oldSpec.Spec.Streams) != len(newSpec.Spec.Streams) {
+		c.logger.Debug("syncing streams")
 		if err := c.syncStreams(); err != nil {
 			c.logger.Errorf("could not sync streams: %v", err)
 			updateFailed = true
@@ -1207,10 +1233,10 @@ func (c *Cluster) Delete() error {
 		c.logger.Info("not deleting secrets because disabled in configuration")
 	}
 
-	if err := c.deletePodDisruptionBudget(); err != nil {
+	if err := c.deletePodDisruptionBudgets(); err != nil {
 		anyErrors = true
-		c.logger.Warningf("could not delete pod disruption budget: %v", err)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budget: %v", err)
+		c.logger.Warningf("could not delete pod disruption budgets: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete pod disruption budgets: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -1709,16 +1735,17 @@ func (c *Cluster) GetCurrentProcess() Process {
 // GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() *ClusterStatus {
 	status := &ClusterStatus{
-		Cluster:             c.Name,
-		Namespace:           c.Namespace,
-		Team:                c.Spec.TeamID,
-		Status:              c.Status,
-		Spec:                c.Spec,
-		MasterService:       c.GetServiceMaster(),
-		ReplicaService:      c.GetServiceReplica(),
-		StatefulSet:         c.GetStatefulSet(),
-		PodDisruptionBudget: c.GetPodDisruptionBudget(),
-		CurrentProcess:      c.GetCurrentProcess(),
+		Cluster:                       c.Name,
+		Namespace:                     c.Namespace,
+		Team:                          c.Spec.TeamID,
+		Status:                        c.Status,
+		Spec:                          c.Spec,
+		MasterService:                 c.GetServiceMaster(),
+		ReplicaService:                c.GetServiceReplica(),
+		StatefulSet:                   c.GetStatefulSet(),
+		PrimaryPodDisruptionBudget:    c.GetPrimaryPodDisruptionBudget(),
+		CriticalOpPodDisruptionBudget: c.GetCriticalOpPodDisruptionBudget(),
+		CurrentProcess:                c.GetCurrentProcess(),
 
 		Error: fmt.Errorf("error: %s", c.Error),
 	}
@@ -1731,18 +1758,58 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 	return status
 }
 
-// Switchover does a switchover (via Patroni) to a candidate pod
-func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
+func (c *Cluster) GetSwitchoverSchedule() string {
+	var possibleSwitchover, schedule time.Time
 
+	now := time.Now().UTC()
+	for _, window := range c.Spec.MaintenanceWindows {
+		// in the best case it is possible today
+		possibleSwitchover = time.Date(now.Year(), now.Month(), now.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
+		if window.Everyday {
+			if now.After(possibleSwitchover) {
+				// we are already past the time for today, try tomorrow
+				possibleSwitchover = possibleSwitchover.AddDate(0, 0, 1)
+			}
+		} else {
+			if now.Weekday() != window.Weekday {
+				// get closest possible time for this window
+				possibleSwitchover = possibleSwitchover.AddDate(0, 0, int((7+window.Weekday-now.Weekday())%7))
+			} else if now.After(possibleSwitchover) {
+				// we are already past the time for today, try next week
+				possibleSwitchover = possibleSwitchover.AddDate(0, 0, 7)
+			}
+		}
+
+		if (schedule == time.Time{}) || possibleSwitchover.Before(schedule) {
+			schedule = possibleSwitchover
+		}
+	}
+	return schedule.Format("2006-01-02T15:04+00")
+}
+
+// Switchover does a switchover (via Patroni) to a candidate pod
+func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName, scheduled bool) error {
 	var err error
-	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
-	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
+
 	stopCh := make(chan struct{})
 	ch := c.registerPodSubscriber(candidate)
 	defer c.unregisterPodSubscriber(candidate)
 	defer close(stopCh)
 
-	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
+	var scheduled_at string
+	if scheduled {
+		scheduled_at = c.GetSwitchoverSchedule()
+	} else {
+		c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
+		scheduled_at = ""
+	}
+
+	if err = c.patroni.Switchover(curMaster, candidate.Name, scheduled_at); err == nil {
+		if scheduled {
+			c.logger.Infof("switchover from %q to %q is scheduled at %s", curMaster.Name, candidate, scheduled_at)
+			return nil
+		}
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
 		_, err = c.waitForPodLabel(ch, stopCh, nil)
@@ -1750,6 +1817,9 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
+		if scheduled {
+			return fmt.Errorf("could not schedule switchover: %v", err)
+		}
 		err = fmt.Errorf("could not switch over from %q to %q: %v", curMaster.Name, candidate, err)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	}

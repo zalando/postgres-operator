@@ -1680,12 +1680,20 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 				}
 			}
 
-			match, reason := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob)
-			if match != tt.match {
-				t.Errorf("%s - unexpected match result %t when comparing cronjobs %#v and %#v", t.Name(), match, currentCronJob, desiredCronJob)
-			} else {
-				if !strings.HasPrefix(reason, tt.reason) {
-					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
+			cmp := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob)
+			if cmp.match != tt.match {
+				t.Errorf("%s - unexpected match result %t when comparing cronjobs %#v and %#v", t.Name(), cmp.match, currentCronJob, desiredCronJob)
+			} else if !cmp.match {
+				found := false
+				for _, reason := range cmp.reasons {
+					if strings.HasPrefix(reason, tt.reason) {
+						found = true
+						break
+					}
+					found = false
+				}
+				if !found {
+					t.Errorf("%s - expected reason prefix %s, not found in %#v", t.Name(), tt.reason, cmp.reasons)
 				}
 			}
 		})
@@ -2054,6 +2062,94 @@ func TestCompareVolumeMounts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := compareVolumeMounts(tt.mountsA, tt.mountsB)
 			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestGetSwitchoverSchedule(t *testing.T) {
+	now := time.Now()
+
+	futureTimeStart := now.Add(1 * time.Hour)
+	futureWindowTimeStart := futureTimeStart.Format("15:04")
+	futureWindowTimeEnd := now.Add(2 * time.Hour).Format("15:04")
+	pastTimeStart := now.Add(-2 * time.Hour)
+	pastWindowTimeStart := pastTimeStart.Format("15:04")
+	pastWindowTimeEnd := now.Add(-1 * time.Hour).Format("15:04")
+
+	tests := []struct {
+		name     string
+		windows  []acidv1.MaintenanceWindow
+		expected string
+	}{
+		{
+			name: "everyday maintenance windows is later today",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Everyday:  true,
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+			},
+			expected: futureTimeStart.Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "everyday maintenance window is tomorrow",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Everyday:  true,
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "weekday maintenance windows is later today",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+			},
+			expected: futureTimeStart.Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "weekday maintenance windows is passed for today",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 7).Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "choose the earliest window",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.AddDate(0, 0, 2).Weekday(),
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+				{
+					Everyday:  true,
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster.Spec.MaintenanceWindows = tt.windows
+			schedule := cluster.GetSwitchoverSchedule()
+			if schedule != tt.expected {
+				t.Errorf("Expected GetSwitchoverSchedule to return %s, returned: %s", tt.expected, schedule)
+			}
 		})
 	}
 }

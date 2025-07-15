@@ -384,7 +384,7 @@ exceptions:
 The interval of days can be set with `password_rotation_interval` (default
 `90` = 90 days, minimum 1). On each rotation the user name and password values
 are replaced in the K8s secret. They belong to a newly created user named after
-the original role plus rotation date in YYMMDD format. All priviliges are
+the original role plus rotation date in YYMMDD format. All privileges are
 inherited meaning that migration scripts should still grant and revoke rights
 against the original role. The timestamp of the next rotation (in RFC 3339
 format, UTC timezone) is written to the secret as well. Note, if the rotation
@@ -564,7 +564,7 @@ manifest affinity.
 ```
 
 If `node_readiness_label_merge` is set to `"OR"` (default) the readiness label
-affinty will be appended with its own expressions block:
+affinity will be appended with its own expressions block:
 
 ```yaml
   affinity:
@@ -620,22 +620,34 @@ By default the topology key for the pod anti affinity is set to
 `kubernetes.io/hostname`, you can set another topology key e.g.
 `failure-domain.beta.kubernetes.io/zone`. See [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys.
 
-## Pod Disruption Budget
+## Pod Disruption Budgets
 
-By default the operator uses a PodDisruptionBudget (PDB) to protect the cluster
-from voluntarily disruptions and hence unwanted DB downtime. The `MinAvailable`
-parameter of the PDB is set to `1` which prevents killing masters in single-node
-clusters and/or the last remaining running instance in a multi-node cluster.
+By default the operator creates two PodDisruptionBudgets (PDB) to protect the cluster
+from voluntarily disruptions and hence unwanted DB downtime: so-called primary PDB and
+and PDB for critical operations.
+
+### Primary PDB
+The `MinAvailable` parameter of this PDB is set to `1` and, if `pdb_master_label_selector`
+is enabled, label selector includes `spilo-role=master` condition, which prevents killing
+masters in single-node clusters and/or the last remaining running instance in a multi-node
+cluster.
+
+## PDB for critical operations
+The `MinAvailable` parameter of this PDB is equal to the `numberOfInstances` set in the
+cluster manifest, while label selector includes `critical-operation=true` condition. This
+allows to protect all pods of a cluster, given they are labeled accordingly.
+For example, Operator labels all Spilo pods with `critical-operation=true` during the major
+version upgrade run. You may want to protect cluster pods during other critical operations
+by assigning the label to pods yourself or using other means of automation.
 
 The PDB is only relaxed in two scenarios:
 
 * If a cluster is scaled down to `0` instances (e.g. for draining nodes)
 * If the PDB is disabled in the configuration (`enable_pod_disruption_budget`)
 
-The PDB is still in place having `MinAvailable` set to `0`. If enabled it will
-be automatically set to `1` on scale up. Disabling PDBs helps avoiding blocking
-Kubernetes upgrades in managed K8s environments at the cost of prolonged DB
-downtime. See PR [#384](https://github.com/zalando/postgres-operator/pull/384)
+The PDBs are still in place having `MinAvailable` set to `0`. Disabling PDBs
+helps avoiding blocking Kubernetes upgrades in managed K8s environments at the
+cost of prolonged DB downtime. See PR [#384](https://github.com/zalando/postgres-operator/pull/384)
 for the use case.
 
 ## Add cluster-specific labels
@@ -1128,7 +1140,7 @@ metadata:
     iam.gke.io/gcp-service-account: <GCP_SERVICE_ACCOUNT_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com
 ```
 
-2. Specify the new custom service account in your [operator paramaters](./reference/operator_parameters.md)
+2. Specify the new custom service account in your [operator parameters](./reference/operator_parameters.md)
 
 If using manual deployment or kustomize, this is done by setting
 `pod_service_account_name` in your configuration file specified in the

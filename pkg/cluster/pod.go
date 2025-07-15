@@ -280,11 +280,16 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
 
+	scheduleSwitchover := false
+	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+		c.logger.Infof("postponing switchover, not in maintenance window")
+		scheduleSwitchover = true
+	}
 	err = retryutil.Retry(1*time.Minute, 5*time.Minute,
 		func() (bool, error) {
-			err := c.Switchover(oldMaster, masterCandidateName)
+			err := c.Switchover(oldMaster, masterCandidateName, scheduleSwitchover)
 			if err != nil {
-				c.logger.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+				c.logger.Errorf("could not switchover to pod %q: %v", masterCandidateName, err)
 				return false, nil
 			}
 			return true, nil
@@ -445,7 +450,7 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 				// do not recreate master now so it will keep the update flag and switchover will be retried on next sync
 				return fmt.Errorf("skipping switchover: %v", err)
 			}
-			if err := c.Switchover(masterPod, masterCandidate); err != nil {
+			if err := c.Switchover(masterPod, masterCandidate, false); err != nil {
 				return fmt.Errorf("could not perform switch over: %v", err)
 			}
 		} else if newMasterPod == nil && len(replicas) == 0 {

@@ -1187,7 +1187,7 @@ class EndToEndTestCase(unittest.TestCase):
         Test major version upgrade: with full upgrade, maintenance window, and annotation
         """
         def check_version():
-            p = k8s.patroni_rest("acid-upgrade-test-0", "")
+            p = k8s.patroni_rest("acid-upgrade-test-0", "") or {}
             version = p.get("server_version", 0) // 10000
             return version
 
@@ -1237,7 +1237,7 @@ class EndToEndTestCase(unittest.TestCase):
         # should not upgrade because current time is not in maintenanceWindow
         current_time = datetime.now()
         maintenance_window_future = f"{(current_time+timedelta(minutes=60)).strftime('%H:%M')}-{(current_time+timedelta(minutes=120)).strftime('%H:%M')}"
-        pg_patch_version_15 = {
+        pg_patch_version_15_outside_mw = {
             "spec": {
                 "postgresql": {
                     "version": "15"
@@ -1248,10 +1248,10 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15_outside_mw)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
+        # no pod replacement outside of the maintenance window
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         self.eventuallyEqual(check_version, 14, "Version should not be upgraded")
@@ -1259,12 +1259,12 @@ class EndToEndTestCase(unittest.TestCase):
         second_annotations = get_annotations()
         self.assertIsNone(second_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure should not be set")
 
-        # change the version again to trigger operator sync
+        # change maintenanceWindows to current
         maintenance_window_current = f"{(current_time-timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=30)).strftime('%H:%M')}"
-        pg_patch_version_16 = {
+        pg_patch_version_15_in_mw = {
             "spec": {
                 "postgresql": {
-                    "version": "16"
+                    "version": "15"
                 },
                 "maintenanceWindows": [
                     maintenance_window_current
@@ -1273,13 +1273,13 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_16)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15_in_mw)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
+        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 16, "Version should be upgraded from 14 to 16")
+        self.eventuallyEqual(check_version, 15, "Version should be upgraded from 14 to 15")
 
         # check if annotation for last upgrade's success is updated after second upgrade
         third_annotations = get_annotations()
@@ -1303,20 +1303,20 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_17)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 16, "Version should not be upgraded because annotation for last upgrade's failure is set")
-
-        # change the version back to 15 and should remove failure annotation
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+        self.eventuallyEqual(check_version, 15, "Version should not be upgraded because annotation for last upgrade's failure is set")
 
+        # change the version back to 15 and should remove failure annotation
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15_in_mw)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+        self.eventuallyEqual(check_version, 15, "Version should not be upgraded from 15")
         fourth_annotations = get_annotations()
         self.assertIsNone(fourth_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure is not removed")
 
@@ -1752,8 +1752,12 @@ class EndToEndTestCase(unittest.TestCase):
            Test password rotation and removal of users due to retention policy
         '''
         k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
         leader = k8s.get_cluster_leader_pod()
         today = date.today()
+
+        # remember number of secrets to make sure it stays the same
+        secret_count = k8s.count_secrets_with_label(cluster_label)
 
         # enable password rotation for owner of foo database
         pg_patch_rotation_single_users = {
@@ -1810,6 +1814,7 @@ class EndToEndTestCase(unittest.TestCase):
         enable_password_rotation = {
             "data": {
                 "enable_password_rotation": "true",
+                "inherited_annotations": "environment",
                 "password_rotation_interval": "30",
                 "password_rotation_user_retention": "30",  # should be set to 60 
             },
@@ -1856,12 +1861,28 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(self.query_database_with_user(leader.metadata.name, "postgres", "SELECT 1", "foo_user")), 1,
             "Could not connect to the database with rotation user {}".format(rotation_user), 10, 5)
 
+        # add annotation which triggers syncSecrets call
+        pg_annotation_patch = {
+            "metadata": {
+                "annotations": {
+                    "environment": "test",
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_annotation_patch)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        time.sleep(10)
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), secret_count, "Unexpected number of secrets")
+
         # check if rotation has been ignored for user from test_cross_namespace_secrets test
         db_user_secret = k8s.get_secret(username="test.db_user", namespace="test")
         secret_username = str(base64.b64decode(db_user_secret.data["username"]), 'utf-8')
-
         self.assertEqual("test.db_user", secret_username,
                         "Unexpected username in secret of test.db_user: expected {}, got {}".format("test.db_user", secret_username))
+
+        # check if annotation for secret has been updated
+        self.assertTrue("environment" in db_user_secret.metadata.annotations, "Added annotation was not propagated to secret")
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped 
@@ -2100,7 +2121,7 @@ class EndToEndTestCase(unittest.TestCase):
         patch_sset_propagate_annotations = {
             "data": {
                 "downscaler_annotations": "deployment-time,downscaler/*",
-                "inherited_annotations": "owned-by",
+                "inherited_annotations": "environment,owned-by",
             }
         }
         k8s.update_config(patch_sset_propagate_annotations)
@@ -2547,7 +2568,10 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertTrue(self.has_postgresql_owner_reference(config_ep.metadata.owner_references, inverse), "config endpoint owner reference check failed")
 
         pdb = k8s.api.policy_v1.read_namespaced_pod_disruption_budget("postgres-{}-pdb".format(cluster_name), cluster_namespace)
-        self.assertTrue(self.has_postgresql_owner_reference(pdb.metadata.owner_references, inverse), "pod disruption owner reference check failed")
+        self.assertTrue(self.has_postgresql_owner_reference(pdb.metadata.owner_references, inverse), "primary pod disruption budget owner reference check failed")
+
+        pdb = k8s.api.policy_v1.read_namespaced_pod_disruption_budget("postgres-{}-critical-op-pdb".format(cluster_name), cluster_namespace)
+        self.assertTrue(self.has_postgresql_owner_reference(pdb.metadata.owner_references, inverse), "pod disruption budget for critical operations owner reference check failed")
 
         pg_secret = k8s.api.core_v1.read_namespaced_secret("postgres.{}.credentials.postgresql.acid.zalan.do".format(cluster_name), cluster_namespace)
         self.assertTrue(self.has_postgresql_owner_reference(pg_secret.metadata.owner_references, inverse), "postgres secret owner reference check failed")
