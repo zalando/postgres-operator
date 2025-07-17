@@ -192,11 +192,21 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 }
 
 // SetPostgresCRDStatus of Postgres cluster
-func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, pgStatus apiacidv1.PostgresStatus, message string) (*apiacidv1.Postgresql, error) {
+func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string, clusterNameLabel string, message string) (*apiacidv1.Postgresql, error) {
 	var pg *apiacidv1.Postgresql
+	var pgStatus apiacidv1.PostgresStatus
 
-	newConditions := updateConditions(pgStatus.Conditions, pgStatus.PostgresClusterStatus, message)
-	pgStatus.Conditions = newConditions
+	pg, err := client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Get(context.TODO(), clusterName.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch Postgres CR %s/%s: %v", clusterName.Namespace, clusterName.Name, err)
+	}
+
+	pgStatus = updateConditions(pg, status, message)
+	if pgStatus.LabelSelector == "" {
+		pgStatus.LabelSelector = fmt.Sprintf("%s=%s", clusterNameLabel, pg.Name)
+	}
+
+	pgStatus.PostgresClusterStatus = status
 
 	patch, err := json.Marshal(struct {
 		PgStatus interface{} `json:"status"`
@@ -218,8 +228,10 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 	return pg, nil
 }
 
-func updateConditions(existingConditions apiacidv1.Conditions, currentStatus string, message string) apiacidv1.Conditions {
+func updateConditions(existingPg *apiacidv1.Postgresql, currentStatus string, message string) apiacidv1.PostgresStatus {
 	now := apiacidv1.VolatileTime{Inner: metav1.NewTime(time.Now())}
+	existingStatus := existingPg.Status
+	existingConditions := existingStatus.Conditions
 	var readyCondition, reconciliationCondition *apiacidv1.Condition
 
 	// Find existing conditions
@@ -228,21 +240,6 @@ func updateConditions(existingConditions apiacidv1.Conditions, currentStatus str
 			readyCondition = &existingConditions[i]
 		} else if existingConditions[i].Type == "ReconciliationSuccessful" {
 			reconciliationCondition = &existingConditions[i]
-		}
-	}
-
-	// Initialize conditions if not present
-	switch currentStatus {
-	case "Creating":
-		if reconciliationCondition == nil {
-			existingConditions = append(existingConditions, apiacidv1.Condition{Type: "ReconciliationSuccessful"})
-			reconciliationCondition = &existingConditions[len(existingConditions)-1]
-
-		}
-	default:
-		if readyCondition == nil {
-			existingConditions = append(existingConditions, apiacidv1.Condition{Type: "Ready"})
-			readyCondition = &existingConditions[len(existingConditions)-1]
 		}
 	}
 
@@ -262,15 +259,23 @@ func updateConditions(existingConditions apiacidv1.Conditions, currentStatus str
 	case "Running":
 		readyCondition.Status = v1.ConditionTrue
 		readyCondition.LastTransitionTime = now
+		existingPg.Status.NumberOfInstances = existingPg.Spec.NumberOfInstances
+		existingPg.Status.ObservedGeneration = existingPg.Generation
 	case "CreateFailed":
 		readyCondition.Status = v1.ConditionFalse
 		readyCondition.LastTransitionTime = now
+		existingPg.Status.NumberOfInstances = 0
+		existingPg.Status.ObservedGeneration = 0
 	case "UpdateFailed", "SyncFailed", "Invalid":
 		if readyCondition.Status == v1.ConditionFalse {
 			readyCondition.LastTransitionTime = now
+			existingPg.Status.NumberOfInstances = existingStatus.NumberOfInstances
+			existingPg.Status.ObservedGeneration = existingStatus.ObservedGeneration
 		}
 	case "Updating":
-		// not updatinf time, just setting the status
+		existingPg.Status.NumberOfInstances = existingStatus.NumberOfInstances
+		existingPg.Status.ObservedGeneration = existingStatus.ObservedGeneration
+		// not updating time, just setting the status
 		if readyCondition.Status == v1.ConditionFalse {
 			readyCondition.Status = v1.ConditionFalse
 		} else {
@@ -297,7 +302,19 @@ func updateConditions(existingConditions apiacidv1.Conditions, currentStatus str
 		}
 	}
 
-	return existingConditions
+	if currentStatus == "Creating" {
+		existingPg.Status.NumberOfInstances = 0
+		existingPg.Status.ObservedGeneration = 0
+		for i := range existingConditions {
+			if existingConditions[i].Type == "Ready" {
+				existingConditions = append(existingConditions[:i], existingConditions[i+1:]...)
+				break
+			}
+		}
+	}
+	existingPg.Status.Conditions = existingConditions
+
+	return existingPg.Status
 }
 
 // SetFinalizer of Postgres cluster
