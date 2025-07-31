@@ -21,6 +21,7 @@ SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
 DIRS := cmd pkg
 PKG := `go list ./... | grep -v /vendor/`
+ARCH := $(shell go env GOARCH)
 
 ifeq ($(DEBUG),1)
 	DOCKERFILE = DebugDockerfile
@@ -42,8 +43,7 @@ ifndef GOPATH
 	GOPATH := $(HOME)/go
 endif
 
-PATH := $(GOPATH)/bin:$(PATH)
-SHELL := env PATH=$(PATH) $(SHELL)
+export PATH := $(GOPATH)/bin:$(PATH)
 
 default: local
 
@@ -61,12 +61,11 @@ macos: ${SOURCES}
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
 
 docker: ${DOCKERDIR}/${DOCKERFILE}
-	echo `(env)`
 	echo "Tag ${TAG}"
 	echo "Version ${VERSION}"
 	echo "CDP tag ${CDP_TAG}"
 	echo "git describe $(shell git describe --tags --always --dirty)"
-	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERDIR}/${DOCKERFILE}" --build-arg VERSION="${VERSION}" .
+	docker buildx build --build-arg "BASE_REGISTRY=docker.io" --build-arg "ARCH=linux/${ARCH}" --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERDIR}/${DOCKERFILE}" --build-arg VERSION="${VERSION}" .
 
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.23.4 bash -c "make linux"
@@ -101,3 +100,16 @@ codegen:
 
 e2e: docker # build operator image to be tested
 	cd e2e; make e2etest
+
+grype-scan: docker
+	@echo "Checking for grype installation..."
+	@if ! command -v grype &> /dev/null; then \
+		echo "grype could not be found, please install it first."; \
+		exit 1; \
+	fi
+	@echo "Grype is installed, proceeding with the scan..."
+	@echo "Using image: $(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)"
+	@echo "Running grype scan on image: $(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)"
+	docker run --rm --volume ~/.docker/run/docker.sock:/var/run/docker.sock \
+	-w ${PWD} anchore/grype:latest \
+	docker:$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)
