@@ -1000,8 +1000,8 @@ restoring WAL files. You can find the log files to the respective commands
 under `$HOME/pgdata/pgroot/pg_log/postgres-?.log`.
 
 ```bash
-archive_command:  `envdir "{WALE_ENV_DIR}" {WALE_BINARY} wal-push "%p"`
-restore_command:  `envdir "{{WALE_ENV_DIR}}" /scripts/restore_command.sh "%f" "%p"`
+archive_command:  `envdir "{WALG_ENV_DIR}" {WALG_BINARY} wal-push "%p"`
+restore_command:  `envdir "{{WALG_ENV_DIR}}" /scripts/restore_command.sh "%f" "%p"`
 ```
 
 You can produce a basebackup manually with the following command and check
@@ -1080,8 +1080,8 @@ variables:
 
 ```bash
 AWS_ENDPOINT='https://s3.eu-central-1.amazonaws.com:443'
-WALE_S3_ENDPOINT='https+path://s3.eu-central-1.amazonaws.com:443'
-WALE_S3_PREFIX=$WAL_S3_BUCKET/spilo/{WAL_BUCKET_SCOPE_PREFIX}{SCOPE}{WAL_BUCKET_SCOPE_SUFFIX}/wal/{PGVERSION}
+WALG_S3_ENDPOINT='https+path://s3.eu-central-1.amazonaws.com:443'
+WALG_S3_PREFIX=$WAL_S3_BUCKET/spilo/{WAL_BUCKET_SCOPE_PREFIX}{SCOPE}{WAL_BUCKET_SCOPE_SUFFIX}/wal/{PGVERSION}
 ```
 
 The operator sets the prefix to an empty string so that spilo will generate it
@@ -1092,11 +1092,11 @@ the [pod_environment_configmap](#custom-pod-environment-variables) you have
 to set `WAL_BUCKET_SCOPE_PREFIX = ""`, too. Otherwise Spilo will not find
 the physical backups on restore (next chapter).
 
-When the `AWS_REGION` is set, `AWS_ENDPOINT` and `WALE_S3_ENDPOINT` are
-generated automatically. `WALG_S3_PREFIX` is identical to `WALE_S3_PREFIX`.
+When the `AWS_REGION` is set, `AWS_ENDPOINT` and `WALG_S3_ENDPOINT` are
+generated automatically. `WALG_S3_PREFIX` is identical to `WALG_S3_PREFIX`.
 `SCOPE` is the Postgres cluster name.
 
-:warning: If both `AWS_REGION` and `AWS_ENDPOINT` or `WALE_S3_ENDPOINT` are
+:warning: If both `AWS_REGION` and `AWS_ENDPOINT` or `WALG_S3_ENDPOINT` are
 defined backups with WAL-E will fail. You can fix it by switching to WAL-G
 with `USE_WALG_BACKUP: "true"`.
 
@@ -1195,7 +1195,7 @@ scope to just the WAL-E bucket.
 apiVersion: v1
 kind: Secret
 metadata:
-  name: psql-wale-creds
+  name: psql-wal-creds
   namespace: default
 type: Opaque
 stringData:
@@ -1203,13 +1203,13 @@ stringData:
     <GCP .json credentials>
 ```
 
-2. Setup your operator configuration values. With the `psql-wale-creds`
+2. Setup your operator configuration values. With the `psql-wal-creds`
 resource applied to your cluster, ensure that the operator's configuration
 is set up like the following:
 ```yml
 ...
 aws_or_gcp:
-  additional_secret_mount: "psql-wale-creds"
+  additional_secret_mount: "psql-wal-creds"
   additional_secret_mount_path: "/var/secrets/google"  # or where ever you want to mount the file
   # aws_region: eu-central-1
   # kube_iam_role: ""

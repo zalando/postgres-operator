@@ -715,7 +715,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	mockClient.EXPECT().Get(gomock.Any()).Return(&response, nil).AnyTimes()
 
 	// mocking a config after setConfig is called
-	standbyJson := `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_wale","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}}`
+	standbyJson := `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_walg","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-g.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}}`
 	r = io.NopCloser(bytes.NewReader([]byte(standbyJson)))
 	response = http.Response{
 		StatusCode: 200,
@@ -741,7 +741,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check that pods do not have a STANDBY_* environment variable
-	assert.NotContains(t, sts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
+	assert.NotContains(t, sts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALG"})
 
 	// add standby section
 	cluster.Spec.StandbyCluster = &acidv1.StandbyDescription{
@@ -751,13 +751,13 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	updatedSts := cluster.Statefulset
 
 	// check that pods do not have a STANDBY_* environment variable
-	assert.Contains(t, updatedSts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
+	assert.Contains(t, updatedSts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALG"})
 
 	// this should update the Patroni config
 	err = cluster.syncStandbyClusterConfiguration()
 	assert.NoError(t, err)
 
-	configJson = `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_wale","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}, "ttl": 20}`
+	configJson = `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_g","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-g.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}, "ttl": 20}`
 	r = io.NopCloser(bytes.NewReader([]byte(configJson)))
 	response = http.Response{
 		StatusCode: 200,
@@ -773,8 +773,8 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	// ToDo extend GetConfig to return standy_cluster setting to compare
 	/*
 		defaultStandbyParameters := map[string]interface{}{
-			"create_replica_methods": []string{"bootstrap_standby_with_wale", "basebackup_fast_xlog"},
-			"restore_command":        "envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\"",
+			"create_replica_methods": []string{"bootstrap_standby_with_walg", "basebackup_fast_xlog"},
+			"restore_command":        "envdir \"/run/etc/wal-g.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\"",
 		}
 		assert.True(t, reflect.DeepEqual(defaultStandbyParameters, standbyCluster))
 	*/
@@ -784,7 +784,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	updatedSts2 := cluster.Statefulset
 
 	// check that pods do not have a STANDBY_* environment variable
-	assert.NotContains(t, updatedSts2.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
+	assert.NotContains(t, updatedSts2.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALG"})
 
 	// this should update the Patroni config again
 	err = cluster.syncStandbyClusterConfiguration()

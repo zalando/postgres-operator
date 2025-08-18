@@ -665,7 +665,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	expectedCloneEnvSpec := []ExpectedValue{
 		{
 			envIndex:       16,
-			envVarConstant: "CLONE_WALE_S3_PREFIX",
+			envVarConstant: "CLONE_WALG_S3_PREFIX",
 			envVarValue:    "s3://another-bucket",
 		},
 		{
@@ -687,7 +687,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		},
 		{
 			envIndex:       17,
-			envVarConstant: "CLONE_WALE_S3_PREFIX",
+			envVarConstant: "CLONE_WALG_S3_PREFIX",
 			envVarValue:    "s3://another-bucket",
 		},
 		{
@@ -730,7 +730,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	expectedStandbyEnvSecret := []ExpectedValue{
 		{
 			envIndex:       15,
-			envVarConstant: "STANDBY_WALE_GS_PREFIX",
+			envVarConstant: "STANDBY_WALG_GS_PREFIX",
 			envVarValue:    "gs://some/path/",
 		},
 		{
@@ -767,7 +767,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		{
 			subTest: "will set WAL_S3_BUCKET env",
 			opConfig: config.Config{
-				WALES3Bucket: "global-s3-bucket",
+				WALS3Bucket: "global-s3-bucket",
 			},
 			cloneDescription:   &acidv1.CloneDescription{},
 			standbyDescription: &acidv1.StandbyDescription{},
@@ -815,7 +815,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 						Name: testPodEnvironmentConfigMapName,
 					},
 				},
-				WALES3Bucket: "global-s3-bucket",
+				WALS3Bucket: "global-s3-bucket",
 			},
 			cloneDescription:   &acidv1.CloneDescription{},
 			standbyDescription: &acidv1.StandbyDescription{},
@@ -903,7 +903,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 						Name: testPodEnvironmentConfigMapName,
 					},
 				},
-				WALES3Bucket: "global-s3-bucket",
+				WALS3Bucket: "global-s3-bucket",
 			},
 			cloneDescription: &acidv1.CloneDescription{
 				ClusterName:  "test-cluster",
@@ -923,7 +923,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 						Name: testPodEnvironmentConfigMapName,
 					},
 				},
-				WALES3Bucket: "global-s3-bucket",
+				WALS3Bucket: "global-s3-bucket",
 			},
 			cloneDescription: &acidv1.CloneDescription{
 				ClusterName:  "test-cluster",
@@ -953,7 +953,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 						Name: testPodEnvironmentConfigMapName,
 					},
 				},
-				WALES3Bucket: "global-s3-bucket",
+				WALS3Bucket: "global-s3-bucket",
 			},
 			cloneDescription: &acidv1.CloneDescription{
 				ClusterName:  "test-cluster",
@@ -971,7 +971,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
 					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
-				WALES3Bucket: "global-s3-bucket",
+				WALS3Bucket: "global-s3-bucket",
 			},
 			cloneDescription: &acidv1.CloneDescription{
 				ClusterName:  "test-cluster",
@@ -989,7 +989,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
 					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
 				},
-				WALES3Bucket: "global-s3-bucket",
+				WALS3Bucket: "global-s3-bucket",
 			},
 			cloneDescription: &acidv1.CloneDescription{},
 			standbyDescription: &acidv1.StandbyDescription{
@@ -1177,7 +1177,7 @@ func TestCloneEnv(t *testing.T) {
 				EndTimestamp: "somewhen",
 			},
 			env: v1.EnvVar{
-				Name:  "CLONE_WALE_S3_PREFIX",
+				Name:  "CLONE_WALG_S3_PREFIX",
 				Value: "s3://some/path/",
 			},
 			envPos: 1,
@@ -1191,7 +1191,7 @@ func TestCloneEnv(t *testing.T) {
 			},
 			env: v1.EnvVar{
 				Name:  "CLONE_WAL_S3_BUCKET",
-				Value: "wale-bucket",
+				Value: "wal-bucket",
 			},
 			envPos: 1,
 		},
@@ -1213,7 +1213,7 @@ func TestCloneEnv(t *testing.T) {
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
-				WALES3Bucket:   "wale-bucket",
+				WALS3Bucket:    "wal-bucket",
 				ProtectedRoles: []string{"admin"},
 				Auth: config.Auth{
 					SuperUsername:       superUserName,
@@ -1325,7 +1325,7 @@ func TestStandbyEnv(t *testing.T) {
 				S3WalPath: "s3://some/path/",
 			},
 			env: v1.EnvVar{
-				Name:  "STANDBY_WALE_S3_PREFIX",
+				Name:  "STANDBY_WALG_S3_PREFIX",
 				Value: "s3://some/path/",
 			},
 			envPos: 0,
@@ -1339,7 +1339,7 @@ func TestStandbyEnv(t *testing.T) {
 			},
 			env: v1.EnvVar{
 				Name:  "STANDBY_METHOD",
-				Value: "STANDBY_WITH_WALE",
+				Value: "STANDBY_WITH_WALG",
 			},
 			envPos: 1,
 			envLen: 3,

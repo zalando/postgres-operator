@@ -1027,8 +1027,8 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 	standbyOptionsToSet := make(map[string]interface{})
 	if c.Spec.StandbyCluster != nil {
 		c.logger.Infof("turning %q into a standby cluster", c.Name)
-		standbyOptionsToSet["create_replica_methods"] = []string{"bootstrap_standby_with_wale", "basebackup_fast_xlog"}
-		standbyOptionsToSet["restore_command"] = "envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""
+		standbyOptionsToSet["create_replica_methods"] = []string{"bootstrap_standby_with_walg", "basebackup_fast_xlog"}
+		standbyOptionsToSet["restore_command"] = "envdir \"/run/etc/wal-g.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""
 
 	} else {
 		c.logger.Infof("promoting standby cluster and detach from source")

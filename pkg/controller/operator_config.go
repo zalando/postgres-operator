@@ -166,7 +166,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ExternalTrafficPolicy = util.Coalesce(fromCRD.LoadBalancer.ExternalTrafficPolicy, "Cluster")
 
 	// AWS or GCP config
-	result.WALES3Bucket = fromCRD.AWSGCP.WALES3Bucket
+	result.WALS3Bucket = fromCRD.AWSGCP.WALS3Bucket
 	result.AWSRegion = fromCRD.AWSGCP.AWSRegion
 	result.LogS3Bucket = fromCRD.AWSGCP.LogS3Bucket
 	result.KubeIAMRole = fromCRD.AWSGCP.KubeIAMRole
