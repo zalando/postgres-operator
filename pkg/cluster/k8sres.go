@@ -171,7 +171,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 		if isSmaller {
 			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required minimum %s and will be increased",
 				cpuLimit.String(), constants.PostgresContainerName, minCPULimit)
-			c.logger.Warningf(msg)
+			c.logger.Warningf("%s", msg)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
 			resources.Limits[v1.ResourceCPU], _ = resource.ParseQuantity(minCPULimit)
 		}
@@ -188,7 +188,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 		if isSmaller {
 			msg = fmt.Sprintf("defined memory limit %s for %q container is below required minimum %s and will be increased",
 				memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit)
-			c.logger.Warningf(msg)
+			c.logger.Warningf("%s", msg)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
 			resources.Limits[v1.ResourceMemory], _ = resource.ParseQuantity(minMemoryLimit)
 		}

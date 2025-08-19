@@ -129,7 +129,7 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 
 	if len(errors) > 0 {
 		for _, s := range errors {
-			c.logger.Warningf(s)
+			c.logger.Warningf("%s", s)
 		}
 	}
 	return nil
