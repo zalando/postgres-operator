@@ -1052,8 +1052,8 @@ func (c *Cluster) generateSpiloPodEnvVars(
 
 	// global variables derived from operator configuration
 	opConfigEnvVars := make([]v1.EnvVar, 0)
-	if c.OpConfig.WALS3Bucket != "" {
-		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALS3Bucket})
+	if c.OpConfig.WALES3Bucket != "" {
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
@@ -2118,9 +2118,9 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		if description.S3WalPath == "" {
 			c.logger.Info("no S3 WAL path defined - taking value from global config", description.S3WalPath)
 
-			if c.OpConfig.WALS3Bucket != "" {
-				c.logger.Debugf("found WALS3Bucket %s - will set CLONE_WAL_S3_BUCKET", c.OpConfig.WALS3Bucket)
-				result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALS3Bucket})
+			if c.OpConfig.WALES3Bucket != "" {
+				c.logger.Debugf("found WALES3Bucket %s - will set CLONE_WAL_S3_BUCKET", c.OpConfig.WALES3Bucket)
+				result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 			} else if c.OpConfig.WALGSBucket != "" {
 				c.logger.Debugf("found WALGSBucket %s - will set CLONE_WAL_GS_BUCKET", c.OpConfig.WALGSBucket)
 				result = append(result, v1.EnvVar{Name: "CLONE_WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
@@ -2139,21 +2139,19 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		} else {
 			c.logger.Debugf("use S3WalPath %s from the manifest", description.S3WalPath)
 
-			// add if
 			result = append(result, v1.EnvVar{
-				Name:  "CLONE_WALG_S3_PREFIX",
+				Name:  "CLONE_WALE_S3_PREFIX",
 				Value: description.S3WalPath,
 			})
 		}
 
-		// if else wal-g
-		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALG"})
+		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 		if description.S3Endpoint != "" {
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
-			result = append(result, v1.EnvVar{Name: "CLONE_WALG_S3_ENDPOINT", Value: description.S3Endpoint})
+			result = append(result, v1.EnvVar{Name: "CLONE_WALE_S3_ENDPOINT", Value: description.S3Endpoint})
 		}
 
 		if description.S3AccessKeyId != "" {
@@ -2197,12 +2195,12 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 		c.logger.Info("standby cluster streaming from WAL location")
 		if description.S3WalPath != "" {
 			result = append(result, v1.EnvVar{
-				Name:  "STANDBY_WALG_S3_PREFIX",
+				Name:  "STANDBY_WALE_S3_PREFIX",
 				Value: description.S3WalPath,
 			})
 		} else if description.GSWalPath != "" {
 			result = append(result, v1.EnvVar{
-				Name:  "STANDBY_WALG_GS_PREFIX",
+				Name:  "STANDBY_WALE_GS_PREFIX",
 				Value: description.GSWalPath,
 			})
 		} else {
@@ -2211,7 +2209,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 		}
 
 		// if use wal-g
-		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALG"})
+		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
