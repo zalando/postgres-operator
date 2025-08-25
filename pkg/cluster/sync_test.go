@@ -715,7 +715,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	mockClient.EXPECT().Get(gomock.Any()).Return(&response, nil).AnyTimes()
 
 	// mocking a config after setConfig is called
-	standbyJson := `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_walg","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-g.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}}`
+	standbyJson := `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_walg","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}}`
 	r = io.NopCloser(bytes.NewReader([]byte(standbyJson)))
 	response = http.Response{
 		StatusCode: 200,
@@ -757,7 +757,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	err = cluster.syncStandbyClusterConfiguration()
 	assert.NoError(t, err)
 
-	configJson = `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_walg","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-g.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}, "ttl": 20}`
+	configJson = `{"standby_cluster":{"create_replica_methods":["bootstrap_standby_with_walg","basebackup_fast_xlog"],"restore_command":"envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""}, "ttl": 20}`
 	r = io.NopCloser(bytes.NewReader([]byte(configJson)))
 	response = http.Response{
 		StatusCode: 200,
