@@ -628,7 +628,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 		newCheck("new %s's %s (index %d) environment sources do not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 		newCheck("new %s's %s (index %d) security context does not match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
+			//func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
+			func(a, b v1.Container) bool { return !compareSecurityContexts(a.SecurityContext, b.SecurityContext) }),
 		newCheck("new %s's %s (index %d) volume mounts do not match the current one",
 			func(a, b v1.Container) bool { return !compareVolumeMounts(a.VolumeMounts, b.VolumeMounts) }),
 	}
@@ -649,6 +650,14 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 	}
 
 	return needsRollUpdate, reasons
+}
+
+func compareSecurityContexts(a *v1.SecurityContext, b *v1.SecurityContext) bool {
+	if b == nil || reflect.ValueOf(b.Capabilities).IsNil() {
+		return true
+	} else {
+		return reflect.DeepEqual(a, b)
+	}
 }
 
 func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
