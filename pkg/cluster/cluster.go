@@ -677,12 +677,12 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 		return len(a.Requests) == 0
 	}
 	for k, v := range a.Requests {
-		if (&v).Cmp(b.Requests[k]) != 0 {
+		if k != "ephemeral-storage" && (&v).Cmp(b.Requests[k]) != 0 {
 			return false
 		}
 	}
 	for k, v := range a.Limits {
-		if (&v).Cmp(b.Limits[k]) != 0 {
+		if k != "ephemeral-storage" && (&v).Cmp(b.Limits[k]) != 0 {
 			return false
 		}
 	}
