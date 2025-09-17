@@ -1208,7 +1208,7 @@ func (c *Cluster) updateSecret(
 	}
 
 	if updateSecret {
-		c.logger.Infof(updateSecretMsg)
+		c.logger.Infof("%s", updateSecretMsg)
 		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("could not update secret %s: %v", secretName, err)
 		}

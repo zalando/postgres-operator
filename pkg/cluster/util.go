@@ -257,9 +257,9 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	if teamID == "" {
 		msg := "no teamId specified"
 		if c.OpConfig.EnableTeamIdClusternamePrefix {
-			return nil, fmt.Errorf(msg)
+			return nil, fmt.Errorf("%s", msg)
 		}
-		c.logger.Warnf(msg)
+		c.logger.Warnf("%s", msg)
 		return nil, nil
 	}
 

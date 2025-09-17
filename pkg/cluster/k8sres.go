@@ -170,7 +170,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 		if isSmaller {
 			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required minimum %s and will be increased",
 				cpuLimit.String(), constants.PostgresContainerName, minCPULimit)
-			c.logger.Warningf(msg)
+			c.logger.Warningf("%s", msg)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
 			resources.Limits[v1.ResourceCPU], _ = resource.ParseQuantity(minCPULimit)
 		}
@@ -187,7 +187,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 		if isSmaller {
 			msg = fmt.Sprintf("defined memory limit %s for %q container is below required minimum %s and will be increased",
 				memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit)
-			c.logger.Warningf(msg)
+			c.logger.Warningf("%s", msg)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
 			resources.Limits[v1.ResourceMemory], _ = resource.ParseQuantity(minMemoryLimit)
 		}
@@ -1927,7 +1927,7 @@ func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 
 	// if secret lives in another namespace we cannot set ownerReferences
 	var ownerReferences []metav1.OwnerReference
-	if c.Config.OpConfig.EnableCrossNamespaceSecret && strings.Contains(username, ".") {
+	if c.Config.OpConfig.EnableCrossNamespaceSecret && c.Postgresql.ObjectMeta.Namespace != pgUser.Namespace {
 		ownerReferences = nil
 	} else {
 		ownerReferences = c.ownerReferences()
