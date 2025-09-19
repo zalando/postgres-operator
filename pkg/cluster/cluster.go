@@ -841,6 +841,10 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		return false, "new service's owner references do not match the current ones"
 	}
 
+	if !reflect.DeepEqual(old.Spec.Selector, new.Spec.Selector) {
+		return false, "new service's selector does not match the current one"
+	}
+
 	return true, ""
 }
 
