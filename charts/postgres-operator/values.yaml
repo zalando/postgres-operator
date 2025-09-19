@@ -544,3 +544,17 @@ controllerID:
   # The name of the controller ID to use.
   # If not set and create is true, a name is generated using the fullname template
   name:
+
+# -- Array of extra K8s manifests to deploy
+## Note: Supports use of custom Helm templates
+extraObjects: []
+  # - apiVersion: acid.zalan.do/v1
+  #   kind: postgresql
+  #   metadata:
+  #     name: my-db-cluster
+  #     namespace: default
+  #   spec:
+  #     teamId: my-team
+  #     numberOfInstances: 3
+  #     preparedDatabases:
+  #       myfirstdb: {}
