@@ -42,7 +42,7 @@ import (
 
 var (
 	alphaNumericRegexp    = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
-	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
+	databaseNameRegexp    = regexp.MustCompile("^[\w-]*$")
 	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 	patroniObjectSuffixes = []string{"leader", "config", "sync", "failover"}
 	finalizerName         = "postgres-operator.acid.zalan.do"
