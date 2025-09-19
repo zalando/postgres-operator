@@ -86,3 +86,15 @@ jobs:
           build-args: BASE_IMAGE=ubuntu:22.04
           tags: "${{ steps.image_lb.outputs.BACKUP_IMAGE }}"
           platforms: linux/amd64,linux/arm64
+
+      - name: Build and push postgres-operator chart to ghcr
+        run: |
+          helm package charts/postgres-operator
+          helm push postgres-operator-*.tgz oci://${{ env.REGISTRY }}/zalando/charts
+          rm -rf postgres-operator-*.tgz
+
+      - name: Build and push postgres-operator-ui chart to ghcr
+        run: |
+          helm package charts/postgres-operator-ui
+          helm push postgres-operator-ui-*.tgz oci://${{ env.REGISTRY }}/zalando/charts
+          rm -rf postgres-operator-ui-*.tgz
