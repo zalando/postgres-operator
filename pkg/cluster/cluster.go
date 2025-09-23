@@ -845,6 +845,10 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		return false, "new service's selector does not match the current one"
 	}
 
+	if old.Spec.ExternalTrafficPolicy != new.Spec.ExternalTrafficPolicy {
+		return false, "new service's ExternalTrafficPolicy does not match the current one"
+	}
+
 	return true, ""
 }
 
