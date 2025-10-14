@@ -597,7 +597,7 @@ func (c *Controller) createPodServiceAccount(namespace string) error {
 	_, err := c.KubeClient.ServiceAccounts(namespace).Get(context.TODO(), podServiceAccountName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 
-		c.logger.Infof(fmt.Sprintf("creating pod service account %q in the %q namespace", podServiceAccountName, namespace))
+		c.logger.Infof("creating pod service account %q in the %q namespace", podServiceAccountName, namespace)
 
 		// get a separate copy of service account
 		// to prevent a race condition when setting a namespace for many clusters

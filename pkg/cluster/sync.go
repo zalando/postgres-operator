@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -15,8 +17,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -1208,7 +1208,7 @@ func (c *Cluster) updateSecret(
 	}
 
 	if updateSecret {
-		c.logger.Infof(updateSecretMsg)
+		c.logger.Infof("%s", updateSecretMsg)
 		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("could not update secret %s: %v", secretName, err)
 		}
