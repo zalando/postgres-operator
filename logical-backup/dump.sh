@@ -122,7 +122,21 @@ function aws_upload {
 function gcs_upload {
     PATH_TO_BACKUP=gs://$LOGICAL_BACKUP_S3_BUCKET"/"$LOGICAL_BACKUP_S3_BUCKET_PREFIX"/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
 
-    gsutil -o Credentials:gs_service_key_file=$LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS cp - "$PATH_TO_BACKUP"
+    #Set local LOGICAL_GOOGLE_APPLICATION_CREDENTIALS to nothing or
+    #value of LOGICAL_GOOGLE_APPLICATION_CREDENTIALS env var. Needed
+    #because `set -o nounset` is globally set
+    local LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS=${LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS:-}
+
+    GSUTIL_OPTIONS=("-o" "Credentials:gs_service_key_file=$LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS")
+
+    #If GOOGLE_APPLICATION_CREDENTIALS is not set try to get
+    #creds from metadata
+    if [[ -z $LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS ]]
+    then
+	    GSUTIL_OPTIONS[1]="GoogleCompute:service_account=default"
+    fi
+
+    gsutil ${GSUTIL_OPTIONS[@]} cp - "$PATH_TO_BACKUP"
 }
 
 function upload {
