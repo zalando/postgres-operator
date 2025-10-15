@@ -1341,14 +1341,21 @@ func TestCompareEnv(t *testing.T) {
 	}
 }
 
-func newService(ann map[string]string, svcT v1.ServiceType, lbSr []string) *v1.Service {
+func newService(
+	annotations map[string]string,
+	svcType v1.ServiceType,
+	sourceRanges []string,
+	selector map[string]string,
+	policy v1.ServiceExternalTrafficPolicyType) *v1.Service {
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type:                     svcT,
-			LoadBalancerSourceRanges: lbSr,
+			Selector:                 selector,
+			Type:                     svcType,
+			LoadBalancerSourceRanges: sourceRanges,
+			ExternalTrafficPolicy:    policy,
 		},
 	}
-	svc.Annotations = ann
+	svc.Annotations = annotations
 	return svc
 }
 
@@ -1365,13 +1372,18 @@ func TestCompareServices(t *testing.T) {
 		},
 	}
 
+	defaultPolicy := v1.ServiceExternalTrafficPolicyTypeCluster
+
 	serviceWithOwnerReference := newService(
 		map[string]string{
 			constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 		},
 		v1.ServiceTypeClusterIP,
-		[]string{"128.141.0.0/16", "137.138.0.0/16"})
+		[]string{"128.141.0.0/16", "137.138.0.0/16"},
+		nil,
+		defaultPolicy,
+	)
 
 	ownerRef := metav1.OwnerReference{
 		APIVersion: "acid.zalan.do/v1",
@@ -1397,14 +1409,16 @@ func TestCompareServices(t *testing.T) {
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			match: true,
 		},
 		{
@@ -1415,14 +1429,16 @@ func TestCompareServices(t *testing.T) {
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			match:  false,
 			reason: `new service's type "LoadBalancer" does not match the current one "ClusterIP"`,
 		},
@@ -1434,14 +1450,16 @@ func TestCompareServices(t *testing.T) {
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"185.249.56.0/22"}),
+				[]string{"185.249.56.0/22"},
+				nil, defaultPolicy),
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
@@ -1453,14 +1471,16 @@ func TestCompareServices(t *testing.T) {
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{}),
+				[]string{},
+				nil, defaultPolicy),
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
@@ -1472,8 +1492,37 @@ func TestCompareServices(t *testing.T) {
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new:   serviceWithOwnerReference,
+			match: false,
+		},
+		{
+			about: "new service has a label selector",
+			current: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				nil, defaultPolicy),
+			new: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				map[string]string{"cluster-name": "clstr", "spilo-role": "master"}, defaultPolicy),
+			match: false,
+		},
+		{
+			about: "services differ on external traffic policy",
+			current: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				nil, defaultPolicy),
+			new: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				nil, v1.ServiceExternalTrafficPolicyTypeLocal),
 			match: false,
 		},
 	}
