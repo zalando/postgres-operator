@@ -94,12 +94,12 @@ func (c *Cluster) listResources() error {
 func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 	c.setProcessName("creating statefulset")
 	// check if it's allowed that spec contains initContainers
-	if c.Spec.InitContainers != nil && len(c.Spec.InitContainers) > 0 &&
+	if len(c.Spec.InitContainers) > 0 &&
 		c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
 		return nil, fmt.Errorf("initContainers specified but disabled in configuration")
 	}
 	// check if it's allowed that spec contains sidecars
-	if c.Spec.Sidecars != nil && len(c.Spec.Sidecars) > 0 &&
+	if len(c.Spec.Sidecars) > 0 &&
 		c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
 		return nil, fmt.Errorf("sidecar containers specified but disabled in configuration")
 	}

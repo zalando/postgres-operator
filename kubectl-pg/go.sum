@@ -129,8 +129,8 @@ github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSW
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
-github.com/zalando/postgres-operator v1.13.0 h1:T9Mb+ZRQyTxXbagIK66GLVGCwM3661aX2lOkNpax4s8=
-github.com/zalando/postgres-operator v1.13.0/go.mod h1:WiMEKzUny2lJHYle+7+D/5BhlvPn8prl76rEDYLsQAg=
+github.com/zalando/postgres-operator v1.14.0 h1:C8+n26C8v6fPB1SNW+Y8X6oQoEHufzGJXJzYPlix+zw=
+github.com/zalando/postgres-operator v1.14.0/go.mod h1:ZTHY3sVfHgLLRpTgyR/44JcumbACeJBjztr3o1yHBdc=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=

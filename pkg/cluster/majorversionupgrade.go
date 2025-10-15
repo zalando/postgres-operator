@@ -237,7 +237,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	isUpgradeSuccess := true
 	numberOfPods := len(pods)
-	if allRunning && masterPod != nil {
+	if allRunning {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
 			defer func() error {

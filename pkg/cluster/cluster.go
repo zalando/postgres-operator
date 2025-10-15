@@ -1788,7 +1788,7 @@ func (c *Cluster) GetSwitchoverSchedule() string {
 			}
 		}
 
-		if (schedule == time.Time{}) || possibleSwitchover.Before(schedule) {
+		if (schedule.Equal(time.Time{})) || possibleSwitchover.Before(schedule) {
 			schedule = possibleSwitchover
 		}
 	}

@@ -1122,13 +1122,14 @@ func (c *Cluster) updateSecret(
 	// fetch user map to update later
 	var userMap map[string]spec.PgUser
 	var userKey string
-	if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
+	switch secretUsername {
+	case c.systemUsers[constants.SuperuserKeyName].Name:
 		userKey = constants.SuperuserKeyName
 		userMap = c.systemUsers
-	} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
+	case c.systemUsers[constants.ReplicationUserKeyName].Name:
 		userKey = constants.ReplicationUserKeyName
 		userMap = c.systemUsers
-	} else {
+	default:
 		userKey = secretUsername
 		userMap = c.pgUsers
 	}
