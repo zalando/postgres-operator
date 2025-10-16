@@ -228,6 +228,7 @@ type Config struct {
 	EnableSidecars                           *bool             `name:"enable_sidecars" default:"true"`
 	SharePgSocketWithSidecars                *bool             `name:"share_pgsocket_with_sidecars" default:"false"`
 	Workers                                  uint32            `name:"workers" default:"8"`
+	APIAddress                               string            `name:"api_address" default:""`
 	APIPort                                  int               `name:"api_port" default:"8080"`
 	RingLogLines                             int               `name:"ring_log_lines" default:"100"`
 	ClusterHistoryEntries                    int               `name:"cluster_history_entries" default:"1000"`
