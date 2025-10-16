@@ -5,7 +5,7 @@ go 1.25
 require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
-	github.com/zalando/postgres-operator v1.13.0
+	github.com/zalando/postgres-operator v1.14.0
 	k8s.io/api v0.30.4
 	k8s.io/apiextensions-apiserver v0.25.9
 	k8s.io/apimachinery v0.30.4

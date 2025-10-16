@@ -523,13 +523,14 @@ func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinit
 				},
 			}
 		} else {
-			if c.OpConfig.NodeReadinessLabelMerge == "OR" {
+			switch c.OpConfig.NodeReadinessLabelMerge {
+			case "OR":
 				manifestTerms := nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
 				manifestTerms = append(manifestTerms, nodeReadinessSelectorTerm)
 				nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
 					NodeSelectorTerms: manifestTerms,
 				}
-			} else if c.OpConfig.NodeReadinessLabelMerge == "AND" {
+			case "AND":
 				for i, nodeSelectorTerm := range nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
 					manifestExpressions := nodeSelectorTerm.MatchExpressions
 					manifestExpressions = append(manifestExpressions, matchExpressions...)
@@ -1297,7 +1298,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	if spec.InitContainers != nil && len(spec.InitContainers) > 0 {
+	if len(spec.InitContainers) > 0 {
 		if c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
 			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
 		}
@@ -1400,7 +1401,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// generate container specs for sidecars specified in the cluster manifest
 	clusterSpecificSidecars := []v1.Container{}
-	if spec.Sidecars != nil && len(spec.Sidecars) > 0 {
+	if len(spec.Sidecars) > 0 {
 		// warn if sidecars are defined, but globally disabled (does not apply to globally defined sidecars)
 		if c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
 			c.logger.Warningf("sidecars specified but disabled in configuration - next statefulset creation would fail")
@@ -1504,11 +1505,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	updateStrategy := appsv1.StatefulSetUpdateStrategy{Type: appsv1.OnDeleteStatefulSetStrategyType}
 
 	var podManagementPolicy appsv1.PodManagementPolicyType
-	if c.OpConfig.PodManagementPolicy == "ordered_ready" {
+	switch c.OpConfig.PodManagementPolicy {
+	case "ordered_ready":
 		podManagementPolicy = appsv1.OrderedReadyPodManagement
-	} else if c.OpConfig.PodManagementPolicy == "parallel" {
+	case "parallel":
 		podManagementPolicy = appsv1.ParallelPodManagement
-	} else {
+	default:
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 

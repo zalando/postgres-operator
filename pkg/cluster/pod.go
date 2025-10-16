@@ -432,9 +432,10 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 		}
 
 		newRole := PostgresRole(newPod.Labels[c.OpConfig.PodRoleLabel])
-		if newRole == Replica {
+		switch newRole {
+		case Replica:
 			replicas = append(replicas, util.NameFromMeta(pod.ObjectMeta))
-		} else if newRole == Master {
+		case Master:
 			newMasterPod = newPod
 		}
 	}
