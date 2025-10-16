@@ -129,6 +129,7 @@ type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
 	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
+	LogicalBackupFilenameDateFormat           string `name:"logical_backup_filename_date_format"`
 	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
 	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
 	LogicalBackupAzureStorageAccountKey       string `name:"logical_backup_azure_storage_account_key" default:""`

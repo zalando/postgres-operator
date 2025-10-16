@@ -200,6 +200,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupMemoryRequest = fromCRD.LogicalBackup.MemoryRequest
 	result.LogicalBackupCPULimit = fromCRD.LogicalBackup.CPULimit
 	result.LogicalBackupMemoryLimit = fromCRD.LogicalBackup.MemoryLimit
+	result.LogicalBackupFilenameDateFormat = fromCRD.LogicalBackup.FilenameDateFormat
 
 	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
