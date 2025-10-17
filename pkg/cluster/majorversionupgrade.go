@@ -16,7 +16,6 @@ import (
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"12": 120000,
 	"13": 130000,
 	"14": 140000,
 	"15": 150000,
