@@ -894,9 +894,7 @@ func (c *Cluster) generatePodTemplate(
 		podSpec.PriorityClassName = priorityClassName
 	}
 
-	if len(topologySpreadConstraintsSpec) > 0 {
-		podSpec.TopologySpreadConstraints = generateTopologySpreadConstraints(labels, topologySpreadConstraintsSpec)
-	}
+	podSpec.TopologySpreadConstraints = generateTopologySpreadConstraints(labels, topologySpreadConstraintsSpec)
 
 	if sharePgSocketWithSidecars != nil && *sharePgSocketWithSidecars {
 		addVarRunVolume(&podSpec)
