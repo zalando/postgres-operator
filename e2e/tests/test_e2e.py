@@ -2411,9 +2411,23 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.core_v1.patch_node(master_nodes[0], patch_node_label)
         k8s.api.core_v1.patch_node(replica_nodes[0], patch_node_label)
 
-        # Scale-out postgresql pods
-        k8s.api.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster",
-            {"spec": {"numberOfInstances": 6}})
+        # Patch topologySpreadConstraint and scale-out postgresql pods to postgresqls manifest.
+        patch_topologySpreadConstraint_config = {
+            "spec": {
+                "numberOfInstances": 6,
+                "topologySpreadConstraint": [
+                    {
+                        "maxskew": 1,
+                        "topologyKey": "topology.kubernetes.io/zone",
+                        "whenUnsatisfiable": "DoNotSchedule"
+                    }
+                ]
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default",
+            "postgresqls", "acid-minimal-cluster",
+            patch_topologySpreadConstraint_config)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_labels), 6, "Postgresql StatefulSet are scale to 6")
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 6, "All pods are running")
@@ -2431,9 +2445,17 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertEqual(worker_node_1, 3)
         self.assertEqual(worker_node_2, 3)
 
-        # Scale-it postgresql pods to previous replicas
-        k8s.api.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster",
-            {"spec": {"numberOfInstances": 2}})
+        # Reset configurations
+        patch_topologySpreadConstraint_config = {
+            "spec": {
+                "numberOfInstances": 2,
+                "topologySpreadConstraint": []
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default",
+            "postgresqls", "acid-minimal-cluster",
+            patch_topologySpreadConstraint_config)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_cluster_deletion(self):
