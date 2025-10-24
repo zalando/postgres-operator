@@ -12,9 +12,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/zalando/postgres-operator/mocks"
@@ -50,6 +53,16 @@ func newFakeK8sSyncClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 }
 
 func newFakeK8sSyncSecretsClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	// add a reactor that checks namespace existence before creating secrets
+	clientSet.PrependReactor("create", "secrets", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		createAction := action.(k8stesting.CreateAction)
+		secret := createAction.GetObject().(*v1.Secret)
+		if secret.Namespace != "default" {
+			return true, nil, errors.New("namespace does not exist")
+		}
+		return false, nil, nil
+	})
+
 	return k8sutil.KubernetesClient{
 		SecretsGetter: clientSet.CoreV1(),
 	}, clientSet
@@ -810,7 +823,7 @@ func TestUpdateSecret(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			Databases:                      map[string]string{dbname: dbowner},
-			Users:                          map[string]acidv1.UserFlags{appUser: {}, "bar": {}, dbowner: {}},
+			Users:                          map[string]acidv1.UserFlags{appUser: {}, "bar": {}, dbowner: {}, "not-exist.test_user": {}},
 			UsersIgnoringSecretRotation:    []string{"bar"},
 			UsersWithInPlaceSecretRotation: []string{dbowner},
 			Streams: []acidv1.Stream{
@@ -842,6 +855,7 @@ func TestUpdateSecret(t *testing.T) {
 					PasswordRotationInterval:      1,
 					PasswordRotationUserRetention: 3,
 				},
+				EnableCrossNamespaceSecret: true,
 				Resources: config.Resources{
 					ClusterLabels:    map[string]string{"application": "spilo"},
 					ClusterNameLabel: "cluster-name",
@@ -864,7 +878,9 @@ func TestUpdateSecret(t *testing.T) {
 
 	allUsers := make(map[string]spec.PgUser)
 	for _, pgUser := range cluster.pgUsers {
-		allUsers[pgUser.Name] = pgUser
+		if !pgUser.Degraded {
+			allUsers[pgUser.Name] = pgUser
+		}
 	}
 	for _, systemUser := range cluster.systemUsers {
 		allUsers[systemUser.Name] = systemUser

@@ -1003,7 +1003,8 @@ class EndToEndTestCase(unittest.TestCase):
                             "Origin": 2,
                             "IsDbOwner": False,
                             "Deleted": False,
-                            "Rotated": False
+                            "Rotated": False,
+                            "Degraded": False,
                         })
                         return True
                 except:
