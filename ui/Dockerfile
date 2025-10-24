@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ghcr.io/python/python-3.11-slim:latest
+ARG BASE_IMAGE=registry.opensource.zalan.do/library/python-3.11-slim:latest
 ARG NODE_IMAGE=node:lts-alpine
 
 FROM $NODE_IMAGE AS build
