@@ -1059,6 +1059,7 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 func (c *Cluster) syncSecrets() error {
 	c.logger.Debug("syncing secrets")
 	c.setProcessName("syncing secrets")
+	errors := make([]string, 0)
 	generatedSecrets := c.generateUserSecrets()
 	retentionUsers := make([]string, 0)
 	currentTime := time.Now()
@@ -1077,10 +1078,10 @@ func (c *Cluster) syncSecrets() error {
 				c.Secrets[updatedSecret.UID] = updatedSecret
 				continue
 			}
-			c.logger.Warningf("syncing secret %s failed: %v", util.NameFromMeta(updatedSecret.ObjectMeta), err)
+			errors = append(errors, fmt.Sprintf("syncing secret %s failed: %v", util.NameFromMeta(updatedSecret.ObjectMeta), err))
 			pgUserDegraded = true
 		} else {
-			c.logger.Warningf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err)
+			errors = append(errors, fmt.Sprintf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err))
 			pgUserDegraded = true
 		}
 		c.updatePgUser(secretUsername, pgUserDegraded)
@@ -1090,14 +1091,18 @@ func (c *Cluster) syncSecrets() error {
 	if len(retentionUsers) > 0 {
 		err := c.initDbConn()
 		if err != nil {
-			return fmt.Errorf("could not init db connection: %v", err)
+			errors = append(errors, fmt.Sprintf("could not init db connection: %v", err))
 		}
 		if err = c.cleanupRotatedUsers(retentionUsers, c.pgDb); err != nil {
-			return fmt.Errorf("error removing users exceeding configured retention interval: %v", err)
+			errors = append(errors, fmt.Sprintf("error removing users exceeding configured retention interval: %v", err))
 		}
 		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection after removing users exceeding configured retention interval: %v", err)
+			errors = append(errors, fmt.Sprintf("could not close database connection after removing users exceeding configured retention interval: %v", err))
 		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
 	}
 
 	return nil
