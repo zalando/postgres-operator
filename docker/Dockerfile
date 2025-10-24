@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ghcr.io/alpine-3:latest
+ARG BASE_IMAGE=ghcr.io/actions/actions-runner:latest-alpine-3
 FROM golang:1.25-alpine AS builder
 ARG VERSION=latest
 

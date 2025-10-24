@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ghcr.io/ubuntu-22.04:latest
+ARG BASE_IMAGE=ghcr.io/ubuntu/ubuntu-22.04:latest
 FROM ${BASE_IMAGE}
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
