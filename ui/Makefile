@@ -30,6 +30,7 @@ docker: appjs
 	echo "Version ${VERSION}"
 	echo "CDP tag ${CDP_TAG}"
 	echo "git describe $(shell git describe --tags --always --dirty)"
+	docker login ghcr.io -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)" -f Dockerfile .
 
 push:
