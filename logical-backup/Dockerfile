@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ubuntu-22.04
+ARG BASE_IMAGE=registry.opensource.zalan.do/library/ubuntu-22.04:latest
 FROM ${BASE_IMAGE}
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
