@@ -20,9 +20,9 @@ pipeline:
             IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
             if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
             then
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
+              IMAGE=ghcr.io/zalando/postgres-operator
             else
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
+              IMAGE=ghcr.io/zalando/postgres-operator-test
             fi
             export IMAGE
             make docker push
@@ -49,9 +49,9 @@ pipeline:
             IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
             if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
             then
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui
+              IMAGE=ghcr.io/zalando/postgres-operator-ui
             else
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui-test
+              IMAGE=ghcr.io/zalando/postgres-operator-ui-test
             fi
             export IMAGE
             make docker
@@ -67,6 +67,7 @@ pipeline:
           cmd: |
             cd logical-backup
             export TAG=$(git describe --tags --always --dirty)
-            IMAGE="registry-write.opensource.zalan.do/acid/logical-backup"
+            IMAGE="ghcr.io/zalando/logical-backup"
+            docker login ghcr.io -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
             docker build --rm -t "$IMAGE:$TAG$CDP_TAG" .
             docker push "$IMAGE:$TAG$CDP_TAG"
