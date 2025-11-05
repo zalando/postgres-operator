@@ -582,6 +582,22 @@ spec:
                         - PreferNoSchedule
                     tolerationSeconds:
                       type: integer
+              topologySpreadConstraints:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  properties:
+                    maxSkew:
+                      type: integer
+                      format: int32
+                    topologyKey:
+                      type: string
+                    whenUnsatisfiable:
+                      type: string
+                      enum:
+                        - DoNotSchedule
+                        - ScheduleAnyway
               useLoadBalancer:
                 type: boolean
                 description: deprecated

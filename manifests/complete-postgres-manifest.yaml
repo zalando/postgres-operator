@@ -232,6 +232,12 @@ spec:
 #              values:
 #                - enabled
 
+# Add topology spread constraint to distribute PostgreSQL pods across all nodes labeled with "topology.kubernetes.io/zone".
+#   topologySpreadConstraint:
+#     - maxSkew: 1
+#       topologyKey: topology.kubernetes.io/zone
+#       whenUnsatisfiable: DoNotSchedule
+
 # Enables change data capture streams for defined database tables
 #  streams:
 #  - applicationId: test-app

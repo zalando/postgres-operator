@@ -63,24 +63,25 @@ type PostgresSpec struct {
 	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
 	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
 
-	NumberOfInstances      int32                       `json:"numberOfInstances"`
-	MaintenanceWindows     []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                  *CloneDescription           `json:"clone,omitempty"`
-	Databases              map[string]string           `json:"databases,omitempty"`
-	PreparedDatabases      map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
-	SchedulerName          *string                     `json:"schedulerName,omitempty"`
-	NodeAffinity           *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
-	Tolerations            []v1.Toleration             `json:"tolerations,omitempty"`
-	Sidecars               []Sidecar                   `json:"sidecars,omitempty"`
-	InitContainers         []v1.Container              `json:"initContainers,omitempty"`
-	PodPriorityClassName   string                      `json:"podPriorityClassName,omitempty"`
-	ShmVolume              *bool                       `json:"enableShmVolume,omitempty"`
-	EnableLogicalBackup    bool                        `json:"enableLogicalBackup,omitempty"`
-	LogicalBackupRetention string                      `json:"logicalBackupRetention,omitempty"`
-	LogicalBackupSchedule  string                      `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster         *StandbyDescription         `json:"standby,omitempty"`
-	PodAnnotations         map[string]string           `json:"podAnnotations,omitempty"`
-	ServiceAnnotations     map[string]string           `json:"serviceAnnotations,omitempty"`
+	NumberOfInstances         int32                         `json:"numberOfInstances"`
+	MaintenanceWindows        []MaintenanceWindow           `json:"maintenanceWindows,omitempty"`
+	Clone                     *CloneDescription             `json:"clone,omitempty"`
+	Databases                 map[string]string             `json:"databases,omitempty"`
+	PreparedDatabases         map[string]PreparedDatabase   `json:"preparedDatabases,omitempty"`
+	SchedulerName             *string                       `json:"schedulerName,omitempty"`
+	NodeAffinity              *v1.NodeAffinity              `json:"nodeAffinity,omitempty"`
+	TopologySpreadConstraints []v1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+	Tolerations               []v1.Toleration               `json:"tolerations,omitempty"`
+	Sidecars                  []Sidecar                     `json:"sidecars,omitempty"`
+	InitContainers            []v1.Container                `json:"initContainers,omitempty"`
+	PodPriorityClassName      string                        `json:"podPriorityClassName,omitempty"`
+	ShmVolume                 *bool                         `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup       bool                          `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupRetention    string                        `json:"logicalBackupRetention,omitempty"`
+	LogicalBackupSchedule     string                        `json:"logicalBackupSchedule,omitempty"`
+	StandbyCluster            *StandbyDescription           `json:"standby,omitempty"`
+	PodAnnotations            map[string]string             `json:"podAnnotations,omitempty"`
+	ServiceAnnotations        map[string]string             `json:"serviceAnnotations,omitempty"`
 	// MasterServiceAnnotations takes precedence over ServiceAnnotations for master role if not empty
 	MasterServiceAnnotations map[string]string `json:"masterServiceAnnotations,omitempty"`
 	// ReplicaServiceAnnotations takes precedence over ServiceAnnotations for replica role if not empty
