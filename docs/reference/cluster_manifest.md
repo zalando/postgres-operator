@@ -511,7 +511,8 @@ properties of the persistent storage that stores Postgres data.
 
 Those parameters are defined under the `sidecars` key. They consist of a list
 of dictionaries, each defining one sidecar (an extra container running
-along the main Postgres container on the same pod). The following keys can be
+along the main Postgres container on the same pod). Same way sidecars can be
+defined for the pooler, using `connectionPooler.sidecars` key. The following keys can be
 defined in the sidecar dictionary:
 
 * **name**
@@ -600,6 +601,9 @@ for both master and replica pooler services (if `enableReplicaConnectionPooler`
 
 * **resources**
   Resource configuration for connection pooler deployment.
+
+* **sidecars**
+  Extra containers to run alongside with PGBouncer container in the same pod. 
 
 ## Custom TLS certificates
 
