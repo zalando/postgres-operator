@@ -1,3 +1,4 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -10,9 +11,9 @@ spec:
     plural: operatorconfigurations
     singular: operatorconfiguration
     shortNames:
-    - opconfig
+      - opconfig
     categories:
-    - all
+      - all
   scope: Namespaced
   versions:
   - name: v1
@@ -21,25 +22,25 @@ spec:
     subresources:
       status: {}
     additionalPrinterColumns:
-    - name: Image
-      type: string
-      description: Spilo image to be used for Pods
-      jsonPath: .configuration.docker_image
-    - name: Cluster-Label
-      type: string
-      description: Label for K8s resources created by operator
-      jsonPath: .configuration.kubernetes.cluster_name_label
-    - name: Service-Account
-      type: string
-      description: Name of service account to be used
-      jsonPath: .configuration.kubernetes.pod_service_account_name
-    - name: Min-Instances
-      type: integer
-      description: Minimum number of instances per Postgres cluster
-      jsonPath: .configuration.min_instances
-    - name: Age
-      type: date
-      jsonPath: .metadata.creationTimestamp
+      - name: Image
+        type: string
+        description: Spilo image to be used for Pods
+        jsonPath: .configuration.docker_image
+      - name: Cluster-Label
+        type: string
+        description: Label for K8s resources created by operator
+        jsonPath: .configuration.kubernetes.cluster_name_label
+      - name: Service-Account
+        type: string
+        description: Name of service account to be used
+        jsonPath: .configuration.kubernetes.pod_service_account_name
+      - name: Min-Instances
+        type: integer
+        description: Minimum number of instances per Postgres cluster
+        jsonPath: .configuration.min_instances
+      - name: Age
+        type: date
+        jsonPath: .metadata.creationTimestamp
     schema:
       openAPIV3Schema:
         type: object
@@ -51,11 +52,11 @@ spec:
           kind:
             type: string
             enum:
-            - OperatorConfiguration
+              - OperatorConfiguration
           apiVersion:
             type: string
             enum:
-            - acid.zalan.do/v1
+              - acid.zalan.do/v1
           configuration:
             type: object
             properties:
@@ -148,11 +149,11 @@ spec:
                     type: integer
                     default: 180
                   replication_username:
-                     type: string
-                     default: standby
+                    type: string
+                    default: standby
                   super_username:
-                     type: string
-                     default: postgres
+                    type: string
+                    default: postgres
               major_version_upgrade:
                 type: object
                 properties:
@@ -594,8 +595,8 @@ spec:
                     items:
                       type: string
                     default:
-                    - admin
-                    - cron_admin
+                      - admin
+                      - cron_admin
                   role_deletion_suffix:
                     type: string
                     default: "_deleted"
