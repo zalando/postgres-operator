@@ -1088,7 +1088,20 @@ func (c *Cluster) generateSpiloPodEnvVars(
 func appendEnvVars(envs []v1.EnvVar, appEnv ...v1.EnvVar) []v1.EnvVar {
 	collectedEnvs := envs
 	for _, env := range appEnv {
-		if !isEnvVarPresent(collectedEnvs, env.Name) {
+		// Check if env var already exists
+		existingIdx := -1
+		for i, existing := range collectedEnvs {
+			if strings.EqualFold(existing.Name, env.Name) {
+				existingIdx = i
+				break
+			}
+		}
+		
+		if existingIdx >= 0 {
+			// Replace existing env var (user override takes precedence)
+			collectedEnvs[existingIdx] = env
+		} else {
+			// Add new env var
 			collectedEnvs = append(collectedEnvs, env)
 		}
 	}
