@@ -43,6 +43,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO: User uppercase CRDResourceKind of our types in the next major API version
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresql"), &Postgresql{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresqlList"), &PostgresqlList{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("PostgresqlList"), &PostgresqlList{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("PostgresTeam"), &PostgresTeam{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("PostgresTeamList"), &PostgresTeamList{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("OperatorConfiguration"),
