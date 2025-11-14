@@ -312,6 +312,34 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enableReplicaPoolerLoadBalancer": {
 						Type: "boolean",
 					},
+					"enableMasterNodePort": {
+						Type: "boolean",
+					},
+					"masterNodePort": {
+						Type:    "integer",
+						Minimum: &min0,
+					},
+					"enableMasterPoolerNodePort": {
+						Type: "boolean",
+					},
+					"masterPoolerNodePort": {
+						Type:    "integer",
+						Minimum: &min0,
+					},
+					"enableReplicaNodePort": {
+						Type: "boolean",
+					},
+					"replicaNodePort": {
+						Type:    "integer",
+						Minimum: &min0,
+					},
+					"enableReplicaPoolerNodePort": {
+						Type: "boolean",
+					},
+					"replicaPoolerNodePort": {
+						Type:    "integer",
+						Minimum: &min0,
+					},
 					"enableShmVolume": {
 						Type: "boolean",
 					},
@@ -1658,6 +1686,18 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "boolean",
 							},
 							"enable_replica_pooler_load_balancer": {
+								Type: "boolean",
+							},
+							"enable_master_node_port": {
+								Type: "boolean",
+							},
+							"enable_master_pooler_node_port": {
+								Type: "boolean",
+							},
+							"enable_replica_node_port": {
+								Type: "boolean",
+							},
+							"enable_replica_pooler_node_port": {
 								Type: "boolean",
 							},
 							"external_traffic_policy": {
