@@ -114,6 +114,48 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   this parameter. Optional, when empty the load balancer service becomes
   inaccessible from outside of the Kubernetes cluster.
 
+* **enableMasterNodePort**
+  boolean flag to override the operator defaults (set by the
+  `enable_master_node_port` parameter) to define whether to enable the node
+  port pointing to the Postgres primary. Optional. Overrides `enableMasterLoadBalancer`.
+
+* **enableMasterPoolerNodePort**
+  boolean flag to override the operator defaults (set by the
+  `enable_master_pooler_node_port` parameter) to define whether to enable
+  the node port for master pooler pods pointing to the Postgres primary.
+  Optional. Overrides `enableMasterPoolerLoadBalancer`.
+
+* **enableReplicaNodePort**
+  boolean flag to override the operator defaults (set by the
+  `enable_replica_node_port` parameter) to define whether to enable the node
+  port pointing to the Postgres standby instances. Optional. Overrides `enableReplicaLoadBalancer`.
+
+* **enableReplicaPoolerNodePort**
+  boolean flag to override the operator defaults (set by the
+  `enable_replica_pooler_node_port` parameter) to define whether to enable
+  the node port for replica pooler pods pointing to the Postgres standby
+  instances. Optional. Overrides `enableReplicaPoolerLoadBalancer`.
+
+* **masterNodePort**
+  integer flag to specify a port number for the node port to the Postgres primary.
+  Only used when `enableMasterNodePort` or `enable_master_node_port` are enabled.
+  Optional. Kubernetes will provide a port number for you if not specified.
+
+* **masterPoolerNodePort**
+  integer flag to specify a port number for the node port for the master pooler pods pointing to the Postgres primary.
+  Only used when `enableMasterPoolerNodePort` or `enable_master_pooler_node_port` are enabled.
+  Optional. Kubernetes will provide a port number for you if not specified.
+
+* **replicaNodePort**
+  integer flag to specify a port number for the node port pointing to the Postgres standby instances.
+  Only used when `enableReplicaNodePort` or `enable_replica_node_port` are enabled.
+  Optional. Kubernetes will provide a port number for you if not specified.
+
+* **replicaPoolerNodePort**
+  integer flag to specify a port number for the node port for the replica pooler pods pointing to the Postgres standby instances
+  Only used when `enableReplicaPoolerNodePort` or `enable_replica_pooler_node_port` are enabled.
+  Optional. Kubernetes will provide a port number for you if not specified.
+
 * **maintenanceWindows**
   a list which defines specific time frames when certain maintenance operations
   such as automatic major upgrades or master pod migration are allowed to happen.
