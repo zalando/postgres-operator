@@ -2,20 +2,22 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
-	"context"
-
-	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/zalando/postgres-operator/mocks"
@@ -51,6 +53,16 @@ func newFakeK8sSyncClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 }
 
 func newFakeK8sSyncSecretsClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	// add a reactor that checks namespace existence before creating secrets
+	clientSet.PrependReactor("create", "secrets", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		createAction := action.(k8stesting.CreateAction)
+		secret := createAction.GetObject().(*v1.Secret)
+		if secret.Namespace != "default" {
+			return true, nil, errors.New("namespace does not exist")
+		}
+		return false, nil, nil
+	})
+
 	return k8sutil.KubernetesClient{
 		SecretsGetter: clientSet.CoreV1(),
 	}, clientSet
@@ -139,6 +151,181 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 	// check if inherited annotation exists
 	if _, exists := desiredSts.Annotations[inheritedAnnotation]; !exists {
 		t.Errorf("%s: inherited annotation not found in desired statefulset: %#v", testName, desiredSts.Annotations)
+	}
+}
+
+func TestPodAnnotationsSync(t *testing.T) {
+	clusterName := "acid-test-cluster-2"
+	namespace := "default"
+	podAnnotation := "no-scale-down"
+	podAnnotations := map[string]string{podAnnotation: "true"}
+	customPodAnnotation := "foo"
+	customPodAnnotations := map[string]string{customPodAnnotation: "true"}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := mocks.NewMockHTTPClient(ctrl)
+	client, _ := newFakeK8sAnnotationsClient()
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+			EnableConnectionPooler:        boolToPointer(true),
+			EnableLogicalBackup:           true,
+			EnableReplicaConnectionPooler: boolToPointer(true),
+			PodAnnotations:                podAnnotations,
+			NumberOfInstances:             2,
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PatroniAPICheckInterval: time.Duration(1),
+				PatroniAPICheckTimeout:  time.Duration(5),
+				PodManagementPolicy:     "ordered_ready",
+				CustomPodAnnotations:    customPodAnnotations,
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
+				},
+				Resources: config.Resources{
+					ClusterLabels:         map[string]string{"application": "spilo"},
+					ClusterNameLabel:      "cluster-name",
+					DefaultCPURequest:     "300m",
+					DefaultCPULimit:       "300m",
+					DefaultMemoryRequest:  "300Mi",
+					DefaultMemoryLimit:    "300Mi",
+					MaxInstances:          -1,
+					PodRoleLabel:          "spilo-role",
+					ResourceCheckInterval: time.Duration(3),
+					ResourceCheckTimeout:  time.Duration(10),
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	configJson := `{"postgresql": {"parameters": {"log_min_duration_statement": 200, "max_connections": 50}}}, "ttl": 20}`
+	response := http.Response{
+		StatusCode: 200,
+		Body:       io.NopCloser(bytes.NewReader([]byte(configJson))),
+	}
+
+	mockClient.EXPECT().Do(gomock.Any()).Return(&response, nil).AnyTimes()
+	cluster.patroni = patroni.New(patroniLogger, mockClient)
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+	clusterOptions := clusterLabelsOptions(cluster)
+
+	// create a statefulset
+	_, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
+	// create a pods
+	podsList := createPods(cluster)
+	for _, pod := range podsList {
+		_, err = cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+		assert.NoError(t, err)
+	}
+	// create connection pooler
+	_, err = cluster.createConnectionPooler(mockInstallLookupFunction)
+	assert.NoError(t, err)
+
+	// create cron job
+	err = cluster.createLogicalBackupJob()
+	assert.NoError(t, err)
+
+	annotateResources(cluster)
+	err = cluster.Sync(&cluster.Postgresql)
+	assert.NoError(t, err)
+
+	// 1. PodAnnotations set
+	stsList, err := cluster.KubeClient.StatefulSets(namespace).List(context.TODO(), clusterOptions)
+	assert.NoError(t, err)
+	for _, sts := range stsList.Items {
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.Contains(t, sts.Spec.Template.Annotations, annotation)
+		}
+	}
+
+	for _, role := range []PostgresRole{Master, Replica} {
+		deploy, err := cluster.KubeClient.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(role), metav1.GetOptions{})
+		assert.NoError(t, err)
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.Contains(t, deploy.Spec.Template.Annotations, annotation,
+				fmt.Sprintf("pooler deployment pod template %s should contain annotation %s, found %#v",
+					deploy.Name, annotation, deploy.Spec.Template.Annotations))
+		}
+	}
+
+	podList, err := cluster.KubeClient.Pods(namespace).List(context.TODO(), clusterOptions)
+	assert.NoError(t, err)
+	for _, pod := range podList.Items {
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.Contains(t, pod.Annotations, annotation,
+				fmt.Sprintf("pod %s should contain annotation %s, found %#v", pod.Name, annotation, pod.Annotations))
+		}
+	}
+
+	cronJobList, err := cluster.KubeClient.CronJobs(namespace).List(context.TODO(), clusterOptions)
+	assert.NoError(t, err)
+	for _, cronJob := range cronJobList.Items {
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.Contains(t, cronJob.Spec.JobTemplate.Spec.Template.Annotations, annotation,
+				fmt.Sprintf("logical backup cron job's pod template should contain annotation %s, found %#v",
+					annotation, cronJob.Spec.JobTemplate.Spec.Template.Annotations))
+		}
+	}
+
+	// 2 PodAnnotations removed
+	newSpec := cluster.Postgresql.DeepCopy()
+	newSpec.Spec.PodAnnotations = nil
+	cluster.OpConfig.CustomPodAnnotations = nil
+	err = cluster.Sync(newSpec)
+	assert.NoError(t, err)
+
+	stsList, err = cluster.KubeClient.StatefulSets(namespace).List(context.TODO(), clusterOptions)
+	assert.NoError(t, err)
+	for _, sts := range stsList.Items {
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.NotContains(t, sts.Spec.Template.Annotations, annotation)
+		}
+	}
+
+	for _, role := range []PostgresRole{Master, Replica} {
+		deploy, err := cluster.KubeClient.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(role), metav1.GetOptions{})
+		assert.NoError(t, err)
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.NotContains(t, deploy.Spec.Template.Annotations, annotation,
+				fmt.Sprintf("pooler deployment pod template %s should not contain annotation %s, found %#v",
+					deploy.Name, annotation, deploy.Spec.Template.Annotations))
+		}
+	}
+
+	podList, err = cluster.KubeClient.Pods(namespace).List(context.TODO(), clusterOptions)
+	assert.NoError(t, err)
+	for _, pod := range podList.Items {
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.NotContains(t, pod.Annotations, annotation,
+				fmt.Sprintf("pod %s should not contain annotation %s, found %#v", pod.Name, annotation, pod.Annotations))
+		}
+	}
+
+	cronJobList, err = cluster.KubeClient.CronJobs(namespace).List(context.TODO(), clusterOptions)
+	assert.NoError(t, err)
+	for _, cronJob := range cronJobList.Items {
+		for _, annotation := range []string{podAnnotation, customPodAnnotation} {
+			assert.NotContains(t, cronJob.Spec.JobTemplate.Spec.Template.Annotations, annotation,
+				fmt.Sprintf("logical backup cron job's pod template should not contain annotation %s, found %#v",
+					annotation, cronJob.Spec.JobTemplate.Spec.Template.Annotations))
+		}
 	}
 }
 
@@ -636,7 +823,7 @@ func TestUpdateSecret(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			Databases:                      map[string]string{dbname: dbowner},
-			Users:                          map[string]acidv1.UserFlags{appUser: {}, "bar": {}, dbowner: {}},
+			Users:                          map[string]acidv1.UserFlags{appUser: {}, "bar": {}, dbowner: {}, "not-exist.test_user": {}},
 			UsersIgnoringSecretRotation:    []string{"bar"},
 			UsersWithInPlaceSecretRotation: []string{dbowner},
 			Streams: []acidv1.Stream{
@@ -644,7 +831,7 @@ func TestUpdateSecret(t *testing.T) {
 					ApplicationId: appId,
 					Database:      dbname,
 					Tables: map[string]acidv1.StreamTable{
-						"data.foo": acidv1.StreamTable{
+						"data.foo": {
 							EventType: "stream-type-b",
 						},
 					},
@@ -668,6 +855,7 @@ func TestUpdateSecret(t *testing.T) {
 					PasswordRotationInterval:      1,
 					PasswordRotationUserRetention: 3,
 				},
+				EnableCrossNamespaceSecret: true,
 				Resources: config.Resources{
 					ClusterLabels:    map[string]string{"application": "spilo"},
 					ClusterNameLabel: "cluster-name",
@@ -690,7 +878,9 @@ func TestUpdateSecret(t *testing.T) {
 
 	allUsers := make(map[string]spec.PgUser)
 	for _, pgUser := range cluster.pgUsers {
-		allUsers[pgUser.Name] = pgUser
+		if !pgUser.Degraded {
+			allUsers[pgUser.Name] = pgUser
+		}
 	}
 	for _, systemUser := range cluster.systemUsers {
 		allUsers[systemUser.Name] = systemUser

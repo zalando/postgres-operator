@@ -95,14 +95,6 @@ DEFAULT_MEMORY_LIMIT = getenv('DEFAULT_MEMORY_LIMIT', '300Mi')
 DEFAULT_CPU = getenv('DEFAULT_CPU', '10m')
 DEFAULT_CPU_LIMIT = getenv('DEFAULT_CPU_LIMIT', '300m')
 
-WALE_S3_ENDPOINT = getenv(
-    'WALE_S3_ENDPOINT',
-    'https+path://s3.eu-central-1.amazonaws.com:443',
-)
-
-USE_AWS_INSTANCE_PROFILE = (
-    getenv('USE_AWS_INSTANCE_PROFILE', 'false').lower() != 'false'
-)
 
 AWS_ENDPOINT = getenv('AWS_ENDPOINT')
 
@@ -267,7 +259,7 @@ DEFAULT_UI_CONFIG = {
     'users_visible': True,
     'databases_visible': True,
     'resources_visible': RESOURCES_VISIBLE,
-    'postgresql_versions': ['12', '13', '14', '15', '16'],
+    'postgresql_versions': ['13', '14', '15', '16', '17'],
     'dns_format_string': '{0}.{1}',
     'pgui_link': '',
     'static_network_whitelist': {},
@@ -465,6 +457,7 @@ def get_postgresqls():
             'status': status,
             'num_elb': spec.get('enableMasterLoadBalancer', 0) + spec.get('enableReplicaLoadBalancer', 0) + \
                        spec.get('enableMasterPoolerLoadBalancer', 0) + spec.get('enableReplicaPoolerLoadBalancer', 0),
+            'maintenance_windows': spec.get('maintenanceWindows', []),
         }
         for cluster in these(
             read_postgresqls(
@@ -565,6 +558,11 @@ def update_postgresql(namespace: str, cluster: str):
         if not isinstance(postgresql['spec']['allowedSourceRanges'], list):
             return fail('allowedSourceRanges invalid')
         spec['allowedSourceRanges'] = postgresql['spec']['allowedSourceRanges']
+
+    if 'maintenanceWindows' in postgresql['spec']:
+        if not isinstance(postgresql['spec']['maintenanceWindows'], list):
+            return fail('maintenanceWindows invalid')
+        spec['maintenanceWindows'] = postgresql['spec']['maintenanceWindows']
 
     if 'numberOfInstances' in postgresql['spec']:
         if not isinstance(postgresql['spec']['numberOfInstances'], int):
@@ -778,8 +776,6 @@ def get_versions(pg_cluster: str):
             bucket=SPILO_S3_BACKUP_BUCKET,
             pg_cluster=pg_cluster,
             prefix=SPILO_S3_BACKUP_PREFIX,
-            s3_endpoint=WALE_S3_ENDPOINT,
-            use_aws_instance_profile=USE_AWS_INSTANCE_PROFILE,
         ),
     )
 
@@ -791,9 +787,8 @@ def get_basebackups(pg_cluster: str, uid: str):
             bucket=SPILO_S3_BACKUP_BUCKET,
             pg_cluster=pg_cluster,
             prefix=SPILO_S3_BACKUP_PREFIX,
-            s3_endpoint=WALE_S3_ENDPOINT,
             uid=uid,
-            use_aws_instance_profile=USE_AWS_INSTANCE_PROFILE,
+            postgresql_versions=OPERATOR_UI_CONFIG.get('postgresql_versions', DEFAULT_UI_CONFIG['postgresql_versions']),
         ),
     )
 
@@ -985,8 +980,6 @@ def main(port, debug, clusters: list):
     logger.info(f'Superuser team: {SUPERUSER_TEAM}')
     logger.info(f'Target namespace: {TARGET_NAMESPACE}')
     logger.info(f'Teamservice URL: {TEAM_SERVICE_URL}')
-    logger.info(f'Use AWS instance_profile: {USE_AWS_INSTANCE_PROFILE}')
-    logger.info(f'WAL-E S3 endpoint: {WALE_S3_ENDPOINT}')
     logger.info(f'AWS S3 endpoint: {AWS_ENDPOINT}')
 
     if TARGET_NAMESPACE is None:

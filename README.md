@@ -17,6 +17,7 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Live volume resize without pod restarts (AWS EBS, PVC)
 * Database connection pooling with PGBouncer
 * Support fast in place major version upgrade. Supports global upgrade of all clusters.
+* Pod protection during boostrap phase and configurable maintenance windows
 * Restore and cloning Postgres clusters on AWS, GCS and Azure
 * Additionally logical backups to S3 or GCS bucket can be configured
 * Standby cluster from S3 or GCS WAL archive
@@ -28,25 +29,30 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 16, starting from 11+
+* Supports PostgreSQL 17, starting from 13+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
-[pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html) /
-[WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
+[pg_basebackup](https://www.postgresql.org/docs/17/app-pgbasebackup.html) /
+[WAL-G](https://github.com/wal-g/wal-g) or [WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
 * Preload libraries: [bg_mon](https://github.com/CyberDem0n/bg_mon),
-[pg_stat_statements](https://www.postgresql.org/docs/16/pgstatstatements.html),
+[pg_stat_statements](https://www.postgresql.org/docs/17/pgstatstatements.html),
 [pgextwlist](https://github.com/dimitri/pgextwlist),
 [pg_auth_mon](https://github.com/RafiaSabih/pg_auth_mon)
 * Incl. popular Postgres extensions such as
 [decoderbufs](https://github.com/debezium/postgres-decoderbufs),
 [hypopg](https://github.com/HypoPG/hypopg),
 [pg_cron](https://github.com/citusdata/pg_cron),
+[pg_repack](https://github.com/reorg/pg_repack),
 [pg_partman](https://github.com/pgpartman/pg_partman),
 [pg_stat_kcache](https://github.com/powa-team/pg_stat_kcache),
+[pg_audit](https://github.com/pgaudit/pgaudit),
+[pgfaceting](https://github.com/cybertec-postgresql/pgfaceting),
 [pgq](https://github.com/pgq/pgq),
 [pgvector](https://github.com/pgvector/pgvector),
 [plpgsql_check](https://github.com/okbob/plpgsql_check),
+[plproxy](https://github.com/plproxy/plproxy),
 [postgis](https://postgis.net/),
+[roaringbitmap](https://github.com/ChenHuajun/pg_roaringbitmap),
 [set_user](https://github.com/pgaudit/set_user) and
 [timescaledb](https://github.com/timescale/timescaledb)
 
@@ -57,14 +63,12 @@ production for over five years.
 
 | Release   | Postgres versions | K8s versions      | Golang  |
 | :-------- | :---------------: | :---------------: | :-----: |
-| v1.13.0*  | 12 &rarr; 16      | 1.27+             | 1.22.5  |
-| v1.12.2   | 11 &rarr; 16      | 1.27+             | 1.22.3  |
+| v1.15.0   | 13 &rarr; 17      | 1.27+             | 1.25.3  |
+| v1.14.0   | 13 &rarr; 17      | 1.27+             | 1.23.4  |
+| v1.13.0   | 12 &rarr; 16      | 1.27+             | 1.22.5  |
+| v1.12.0   | 11 &rarr; 16      | 1.27+             | 1.22.3  |
 | v1.11.0   | 11 &rarr; 16      | 1.27+             | 1.21.7  |
 | v1.10.1   | 10 &rarr; 15      | 1.21+             | 1.19.8  |
-| v1.9.0    | 10 &rarr; 15      | 1.21+             | 1.18.9  |
-| v1.8.2    | 9.5 &rarr; 14     | 1.20 &rarr; 1.24  | 1.17.4  |
-
-*not yet released
 
 ## Getting started
 

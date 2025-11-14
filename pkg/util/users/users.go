@@ -24,7 +24,7 @@ const (
 	doBlockStmt          = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
 	passwordTemplate     = "ENCRYPTED PASSWORD '%s'"
 	inRoleTemplate       = `IN ROLE %s`
-	adminTemplate        = `ADMIN %s`
+	adminTemplate        = `ADMIN "%s"`
 )
 
 // DefaultUserSyncStrategy implements a user sync strategy that merges already existing database users
@@ -46,6 +46,10 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 		// do not create user when there exists a user with the same name plus deletion suffix
 		// instead request a renaming of the deleted user back to the original name (see * below)
 		if newUser.Deleted {
+			continue
+		}
+		// when the secret of the user could not be created or updated skip any database actions
+		if newUser.Degraded {
 			continue
 		}
 		dbUser, exists := dbUsers[name]
