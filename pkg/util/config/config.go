@@ -211,6 +211,10 @@ type Config struct {
 	EnableMasterPoolerLoadBalancer           bool              `name:"enable_master_pooler_load_balancer" default:"false"`
 	EnableReplicaLoadBalancer                bool              `name:"enable_replica_load_balancer" default:"false"`
 	EnableReplicaPoolerLoadBalancer          bool              `name:"enable_replica_pooler_load_balancer" default:"false"`
+	EnableMasterNodePort                     bool              `name:"enable_master_node_port" default:"false"`
+	EnableMasterPoolerNodePort               bool              `name:"enable_master_pooler_node_port" default:"false"`
+	EnableReplicaNodePort                    bool              `name:"enable_replica_node_port" default:"false"`
+	EnableReplicaPoolerNodePort              bool              `name:"enable_replica_pooler_node_port" default:"false"`
 	CustomServiceAnnotations                 map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                     map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                    bool              `name:"enable_pod_antiaffinity" default:"false"`

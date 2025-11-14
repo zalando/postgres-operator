@@ -1149,3 +1149,181 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 		}
 	}
 }
+
+func TestConnectionPoolerServiceType(t *testing.T) {
+	testName := "Test connection pooler service type selection"
+
+	cluster := New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+				},
+				Resources: config.Resources{
+					EnableOwnerReferences: util.True(),
+				},
+			},
+		},
+		k8sutil.KubernetesClient{},
+		acidv1.Postgresql{},
+		logger,
+		eventRecorder,
+	)
+
+	cluster.Statefulset = &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sts",
+		},
+	}
+
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+		Master: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+			Role:           Master,
+		},
+		Replica: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+			Role:           Replica,
+		},
+	}
+
+	tests := []struct {
+		subTest      string
+		spec         *acidv1.PostgresSpec
+		cluster      *Cluster
+		expectedType map[PostgresRole]v1.ServiceType
+	}{
+		{
+			subTest: "default configuration -> ClusterIP for both",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeClusterIP,
+				Replica: v1.ServiceTypeClusterIP,
+			},
+		},
+		{
+			subTest: "LoadBalancer for both roles",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:                &acidv1.ConnectionPooler{},
+				EnableMasterPoolerLoadBalancer:  boolToPointer(true),
+				EnableReplicaPoolerLoadBalancer: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeLoadBalancer,
+				Replica: v1.ServiceTypeLoadBalancer,
+			},
+		},
+		{
+			subTest: "LoadBalancer for master",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:               &acidv1.ConnectionPooler{},
+				EnableMasterPoolerLoadBalancer: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeLoadBalancer,
+				Replica: v1.ServiceTypeClusterIP,
+			},
+		},
+		{
+			subTest: "LoadBalancer for replica",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:                &acidv1.ConnectionPooler{},
+				EnableReplicaPoolerLoadBalancer: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeClusterIP,
+				Replica: v1.ServiceTypeLoadBalancer,
+			},
+		},
+		{
+			subTest: "NodePort for both roles",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:            &acidv1.ConnectionPooler{},
+				EnableMasterPoolerNodePort:  boolToPointer(true),
+				EnableReplicaPoolerNodePort: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeNodePort,
+				Replica: v1.ServiceTypeNodePort,
+			},
+		},
+		{
+			subTest: "NodePort for master",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:           &acidv1.ConnectionPooler{},
+				EnableMasterPoolerNodePort: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeNodePort,
+				Replica: v1.ServiceTypeClusterIP,
+			},
+		},
+		{
+			subTest: "NodePort for replica",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:            &acidv1.ConnectionPooler{},
+				EnableReplicaPoolerNodePort: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeClusterIP,
+				Replica: v1.ServiceTypeNodePort,
+			},
+		},
+		{
+			subTest: "NodePort overrides LoadBalancer for both roles",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:                &acidv1.ConnectionPooler{},
+				EnableMasterPoolerLoadBalancer:  boolToPointer(true),
+				EnableReplicaPoolerLoadBalancer: boolToPointer(true),
+				EnableMasterPoolerNodePort:      boolToPointer(true),
+				EnableReplicaPoolerNodePort:     boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeNodePort,
+				Replica: v1.ServiceTypeNodePort,
+			},
+		},
+	}
+
+	roles := []PostgresRole{Master, Replica}
+
+	for _, tt := range tests {
+		tt.cluster.Spec = *tt.spec
+
+		for _, role := range roles {
+			svc := tt.cluster.generateConnectionPoolerService(tt.cluster.ConnectionPooler[role])
+
+			expected, ok := tt.expectedType[role]
+			if !ok {
+				t.Fatalf("%s [%s]: missing expectedType for role %v", testName, tt.subTest, role)
+			}
+
+			if svc.Spec.Type != expected {
+				t.Errorf("%s [%s] role=%s: service Type is incorrect, got %s, expected %s",
+					testName, tt.subTest, role, svc.Spec.Type, expected)
+			}
+		}
+	}
+}

@@ -508,6 +508,10 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
+	if ok, port := c.shouldCreateNodePortForPoolerService(poolerRole, spec); ok {
+		c.configureNodePortService(&serviceSpec, port)
+	}
+
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        connectionPooler.Name,
@@ -532,7 +536,10 @@ func (c *Cluster) generatePoolerServiceAnnotations(role PostgresRole, spec *acid
 	var dnsString string
 	annotations := c.getCustomServiceAnnotations(role, spec)
 
-	if c.shouldCreateLoadBalancerForPoolerService(role, spec) {
+	// we do not want the load balancer specific annotations on a NodePort service
+	nodePort, _ := c.shouldCreateNodePortForPoolerService(role, spec)
+
+	if c.shouldCreateLoadBalancerForPoolerService(role, spec) && !nodePort {
 		// set ELB Timeout annotation with default value
 		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
 			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
@@ -572,6 +579,37 @@ func (c *Cluster) shouldCreateLoadBalancerForPoolerService(role PostgresRole, sp
 		}
 		return c.OpConfig.EnableMasterPoolerLoadBalancer
 
+	default:
+		panic(fmt.Sprintf("Unknown role %v", role))
+	}
+}
+
+func (c *Cluster) shouldCreateNodePortForPoolerService(role PostgresRole, spec *acidv1.PostgresSpec) (bool, int32) {
+	switch role {
+	case Replica:
+		// if the value is explicitly set in a Postgresql manifest, follow this setting
+		if spec.EnableReplicaPoolerNodePort != nil {
+			port := int32(0)
+			if spec.ReplicaPoolerNodePort != nil {
+				port = *spec.ReplicaPoolerNodePort
+			}
+
+			return *spec.EnableReplicaPoolerNodePort, port
+		}
+
+		// otherwise, follow the operator configuration
+		return c.OpConfig.EnableReplicaPoolerNodePort, 0
+	case Master:
+		if spec.EnableMasterPoolerNodePort != nil {
+			port := int32(0)
+			if spec.MasterPoolerNodePort != nil {
+				port = *spec.MasterPoolerNodePort
+			}
+
+			return *spec.EnableMasterPoolerNodePort, port
+		}
+
+		return c.OpConfig.EnableMasterPoolerNodePort, 0
 	default:
 		panic(fmt.Sprintf("Unknown role %v", role))
 	}

@@ -715,6 +715,46 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableMasterNodePort != nil {
+		in, out := &in.EnableMasterNodePort, &out.EnableMasterNodePort
+		*out = new(bool)
+		**out = **in
+	}
+	if in.MasterNodePort != nil {
+		in, out := &in.MasterNodePort, &out.MasterNodePort
+		*out = new(int32)
+		**out = **in
+	}
+	if in.EnableMasterPoolerNodePort != nil {
+		in, out := &in.EnableMasterPoolerNodePort, &out.EnableMasterPoolerNodePort
+		*out = new(bool)
+		**out = **in
+	}
+	if in.MasterPoolerNodePort != nil {
+		in, out := &in.MasterPoolerNodePort, &out.MasterPoolerNodePort
+		*out = new(int32)
+		**out = **in
+	}
+	if in.EnableReplicaNodePort != nil {
+		in, out := &in.EnableReplicaNodePort, &out.EnableReplicaNodePort
+		*out = new(bool)
+		**out = **in
+	}
+	if in.ReplicaNodePort != nil {
+		in, out := &in.ReplicaNodePort, &out.ReplicaNodePort
+		*out = new(int32)
+		**out = **in
+	}
+	if in.EnableReplicaPoolerNodePort != nil {
+		in, out := &in.EnableReplicaPoolerNodePort, &out.EnableReplicaPoolerNodePort
+		*out = new(bool)
+		**out = **in
+	}
+	if in.ReplicaPoolerNodePort != nil {
+		in, out := &in.ReplicaPoolerNodePort, &out.ReplicaPoolerNodePort
+		*out = new(int32)
+		**out = **in
+	}
 	if in.UseLoadBalancer != nil {
 		in, out := &in.UseLoadBalancer, &out.UseLoadBalancer
 		*out = new(bool)
