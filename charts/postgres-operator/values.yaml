@@ -1,7 +1,7 @@
 image:
   registry: ghcr.io
   repository: zalando/postgres-operator
-  tag: v1.14.0
+  tag: v1.15.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -38,7 +38,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: ghcr.io/zalando/spilo-17:4.0-p2
+  docker_image: ghcr.io/zalando/spilo-17:4.0-p3
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
@@ -364,7 +364,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.0"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 

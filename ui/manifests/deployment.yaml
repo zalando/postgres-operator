@@ -18,7 +18,7 @@ spec:
       serviceAccountName: postgres-operator-ui
       containers:
         - name: "service"
-          image: ghcr.io/zalando/postgres-operator-ui:v1.14.0
+          image: ghcr.io/zalando/postgres-operator-ui:v1.15.0
           ports:
             - containerPort: 8081
               protocol: "TCP"
@@ -81,8 +81,6 @@ spec:
                   ]
                 }
             # Exemple of settings to make snapshot view working in the ui when using AWS
-            # - name: WALE_S3_ENDPOINT
-            #   value: https+path://s3.us-east-1.amazonaws.com:443
             # - name: SPILO_S3_BACKUP_PREFIX
             #   value: spilo/
             # - name: AWS_ACCESS_KEY_ID
@@ -102,5 +100,3 @@ spec:
             #       key: AWS_DEFAULT_REGION
             # - name: SPILO_S3_BACKUP_BUCKET
             #   value: <s3 bucket used by the operator>
-            # - name: "USE_AWS_INSTANCE_PROFILE"
-            #   value: "true"

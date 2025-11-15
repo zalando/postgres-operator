@@ -248,7 +248,7 @@ func (c *Controller) getInfrastructureRoles(
 	}
 
 	if len(errors) > 0 {
-		return uniqRoles, fmt.Errorf(strings.Join(errors, `', '`))
+		return uniqRoles, fmt.Errorf("%s", strings.Join(errors, `', '`))
 	}
 
 	return uniqRoles, nil
