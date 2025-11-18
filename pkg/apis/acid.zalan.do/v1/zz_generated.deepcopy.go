@@ -183,6 +183,16 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(int64)
 		**out = **in
 	}
+	if in.SpiloRunAsNonRoot != nil {
+		in, out := &in.SpiloRunAsNonRoot, &out.SpiloRunAsNonRoot
+		*out = new(bool)
+		**out = **in
+	}
+	if in.SpiloSeccompProfile != nil {
+		in, out := &in.SpiloSeccompProfile, &out.SpiloSeccompProfile
+		*out = new(corev1.SeccompProfile)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.AdditionalPodCapabilities != nil {
 		in, out := &in.AdditionalPodCapabilities, &out.AdditionalPodCapabilities
 		*out = make([]string, len(*in))
@@ -687,6 +697,16 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		in, out := &in.SpiloFSGroup, &out.SpiloFSGroup
 		*out = new(int64)
 		**out = **in
+	}
+	if in.SpiloRunAsNonRoot != nil {
+		in, out := &in.SpiloRunAsNonRoot, &out.SpiloRunAsNonRoot
+		*out = new(bool)
+		**out = **in
+	}
+	if in.SpiloSeccompProfile != nil {
+		in, out := &in.SpiloSeccompProfile, &out.SpiloSeccompProfile
+		*out = new(corev1.SeccompProfile)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.EnableMasterLoadBalancer != nil {
 		in, out := &in.EnableMasterLoadBalancer, &out.EnableMasterLoadBalancer
