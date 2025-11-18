@@ -34,6 +34,8 @@ type Resources struct {
 	SpiloRunAsUser                *int64              `name:"spilo_runasuser"`
 	SpiloRunAsGroup               *int64              `name:"spilo_runasgroup"`
 	SpiloFSGroup                  *int64              `name:"spilo_fsgroup"`
+	SpiloRunAsNonRoot             *bool               `name:"spilo_runasnonroot"`
+	SpiloSeccompProfile           *v1.SeccompProfile  `name:"spilo_seccompprofile"`
 	PodPriorityClassName          string              `name:"pod_priority_class_name"`
 	ClusterDomain                 string              `name:"cluster_domain" default:"cluster.local"`
 	SpiloPrivileged               bool                `name:"spilo_privileged" default:"false"`

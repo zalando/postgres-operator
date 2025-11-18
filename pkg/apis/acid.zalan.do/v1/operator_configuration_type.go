@@ -66,6 +66,8 @@ type KubernetesMetaConfiguration struct {
 	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
 	SpiloRunAsGroup                        *int64                       `json:"spilo_runasgroup,omitempty"`
 	SpiloFSGroup                           *int64                       `json:"spilo_fsgroup,omitempty"`
+	SpiloRunAsNonRoot                      *bool                        `json:"spilo_runasnonroot,omitempty"`
+	SpiloSeccompProfile                    *v1.SeccompProfile           `json:"spilo_seccompprofile,omitempty"`
 	AdditionalPodCapabilities              []string                     `json:"additional_pod_capabilities,omitempty"`
 	WatchedNamespace                       string                       `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate        `json:"pdb_name_format,omitempty"`
