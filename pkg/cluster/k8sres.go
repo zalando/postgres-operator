@@ -485,17 +485,30 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (loca
 	return
 }
 
-func generateCapabilities(capabilities []string) *v1.Capabilities {
-	additionalCapabilities := make([]v1.Capability, 0, len(capabilities))
-	for _, capability := range capabilities {
-		additionalCapabilities = append(additionalCapabilities, v1.Capability(strings.ToUpper(capability)))
+func generateCapabilities(added, dropped []string) *v1.Capabilities {
+	if len(added) == 0 && len(dropped) == 0 {
+		return nil
 	}
-	if len(additionalCapabilities) > 0 {
-		return &v1.Capabilities{
-			Add: additionalCapabilities,
+
+	capabilities := &v1.Capabilities{}
+
+	if len(added) > 0 {
+		additionalCapabilities := make([]v1.Capability, 0, len(added))
+		for _, capability := range added {
+			additionalCapabilities = append(additionalCapabilities, v1.Capability(strings.ToUpper(capability)))
 		}
+		capabilities.Add = additionalCapabilities
 	}
-	return nil
+
+	if len(dropped) > 0 {
+		droppedCapabilities := make([]v1.Capability, 0, len(dropped))
+		for _, capability := range dropped {
+			droppedCapabilities = append(droppedCapabilities, v1.Capability(strings.ToUpper(capability)))
+		}
+		capabilities.Drop = droppedCapabilities
+	}
+
+	return capabilities
 }
 
 func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
@@ -1391,7 +1404,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
-		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
+		generateCapabilities(c.OpConfig.AdditionalPodCapabilities, c.OpConfig.DroppedPodCapabilities),
 	)
 
 	// Patroni responds 200 to probe only if it either owns the leader lock or postgres is running and DCS is accessible
