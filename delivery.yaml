@@ -1,6 +1,13 @@
 version: "2017-09-20"
+
+build_env: &BUILD_ENV
+  BASE_IMAGE: container-registry.zalando.net/library/alpine-3.15
+  MULTI_ARCH_REGISTRY: container-registry-test.zalando.net/acid
+
 pipeline:
     - id: build-postgres-operator
+      env:
+        <<: *BUILD_ENV
       type: script
       vm_config:
         type: linux
@@ -17,17 +24,21 @@ pipeline:
 
         - desc: Build Docker image
           cmd: |
-            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
-            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
-            then
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
+            if [ -z ${CDP_SOURCE_BRANCH} ]; then
+              IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator
             else
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
+              IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-test
             fi
-            export IMAGE
-            make docker push
+
+            IMAGE_TAG=$(make docker-push IMAGE=${IMAGE} BASE_IMAGE=${BASE_IMAGE})
+
+            if [ -z ${CDP_SOURCE_BRANCH} ]; then
+              cdp-promote-image ${IMAGE_TAG}
+            fi
 
     - id: build-operator-ui
+      env:
+        <<: *BUILD_ENV
       type: script
       vm_config:
         type: linux
@@ -46,18 +57,21 @@ pipeline:
         - desc: 'Build and push Docker image'
           cmd: |
             cd ui
-            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
-            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
-            then
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui
+            if [ -z ${CDP_SOURCE_BRANCH} ]; then
+              IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-ui
             else
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui-test
+              IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-ui-test
             fi
-            export IMAGE
-            make docker
-            make push
+            
+            IMAGE_TAG=$(make docker-push IMAGE=${IMAGE} BASE_IMAGE=${BASE_IMAGE})
+
+            if [ -z ${CDP_SOURCE_BRANCH} ]; then
+              cdp-promote-image ${IMAGE_TAG}
+            fi
 
     - id: build-logical-backup
+      env:
+        <<: *BUILD_ENV
       type: script
       vm_config:
         type: linux
@@ -67,6 +81,11 @@ pipeline:
           cmd: |
             cd logical-backup
             export TAG=$(git describe --tags --always --dirty)
-            IMAGE="registry-write.opensource.zalan.do/acid/logical-backup"
-            docker build --rm -t "$IMAGE:$TAG$CDP_TAG" .
-            docker push "$IMAGE:$TAG$CDP_TAG"
+            docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
+            docker buildx build --platform linux/amd64,linux/arm64 \
+                                -t ${MULTI_ARCH_REGISTRY}/postgres-operator-logical-backup:${TAG} \
+                                --push .
+
+            if [ -z ${CDP_SOURCE_BRANCH} ]; then
+              cdp-promote-image ${MULTI_ARCH_REGISTRY}/postgres-operator-logical-backup:${TAG}
+            fi
