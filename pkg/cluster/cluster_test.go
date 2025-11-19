@@ -2116,7 +2116,7 @@ func TestCompareVolumeMounts(t *testing.T) {
 }
 
 func TestGetSwitchoverSchedule(t *testing.T) {
-	now := time.Now()
+	now, _ := time.Parse(time.RFC3339, "2025-11-11T12:35:00Z")
 
 	futureTimeStart := now.Add(1 * time.Hour)
 	futureWindowTimeStart := futureTimeStart.Format("15:04")
@@ -2195,7 +2195,7 @@ func TestGetSwitchoverSchedule(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster.Spec.MaintenanceWindows = tt.windows
-			schedule := cluster.GetSwitchoverSchedule()
+			schedule := cluster.GetSwitchoverScheduleAtTime(now)
 			if schedule != tt.expected {
 				t.Errorf("Expected GetSwitchoverSchedule to return %s, returned: %s", tt.expected, schedule)
 			}
