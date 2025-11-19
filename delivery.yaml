@@ -65,7 +65,7 @@ pipeline:
               IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-ui-test
             fi
             
-            IMAGE_TAG=$(make docker-push IMAGE=${IMAGE} BASE_IMAGE=${PYTHON_BASE_IMAGE} NODE_IMAGE=${ALPINE_BASE_IMAGE})
+            IMAGE_TAG=$(make docker-push IMAGE=${IMAGE} BASE_IMAGE=${PYTHON_BASE_IMAGE})
 
             if [ -z ${CDP_SOURCE_BRANCH} ]; then
               cdp-promote-image ${IMAGE_TAG}
