@@ -1089,15 +1089,8 @@ func (c *Cluster) syncSecrets() error {
 
 	// remove rotation users that exceed the retention interval
 	if len(retentionUsers) > 0 {
-		err := c.initDbConn()
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("could not init db connection: %v", err))
-		}
-		if err = c.cleanupRotatedUsers(retentionUsers, c.pgDb); err != nil {
+		if err := c.cleanupRotatedUsers(retentionUsers); err != nil {
 			errors = append(errors, fmt.Sprintf("error removing users exceeding configured retention interval: %v", err))
-		}
-		if err := c.closeDbConn(); err != nil {
-			errors = append(errors, fmt.Sprintf("could not close database connection after removing users exceeding configured retention interval: %v", err))
 		}
 	}
 
