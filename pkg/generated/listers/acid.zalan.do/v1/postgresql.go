@@ -25,10 +25,10 @@ SOFTWARE.
 package v1
 
 import (
-	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PostgresqlLister helps list Postgresqls.
@@ -36,7 +36,7 @@ import (
 type PostgresqlLister interface {
 	// List lists all Postgresqls in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Postgresql, err error)
+	List(selector labels.Selector) (ret []*acidzalandov1.Postgresql, err error)
 	// Postgresqls returns an object that can list and get Postgresqls.
 	Postgresqls(namespace string) PostgresqlNamespaceLister
 	PostgresqlListerExpansion
@@ -44,25 +44,17 @@ type PostgresqlLister interface {
 
 // postgresqlLister implements the PostgresqlLister interface.
 type postgresqlLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*acidzalandov1.Postgresql]
 }
 
 // NewPostgresqlLister returns a new PostgresqlLister.
 func NewPostgresqlLister(indexer cache.Indexer) PostgresqlLister {
-	return &postgresqlLister{indexer: indexer}
-}
-
-// List lists all Postgresqls in the indexer.
-func (s *postgresqlLister) List(selector labels.Selector) (ret []*v1.Postgresql, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Postgresql))
-	})
-	return ret, err
+	return &postgresqlLister{listers.New[*acidzalandov1.Postgresql](indexer, acidzalandov1.Resource("postgresql"))}
 }
 
 // Postgresqls returns an object that can list and get Postgresqls.
 func (s *postgresqlLister) Postgresqls(namespace string) PostgresqlNamespaceLister {
-	return postgresqlNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return postgresqlNamespaceLister{listers.NewNamespaced[*acidzalandov1.Postgresql](s.ResourceIndexer, namespace)}
 }
 
 // PostgresqlNamespaceLister helps list and get Postgresqls.
@@ -70,36 +62,15 @@ func (s *postgresqlLister) Postgresqls(namespace string) PostgresqlNamespaceList
 type PostgresqlNamespaceLister interface {
 	// List lists all Postgresqls in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Postgresql, err error)
+	List(selector labels.Selector) (ret []*acidzalandov1.Postgresql, err error)
 	// Get retrieves the Postgresql from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Postgresql, error)
+	Get(name string) (*acidzalandov1.Postgresql, error)
 	PostgresqlNamespaceListerExpansion
 }
 
 // postgresqlNamespaceLister implements the PostgresqlNamespaceLister
 // interface.
 type postgresqlNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Postgresqls in the indexer for a given namespace.
-func (s postgresqlNamespaceLister) List(selector labels.Selector) (ret []*v1.Postgresql, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Postgresql))
-	})
-	return ret, err
-}
-
-// Get retrieves the Postgresql from the indexer for a given namespace and name.
-func (s postgresqlNamespaceLister) Get(name string) (*v1.Postgresql, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("postgresql"), name)
-	}
-	return obj.(*v1.Postgresql), nil
+	listers.ResourceIndexer[*acidzalandov1.Postgresql]
 }

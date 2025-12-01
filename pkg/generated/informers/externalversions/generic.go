@@ -25,7 +25,7 @@ SOFTWARE.
 package externalversions
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"

@@ -25,13 +25,13 @@ SOFTWARE.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	apiszalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
 	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/zalando/postgres-operator/pkg/generated/listers/zalando.org/v1"
+	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/generated/listers/zalando.org/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -42,7 +42,7 @@ import (
 // FabricEventStreams.
 type FabricEventStreamInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.FabricEventStreamLister
+	Lister() zalandoorgv1.FabricEventStreamLister
 }
 
 type fabricEventStreamInformer struct {
@@ -77,7 +77,7 @@ func NewFilteredFabricEventStreamInformer(client versioned.Interface, namespace 
 				return client.ZalandoV1().FabricEventStreams(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&zalandoorgv1.FabricEventStream{},
+		&apiszalandoorgv1.FabricEventStream{},
 		resyncPeriod,
 		indexers,
 	)
@@ -88,9 +88,9 @@ func (f *fabricEventStreamInformer) defaultInformer(client versioned.Interface, 
 }
 
 func (f *fabricEventStreamInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&zalandoorgv1.FabricEventStream{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiszalandoorgv1.FabricEventStream{}, f.defaultInformer)
 }
 
-func (f *fabricEventStreamInformer) Lister() v1.FabricEventStreamLister {
-	return v1.NewFabricEventStreamLister(f.Informer().GetIndexer())
+func (f *fabricEventStreamInformer) Lister() zalandoorgv1.FabricEventStreamLister {
+	return zalandoorgv1.NewFabricEventStreamLister(f.Informer().GetIndexer())
 }
