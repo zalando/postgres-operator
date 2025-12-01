@@ -26,7 +26,7 @@ jobs:
           go-version: "^1.25.3"
 
       - name: Run unit tests
-        run: make deps mocks test
+        run: make test
 
       - name: Define image name
         id: image
