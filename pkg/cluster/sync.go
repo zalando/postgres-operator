@@ -1181,12 +1181,16 @@ func (c *Cluster) updateSecret(
 	} else {
 		// username might not match if password rotation has been disabled again
 		if secretUsername != string(secret.Data["username"]) {
-			*retentionUsers = append(*retentionUsers, secretUsername)
-			secret.Data["username"] = []byte(secretUsername)
-			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
-			secret.Data["nextRotation"] = []byte{}
-			updateSecret = true
-			updateSecretMsg = fmt.Sprintf("secret %s does not contain the role %s - updating username and resetting password", secretName, secretUsername)
+			if len(string(secret.Data["username"])) != len(secretUsername) {
+				*retentionUsers = append(*retentionUsers, secretUsername)
+				secret.Data["username"] = []byte(secretUsername)
+				secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+				secret.Data["nextRotation"] = []byte{}
+				updateSecret = true
+				updateSecretMsg = fmt.Sprintf("secret does not contain the role %s - updating username and resetting password", secretUsername)
+			} else {
+				return secret, fmt.Errorf("could not update secret because of user name mismatch: expected: %s, got: %s", secretUsername, string(secret.Data["username"]))
+			}
 		}
 	}
 
@@ -1216,18 +1220,18 @@ func (c *Cluster) updateSecret(
 	if updateSecret {
 		c.logger.Infof("%s", updateSecretMsg)
 		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
-			return secret, fmt.Errorf("could not update secret %s: %v", secretName, err)
+			return secret, fmt.Errorf("could not update secret: %v", err)
 		}
 	}
 
 	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations, nil); changed {
 		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
 		if err != nil {
-			return secret, fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
+			return secret, fmt.Errorf("could not form patch for secret annotations: %v", err)
 		}
 		secret, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
-			return secret, fmt.Errorf("could not patch annotations for secret %q: %v", secret.Name, err)
+			return secret, fmt.Errorf("could not patch annotations for secret: %v", err)
 		}
 	}
 
