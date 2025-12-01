@@ -19,6 +19,8 @@ GITURL = $(shell git config --get remote.origin.url)
 GITSTATUS = $(shell git status --porcelain || echo "no changes")
 SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
+CRD_SOURCES    = $(shell find pkg/apis/zalando.org pkg/apis/acid.zalan.do -name '*.go' -not -name '*.deepcopy.go')
+GENERATED      = pkg/apis/zalando.org/v1/zz_generated.deepcopy.go pkg/apis/acid.zalan.do/v1/zz_generated.deepcopy.go
 DIRS := cmd pkg
 PKG := `go list ./... | grep -v /vendor/`
 
@@ -50,15 +52,20 @@ default: local
 clean:
 	rm -rf build
 
-local: ${SOURCES}
+verify:
 	hack/verify-codegen.sh
-	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $^
 
-linux: ${SOURCES}
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
+$(GENERATED): go.mod $(CRD_SOURCES)
+	hack/update-codegen.sh
 
-macos: ${SOURCES}
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
+local: ${SOURCES} $(GENERATED)
+	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)
+
+linux: ${SOURCES} $(GENERATED)
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
+
+macos: ${SOURCES} $(GENERATED)
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 docker: ${DOCKERDIR}/${DOCKERFILE}
 	echo `(env)`
@@ -77,11 +84,6 @@ push:
 mocks:
 	GO111MODULE=on go generate ./...
 
-tools:
-	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.32.9
-	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.6.0
-	GO111MODULE=on go mod tidy
-
 fmt:
 	@gofmt -l -w -s $(DIRS)
 
@@ -89,15 +91,10 @@ vet:
 	@go vet $(PKG)
 	@staticcheck $(PKG)
 
-deps: tools
-	GO111MODULE=on go mod vendor
-
-test:
-	hack/verify-codegen.sh
+test: mocks $(GENERATED)
 	GO111MODULE=on go test ./...
 
-codegen:
-	hack/update-codegen.sh
+codegen: $(GENERATED)
 
 e2e: docker # build operator image to be tested
 	cd e2e; make e2etest

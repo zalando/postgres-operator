@@ -25,31 +25,26 @@ SOFTWARE.
 package fake
 
 import (
-	"context"
-
-	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	testing "k8s.io/client-go/testing"
+	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeOperatorConfigurations implements OperatorConfigurationInterface
-type FakeOperatorConfigurations struct {
+// fakeOperatorConfigurations implements OperatorConfigurationInterface
+type fakeOperatorConfigurations struct {
+	*gentype.FakeClient[*v1.OperatorConfiguration]
 	Fake *FakeAcidV1
-	ns   string
 }
 
-var operatorconfigurationsResource = schema.GroupVersionResource{Group: "acid.zalan.do", Version: "v1", Resource: "operatorconfigurations"}
-
-var operatorconfigurationsKind = schema.GroupVersionKind{Group: "acid.zalan.do", Version: "v1", Kind: "OperatorConfiguration"}
-
-// Get takes name of the operatorConfiguration, and returns the corresponding operatorConfiguration object, and an error if there is any.
-func (c *FakeOperatorConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *acidzalandov1.OperatorConfiguration, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(operatorconfigurationsResource, c.ns, name), &acidzalandov1.OperatorConfiguration{})
-
-	if obj == nil {
-		return nil, err
+func newFakeOperatorConfigurations(fake *FakeAcidV1, namespace string) acidzalandov1.OperatorConfigurationInterface {
+	return &fakeOperatorConfigurations{
+		gentype.NewFakeClient[*v1.OperatorConfiguration](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("operatorconfigurations"),
+			v1.SchemeGroupVersion.WithKind("OperatorConfiguration"),
+			func() *v1.OperatorConfiguration { return &v1.OperatorConfiguration{} },
+		),
+		fake,
 	}
-	return obj.(*acidzalandov1.OperatorConfiguration), err
 }

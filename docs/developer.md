@@ -33,11 +33,8 @@ by setting the `GO111MODULE` environment variable to `on`. The make targets do
 this for you, so simply run
 
 ```bash
-make deps
+make
 ```
-
-This would take a while to complete. You have to redo `make deps` every time
-your dependencies list changes, i.e. after adding a new library dependency.
 
 Build the operator with the `make docker` command. You may define the TAG
 variable to assign an explicit tag to your Docker image and the IMAGE to set
@@ -223,14 +220,13 @@ dlv connect 127.0.0.1:DLV_PORT
 Prerequisites:
 
 ```bash
-make deps
 make mocks
 ```
 
 To run all unit tests, you can simply do:
 
 ```bash
-go test ./pkg/...
+make test
 ```
 
 In case if you need to debug your unit test, it's possible to use delve:
