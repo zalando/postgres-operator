@@ -5,64 +5,64 @@ metadata:
 spec:
   group: acid.zalan.do
   names:
+    categories:
+    - all
     kind: PostgresTeam
     listKind: PostgresTeamList
     plural: postgresteams
-    singular: postgresteam
     shortNames:
     - pgteam
-    categories:
-    - all
+    singular: postgresteam
   scope: Namespaced
   versions:
   - name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            enum:
+            - acid.zalan.do/v1
+            type: string
+          kind:
+            enum:
+            - PostgresTeam
+            type: string
+          spec:
+            properties:
+              additionalMembers:
+                additionalProperties:
+                  description: "List of users who will also be added to the Postgres cluster"
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                description: "Map for teamId and associated additional users"
+                type: object
+              additionalSuperuserTeams:
+                additionalProperties:
+                  description: "List of teams to become Postgres superusers"
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                description: "Map for teamId and associated additional superuser teams"
+                type: object
+              additionalTeams:
+                additionalProperties:
+                  description: "List of teams whose members will also be added to the Postgres cluster"
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                description: "Map for teamId and associated additional teams"
+                type: object
+            type: object
+        required:
+        - kind
+        - apiVersion
+        - spec
+        type: object
     served: true
     storage: true
     subresources:
       status: {}
-    schema:
-      openAPIV3Schema:
-        type: object
-        required:
-          - kind
-          - apiVersion
-          - spec
-        properties:
-          kind:
-            type: string
-            enum:
-              - PostgresTeam
-          apiVersion:
-            type: string
-            enum:
-              - acid.zalan.do/v1
-          spec:
-            type: object
-            properties:
-              additionalSuperuserTeams:
-                type: object
-                description: "Map for teamId and associated additional superuser teams"
-                additionalProperties:
-                  type: array
-                  nullable: true
-                  description: "List of teams to become Postgres superusers"
-                  items:
-                    type: string
-              additionalTeams:
-                type: object
-                description: "Map for teamId and associated additional teams"
-                additionalProperties:
-                  type: array
-                  nullable: true
-                  description: "List of teams whose members will also be added to the Postgres cluster"
-                  items:
-                    type: string
-              additionalMembers:
-                type: object
-                description: "Map for teamId and associated additional users"
-                additionalProperties:
-                  type: array
-                  nullable: true
-                  description: "List of users who will also be added to the Postgres cluster"
-                  items:
-                    type: string
