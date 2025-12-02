@@ -44,6 +44,14 @@ func (ths *teamHashSet) toMap() map[string][]string {
 	return newTeamMap
 }
 
+func mapStringSliceToStringSliceMap[T ~[]string](input map[string]T) map[string][]string {
+	output := make(map[string][]string)
+	for k, v := range input {
+		output[k] = []string(v)
+	}
+	return output
+}
+
 func (ths *teamHashSet) mergeCrdMap(crdTeamMap map[string][]string) {
 	for t, at := range crdTeamMap {
 		ths.add(t, at)
@@ -110,9 +118,9 @@ func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
 	teamIDs := make(map[string]struct{})
 
 	for _, pgTeam := range pgTeams.Items {
-		superuserTeamSet.mergeCrdMap(pgTeam.Spec.AdditionalSuperuserTeams)
-		teamSet.mergeCrdMap(pgTeam.Spec.AdditionalTeams)
-		teamMemberSet.mergeCrdMap(pgTeam.Spec.AdditionalMembers)
+		superuserTeamSet.mergeCrdMap(mapStringSliceToStringSliceMap(pgTeam.Spec.AdditionalSuperuserTeams))
+		teamSet.mergeCrdMap(mapStringSliceToStringSliceMap(pgTeam.Spec.AdditionalTeams))
+		teamMemberSet.mergeCrdMap(mapStringSliceToStringSliceMap(pgTeam.Spec.AdditionalMembers))
 	}
 	fetchTeams(&teamIDs, superuserTeamSet)
 	fetchTeams(&teamIDs, teamSet)
