@@ -1,6 +1,9 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: postgresteams.acid.zalan.do
 spec:
   group: acid.zalan.do
@@ -18,48 +21,59 @@ spec:
   - name: v1
     schema:
       openAPIV3Schema:
+        description: PostgresTeam defines Custom Resource Definition Object for team
+          management.
         properties:
           apiVersion:
-            enum:
-            - acid.zalan.do/v1
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            enum:
-            - PostgresTeam
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
+          metadata:
+            type: object
           spec:
+            description: PostgresTeamSpec defines the specification for the PostgresTeam
+              TPR.
             properties:
               additionalMembers:
                 additionalProperties:
-                  description: "List of users who will also be added to the Postgres cluster"
+                  description: List of users who will also be added to the Postgres
+                    cluster.
                   items:
                     type: string
-                  nullable: true
                   type: array
-                description: "Map for teamId and associated additional users"
+                description: Map for teamId and associated additional users
                 type: object
               additionalSuperuserTeams:
                 additionalProperties:
-                  description: "List of teams to become Postgres superusers"
+                  description: List of teams to become Postgres superusers
                   items:
                     type: string
-                  nullable: true
                   type: array
-                description: "Map for teamId and associated additional superuser teams"
+                description: Map for teamId and associated additional superuser teams
                 type: object
               additionalTeams:
                 additionalProperties:
-                  description: "List of teams whose members will also be added to the Postgres cluster"
+                  description: List of teams whose members will also be added to the
+                    Postgres cluster.
                   items:
                     type: string
-                  nullable: true
                   type: array
-                description: "Map for teamId and associated additional teams"
+                description: Map for teamId and associated additional teams
                 type: object
             type: object
         required:
-        - kind
-        - apiVersion
+        - metadata
         - spec
         type: object
     served: true
