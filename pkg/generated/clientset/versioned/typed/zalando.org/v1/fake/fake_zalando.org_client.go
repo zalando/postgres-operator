@@ -35,7 +35,7 @@ type FakeZalandoV1 struct {
 }
 
 func (c *FakeZalandoV1) FabricEventStreams(namespace string) v1.FabricEventStreamInterface {
-	return &FakeFabricEventStreams{c, namespace}
+	return newFakeFabricEventStreams(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
