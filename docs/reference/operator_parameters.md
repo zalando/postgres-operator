@@ -509,6 +509,13 @@ configuration they are grouped under the `kubernetes` key.
   non-root process, but requires a custom Spilo image. Note the FSGroup of a Pod
   cannot be changed without recreating a new Pod.
 
+* **spilo_runasnonroot**
+  boolean flag to set `runAsNonRoot` in the Spilo pod security context. If this
+  is set then `spilo_runasuser` must also be set. Optional.
+
+* **spilo_seccompprofile**
+  sets the `seccompProfile` in the Spilo pod security context. Optional.
+
 * **spilo_privileged**
   whether the Spilo container should run in privileged mode. Privileged mode is
   used for AWS volume resizing and not required if you don't need that

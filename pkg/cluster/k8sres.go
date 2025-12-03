@@ -813,6 +813,8 @@ func (c *Cluster) generatePodTemplate(
 	spiloRunAsUser *int64,
 	spiloRunAsGroup *int64,
 	spiloFSGroup *int64,
+	spiloRunAsNonRoot *bool,
+	spiloSeccompProfile *v1.SeccompProfile,
 	nodeAffinity *v1.Affinity,
 	schedulerName *string,
 	terminateGracePeriod int64,
@@ -843,6 +845,14 @@ func (c *Cluster) generatePodTemplate(
 
 	if spiloFSGroup != nil {
 		securityContext.FSGroup = spiloFSGroup
+	}
+
+	if spiloRunAsNonRoot != nil {
+		securityContext.RunAsNonRoot = spiloRunAsNonRoot
+	}
+
+	if spiloSeccompProfile != nil {
+		securityContext.SeccompProfile = spiloSeccompProfile
 	}
 
 	podSpec := v1.PodSpec{
@@ -1357,6 +1367,16 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveFSGroup = spec.SpiloFSGroup
 	}
 
+	effectiveRunAsNonRoot := c.OpConfig.Resources.SpiloRunAsNonRoot
+	if spec.SpiloRunAsNonRoot != nil {
+		effectiveRunAsNonRoot = spec.SpiloRunAsNonRoot
+	}
+
+	effectiveSeccompProfile := c.OpConfig.Resources.SpiloSeccompProfile
+	if spec.SpiloSeccompProfile != nil {
+		effectiveSeccompProfile = spec.SpiloSeccompProfile
+	}
+
 	volumeMounts := generateVolumeMounts(spec.Volume)
 
 	// configure TLS with a custom secret volume
@@ -1473,6 +1493,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
 		effectiveFSGroup,
+		effectiveRunAsNonRoot,
+		effectiveSeccompProfile,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
 		spec.SchedulerName,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
@@ -2358,6 +2380,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.Container{},
 		util.False(),
 		&tolerationsSpec,
+		nil,
+		nil,
 		nil,
 		nil,
 		nil,

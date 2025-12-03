@@ -3984,3 +3984,123 @@ func TestGenerateCapabilities(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateSeccompProfile(t *testing.T) {
+	mockClient, _ := newFakeK8sTestClient()
+
+	spiloSeccompProfile := v1.SeccompProfile{
+		Type:             "Localhost",
+		LocalhostProfile: k8sutil.StringToPointer("profiles/audit.json"),
+	}
+
+	postgresql := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "acid-test-cluster",
+			Namespace: "default",
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID:            "myapp",
+			NumberOfInstances: 1,
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+		},
+	}
+
+	testCluster := New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					SpiloSeccompProfile: &spiloSeccompProfile,
+				},
+			},
+		}, mockClient, postgresql, logger, eventRecorder)
+
+	// create a statefulset
+	sts, err := testCluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	assert.Equal(t, spiloSeccompProfile.Type, sts.Spec.Template.Spec.SecurityContext.SeccompProfile.Type, "SeccompProfile.Type matches")
+	assert.Equal(t, *spiloSeccompProfile.LocalhostProfile, *sts.Spec.Template.Spec.SecurityContext.SeccompProfile.LocalhostProfile, "SeccompProfile.LocalhostProfile matches")
+}
+
+func TestGenerateEmptySeccompProfile(t *testing.T) {
+	mockClient, _ := newFakeK8sTestClient()
+
+	postgresql := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "acid-test-cluster",
+			Namespace: "default",
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID:            "myapp",
+			NumberOfInstances: 1,
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+		},
+	}
+
+	testCluster := New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources:           config.Resources{},
+			},
+		}, mockClient, postgresql, logger, eventRecorder)
+
+	// create a statefulset
+	sts, err := testCluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	assert.Nil(t, sts.Spec.Template.Spec.SecurityContext.SeccompProfile, "SeccompProfile not set")
+}
+
+func TestGenerateRunAsNonRoot(t *testing.T) {
+	mockClient, _ := newFakeK8sTestClient()
+
+	postgresql := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "acid-test-cluster",
+			Namespace: "default",
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID:            "myapp",
+			NumberOfInstances: 1,
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+		},
+	}
+
+	runAsNonRoot := true
+
+	testCluster := New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					SpiloRunAsNonRoot: &runAsNonRoot,
+				},
+			},
+		}, mockClient, postgresql, logger, eventRecorder)
+
+	// create a statefulset
+	sts, err := testCluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	assert.Equal(t, true, *sts.Spec.Template.Spec.SecurityContext.RunAsNonRoot, "RunAsNonRoot set")
+}
