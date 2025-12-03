@@ -963,4 +963,37 @@ func TestUpdateSecret(t *testing.T) {
 	if currentUsername != appUser {
 		t.Errorf("%s: updated secret does not contain expected username: expected %s, got %s", testName, appUser, currentUsername)
 	}
+
+	// test error cases
+	pg.Spec.Users["prepared-owner-user"] = acidv1.UserFlags{}
+	pg.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{"prepared": {DefaultUsers: true}}
+
+	var errCluster = New(
+		Config{
+			OpConfig: config.Config{
+				Auth: config.Auth{
+					SuperUsername:       "postgres",
+					ReplicationUsername: "standby",
+					SecretNameTemplate:  secretTemplate,
+				},
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: "cluster-name",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	errCluster.Name = clusterName
+	errCluster.Namespace = namespace
+	errCluster.pgUsers = map[string]spec.PgUser{}
+
+	// init all users
+	errCluster.initUsers()
+	// create secrets and fail because of user name mismatch
+	err = errCluster.syncSecrets()
+	assert.Error(t, err)
+
+	// the order of secrets to sync is not deterministic, check only first part of the error message
+	expectedError := fmt.Sprintf("syncing secret %s failed: could not update secret because of user name mismatch", "default/prepared-owner-user.acid-test-cluster.credentials")
+	assert.Contains(t, err.Error(), expectedError)
 }
