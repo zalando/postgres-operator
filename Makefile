@@ -21,7 +21,7 @@ GITSTATUS = $(shell git status --porcelain || echo "no changes")
 SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
 CRD_SOURCES    = $(shell find pkg/apis/zalando.org pkg/apis/acid.zalan.do -name '*.go' -not -name '*.deepcopy.go')
-GENERATED_CRDS = manifests/postgresteam.crd.yaml
+GENERATED_CRDS = manifests/postgresteam.crd.yaml manifests/postgresql.crd.yaml
 GENERATED      = pkg/apis/zalando.org/v1/zz_generated.deepcopy.go pkg/apis/acid.zalan.do/v1/zz_generated.deepcopy.go
 DIRS := cmd pkg
 PKG := `go list ./... | grep -v /vendor/`
@@ -54,6 +54,7 @@ default: local
 
 clean:
 	rm -rf build
+	rm $(GENERATED)
 
 verify:
 	hack/verify-codegen.sh
@@ -63,9 +64,13 @@ $(GENERATED): go.mod $(CRD_SOURCES)
 
 $(GENERATED_CRDS): $(GENERATED)
 	go tool controller-gen crd:crdVersions=v1,allowDangerousTypes=true paths=./pkg/apis/acid.zalan.do/... output:crd:dir=manifests
-	# only generate postgresteam.crd.yaml for now
+	# only generate postgresteam.crd.yaml and postgresql.crd.yaml for now
 	@rm manifests/acid.zalan.do_operatorconfigurations.yaml
-	@rm manifests/acid.zalan.do_postgresqls.yaml
+	@mv manifests/acid.zalan.do_postgresqls.yaml manifests/postgresql.crd.yaml
+	@# hack to use lowercase kind and listKind
+	@sed -i -e 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml
+	@sed -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
+	@hack/adjust_postgresql_crd.sh
 	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
 
 local: ${SOURCES} $(GENERATED_CRDS)

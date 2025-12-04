@@ -1,6 +1,9 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: postgresqls.acid.zalan.do
 spec:
   group: acid.zalan.do
@@ -40,7 +43,8 @@ spec:
       jsonPath: .spec.resources.requests.memory
       name: Memory-Request
       type: string
-    - jsonPath: .metadata.creationTimestamp
+    - description: Age of the PostgreSQL cluster
+      jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
     - description: Current sync status of postgresql resource
@@ -50,19 +54,33 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
+        description: Postgresql defines PostgreSQL Custom Resource Definition Object.
         properties:
           apiVersion:
-            enum:
-            - acid.zalan.do/v1
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            enum:
-            - postgresql
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
+          metadata:
+            type: object
           spec:
+            description: PostgresSpec defines the specification for the PostgreSQL
+              TPR.
             properties:
               additionalVolumes:
                 items:
+                  description: AdditionalVolume specs additional optional volumes
+                    for statefulset
                   properties:
                     isSubPathExpr:
                       type: boolean
@@ -87,12 +105,16 @@ spec:
                   type: object
                 type: array
               allowedSourceRanges:
+                description: load balancers' source ranges are the same for master
+                  and replica services
                 items:
                   pattern: ^(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\/(\d|[1-2]\d|3[0-2])$
                   type: string
                 nullable: true
                 type: array
               clone:
+                description: CloneDescription describes which cluster the new should
+                  clone and up to which point in time
                 properties:
                   cluster:
                     type: string
@@ -107,11 +129,11 @@ spec:
                   s3_wal_path:
                     type: string
                   timestamp:
-                    pattern: '^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\.[0-9]+)?(([+-]([01][0-9]|2[0-3]):[0-5][0-9]))$'
-                    # The regexp matches the date-time format (RFC 3339 Section 5.6) that specifies a timezone as an offset relative to UTC
-                    # Example: 1996-12-19T16:39:57-08:00
-                    # Note: this field requires a timezone
-
+                    description: |-
+                      The regexp matches the date-time format (RFC 3339 Section 5.6) that specifies a timezone as an offset relative to UTC
+                      Example: 1996-12-19T16:39:57-08:00
+                      Note: this field requires a timezone
+                    pattern: ^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\.[0-9]+)?(([+-]([01][0-9]|2[0-3]):[0-5][0-9]))$
                     type: string
                   uid:
                     format: uuid
@@ -120,37 +142,112 @@ spec:
                 - cluster
                 type: object
               connectionPooler:
+                description: |-
+                  ConnectionPooler Options for connection pooler
+
+                  pgbouncer-large (with higher resources) or odyssey-small (with smaller
+                  resources)
+                  Type              string `json:"type,omitempty"`
+
+                  makes sense to expose. E.g. pool size (min/max boundaries), max client
+                  connections etc.
                 properties:
                   dockerImage:
                     type: string
                   maxDBConnections:
+                    format: int32
                     type: integer
                   mode:
                     enum:
-                    - "session"
-                    - "transaction"
+                    - session
+                    - transaction
                     type: string
                   numberOfInstances:
+                    format: int32
                     minimum: 1
                     type: integer
                   resources:
+                    description: Resources describes requests and limits for the cluster
+                      resouces.
                     properties:
                       limits:
+                        description: ResourceDescription describes CPU and memory
+                          resources defined for a cluster.
                         properties:
                           cpu:
-                            pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                            description: |-
+                              Decimal natural followed by m, or decimal natural followed by
+                              dot followed by up to three decimal digits.
+
+                              This is because the Kubernetes CPU resource has millis as the
+                              maximum precision.  The actual values are checked in code
+                              because the regular expression would be huge and horrible and
+                              not very helpful in validation error messages; this one checks
+                              only the format of the given number.
+
+                              https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+
+                              Note: the value specified here must not be zero or be lower
+                              than the corresponding request.
+                            pattern: ^(\d+m|\d+(\.\d{1,3})?)$
+                            type: string
+                          hugepages-1Gi:
+                            pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
+                            type: string
+                          hugepages-2Mi:
+                            pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                             type: string
                           memory:
-                            pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                            description: |-
+                              You can express memory as a plain integer or as a fixed-point
+                              integer using one of these suffixes: E, P, T, G, M, k. You can
+                              also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
+
+                              https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+
+                              Note: the value specified here must not be zero or be higher
+                              than the corresponding limit.
+                            pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                             type: string
                         type: object
                       requests:
+                        description: ResourceDescription describes CPU and memory
+                          resources defined for a cluster.
                         properties:
                           cpu:
-                            pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                            description: |-
+                              Decimal natural followed by m, or decimal natural followed by
+                              dot followed by up to three decimal digits.
+
+                              This is because the Kubernetes CPU resource has millis as the
+                              maximum precision.  The actual values are checked in code
+                              because the regular expression would be huge and horrible and
+                              not very helpful in validation error messages; this one checks
+                              only the format of the given number.
+
+                              https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+
+                              Note: the value specified here must not be zero or be lower
+                              than the corresponding request.
+                            pattern: ^(\d+m|\d+(\.\d{1,3})?)$
+                            type: string
+                          hugepages-1Gi:
+                            pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
+                            type: string
+                          hugepages-2Mi:
+                            pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                             type: string
                           memory:
-                            pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                            description: |-
+                              You can express memory as a plain integer or as a fixed-point
+                              integer using one of these suffixes: E, P, T, G, M, k. You can
+                              also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
+
+                              https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+
+                              Note: the value specified here must not be zero or be higher
+                              than the corresponding limit.
+                            pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                             type: string
                         type: object
                     type: object
@@ -162,7 +259,9 @@ spec:
               databases:
                 additionalProperties:
                   type: string
-                  # Note: usernames specified here as database owners must be declared in the users key of the spec key.
+                description: |-
+                  Note: usernames specified here as database owners must be declared
+                  in the users key of the spec key.
                 type: object
               dockerImage:
                 type: string
@@ -171,6 +270,9 @@ spec:
               enableLogicalBackup:
                 type: boolean
               enableMasterLoadBalancer:
+                description: |-
+                  vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
+                  in that case the var evaluates to nil and the value is taken from the operator config
                 type: boolean
               enableMasterPoolerLoadBalancer:
                 type: boolean
@@ -183,28 +285,19 @@ spec:
               enableShmVolume:
                 type: boolean
               env:
-                items:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
-                nullable: true
-                type: array
-              initContainers:
-                items:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
                 nullable: true
                 type: array
               init_containers:
-                description: deprecated
-                items:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
+                description: deprecated json tags
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              initContainers:
                 nullable: true
                 type: array
               logicalBackupRetention:
                 type: string
               logicalBackupSchedule:
-                pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
+                pattern: ^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$
                 type: string
               maintenanceWindows:
                 items:
@@ -214,101 +307,214 @@ spec:
               masterServiceAnnotations:
                 additionalProperties:
                   type: string
+                description: MasterServiceAnnotations takes precedence over ServiceAnnotations
+                  for master role if not empty
                 type: object
               nodeAffinity:
+                description: Node affinity is a group of node affinity scheduling
+                  rules.
                 properties:
                   preferredDuringSchedulingIgnoredDuringExecution:
+                    description: |-
+                      The scheduler will prefer to schedule pods to nodes that satisfy
+                      the affinity expressions specified by this field, but it may choose
+                      a node that violates one or more of the expressions. The node that is
+                      most preferred is the one with the greatest sum of weights, i.e.
+                      for each node that meets all of the scheduling requirements (resource
+                      request, requiredDuringScheduling affinity expressions, etc.),
+                      compute a sum by iterating through the elements of this field and adding
+                      "weight" to the sum if the node matches the corresponding matchExpressions; the
+                      node(s) with the highest sum are the most preferred.
                     items:
+                      description: |-
+                        An empty preferred scheduling term matches all objects with implicit weight 0
+                        (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
                       properties:
                         preference:
+                          description: A node selector term, associated with the corresponding
+                            weight.
                           properties:
                             matchExpressions:
+                              description: A list of node selector requirements by
+                                node's labels.
                               items:
+                                description: |-
+                                  A node selector requirement is a selector that contains values, a key, and an operator
+                                  that relates the key and values.
                                 properties:
                                   key:
+                                    description: The label key that the selector applies
+                                      to.
                                     type: string
                                   operator:
+                                    description: |-
+                                      Represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                                     type: string
                                   values:
+                                    description: |-
+                                      An array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. If the operator is Gt or Lt, the values
+                                      array must have a single element, which will be interpreted as an integer.
+                                      This array is replaced during a strategic merge patch.
                                     items:
                                       type: string
                                     type: array
+                                    x-kubernetes-list-type: atomic
                                 required:
                                 - key
                                 - operator
                                 type: object
                               type: array
+                              x-kubernetes-list-type: atomic
                             matchFields:
+                              description: A list of node selector requirements by
+                                node's fields.
                               items:
+                                description: |-
+                                  A node selector requirement is a selector that contains values, a key, and an operator
+                                  that relates the key and values.
                                 properties:
                                   key:
+                                    description: The label key that the selector applies
+                                      to.
                                     type: string
                                   operator:
+                                    description: |-
+                                      Represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                                     type: string
                                   values:
+                                    description: |-
+                                      An array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. If the operator is Gt or Lt, the values
+                                      array must have a single element, which will be interpreted as an integer.
+                                      This array is replaced during a strategic merge patch.
                                     items:
                                       type: string
                                     type: array
+                                    x-kubernetes-list-type: atomic
                                 required:
                                 - key
                                 - operator
                                 type: object
                               type: array
+                              x-kubernetes-list-type: atomic
                           type: object
+                          x-kubernetes-map-type: atomic
                         weight:
+                          description: Weight associated with matching the corresponding
+                            nodeSelectorTerm, in the range 1-100.
+                          format: int32
                           type: integer
                       required:
                       - preference
                       - weight
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                   requiredDuringSchedulingIgnoredDuringExecution:
+                    description: |-
+                      If the affinity requirements specified by this field are not met at
+                      scheduling time, the pod will not be scheduled onto the node.
+                      If the affinity requirements specified by this field cease to be met
+                      at some point during pod execution (e.g. due to an update), the system
+                      may or may not try to eventually evict the pod from its node.
                     properties:
                       nodeSelectorTerms:
+                        description: Required. A list of node selector terms. The
+                          terms are ORed.
                         items:
+                          description: |-
+                            A null or empty node selector term matches no objects. The requirements of
+                            them are ANDed.
+                            The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
                           properties:
                             matchExpressions:
+                              description: A list of node selector requirements by
+                                node's labels.
                               items:
+                                description: |-
+                                  A node selector requirement is a selector that contains values, a key, and an operator
+                                  that relates the key and values.
                                 properties:
                                   key:
+                                    description: The label key that the selector applies
+                                      to.
                                     type: string
                                   operator:
+                                    description: |-
+                                      Represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                                     type: string
                                   values:
+                                    description: |-
+                                      An array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. If the operator is Gt or Lt, the values
+                                      array must have a single element, which will be interpreted as an integer.
+                                      This array is replaced during a strategic merge patch.
                                     items:
                                       type: string
                                     type: array
+                                    x-kubernetes-list-type: atomic
                                 required:
                                 - key
                                 - operator
                                 type: object
                               type: array
+                              x-kubernetes-list-type: atomic
                             matchFields:
+                              description: A list of node selector requirements by
+                                node's fields.
                               items:
+                                description: |-
+                                  A node selector requirement is a selector that contains values, a key, and an operator
+                                  that relates the key and values.
                                 properties:
                                   key:
+                                    description: The label key that the selector applies
+                                      to.
                                     type: string
                                   operator:
+                                    description: |-
+                                      Represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                                     type: string
                                   values:
+                                    description: |-
+                                      An array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. If the operator is Gt or Lt, the values
+                                      array must have a single element, which will be interpreted as an integer.
+                                      This array is replaced during a strategic merge patch.
                                     items:
                                       type: string
                                     type: array
+                                    x-kubernetes-list-type: atomic
                                 required:
                                 - key
                                 - operator
                                 type: object
                               type: array
+                              x-kubernetes-list-type: atomic
                           type: object
+                          x-kubernetes-map-type: atomic
                         type: array
+                        x-kubernetes-list-type: atomic
                     required:
                     - nodeSelectorTerms
                     type: object
+                    x-kubernetes-map-type: atomic
                 type: object
               numberOfInstances:
+                format: int32
                 minimum: 0
                 type: integer
               patroni:
+                description: Patroni contains Patroni-specific configuration
                 properties:
                   failsafe_mode:
                     type: boolean
@@ -317,14 +523,17 @@ spec:
                       type: string
                     type: object
                   loop_wait:
+                    format: int32
                     type: integer
                   maximum_lag_on_failover:
+                    format: int64
                     type: integer
                   pg_hba:
                     items:
                       type: string
                     type: array
                   retry_timeout:
+                    format: int32
                     type: integer
                   slots:
                     additionalProperties:
@@ -337,20 +546,24 @@ spec:
                   synchronous_mode_strict:
                     type: boolean
                   synchronous_node_count:
+                    format: int32
                     type: integer
                   ttl:
+                    format: int32
                     type: integer
                 type: object
+              pod_priority_class_name:
+                description: deprecated
+                type: string
               podAnnotations:
                 additionalProperties:
                   type: string
                 type: object
               podPriorityClassName:
                 type: string
-              pod_priority_class_name:
-                description: deprecated
-                type: string
               postgresql:
+                description: PostgresqlParam describes PostgreSQL version and pairs
+                  of configuration parameter name - values.
                 properties:
                   parameters:
                     additionalProperties:
@@ -358,17 +571,18 @@ spec:
                     type: object
                   version:
                     enum:
-                    - "13"
-                    - "14"
-                    - "15"
-                    - "16"
-                    - "17"
+                    - 13
+                    - 14
+                    - 15
+                    - 16
+                    - 17
                     type: string
                 required:
                 - version
                 type: object
               preparedDatabases:
                 additionalProperties:
+                  description: PreparedDatabase describes elements to be bootstrapped
                   properties:
                     defaultUsers:
                       type: boolean
@@ -378,6 +592,8 @@ spec:
                       type: object
                     schemas:
                       additionalProperties:
+                        description: PreparedSchema describes elements to be bootstrapped
+                          per schema
                         properties:
                           defaultRoles:
                             type: boolean
@@ -395,58 +611,91 @@ spec:
               replicaServiceAnnotations:
                 additionalProperties:
                   type: string
+                description: ReplicaServiceAnnotations takes precedence over ServiceAnnotations
+                  for replica role if not empty
                 type: object
               resources:
+                description: Resources describes requests and limits for the cluster
+                  resouces.
                 properties:
                   limits:
+                    description: ResourceDescription describes CPU and memory resources
+                      defined for a cluster.
                     properties:
                       cpu:
-                        # Decimal natural followed by m, or decimal natural followed by
-                        # dot followed by up to three decimal digits.
-                        #
-                        # This is because the Kubernetes CPU resource has millis as the
-                        # maximum precision.  The actual values are checked in code
-                        # because the regular expression would be huge and horrible and
-                        # not very helpful in validation error messages; this one checks
-                        # only the format of the given number.
-                        #
-                        # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
-                        pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                        # Note: the value specified here must not be zero or be lower
-                        # than the corresponding request.
+                        description: |-
+                          Decimal natural followed by m, or decimal natural followed by
+                          dot followed by up to three decimal digits.
 
+                          This is because the Kubernetes CPU resource has millis as the
+                          maximum precision.  The actual values are checked in code
+                          because the regular expression would be huge and horrible and
+                          not very helpful in validation error messages; this one checks
+                          only the format of the given number.
+
+                          https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+
+                          Note: the value specified here must not be zero or be lower
+                          than the corresponding request.
+                        pattern: ^(\d+m|\d+(\.\d{1,3})?)$
                         type: string
                       hugepages-1Gi:
-                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                        pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                         type: string
                       hugepages-2Mi:
-                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                        pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                         type: string
                       memory:
-                        # You can express memory as a plain integer or as a fixed-point
-                        # integer using one of these suffixes: E, P, T, G, M, k. You can
-                        # also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
-                        #
-                        # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
-                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                        # Note: the value specified here must not be zero or be higher
-                        # than the corresponding limit.
+                        description: |-
+                          You can express memory as a plain integer or as a fixed-point
+                          integer using one of these suffixes: E, P, T, G, M, k. You can
+                          also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
 
+                          https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+
+                          Note: the value specified here must not be zero or be higher
+                          than the corresponding limit.
+                        pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                         type: string
                     type: object
                   requests:
+                    description: ResourceDescription describes CPU and memory resources
+                      defined for a cluster.
                     properties:
                       cpu:
-                        pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                        description: |-
+                          Decimal natural followed by m, or decimal natural followed by
+                          dot followed by up to three decimal digits.
+
+                          This is because the Kubernetes CPU resource has millis as the
+                          maximum precision.  The actual values are checked in code
+                          because the regular expression would be huge and horrible and
+                          not very helpful in validation error messages; this one checks
+                          only the format of the given number.
+
+                          https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+
+                          Note: the value specified here must not be zero or be lower
+                          than the corresponding request.
+                        pattern: ^(\d+m|\d+(\.\d{1,3})?)$
                         type: string
                       hugepages-1Gi:
-                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                        pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                         type: string
                       hugepages-2Mi:
-                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                        pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                         type: string
                       memory:
-                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                        description: |-
+                          You can express memory as a plain integer or as a fixed-point
+                          integer using one of these suffixes: E, P, T, G, M, k. You can
+                          also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
+
+                          https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+
+                          Note: the value specified here must not be zero or be higher
+                          than the corresponding limit.
+                        pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                         type: string
                     type: object
                 type: object
@@ -457,16 +706,16 @@ spec:
                   type: string
                 type: object
               sidecars:
-                items:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
                 nullable: true
                 type: array
               spiloFSGroup:
+                format: int64
                 type: integer
               spiloRunAsGroup:
+                format: int64
                 type: integer
               spiloRunAsUser:
+                format: int64
                 type: integer
               standby:
                 oneOf:
@@ -476,6 +725,8 @@ spec:
                   - gs_wal_path
                 - required:
                   - standby_host
+                description: StandbyDescription contains remote primary config or
+                  s3/gs wal path
                 properties:
                   gs_wal_path:
                     type: string
@@ -488,13 +739,16 @@ spec:
                 type: object
               streams:
                 items:
+                  description: Stream defines properties for creating FabricEventStream
+                    resources
                   properties:
                     applicationId:
                       type: string
                     batchSize:
+                      format: int32
                       type: integer
                     cpu:
-                      pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                      pattern: ^(\d+m|\d+(\.\d{1,3})?)$
                       type: string
                     database:
                       type: string
@@ -505,10 +759,12 @@ spec:
                         type: string
                       type: object
                     memory:
-                      pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                       type: string
                     tables:
                       additionalProperties:
+                        description: StreamTable defines properties of outbox tables
+                          for FabricEventStreams
                         properties:
                           eventType:
                             type: string
@@ -533,6 +789,7 @@ spec:
               teamId:
                 type: string
               tls:
+                description: TLSDescription specs TLS properties
                 properties:
                   caFile:
                     type: string
@@ -549,31 +806,51 @@ spec:
                 type: object
               tolerations:
                 items:
+                  description: |-
+                    The pod this Toleration is attached to tolerates any taint that matches
+                    the triple <key,value,effect> using the matching operator <operator>.
                   properties:
                     effect:
-                      enum:
-                      - NoExecute
-                      - NoSchedule
-                      - PreferNoSchedule
+                      description: |-
+                        Effect indicates the taint effect to match. Empty means match all taint effects.
+                        When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
                       type: string
                     key:
+                      description: |-
+                        Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                        If the key is empty, operator must be Exists; this combination means to match all values and all keys.
                       type: string
                     operator:
-                      enum:
-                      - Equal
-                      - Exists
+                      description: |-
+                        Operator represents a key's relationship to the value.
+                        Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod can
+                        tolerate all taints of a particular category.
                       type: string
                     tolerationSeconds:
+                      description: |-
+                        TolerationSeconds represents the period of time the toleration (which must be
+                        of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                        it is not set, which means tolerate the taint forever (do not evict). Zero and
+                        negative values will be treated as 0 (evict immediately) by the system.
+                      format: int64
                       type: integer
                     value:
+                      description: |-
+                        Value is the taint value the toleration matches to.
+                        If the operator is Exists, the value should be empty, otherwise just a regular string.
                       type: string
                   type: object
                 type: array
               useLoadBalancer:
-                description: deprecated
+                description: |-
+                  deprecated load balancer settings maintained for backward compatibility
+                  see "Load balancers" operator docs
                 type: boolean
               users:
                 additionalProperties:
+                  description: UserFlags defines flags (such as superuser, nologin)
+                    that could be assigned to individual users
                   items:
                     enum:
                     - bypassrls
@@ -605,7 +882,6 @@ spec:
                     - nosuperuser
                     - NOSUPERUSER
                     type: string
-                  nullable: true
                   type: array
                 type: object
               usersIgnoringSecretRotation:
@@ -624,65 +900,94 @@ spec:
                 nullable: true
                 type: array
               volume:
+                description: Volume describes a single volume in the manifest.
                 properties:
                   iops:
+                    format: int64
                     type: integer
                   isSubPathExpr:
                     type: boolean
                   selector:
+                    description: |-
+                      A label selector is a label query over a set of resources. The result of matchLabels and
+                      matchExpressions are ANDed. An empty label selector matches all objects. A null
+                      label selector matches no objects.
                     properties:
                       matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
                         items:
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
                           properties:
                             key:
+                              description: key is the label key that the selector
+                                applies to.
                               type: string
                             operator:
-                              enum:
-                              - DoesNotExist
-                              - Exists
-                              - In
-                              - NotIn
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
                               type: string
                             values:
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
                               items:
                                 type: string
                               type: array
+                              x-kubernetes-list-type: atomic
                           required:
                           - key
                           - operator
                           type: object
                         type: array
+                        x-kubernetes-list-type: atomic
                       matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
                         type: object
-                        x-kubernetes-preserve-unknown-fields: true
                     type: object
+                    x-kubernetes-map-type: atomic
                   size:
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    # Note: the value specified here must not be zero.
-
+                    pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                     type: string
                   storageClass:
                     type: string
                   subPath:
                     type: string
                   throughput:
+                    format: int64
                     type: integer
+                  type:
+                    type: string
                 required:
                 - size
                 type: object
             required:
             - numberOfInstances
-            - teamId
             - postgresql
+            - teamId
             - volume
             type: object
           status:
-            additionalProperties:
-              type: string
+            description: PostgresStatus contains status of the PostgreSQL cluster
+              (running, creation failed etc.)
+            properties:
+              PostgresClusterStatus:
+                type: string
+            required:
+            - PostgresClusterStatus
             type: object
         required:
-        - kind
-        - apiVersion
+        - metadata
         - spec
         type: object
     served: true
