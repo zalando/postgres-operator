@@ -13,6 +13,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zalando/postgres-operator/mocks"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
@@ -589,8 +590,15 @@ func TestInheritedAnnotations(t *testing.T) {
 	// + new PVC
 	cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &CreatePVCs(namespace, clusterName, filterLabels, 4, "1Gi").Items[3], metav1.CreateOptions{})
 
+	newSpec, err = cluster.KubeClient.Postgresqls(namespace).Update(context.TODO(), newSpec, metav1.UpdateOptions{})
+	assert.NoError(t, err)
+
+	generation := newSpec.Generation
+
 	err = cluster.Update(cluster.Postgresql.DeepCopy(), newSpec)
 	assert.NoError(t, err)
+
+	require.Equal(t, generation, cluster.Postgresql.Status.ObservedGeneration)
 
 	err = checkResourcesInheritedAnnotations(cluster, result)
 	assert.NoError(t, err)

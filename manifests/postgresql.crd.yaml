@@ -4189,6 +4189,9 @@ spec:
             properties:
               PostgresClusterStatus:
                 type: string
+              observedGeneration:
+                format: int64
+                type: integer
             required:
             - PostgresClusterStatus
             type: object
