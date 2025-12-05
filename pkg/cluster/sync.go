@@ -44,6 +44,9 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.setSpec(newSpec)
 
 	defer func() {
+		// update observedGeneration to reflect that the latest spec
+		// was processed
+		newSpec.Status.ObservedGeneration = newSpec.Generation
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
 			newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusSyncFailed

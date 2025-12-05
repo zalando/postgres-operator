@@ -275,6 +275,7 @@ func (c *Cluster) Create() (err error) {
 		currentStatus := c.Status.DeepCopy()
 		pg := c.Postgresql.DeepCopy()
 		pg.Status.PostgresClusterStatus = acidv1.ClusterStatusRunning
+		pg.Status.ObservedGeneration = pgCreateStatus.Generation
 
 		if err != nil {
 			c.logger.Warningf("cluster created failed: %v", err)
@@ -998,6 +999,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	defer func() {
 		currentStatus := newSpec.Status.DeepCopy()
 		newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusRunning
+		newSpec.Status.ObservedGeneration = newSpec.Generation
 
 		if updateFailed {
 			newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusUpdateFailed
