@@ -6,8 +6,9 @@ env:
   IMAGE_NAME_UI: ${{ github.repository }}-ui
 
 on:
-  pull_request:
   push:
+    branches:
+    - master
     tags:
       - '*'
 
