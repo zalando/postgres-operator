@@ -35,9 +35,9 @@ ifeq ($(FRESH),1)
   DEBUG_FRESH=$(shell date +"%H-%M-%S")
 endif
 
-ifdef CDP_PULL_REQUEST_NUMBER
-	CDP_TAG := -${CDP_BUILD_VERSION}
-endif
+#ifdef CDP_PULL_REQUEST_NUMBER
+#	CDP_TAG := -${CDP_BUILD_VERSION}
+#endif
 
 ifndef GOPATH
 	GOPATH := $(HOME)/go
