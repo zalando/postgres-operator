@@ -92,27 +92,17 @@ type PostgresSpec struct {
 	Clone              *CloneDescription   `json:"clone,omitempty"`
 	// Note: usernames specified here as database owners must be declared
 	// in the users key of the spec key.
-	Databases         map[string]string           `json:"databases,omitempty"`
-	PreparedDatabases map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
-	SchedulerName     *string                     `json:"schedulerName,omitempty"`
-	NodeAffinity      *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
-	Tolerations       []v1.Toleration             `json:"tolerations,omitempty"`
-	// +kubebuilder:validation:Type=array
-	// +kubebuilder:validation:Items:Type=object
-	// +kubebuilder:validation:Items:XPreserveUnknownFields
-	// +kubebuilder:validation:Schemaless
-	// +nullable
-	Sidecars []Sidecar `json:"sidecars,omitempty"`
-	// +kubebuilder:validation:Type=array
-	// +kubebuilder:validation:Items:Type=object
-	// +kubebuilder:validation:Items:XPreserveUnknownFields
-	// +kubebuilder:validation:Schemaless
-	// +nullable
-	InitContainers         []v1.Container `json:"initContainers,omitempty"`
-	PodPriorityClassName   string         `json:"podPriorityClassName,omitempty"`
-	ShmVolume              *bool          `json:"enableShmVolume,omitempty"`
-	EnableLogicalBackup    bool           `json:"enableLogicalBackup,omitempty"`
-	LogicalBackupRetention string         `json:"logicalBackupRetention,omitempty"`
+	Databases              map[string]string           `json:"databases,omitempty"`
+	PreparedDatabases      map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
+	SchedulerName          *string                     `json:"schedulerName,omitempty"`
+	NodeAffinity           *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
+	Tolerations            []v1.Toleration             `json:"tolerations,omitempty"`
+	Sidecars               []Sidecar                   `json:"sidecars,omitempty"`
+	InitContainers         []v1.Container              `json:"initContainers,omitempty"`
+	PodPriorityClassName   string                      `json:"podPriorityClassName,omitempty"`
+	ShmVolume              *bool                       `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup    bool                        `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupRetention string                      `json:"logicalBackupRetention,omitempty"`
 	// +kubebuilder:validation:Pattern=`^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$`
 	LogicalBackupSchedule string              `json:"logicalBackupSchedule,omitempty"`
 	StandbyCluster        *StandbyDescription `json:"standby,omitempty"`
@@ -125,17 +115,9 @@ type PostgresSpec struct {
 	TLS                       *TLSDescription    `json:"tls,omitempty"`
 	AdditionalVolumes         []AdditionalVolume `json:"additionalVolumes,omitempty"`
 	Streams                   []Stream           `json:"streams,omitempty"`
-	// +kubebuilder:validation:Type=array
-	// +kubebuilder:validation:Items:Type=object
-	// +kubebuilder:validation:Items:XPreserveUnknownFields
-	// +kubebuilder:validation:Schemaless
-	// +nullable
-	Env []v1.EnvVar `json:"env,omitempty"`
+	Env                       []v1.EnvVar        `json:"env,omitempty"`
 
-	// deprecated json tags
-	// +kubebuilder:validation:XPreserveUnknownFields
-	// +kubebuilder:validation:Type=object
-	// +kubebuilder:validation:Schemaless
+	// deprecated
 	InitContainersOld []v1.Container `json:"init_containers,omitempty"`
 	// deprecated
 	PodPriorityClassNameOld string `json:"pod_priority_class_name,omitempty"`
