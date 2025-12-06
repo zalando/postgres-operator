@@ -17,7 +17,7 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Live volume resize without pod restarts (AWS EBS, PVC)
 * Database connection pooling with PGBouncer
 * Support fast in place major version upgrade. Supports global upgrade of all clusters.
-* Pod protection during boostrap phase and configurable maintenance windows
+* Pod protection during bootstrap phase and configurable maintenance windows
 * Restore and cloning Postgres clusters on AWS, GCS and Azure
 * Additionally logical backups to S3 or GCS bucket can be configured
 * Standby cluster from S3 or GCS WAL archive
