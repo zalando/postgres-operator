@@ -1059,38 +1059,50 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 func (c *Cluster) syncSecrets() error {
 	c.logger.Debug("syncing secrets")
 	c.setProcessName("syncing secrets")
+	errors := make([]string, 0)
 	generatedSecrets := c.generateUserSecrets()
 	retentionUsers := make([]string, 0)
 	currentTime := time.Now()
 
 	for secretUsername, generatedSecret := range generatedSecrets {
-		secret, err := c.KubeClient.Secrets(generatedSecret.Namespace).Create(context.TODO(), generatedSecret, metav1.CreateOptions{})
+		pgUserDegraded := false
+		createdSecret, err := c.KubeClient.Secrets(generatedSecret.Namespace).Create(context.TODO(), generatedSecret, metav1.CreateOptions{})
 		if err == nil {
-			c.Secrets[secret.UID] = secret
-			c.logger.Infof("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), generatedSecret.Namespace, secret.UID)
+			c.Secrets[createdSecret.UID] = createdSecret
+			c.logger.Infof("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(createdSecret.ObjectMeta), generatedSecret.Namespace, createdSecret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
-			if err = c.updateSecret(secretUsername, generatedSecret, &retentionUsers, currentTime); err != nil {
-				c.logger.Warningf("syncing secret %s failed: %v", util.NameFromMeta(secret.ObjectMeta), err)
+			updatedSecret, err := c.updateSecret(secretUsername, generatedSecret, &retentionUsers, currentTime)
+			if err == nil {
+				c.Secrets[updatedSecret.UID] = updatedSecret
+				continue
 			}
+			errors = append(errors, fmt.Sprintf("syncing secret %s failed: %v", util.NameFromMeta(updatedSecret.ObjectMeta), err))
+			pgUserDegraded = true
 		} else {
-			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err)
+			errors = append(errors, fmt.Sprintf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err))
+			pgUserDegraded = true
 		}
+		c.updatePgUser(secretUsername, pgUserDegraded)
 	}
 
 	// remove rotation users that exceed the retention interval
 	if len(retentionUsers) > 0 {
 		err := c.initDbConn()
 		if err != nil {
-			return fmt.Errorf("could not init db connection: %v", err)
+			errors = append(errors, fmt.Sprintf("could not init db connection: %v", err))
 		}
 		if err = c.cleanupRotatedUsers(retentionUsers, c.pgDb); err != nil {
-			return fmt.Errorf("error removing users exceeding configured retention interval: %v", err)
+			errors = append(errors, fmt.Sprintf("error removing users exceeding configured retention interval: %v", err))
 		}
 		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection after removing users exceeding configured retention interval: %v", err)
+			errors = append(errors, fmt.Sprintf("could not close database connection after removing users exceeding configured retention interval: %v", err))
 		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
 	}
 
 	return nil
@@ -1105,7 +1117,7 @@ func (c *Cluster) updateSecret(
 	secretUsername string,
 	generatedSecret *v1.Secret,
 	retentionUsers *[]string,
-	currentTime time.Time) error {
+	currentTime time.Time) (*v1.Secret, error) {
 	var (
 		secret          *v1.Secret
 		err             error
@@ -1115,7 +1127,7 @@ func (c *Cluster) updateSecret(
 
 	// get the secret first
 	if secret, err = c.KubeClient.Secrets(generatedSecret.Namespace).Get(context.TODO(), generatedSecret.Name, metav1.GetOptions{}); err != nil {
-		return fmt.Errorf("could not get current secret: %v", err)
+		return generatedSecret, fmt.Errorf("could not get current secret: %v", err)
 	}
 	c.Secrets[secret.UID] = secret
 
@@ -1211,24 +1223,22 @@ func (c *Cluster) updateSecret(
 	if updateSecret {
 		c.logger.Infof("%s", updateSecretMsg)
 		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("could not update secret %s: %v", secretName, err)
+			return secret, fmt.Errorf("could not update secret %s: %v", secretName, err)
 		}
-		c.Secrets[secret.UID] = secret
 	}
 
 	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations, nil); changed {
 		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
 		if err != nil {
-			return fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
+			return secret, fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
 		}
 		secret, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
-			return fmt.Errorf("could not patch annotations for secret %q: %v", secret.Name, err)
+			return secret, fmt.Errorf("could not patch annotations for secret %q: %v", secret.Name, err)
 		}
-		c.Secrets[secret.UID] = secret
 	}
 
-	return nil
+	return secret, nil
 }
 
 func (c *Cluster) rotatePasswordInSecret(
@@ -1332,6 +1342,23 @@ func (c *Cluster) rotatePasswordInSecret(
 	}
 
 	return updateSecretMsg, nil
+}
+
+func (c *Cluster) updatePgUser(secretUsername string, degraded bool) {
+	for key, pgUser := range c.pgUsers {
+		if pgUser.Name == secretUsername {
+			pgUser.Degraded = degraded
+			c.pgUsers[key] = pgUser
+			return
+		}
+	}
+	for key, pgUser := range c.systemUsers {
+		if pgUser.Name == secretUsername {
+			pgUser.Degraded = degraded
+			c.systemUsers[key] = pgUser
+			return
+		}
+	}
 }
 
 func (c *Cluster) syncRoles() (err error) {
