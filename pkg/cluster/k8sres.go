@@ -1303,6 +1303,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
 		}
 		initContainers = spec.InitContainers
+		if err := c.validateContainers(initContainers); err != nil {
+			return nil, fmt.Errorf("invalid init containers: %v", err)
+		}
 	}
 
 	// backward compatible check for InitContainers
@@ -1454,6 +1457,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername))
+
+	if err := c.validateContainers(sidecarContainers); err != nil {
+		return nil, fmt.Errorf("invalid sidecar containers: %v", err)
+	}
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
@@ -2591,4 +2598,16 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 		return path.Join(defaultDir, file)
 	}
 	return file
+}
+
+func (c *Cluster) validateContainers(containers []v1.Container) error {
+	for i, container := range containers {
+		if container.Name == "" {
+			return fmt.Errorf("container[%d]: name is required", i)
+		}
+		if container.Image == "" {
+			return fmt.Errorf("container '%v': image is required", container.Name)
+		}
+	}
+	return nil
 }
