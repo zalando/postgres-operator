@@ -1078,7 +1078,7 @@ func (c *Cluster) syncSecrets() error {
 				c.Secrets[updatedSecret.UID] = updatedSecret
 				continue
 			}
-			errors = append(errors, fmt.Sprintf("syncing secret %s failed: %v", util.NameFromMeta(updatedSecret.ObjectMeta), err))
+			errors = append(errors, fmt.Sprintf("syncing secret %s failed: %v", util.NameFromMeta(generatedSecret.ObjectMeta), err))
 			pgUserDegraded = true
 		} else {
 			errors = append(errors, fmt.Sprintf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err))
@@ -1180,17 +1180,18 @@ func (c *Cluster) updateSecret(
 		}
 	} else {
 		// username might not match if password rotation has been disabled again
-		if secretUsername != string(secret.Data["username"]) {
-			if len(string(secret.Data["username"])) != len(secretUsername) {
-				*retentionUsers = append(*retentionUsers, secretUsername)
-				secret.Data["username"] = []byte(secretUsername)
-				secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
-				secret.Data["nextRotation"] = []byte{}
-				updateSecret = true
-				updateSecretMsg = fmt.Sprintf("secret does not contain the role %s - updating username and resetting password", secretUsername)
-			} else {
-				return secret, fmt.Errorf("could not update secret because of user name mismatch: expected: %s, got: %s", secretUsername, string(secret.Data["username"]))
+		usernameFromSecret := string(secret.Data["username"])
+		if secretUsername != usernameFromSecret {
+			// handle edge case when manifest user conflicts with a user from prepared databases
+			if strings.Replace(usernameFromSecret, "-", "_", -1) == strings.Replace(secretUsername, "-", "_", -1) {
+				return nil, fmt.Errorf("could not update secret because of user name mismatch: expected: %s, got: %s", secretUsername, usernameFromSecret)
 			}
+			*retentionUsers = append(*retentionUsers, secretUsername)
+			secret.Data["username"] = []byte(secretUsername)
+			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+			secret.Data["nextRotation"] = []byte{}
+			updateSecret = true
+			updateSecretMsg = fmt.Sprintf("secret does not contain the role %s - updating username and resetting password", secretUsername)
 		}
 	}
 
@@ -1220,18 +1221,18 @@ func (c *Cluster) updateSecret(
 	if updateSecret {
 		c.logger.Infof("%s", updateSecretMsg)
 		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
-			return secret, fmt.Errorf("could not update secret: %v", err)
+			return nil, fmt.Errorf("could not update secret: %v", err)
 		}
 	}
 
 	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations, nil); changed {
 		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
 		if err != nil {
-			return secret, fmt.Errorf("could not form patch for secret annotations: %v", err)
+			return nil, fmt.Errorf("could not form patch for secret annotations: %v", err)
 		}
 		secret, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
-			return secret, fmt.Errorf("could not patch annotations for secret: %v", err)
+			return nil, fmt.Errorf("could not patch annotations for secret: %v", err)
 		}
 	}
 
