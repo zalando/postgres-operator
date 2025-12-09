@@ -963,12 +963,32 @@ func TestUpdateSecret(t *testing.T) {
 	if currentUsername != appUser {
 		t.Errorf("%s: updated secret does not contain expected username: expected %s, got %s", testName, appUser, currentUsername)
 	}
+}
 
-	// test error cases
-	pg.Spec.Users["prepared-owner-user"] = acidv1.UserFlags{}
-	pg.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{"prepared": {DefaultUsers: true}}
+func TestUpdateSecretNameConflict(t *testing.T) {
+	client, _ := newFakeK8sSyncSecretsClient()
 
-	var errCluster = New(
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
+
+	// define manifest users and enable rotation for dbowner
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			PreparedDatabases: map[string]acidv1.PreparedDatabase{"prepared": {DefaultUsers: true}},
+			Users:             map[string]acidv1.UserFlags{"prepared-owner-user": {}},
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	// new cluster with enabled password rotation
+	var cluster = New(
 		Config{
 			OpConfig: config.Config{
 				Auth: config.Auth{
@@ -983,14 +1003,14 @@ func TestUpdateSecret(t *testing.T) {
 			},
 		}, client, pg, logger, eventRecorder)
 
-	errCluster.Name = clusterName
-	errCluster.Namespace = namespace
-	errCluster.pgUsers = map[string]spec.PgUser{}
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+	cluster.pgUsers = map[string]spec.PgUser{}
 
 	// init all users
-	errCluster.initUsers()
+	cluster.initUsers()
 	// create secrets and fail because of user name mismatch
-	err = errCluster.syncSecrets()
+	err := cluster.syncSecrets()
 	assert.Error(t, err)
 
 	// the order of secrets to sync is not deterministic, check only first part of the error message
