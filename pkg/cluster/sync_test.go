@@ -972,7 +972,8 @@ func TestUpdateSecretNameConflict(t *testing.T) {
 	namespace := "default"
 	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
 
-	// define manifest users and enable rotation for dbowner
+	// define manifest user that has the same name as a prepared database owner user except for dashes vs underscores
+	// because of this the operator cannot create both secrets because underscores are not allowed in k8s secret names
 	pg := acidv1.Postgresql{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
@@ -987,7 +988,6 @@ func TestUpdateSecretNameConflict(t *testing.T) {
 		},
 	}
 
-	// new cluster with enabled password rotation
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -1010,6 +1010,7 @@ func TestUpdateSecretNameConflict(t *testing.T) {
 	// init all users
 	cluster.initUsers()
 	// create secrets and fail because of user name mismatch
+	// prepared-owner-user from manifest vs prepared_owner_user from prepared database
 	err := cluster.syncSecrets()
 	assert.Error(t, err)
 
