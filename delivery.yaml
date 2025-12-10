@@ -35,12 +35,12 @@ pipeline:
             docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
             docker buildx build --platform "linux/amd64,linux/arm64" \
                       --build-arg BASE_IMAGE="${ALPINE_BASE_IMAGE}" \
-                      -t "${IMAGE_TAG}:${CDP_BUILD_VERSION}" \
+                      -t "${IMAGE}:${CDP_BUILD_VERSION}" \
                       -f docker/Dockerfile \
                       --push .
 
             if [ -z ${CDP_SOURCE_BRANCH} ]; then
-              cdp-promote-image ${IMAGE_TAG}:${CDP_BUILD_VERSION}
+              cdp-promote-image ${IMAGE}:${CDP_BUILD_VERSION}
             fi
 
     - id: build-operator-ui
