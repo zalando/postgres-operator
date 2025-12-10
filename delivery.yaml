@@ -3,7 +3,7 @@ allow_concurrent_steps: true
 
 build_env: &BUILD_ENV
   PYTHON_BASE_IMAGE: container-registry.zalando.net/library/python-3.11-slim
-  ALPINE_BASE_IMAGE: container-registry.zalando.net/library/alpine-3.15
+  ALPINE_BASE_IMAGE: container-registry.zalando.net/library/alpine-3
   MULTI_ARCH_REGISTRY: container-registry-test.zalando.net/acid
 
 pipeline:
@@ -32,10 +32,15 @@ pipeline:
               IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-test
             fi
 
-            IMAGE_TAG=$(make docker-push IMAGE=${IMAGE} BASE_IMAGE=${ALPINE_BASE_IMAGE})
+            docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
+            docker buildx build --platform "linux/amd64,linux/arm64" \
+                      --build-arg BASE_IMAGE="${ALPINE_BASE_IMAGE}" \
+                      -t "${IMAGE_TAG}:${CDP_BUILD_VERSION}" \
+                      -f docker/Dockerfile \
+                      --push .
 
             if [ -z ${CDP_SOURCE_BRANCH} ]; then
-              cdp-promote-image ${IMAGE_TAG}
+              cdp-promote-image ${IMAGE_TAG}:${CDP_BUILD_VERSION}
             fi
 
     - id: build-operator-ui

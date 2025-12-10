@@ -73,21 +73,6 @@ docker: ${DOCKERDIR}/${DOCKERFILE}
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.25.3 bash -c "make linux"
 
-docker-push:
-	echo `(env)`
-	echo "Tag ${TAG}"
-	echo "Version ${VERSION}"
-	echo "CDP tag ${CDP_TAG}"
-	echo "git describe $(shell git describe --tags --always --dirty)"
-	docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
-	docker buildx build --platform "linux/amd64,linux/arm64" \
-						--build-arg BASE_IMAGE="${BASE_IMAGE}" \
-						--build-arg VERSION="${VERSION}" \
-						-t "$(IMAGE_TAG)" \
-						-f "${DOCKERDIR}/${DOCKERFILE}" \
-						--push .
-	echo "$(IMAGE_TAG)"
-
 mocks:
 	GO111MODULE=on go generate ./...
 
