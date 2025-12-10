@@ -177,6 +177,16 @@ class K8s:
 
         return pod_count
 
+    def get_env_variable_value(self, env_variable_key, labels, namespace='default'):
+        """Get the value of an environment variable from the first pod matching the labels."""
+        pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
+        if not pods:
+            return None
+        for env in pods[0].spec.containers[0].env:
+            if env.name == env_variable_key:
+                return env.value
+        return None
+
     def count_pods_with_rolling_update_flag(self, labels, namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: "zalando-postgres-operator-rolling-update-required" in x.metadata.annotations, pods)))

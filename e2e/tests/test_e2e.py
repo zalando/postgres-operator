@@ -2547,6 +2547,69 @@ class EndToEndTestCase(unittest.TestCase):
 
         return True
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_user_env_var_override(self):
+        '''
+        Test that user-provided environment variables from spec.env can override
+        operator-generated ones (like SPILO_CONFIGURATION). This is useful for
+        customizing Patroni DCS configuration such as ignore_slots.
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        
+        # Custom SPILO_CONFIGURATION with ignore_slots for Patroni
+        custom_spilo_config = '{"bootstrap":{"dcs":{"ignore_slots":{"type":"logical"}}}}'
+        
+        try:
+            # Patch the cluster to add custom env var that should override operator defaults
+            pg_patch_env = {
+                "spec": {
+                    "env": [
+                        {
+                            "name": "SPILO_CONFIGURATION",
+                            "value": custom_spilo_config
+                        }
+                    ]
+                }
+            }
+            
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_env)
+            
+            # Wait for operator to process the change
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, 
+                               "Operator does not get in sync after env var patch")
+            
+            # Wait for pods to be updated with the new env var
+            k8s.wait_for_pod_start(cluster_label)
+            k8s.wait_for_running_pods(cluster_label, 2)
+            
+            # Verify that SPILO_CONFIGURATION env var exists in pods
+            self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("SPILO_CONFIGURATION", cluster_label), 2,
+                               "SPILO_CONFIGURATION env variable not found in pods")
+            
+            # Verify that the user-provided value overrides the operator-generated one
+            actual_value = k8s.get_env_variable_value("SPILO_CONFIGURATION", cluster_label)
+            self.assertIsNotNone(actual_value, "SPILO_CONFIGURATION value is None")
+            self.assertIn("ignore_slots", actual_value, 
+                        "User-provided SPILO_CONFIGURATION with ignore_slots was not applied")
+            
+            # Clean up: remove the custom env var
+            pg_patch_remove_env = {
+                "spec": {
+                    "env": None
+                }
+            }
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_remove_env)
+            
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, 
+                               "Operator does not get in sync after removing env var")
+            
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
     def check_cluster_child_resources_owner_references(self, cluster_name, cluster_namespace='default', inverse=False):
         k8s = self.k8s
 
