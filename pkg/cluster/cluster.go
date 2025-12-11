@@ -1768,7 +1768,7 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 
 func (c *Cluster) GetSwitchoverSchedule() string {
 	now := time.Now().UTC()
-	return c.GetSwitchoverScheduleAtTime(now)
+	return c.getSwitchoverScheduleAtTime(now)
 }
 
 func (c *Cluster) getSwitchoverScheduleAtTime(now time.Time) string {
