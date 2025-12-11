@@ -90,9 +90,9 @@ pipeline:
             export TAG=$(git describe --tags --always --dirty)
             docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
             docker buildx build --platform linux/amd64,linux/arm64 \
-                                -t ${MULTI_ARCH_REGISTRY}/postgres-operator-logical-backup:${TAG} \
+                                -t ${MULTI_ARCH_REGISTRY}/postgres-operator/logical-backup:${TAG} \
                                 --push .
 
             if [ -z ${CDP_SOURCE_BRANCH} ]; then
-              cdp-promote-image ${MULTI_ARCH_REGISTRY}/postgres-operator-logical-backup:${TAG}
+              cdp-promote-image ${MULTI_ARCH_REGISTRY}/postgres-operator/logical-backup:${TAG}
             fi
