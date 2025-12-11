@@ -1771,7 +1771,7 @@ func (c *Cluster) GetSwitchoverSchedule() string {
 	return c.GetSwitchoverScheduleAtTime(now)
 }
 
-func (c *Cluster) GetSwitchoverScheduleAtTime(now time.Time) string {
+func (c *Cluster) getSwitchoverScheduleAtTime(now time.Time) string {
 	var possibleSwitchover, schedule time.Time
 
 	for _, window := range c.Spec.MaintenanceWindows {
