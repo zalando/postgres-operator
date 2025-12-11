@@ -2195,7 +2195,7 @@ func TestGetSwitchoverSchedule(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster.Spec.MaintenanceWindows = tt.windows
-			schedule := cluster.GetSwitchoverScheduleAtTime(now)
+			schedule := cluster.getSwitchoverScheduleAtTime(now)
 			if schedule != tt.expected {
 				t.Errorf("Expected GetSwitchoverSchedule to return %s, returned: %s", tt.expected, schedule)
 			}
