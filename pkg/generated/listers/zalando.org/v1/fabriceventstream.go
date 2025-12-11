@@ -25,10 +25,10 @@ SOFTWARE.
 package v1
 
 import (
-	v1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // FabricEventStreamLister helps list FabricEventStreams.
@@ -36,7 +36,7 @@ import (
 type FabricEventStreamLister interface {
 	// List lists all FabricEventStreams in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.FabricEventStream, err error)
+	List(selector labels.Selector) (ret []*zalandoorgv1.FabricEventStream, err error)
 	// FabricEventStreams returns an object that can list and get FabricEventStreams.
 	FabricEventStreams(namespace string) FabricEventStreamNamespaceLister
 	FabricEventStreamListerExpansion
@@ -44,25 +44,17 @@ type FabricEventStreamLister interface {
 
 // fabricEventStreamLister implements the FabricEventStreamLister interface.
 type fabricEventStreamLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*zalandoorgv1.FabricEventStream]
 }
 
 // NewFabricEventStreamLister returns a new FabricEventStreamLister.
 func NewFabricEventStreamLister(indexer cache.Indexer) FabricEventStreamLister {
-	return &fabricEventStreamLister{indexer: indexer}
-}
-
-// List lists all FabricEventStreams in the indexer.
-func (s *fabricEventStreamLister) List(selector labels.Selector) (ret []*v1.FabricEventStream, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.FabricEventStream))
-	})
-	return ret, err
+	return &fabricEventStreamLister{listers.New[*zalandoorgv1.FabricEventStream](indexer, zalandoorgv1.Resource("fabriceventstream"))}
 }
 
 // FabricEventStreams returns an object that can list and get FabricEventStreams.
 func (s *fabricEventStreamLister) FabricEventStreams(namespace string) FabricEventStreamNamespaceLister {
-	return fabricEventStreamNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return fabricEventStreamNamespaceLister{listers.NewNamespaced[*zalandoorgv1.FabricEventStream](s.ResourceIndexer, namespace)}
 }
 
 // FabricEventStreamNamespaceLister helps list and get FabricEventStreams.
@@ -70,36 +62,15 @@ func (s *fabricEventStreamLister) FabricEventStreams(namespace string) FabricEve
 type FabricEventStreamNamespaceLister interface {
 	// List lists all FabricEventStreams in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.FabricEventStream, err error)
+	List(selector labels.Selector) (ret []*zalandoorgv1.FabricEventStream, err error)
 	// Get retrieves the FabricEventStream from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.FabricEventStream, error)
+	Get(name string) (*zalandoorgv1.FabricEventStream, error)
 	FabricEventStreamNamespaceListerExpansion
 }
 
 // fabricEventStreamNamespaceLister implements the FabricEventStreamNamespaceLister
 // interface.
 type fabricEventStreamNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all FabricEventStreams in the indexer for a given namespace.
-func (s fabricEventStreamNamespaceLister) List(selector labels.Selector) (ret []*v1.FabricEventStream, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.FabricEventStream))
-	})
-	return ret, err
-}
-
-// Get retrieves the FabricEventStream from the indexer for a given namespace and name.
-func (s fabricEventStreamNamespaceLister) Get(name string) (*v1.FabricEventStream, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("fabriceventstream"), name)
-	}
-	return obj.(*v1.FabricEventStream), nil
+	listers.ResourceIndexer[*zalandoorgv1.FabricEventStream]
 }

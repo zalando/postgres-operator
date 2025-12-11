@@ -25,15 +25,14 @@ SOFTWARE.
 package v1
 
 import (
-	"context"
-	"time"
+	context "context"
 
-	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // PostgresTeamsGetter has a method to return a PostgresTeamInterface.
@@ -44,141 +43,32 @@ type PostgresTeamsGetter interface {
 
 // PostgresTeamInterface has methods to work with PostgresTeam resources.
 type PostgresTeamInterface interface {
-	Create(ctx context.Context, postgresTeam *v1.PostgresTeam, opts metav1.CreateOptions) (*v1.PostgresTeam, error)
-	Update(ctx context.Context, postgresTeam *v1.PostgresTeam, opts metav1.UpdateOptions) (*v1.PostgresTeam, error)
+	Create(ctx context.Context, postgresTeam *acidzalandov1.PostgresTeam, opts metav1.CreateOptions) (*acidzalandov1.PostgresTeam, error)
+	Update(ctx context.Context, postgresTeam *acidzalandov1.PostgresTeam, opts metav1.UpdateOptions) (*acidzalandov1.PostgresTeam, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PostgresTeam, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PostgresTeamList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*acidzalandov1.PostgresTeam, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*acidzalandov1.PostgresTeamList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PostgresTeam, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *acidzalandov1.PostgresTeam, err error)
 	PostgresTeamExpansion
 }
 
 // postgresTeams implements PostgresTeamInterface
 type postgresTeams struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*acidzalandov1.PostgresTeam, *acidzalandov1.PostgresTeamList]
 }
 
 // newPostgresTeams returns a PostgresTeams
 func newPostgresTeams(c *AcidV1Client, namespace string) *postgresTeams {
 	return &postgresTeams{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*acidzalandov1.PostgresTeam, *acidzalandov1.PostgresTeamList](
+			"postgresteams",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *acidzalandov1.PostgresTeam { return &acidzalandov1.PostgresTeam{} },
+			func() *acidzalandov1.PostgresTeamList { return &acidzalandov1.PostgresTeamList{} },
+		),
 	}
-}
-
-// Get takes name of the postgresTeam, and returns the corresponding postgresTeam object, and an error if there is any.
-func (c *postgresTeams) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PostgresTeam, err error) {
-	result = &v1.PostgresTeam{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("postgresteams").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PostgresTeams that match those selectors.
-func (c *postgresTeams) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PostgresTeamList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.PostgresTeamList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("postgresteams").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested postgresTeams.
-func (c *postgresTeams) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("postgresteams").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a postgresTeam and creates it.  Returns the server's representation of the postgresTeam, and an error, if there is any.
-func (c *postgresTeams) Create(ctx context.Context, postgresTeam *v1.PostgresTeam, opts metav1.CreateOptions) (result *v1.PostgresTeam, err error) {
-	result = &v1.PostgresTeam{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("postgresteams").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(postgresTeam).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a postgresTeam and updates it. Returns the server's representation of the postgresTeam, and an error, if there is any.
-func (c *postgresTeams) Update(ctx context.Context, postgresTeam *v1.PostgresTeam, opts metav1.UpdateOptions) (result *v1.PostgresTeam, err error) {
-	result = &v1.PostgresTeam{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("postgresteams").
-		Name(postgresTeam.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(postgresTeam).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the postgresTeam and deletes it. Returns an error if one occurs.
-func (c *postgresTeams) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("postgresteams").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *postgresTeams) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("postgresteams").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched postgresTeam.
-func (c *postgresTeams) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PostgresTeam, err error) {
-	result = &v1.PostgresTeam{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("postgresteams").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

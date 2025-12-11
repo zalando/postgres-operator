@@ -35,15 +35,15 @@ type FakeAcidV1 struct {
 }
 
 func (c *FakeAcidV1) OperatorConfigurations(namespace string) v1.OperatorConfigurationInterface {
-	return &FakeOperatorConfigurations{c, namespace}
+	return newFakeOperatorConfigurations(c, namespace)
 }
 
 func (c *FakeAcidV1) PostgresTeams(namespace string) v1.PostgresTeamInterface {
-	return &FakePostgresTeams{c, namespace}
+	return newFakePostgresTeams(c, namespace)
 }
 
 func (c *FakeAcidV1) Postgresqls(namespace string) v1.PostgresqlInterface {
-	return &FakePostgresqls{c, namespace}
+	return newFakePostgresqls(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
