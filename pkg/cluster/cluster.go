@@ -1767,9 +1767,13 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 }
 
 func (c *Cluster) GetSwitchoverSchedule() string {
+	now := time.Now().UTC()
+	return c.getSwitchoverScheduleAtTime(now)
+}
+
+func (c *Cluster) getSwitchoverScheduleAtTime(now time.Time) string {
 	var possibleSwitchover, schedule time.Time
 
-	now := time.Now().UTC()
 	for _, window := range c.Spec.MaintenanceWindows {
 		// in the best case it is possible today
 		possibleSwitchover = time.Date(now.Year(), now.Month(), now.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
