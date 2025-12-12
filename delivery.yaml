@@ -4,7 +4,7 @@ allow_concurrent_steps: true
 build_env: &BUILD_ENV
   PYTHON_BASE_IMAGE: container-registry.zalando.net/library/python-3.11-slim
   ALPINE_BASE_IMAGE: container-registry.zalando.net/library/alpine-3
-  MULTI_ARCH_REGISTRY: container-registry-test.zalando.net/acid
+  MULTI_ARCH_REGISTRY: container-registry.zalando.net/acid
 
 pipeline:
     - id: build-postgres-operator
@@ -90,9 +90,9 @@ pipeline:
             export TAG=$(git describe --tags --always --dirty)
             docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
             docker buildx build --platform linux/amd64,linux/arm64 \
-                                -t ${MULTI_ARCH_REGISTRY}/postgres-operator/logical-backup:${TAG} \
+                                -t ${MULTI_ARCH_REGISTRY}/logical-backup:${TAG} \
                                 --push .
 
             if [ -z ${CDP_SOURCE_BRANCH} ]; then
-              cdp-promote-image ${MULTI_ARCH_REGISTRY}/postgres-operator/logical-backup:${TAG}
+              cdp-promote-image ${MULTI_ARCH_REGISTRY}/logical-backup:${TAG}
             fi
