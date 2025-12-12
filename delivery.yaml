@@ -4,7 +4,7 @@ allow_concurrent_steps: true
 build_env: &BUILD_ENV
   PYTHON_BASE_IMAGE: container-registry.zalando.net/library/python-3.11-slim
   ALPINE_BASE_IMAGE: container-registry.zalando.net/library/alpine-3
-  MULTI_ARCH_REGISTRY: container-registry.zalando.net/acid
+  MULTI_ARCH_REGISTRY: container-registry-test.zalando.net/acid
 
 pipeline:
     - id: build-postgres-operator
