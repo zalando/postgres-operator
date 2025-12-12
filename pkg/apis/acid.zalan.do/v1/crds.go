@@ -275,6 +275,16 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"schema": {
 								Type: "string",
 							},
+							"sidecars": {
+								Type:     "array",
+								Nullable: true,
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type:                   "object",
+										XPreserveUnknownFields: util.True(),
+									},
+								},
+							},
 							"user": {
 								Type: "string",
 							},
