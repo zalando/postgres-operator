@@ -101,14 +101,3 @@ pipeline:
           if [ -z ${CDP_SOURCE_BRANCH} ]; then
             cdp-promote-image ${MULTI_ARCH_REGISTRY}/postgres-operator-logical-backup:${TAG}
           fi
-
-  - id: tag-operator
-    type: script
-    requires_human_approval: true
-    when:
-      event: push
-      branch: master
-    commands:
-      - desc: Tag release operator image
-        cmd: |
-          git gh-tag 
