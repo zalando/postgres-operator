@@ -196,6 +196,26 @@ spec:
                 type: boolean
               enableReplicaPoolerLoadBalancer:
                 type: boolean
+              enableMasterNodePort:
+                type: boolean
+              masterNodePort:
+                type: integer
+                minimum: 0
+              enableMasterPoolerNodePort:
+                type: boolean
+              masterPoolerNodePort:
+                type: integer
+                minimum: 0
+              enableReplicaNodePort:
+                type: boolean
+              replicaNodePort:
+                type: integer
+                minimum: 0
+              enableReplicaPoolerNodePort:
+                type: boolean
+              replicaPoolerNodePort:
+                type: integer
+                minimum: 0
               enableShmVolume:
                 type: boolean
               env:
