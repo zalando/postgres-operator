@@ -223,7 +223,7 @@ var (
 		},
 	}
 
-	cluster = New(
+	cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				Auth: config.Auth{
@@ -529,7 +529,7 @@ func newFabricEventStream(streams []zalandov1.EventStream, annotations map[strin
 func TestSyncStreams(t *testing.T) {
 	newClusterName := fmt.Sprintf("%s-2", pg.Name)
 	pg.Name = newClusterName
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -688,7 +688,7 @@ func TestSameStreams(t *testing.T) {
 
 func TestUpdateStreams(t *testing.T) {
 	pg.Name = fmt.Sprintf("%s-3", pg.Name)
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -787,7 +787,7 @@ func patchPostgresqlStreams(t *testing.T, cluster *Cluster, pgSpec *acidv1.Postg
 
 func TestDeleteStreams(t *testing.T) {
 	pg.Name = fmt.Sprintf("%s-4", pg.Name)
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",

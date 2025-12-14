@@ -52,7 +52,7 @@ type ExpectedValue struct {
 }
 
 func TestGenerateSpiloJSONConfiguration(t *testing.T) {
-	var cluster = New(
+	cluster := New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				ProtectedRoles: []string{"admin"},
@@ -242,11 +242,9 @@ func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.Get
 	return configmap, nil
 }
 
-type MockSecretGetter struct {
-}
+type MockSecretGetter struct{}
 
-type MockConfigMapsGetter struct {
-}
+type MockConfigMapsGetter struct{}
 
 func (c *MockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
 	return &mockSecret{}
@@ -262,6 +260,7 @@ func newMockKubernetesClient() k8sutil.KubernetesClient {
 		ConfigMapsGetter: &MockConfigMapsGetter{},
 	}
 }
+
 func newMockCluster(opConfig config.Config) *Cluster {
 	cluster := &Cluster{
 		Config:     Config{OpConfig: opConfig},
@@ -445,7 +444,6 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 // Test if the keys of an existing secret are properly referenced
@@ -535,7 +533,6 @@ func TestCronjobEnvironmentSecretVariables(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
@@ -565,7 +562,7 @@ func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) 
 }
 
 func TestGenerateSpiloPodEnvVars(t *testing.T) {
-	var dummyUUID = "efd12e58-5786-11e8-b5a7-06148230260c"
+	dummyUUID := "efd12e58-5786-11e8-b5a7-06148230260c"
 
 	expectedClusterNameLabel := []ExpectedValue{
 		{
@@ -1143,7 +1140,7 @@ func TestGetNumberOfInstances(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		var cluster = New(
+		cluster := New(context.Background(),
 			Config{
 				OpConfig: tt.config,
 			}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
@@ -1210,7 +1207,7 @@ func TestCloneEnv(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	cluster := New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				WALES3Bucket:   "wale-bucket",
@@ -1423,7 +1420,7 @@ func TestStandbyEnv(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	cluster := New(context.Background(),
 		Config{}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	for _, tt := range tests {
@@ -1452,9 +1449,9 @@ func TestNodeAffinity(t *testing.T) {
 	var err error
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
-	var spiloRunAsUser = int64(101)
-	var spiloRunAsGroup = int64(103)
-	var spiloFSGroup = int64(103)
+	spiloRunAsUser := int64(101)
+	spiloRunAsGroup := int64(103)
+	spiloFSGroup := int64(103)
 
 	makeSpec := func(nodeAffinity *v1.NodeAffinity) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
@@ -1470,7 +1467,7 @@ func TestNodeAffinity(t *testing.T) {
 		}
 	}
 
-	cluster = New(
+	cluster = New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -1563,7 +1560,7 @@ func TestPodAffinity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		cluster := New(
+		cluster := New(context.Background(),
 			Config{
 				OpConfig: config.Config{
 					EnablePodAntiAffinity:                    tt.anti,
@@ -1692,7 +1689,7 @@ func TestTLS(t *testing.T) {
 	spiloRunAsUser := int64(101)
 	spiloRunAsGroup := int64(103)
 	spiloFSGroup := int64(103)
-	defaultMode := int32(0640)
+	defaultMode := int32(0o640)
 	mountPath := "/tls"
 
 	pg := acidv1.Postgresql{
@@ -1710,7 +1707,8 @@ func TestTLS(t *testing.T) {
 				Size: "1G",
 			},
 			TLS: &acidv1.TLSDescription{
-				SecretName: tlsSecretName, CAFile: "ca.crt"},
+				SecretName: tlsSecretName, CAFile: "ca.crt",
+			},
 			AdditionalVolumes: []acidv1.AdditionalVolume{
 				{
 					Name:      tlsSecretName,
@@ -1726,7 +1724,7 @@ func TestTLS(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	cluster := New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -1981,7 +1979,7 @@ func TestAdditionalVolume(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	cluster := New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -2122,7 +2120,7 @@ func TestVolumeSelector(t *testing.T) {
 		},
 	}
 
-	cluster := New(
+	cluster := New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -2221,7 +2219,7 @@ func TestSidecars(t *testing.T) {
 		},
 	}
 
-	cluster = New(
+	cluster = New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -2367,7 +2365,6 @@ func TestSidecars(t *testing.T) {
 		Env:             scalyrEnv,
 		VolumeMounts:    mounts,
 	})
-
 }
 
 func TestContainerValidation(t *testing.T) {
@@ -2530,7 +2527,7 @@ func TestContainerValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cluster := New(tc.clusterConfig, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+			cluster := New(context.Background(), tc.clusterConfig, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 			_, err := cluster.generateStatefulSet(&tc.spec)
 
@@ -2581,13 +2578,15 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 			if !masterLabelSelectorDisabled {
 				if isPrimary {
 					expectedLabels := &metav1.LabelSelector{
-						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"}}
+						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
+					}
 					if !reflect.DeepEqual(podDisruptionBudget.Spec.Selector, expectedLabels) {
 						return fmt.Errorf("MatchLabels incorrect, got %#v, expected %#v", podDisruptionBudget.Spec.Selector, expectedLabels)
 					}
 				} else {
 					expectedLabels := &metav1.LabelSelector{
-						MatchLabels: map[string]string{"cluster-name": "myapp-database", "critical-operation": "true"}}
+						MatchLabels: map[string]string{"cluster-name": "myapp-database", "critical-operation": "true"},
+					}
 					if !reflect.DeepEqual(podDisruptionBudget.Spec.Selector, expectedLabels) {
 						return fmt.Errorf("MatchLabels incorrect, got %#v, expected %#v", podDisruptionBudget.Spec.Selector, expectedLabels)
 					}
@@ -2619,12 +2618,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 	}{
 		{
 			scenario: "With multiple instances",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2636,12 +2636,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With zero instances",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2653,12 +2654,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With PodDisruptionBudget disabled",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2670,12 +2672,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With non-default PDBNameFormat and PodDisruptionBudget explicitly enabled",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2687,12 +2690,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With PDBMasterLabelSelector disabled",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2704,12 +2708,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With OwnerReference enabled",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2739,12 +2744,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 	}{
 		{
 			scenario: "With multiple instances",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2756,12 +2762,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With zero instances",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2773,12 +2780,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With PodDisruptionBudget disabled",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2790,12 +2798,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With OwnerReference enabled",
-			spec: New(
+			spec: New(context.Background(),
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3},
+				},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
@@ -2852,7 +2861,7 @@ func TestGenerateService(t *testing.T) {
 		EnableMasterLoadBalancer: &enableLB,
 	}
 
-	cluster = New(
+	cluster = New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -2899,11 +2908,10 @@ func TestGenerateService(t *testing.T) {
 	cluster.OpConfig.ExternalTrafficPolicy = "Local"
 	service = cluster.generateService(Master, &spec)
 	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
-
 }
 
 func TestCreateLoadBalancerLogic(t *testing.T) {
-	var cluster = New(
+	cluster := New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				ProtectedRoles: []string{"admin"},
@@ -3116,7 +3124,7 @@ func TestEnableLoadBalancers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		var cluster = New(
+		cluster := New(context.Background(),
 			Config{
 				OpConfig: tt.config,
 			}, client, tt.pgSpec, logger, eventRecorder)
@@ -3811,7 +3819,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		var cluster = New(
+		cluster := New(context.Background(),
 			Config{
 				OpConfig: tt.config,
 			}, client, tt.pgSpec, logger, newEventRecorder)
@@ -3996,7 +4004,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		var cluster = New(
+		cluster := New(context.Background(),
 			Config{
 				OpConfig: tt.config,
 			}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
@@ -4305,7 +4313,7 @@ func TestTopologySpreadConstraints(t *testing.T) {
 		},
 	}
 
-	cluster := New(
+	cluster := New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -4317,11 +4325,12 @@ func TestTopologySpreadConstraints(t *testing.T) {
 
 	s, err := cluster.generateStatefulSet(&pg.Spec)
 	assert.NoError(t, err)
-	assert.Contains(t, s.Spec.Template.Spec.TopologySpreadConstraints, v1.TopologySpreadConstraint{
-		MaxSkew:           int32(1),
-		TopologyKey:       "topology.kubernetes.io/zone",
-		WhenUnsatisfiable: v1.DoNotSchedule,
-		LabelSelector:     labelSelector,
-	},
+	assert.Contains(
+		t, s.Spec.Template.Spec.TopologySpreadConstraints, v1.TopologySpreadConstraint{
+			MaxSkew:           int32(1),
+			TopologyKey:       "topology.kubernetes.io/zone",
+			WhenUnsatisfiable: v1.DoNotSchedule,
+			LabelSelector:     labelSelector,
+		},
 	)
 }
