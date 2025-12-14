@@ -161,7 +161,7 @@ func noEmptySync(cluster *Cluster, err error, reason SyncReason) error {
 
 func TestNeedConnectionPooler(t *testing.T) {
 	testName := "Test how connection pooler can be enabled"
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ProtectedRoles: []string{"admin"},
@@ -297,7 +297,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ConnectionPooler: config.ConnectionPooler{
@@ -405,7 +405,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ConnectionPooler: config.ConnectionPooler{
@@ -667,7 +667,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 
 func TestConnectionPoolerPodSpec(t *testing.T) {
 	testName := "Test connection pooler pod template generation"
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ProtectedRoles: []string{"admin"},
@@ -690,7 +690,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 		ConnectionPooler:              &acidv1.ConnectionPooler{},
 		EnableReplicaConnectionPooler: boolToPointer(true),
 	}
-	var clusterNoDefaultRes = New(
+	var clusterNoDefaultRes = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ProtectedRoles: []string{"admin"},
@@ -780,7 +780,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 
 func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 	testName := "Test connection pooler deployment spec generation"
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ProtectedRoles: []string{"admin"},
@@ -983,7 +983,7 @@ func TestPoolerTLS(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -1063,7 +1063,7 @@ func TestPoolerTLS(t *testing.T) {
 
 func TestConnectionPoolerServiceSpec(t *testing.T) {
 	testName := "Test connection pooler service spec generation"
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ProtectedRoles: []string{"admin"},

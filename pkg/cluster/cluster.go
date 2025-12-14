@@ -89,6 +89,11 @@ type Cluster struct {
 	podSubscribersMu sync.RWMutex
 	pgDb             *sql.DB
 	mu               sync.Mutex
+	ctx              context.Context
+	cancelFunc       context.CancelFunc
+	syncMu           sync.Mutex // protects syncRunning and needsResync
+	syncRunning      bool
+	needsResync      bool
 	userSyncStrategy spec.UserSyncer
 	deleteOptions    metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
@@ -121,8 +126,11 @@ type compareLogicalBackupJobResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
+func New(ctx context.Context, cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
+
+	// Create a cancellable context for this cluster
+	clusterCtx, cancelFunc := context.WithCancel(ctx)
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
 		e, ok := obj.(PodEvent)
@@ -138,6 +146,8 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	}
 
 	cluster := &Cluster{
+		ctx:            clusterCtx,
+		cancelFunc:     cancelFunc,
 		Config:         cfg,
 		Postgresql:     pgSpec,
 		pgUsers:        make(map[string]spec.PgUser),
@@ -175,6 +185,62 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	}
 
 	return cluster
+}
+
+// Cancel cancels the cluster's context, which will cause any ongoing
+// context-aware operations (like Sync) to return early.
+func (c *Cluster) Cancel() {
+	if c.cancelFunc != nil {
+		c.cancelFunc()
+	}
+}
+
+// StartSync attempts to start a sync operation. Returns true if sync can start
+// (no sync currently running and context not cancelled). Returns false if a sync
+// is already running (needsResync is set) or if context is cancelled (deletion in progress).
+func (c *Cluster) StartSync() bool {
+	c.syncMu.Lock()
+	defer c.syncMu.Unlock()
+
+	// Check if context is cancelled (deletion in progress)
+	select {
+	case <-c.ctx.Done():
+		return false
+	default:
+	}
+
+	if c.syncRunning {
+		c.needsResync = true
+		return false
+	}
+	c.syncRunning = true
+	c.needsResync = false
+	return true
+}
+
+// EndSync marks the sync operation as complete.
+func (c *Cluster) EndSync() {
+	c.syncMu.Lock()
+	defer c.syncMu.Unlock()
+	c.syncRunning = false
+}
+
+// NeedsResync returns true if a resync was requested while sync was running,
+// and clears the flag. Returns false if context is cancelled (deletion in progress).
+func (c *Cluster) NeedsResync() bool {
+	c.syncMu.Lock()
+	defer c.syncMu.Unlock()
+
+	// Check if context is cancelled (deletion in progress)
+	select {
+	case <-c.ctx.Done():
+		return false
+	default:
+	}
+
+	result := c.needsResync
+	c.needsResync = false
+	return result
 }
 
 func (c *Cluster) clusterName() spec.NamespacedName {
