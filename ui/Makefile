@@ -33,18 +33,5 @@ docker: appjs
 	echo "git describe $(shell git describe --tags --always --dirty)"
 	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)" -f Dockerfile --build-arg BASE_IMAGE="${BASE_IMAGE}" .
 
-docker-push: appjs
-	echo "Tag ${TAG}"
-	echo "Version ${VERSION}"
-	echo "CDP tag ${CDP_TAG}"
-	echo "git describe $(shell git describe --tags --always --dirty)"
-	docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
-	docker buildx build --platform linux/amd64,linux/arm64 \
-						--build-arg BASE_IMAGE="${BASE_IMAGE}" \
-						-f Dockerfile \
-						-t "$(IMAGE):$(TAG)$(CDP_TAG)" \
-						--push .
-	echo "$(IMAGE):$(TAG)$(CDP_TAG)"
-					
 mock:
 	docker run -it -p 8081:8081 "$(IMAGE):$(TAG)" --mock
