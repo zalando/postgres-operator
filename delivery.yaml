@@ -92,7 +92,6 @@ pipeline:
       - desc: Build image
         cmd: |
           cd logical-backup
-
           if [ -z ${CDP_SOURCE_BRANCH} ]; then
             IMAGE=${MULTI_ARCH_REGISTRY}/logical-backup
           else
