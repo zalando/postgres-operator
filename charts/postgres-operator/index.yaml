@@ -3,10 +3,10 @@ entries:
   postgres-operator:
   - apiVersion: v2
     appVersion: 1.15.1
-    created: "2025-12-11T12:43:37.232803735+01:00"
+    created: "2025-12-17T14:09:50.035474632+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
-    digest: 64d9c1d7be7e5bc4661099806b77dc509cb547938c2de6c7105f9665e9ee0aab
+    digest: 115c586a380c93f6741ec163adcbfbbabdfeef3922be113013871c723068ddf1
     home: https://github.com/zalando/postgres-operator
     keywords:
     - postgres
@@ -25,7 +25,7 @@ entries:
     version: 1.15.1
   - apiVersion: v2
     appVersion: 1.15.0
-    created: "2025-12-11T12:43:37.226030229+01:00"
+    created: "2025-12-17T14:09:50.029719931+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 002dd47647bf51fbba023bd1762d807be478cf37de7a44b80cd01ac1f20bd94a
@@ -47,7 +47,7 @@ entries:
     version: 1.15.0
   - apiVersion: v2
     appVersion: 1.14.0
-    created: "2025-12-11T12:43:37.217094172+01:00"
+    created: "2025-12-17T14:09:50.023677221+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 36e1571f3f455b213f16cdda7b1158648e8e84deb804ba47ed6b9b6d19263ba8
@@ -69,7 +69,7 @@ entries:
     version: 1.14.0
   - apiVersion: v2
     appVersion: 1.13.0
-    created: "2025-12-11T12:43:37.211148314+01:00"
+    created: "2025-12-17T14:09:50.017028241+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: a839601689aea0a7e6bc0712a5244d435683cf3314c95794097ff08540e1dfef
@@ -91,7 +91,7 @@ entries:
     version: 1.13.0
   - apiVersion: v2
     appVersion: 1.12.2
-    created: "2025-12-11T12:43:37.202520969+01:00"
+    created: "2025-12-17T14:09:50.007895169+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 65858d14a40d7fd90c32bd9fc60021acc9555c161079f43a365c70171eaf21d8
@@ -113,7 +113,7 @@ entries:
     version: 1.12.2
   - apiVersion: v2
     appVersion: 1.11.0
-    created: "2025-12-11T12:43:37.197036041+01:00"
+    created: "2025-12-17T14:09:50.00096582+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 3914b5e117bda0834f05c9207f007e2ac372864cf6e86dcc2e1362bbe46c14d9
@@ -135,7 +135,7 @@ entries:
     version: 1.11.0
   - apiVersion: v2
     appVersion: 1.10.1
-    created: "2025-12-11T12:43:37.191421669+01:00"
+    created: "2025-12-17T14:09:49.993816741+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: cc3baa41753da92466223d0b334df27e79c882296577b404a8e9071411fcf19c
@@ -155,4 +155,4 @@ entries:
     urls:
     - postgres-operator-1.10.1.tgz
     version: 1.10.1
-generated: "2025-12-11T12:43:37.184779748+01:00"
+generated: "2025-12-17T14:09:49.986854256+01:00"
