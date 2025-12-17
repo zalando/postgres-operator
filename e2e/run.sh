@@ -19,11 +19,11 @@ echo "Kubeconfig path: ${kubeconfig_path}"
 
 function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
-  if [[ -z $(docker images -q registry.opensource.zalan.do/acid/postgres-operator:${operator_tag}) ]]
+  if [[ -z $(docker images -q container-registry-test.zalando.net/acid/postgres-operator:${operator_tag}) ]]
   then
-    docker pull registry.opensource.zalan.do/acid/postgres-operator:latest
+    docker pull container-registry-test.zalando.net/acid/postgres-operator:latest
   fi
-  operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
+  operator_image=$(docker images --filter=reference="container-registry-test.zalando.net/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
 }
 
 function start_kind(){
