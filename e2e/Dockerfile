@@ -17,4 +17,4 @@ RUN apt-get -qq -y update \
 COPY requirements.txt ./
 RUN pip install -r ./requirements.txt
 
-CMD ["discover","-v","--failfast","--start-directory","/tests"]
+CMD ["python", "-m", "unittest", "discover", "-v", "--failfast", "--start-directory", "/tests"]
