@@ -11,7 +11,7 @@ endif
 LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS)
 LDFLAGS ?= -X=main.version=$(VERSION)
 
-IMAGE            ?= registry.opensource.zalan.do/acid/$(BINARY)
+IMAGE            ?= ghcr.io/zalando/$(BINARY)
 VERSION          ?= $(shell git describe --tags --always --dirty)
 TAG              ?= $(VERSION)
 GITHEAD          = $(shell git rev-parse --short HEAD)
