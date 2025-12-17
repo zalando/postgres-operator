@@ -43,7 +43,7 @@ Build the operator with the `make docker` command. You may define the TAG
 variable to assign an explicit tag to your Docker image and the IMAGE to set
 the image name. By default, the tag is computed with
 `git describe --tags --always --dirty` and the image is
-`registry.opensource.zalan.do/acid/postgres-operator`
+`ghcr.io/zalando/postgres-operator`
 
 ```bash
 export TAG=$(git describe --tags --always --dirty)
@@ -72,7 +72,7 @@ make docker
 
 # kind
 make docker
-kind load docker-image registry.opensource.zalan.do/acid/postgres-operator:${TAG} --name <kind-cluster-name>
+kind load docker-image ghcr.io/zalando/postgres-operator:${TAG} --name <kind-cluster-name>
 ```
 
 Then create a new Postgres Operator deployment.
