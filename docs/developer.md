@@ -43,7 +43,7 @@ Build the operator with the `make docker` command. You may define the TAG
 variable to assign an explicit tag to your Docker image and the IMAGE to set
 the image name. By default, the tag is computed with
 `git describe --tags --always --dirty` and the image is
-`registry.opensource.zalan.do/acid/postgres-operator`
+`ghcr.io/zalando/postgres-operator`
 
 ```bash
 export TAG=$(git describe --tags --always --dirty)
@@ -72,7 +72,7 @@ make docker
 
 # kind
 make docker
-kind load docker-image registry.opensource.zalan.do/acid/postgres-operator:${TAG} --name <kind-cluster-name>
+kind load docker-image ghcr.io/zalando/postgres-operator:${TAG} --name <kind-cluster-name>
 ```
 
 Then create a new Postgres Operator deployment.
@@ -276,10 +276,10 @@ Examples for fake K8s objects can be found in:
 
 The operator provides reference end-to-end (e2e) tests to
 ensure various infrastructure parts work smoothly together. The test code is available at `e2e/tests`.
-The special `registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner` image is used to run the tests. The container mounts the local `e2e/tests` directory at runtime, so whatever you modify in your local copy of the tests will be executed by a test runner. By maintaining a separate test runner image we avoid the need to re-build the e2e test image on every build. 
+The special `ghcr.io/zalando/postgres-operator-e2e-tests-runner` image is used to run the tests. The container mounts the local `e2e/tests` directory at runtime, so whatever you modify in your local copy of the tests will be executed by a test runner. By maintaining a separate test runner image we avoid the need to re-build the e2e test image on every build.
 
-Each e2e execution tests a Postgres Operator image built from the current git branch. The test
-runner creates a new local K8s cluster using [kind](https://kind.sigs.k8s.io/),
+Each e2e execution tests a Postgres Operator image built from the current git branch.
+The test runner creates a new local K8s cluster using [kind](https://kind.sigs.k8s.io/),
 utilizes provided manifest examples, and runs e2e tests contained in the `tests`
 folder. The K8s API client in the container connects to the `kind` cluster via
 the standard Docker `bridge` network. The kind cluster is deleted if tests

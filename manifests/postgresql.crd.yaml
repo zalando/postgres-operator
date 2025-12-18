@@ -276,7 +276,6 @@ spec:
                                     items:
                                       type: string
                         weight:
-                          format: int32
                           type: integer
                   requiredDuringSchedulingIgnoredDuringExecution:
                     type: object

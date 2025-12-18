@@ -17,7 +17,7 @@ WORKDIR /app
 
 RUN apt-get -qq -y update \
  # https://www.psycopg.org/docs/install.html#psycopg-vs-psycopg-binary
- && apt-get -qq -y install --no-install-recommends g++ libpq-dev python3-dev python3-distutils \
+ && apt-get -qq -y install --no-install-recommends g++ libpq-dev python3-dev \
  && apt-get -qq -y clean \
  && rm -rf /var/lib/apt/lists/*
 
