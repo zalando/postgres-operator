@@ -184,19 +184,25 @@ func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedNam
 func (c *Controller) processEvent(event ClusterEvent) {
 	var clusterName spec.NamespacedName
 	var clHistory ringlog.RingLogger
+	var clusterUID types.UID
 	var err error
 
 	lg := c.logger.WithField("worker", event.WorkerID)
 
 	if event.EventType == EventAdd || event.EventType == EventSync || event.EventType == EventRepair {
 		clusterName = util.NameFromMeta(event.NewSpec.ObjectMeta)
+		clusterUID = event.NewSpec.UID
 	} else {
 		clusterName = util.NameFromMeta(event.OldSpec.ObjectMeta)
+		clusterUID = event.OldSpec.UID
 	}
 	lg = lg.WithField("cluster-name", clusterName)
 
 	c.clustersMu.RLock()
 	cl, clusterFound := c.clusters[clusterName]
+	if clusterFound && cl.UID != clusterUID {
+		clusterFound = false
+	}
 	if clusterFound {
 		clHistory = c.clusterHistory[clusterName]
 	}
