@@ -257,9 +257,9 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	if teamID == "" {
 		msg := "no teamId specified"
 		if c.OpConfig.EnableTeamIdClusternamePrefix {
-			return nil, fmt.Errorf(msg)
+			return nil, fmt.Errorf("%s", msg)
 		}
-		c.logger.Warnf(msg)
+		c.logger.Warnf("%s", msg)
 		return nil, nil
 	}
 
@@ -663,7 +663,7 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 	return resources, nil
 }
 
-func isInMainternanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
+func isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
 	if len(specMaintenanceWindows) == 0 {
 		return true
 	}

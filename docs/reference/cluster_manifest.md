@@ -116,9 +116,9 @@ These parameters are grouped directly under  the `spec` key in the manifest.
 
 * **maintenanceWindows**
   a list which defines specific time frames when certain maintenance operations
-  are allowed. So far, it is only implemented for automatic major version
-  upgrades. Accepted formats are "01:00-06:00" for daily maintenance windows or 
-  "Sat:00:00-04:00" for specific days, with all times in UTC.
+  such as automatic major upgrades or master pod migration. Accepted formats
+  are "01:00-06:00" for daily maintenance windows or "Sat:00:00-04:00" for specific
+  days, with all times in UTC.
 
 * **users**
   a map of usernames to user flags for the users that should be created in the
@@ -247,7 +247,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   [kubernetes volumeSource](https://godoc.org/k8s.io/api/core/v1#VolumeSource).
   It allows you to mount existing PersistentVolumeClaims, ConfigMaps and Secrets inside the StatefulSet.
   Also an `emptyDir` volume can be shared between initContainer and statefulSet.
-  Additionaly, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
+  Additionally, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
   Set `isSubPathExpr` to true if you want to include [API environment variables](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath-expanded-environment).
   You can also specify in which container the additional Volumes will be mounted with the `targetContainers` array option.
   If `targetContainers` is empty, additional volumes will be mounted only in the `postgres` container.
@@ -257,7 +257,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
 ## Prepared Databases
 
 The operator can create databases with default owner, reader and writer roles
-without the need to specifiy them under `users` or `databases` sections. Those
+without the need to specify them under `users` or `databases` sections. Those
 parameters are grouped under the `preparedDatabases` top-level key. For more
 information, see [user docs](../user.md#prepared-databases-with-roles-and-default-privileges).
 

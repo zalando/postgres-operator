@@ -16,7 +16,6 @@ import (
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"12": 120000,
 	"13": 130000,
 	"14": 140000,
 	"15": 150000,
@@ -106,6 +105,22 @@ func (c *Cluster) removeFailuresAnnotation() error {
 	return nil
 }
 
+func (c *Cluster) criticalOperationLabel(pods []v1.Pod, value *string) error {
+	metadataReq := map[string]map[string]map[string]*string{"metadata": {"labels": {"critical-operation": value}}}
+
+	patchReq, err := json.Marshal(metadataReq)
+	if err != nil {
+		return fmt.Errorf("could not marshal ObjectMeta: %v", err)
+	}
+	for _, pod := range pods {
+		_, err = c.KubeClient.Pods(c.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patchReq, metav1.PatchOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 /*
 Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
 
@@ -129,17 +144,13 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
-	if !isInMainternanceWindow(c.Spec.MaintenanceWindows) {
-		c.logger.Infof("skipping major version upgrade, not in maintenance window")
-		return nil
-	}
-
 	pods, err := c.listPods()
 	if err != nil {
 		return err
 	}
 
 	allRunning := true
+	isStandbyCluster := false
 
 	var masterPod *v1.Pod
 
@@ -147,8 +158,9 @@ func (c *Cluster) majorVersionUpgrade() error {
 		ps, _ := c.patroni.GetMemberData(&pod)
 
 		if ps.Role == "standby_leader" {
-			c.logger.Errorf("skipping major version upgrade for %s/%s standby cluster. Re-deploy standby cluster with the required Postgres version specified", c.Namespace, c.Name)
-			return nil
+			isStandbyCluster = true
+			c.currentMajorVersion = ps.ServerVersion
+			break
 		}
 
 		if ps.State != "running" {
@@ -175,10 +187,18 @@ func (c *Cluster) majorVersionUpgrade() error {
 		}
 		c.logger.Infof("recheck cluster version is already up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
 		return nil
+	} else if isStandbyCluster {
+		c.logger.Warnf("skipping major version upgrade for %s/%s standby cluster. Re-deploy standby cluster with the required Postgres version specified", c.Namespace, c.Name)
+		return nil
 	}
 
 	if _, exists := c.ObjectMeta.Annotations[majorVersionUpgradeFailureAnnotation]; exists {
 		c.logger.Infof("last major upgrade failed, skipping upgrade")
+		return nil
+	}
+
+	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+		c.logger.Infof("skipping major version upgrade, not in maintenance window")
 		return nil
 	}
 
@@ -216,9 +236,20 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	isUpgradeSuccess := true
 	numberOfPods := len(pods)
-	if allRunning && masterPod != nil {
+	if allRunning {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
+			defer func() error {
+				if err = c.criticalOperationLabel(pods, nil); err != nil {
+					return fmt.Errorf("failed to remove critical-operation label: %s", err)
+				}
+				return nil
+			}()
+			val := "true"
+			if err = c.criticalOperationLabel(pods, &val); err != nil {
+				return fmt.Errorf("failed to assign critical-operation label: %s", err)
+			}
+
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
@@ -245,7 +276,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 				isUpgradeSuccess = false
 				c.annotatePostgresResource(isUpgradeSuccess)
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, scriptErrMsg)
-				return fmt.Errorf(scriptErrMsg)
+				return fmt.Errorf("%s", scriptErrMsg)
 			}
 
 			c.annotatePostgresResource(isUpgradeSuccess)

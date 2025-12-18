@@ -48,6 +48,10 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 		if newUser.Deleted {
 			continue
 		}
+		// when the secret of the user could not be created or updated skip any database actions
+		if newUser.Degraded {
+			continue
+		}
 		dbUser, exists := dbUsers[name]
 		if !exists {
 			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserAdd, User: newUser})

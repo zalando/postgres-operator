@@ -129,7 +129,7 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 
 	if len(errors) > 0 {
 		for _, s := range errors {
-			c.logger.Warningf(s)
+			c.logger.Warningf("%s", s)
 		}
 	}
 	return nil
@@ -225,7 +225,7 @@ func (c *Cluster) syncVolumeClaims() error {
 		}
 
 		newAnnotations := c.annotationsSet(nil)
-		if changed, _ := c.compareAnnotations(pvc.Annotations, newAnnotations); changed {
+		if changed, _ := c.compareAnnotations(pvc.Annotations, newAnnotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(newAnnotations)
 			if err != nil {
 				return fmt.Errorf("could not form patch for the persistent volume claim for volume %q: %v", pvc.Name, err)

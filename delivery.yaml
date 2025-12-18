@@ -1,72 +1,108 @@
 version: "2017-09-20"
+allow_concurrent_steps: true
+
+build_env: &BUILD_ENV
+  PYTHON_BASE_IMAGE: container-registry.zalando.net/library/python-3.11-slim
+  ALPINE_BASE_IMAGE: container-registry.zalando.net/library/alpine-3
+  MULTI_ARCH_REGISTRY: container-registry-test.zalando.net/acid
+
 pipeline:
-    - id: build-postgres-operator
-      type: script
-      vm_config:
-        type: linux
-        size: large
-        image: cdp-runtime/go
-      cache:
-        paths:
-          - /go/pkg/mod       # pkg cache for Go modules
-          - ~/.cache/go-build # Go build cache
-      commands:
-        - desc: Run unit tests
-          cmd: |
-            make deps mocks test
+  - id: build-postgres-operator
+    env:
+      <<: *BUILD_ENV
+    type: script
+    vm_config:
+      type: linux
+      size: large
+      image: cdp-runtime/go
+    cache:
+      paths:
+        - /go/pkg/mod       # pkg cache for Go modules
+        - ~/.cache/go-build # Go build cache
+    commands:
+      - desc: Run unit tests
+        cmd: |
+          make deps mocks test
 
-        - desc: Build Docker image
-          cmd: |
-            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
-            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
-            then
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
-            else
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
-            fi
-            export IMAGE
-            make docker push
+      - desc: Build Docker image
+        cmd: |
+          if [ -z ${CDP_SOURCE_BRANCH} ]; then
+            IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator
+          else
+            IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-test
+          fi
 
-    - id: build-operator-ui
-      type: script
-      vm_config:
-        type: linux
+          docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
+          docker buildx build --platform "linux/amd64,linux/arm64" \
+                    --build-arg BASE_IMAGE="${ALPINE_BASE_IMAGE}" \
+                    -t "${IMAGE}:${CDP_BUILD_VERSION}" \
+                    -f docker/Dockerfile \
+                    --push .
 
-      commands:
-        - desc: 'Prepare environment'
-          cmd: |
-            apt-get update
-            apt-get install -y build-essential
+          if [ -z ${CDP_SOURCE_BRANCH} ]; then
+            cdp-promote-image ${IMAGE}:${CDP_BUILD_VERSION}
+          fi
 
-        - desc: 'Compile JavaScript app'
-          cmd: |
-            cd ui
-            make appjs
+  - id: build-operator-ui
+    env:
+      <<: *BUILD_ENV
+    type: script
+    vm_config:
+      type: linux
 
-        - desc: 'Build and push Docker image'
-          cmd: |
-            cd ui
-            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
-            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
-            then
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui
-            else
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui-test
-            fi
-            export IMAGE
-            make docker
-            make push
+    commands:
+      - desc: 'Prepare environment'
+        cmd: |
+          apt-get update
+          apt-get install -y build-essential
 
-    - id: build-logical-backup
-      type: script
-      vm_config:
-        type: linux
+      - desc: 'Compile JavaScript app'
+        cmd: |
+          cd ui
+          make appjs
 
-      commands:
-        - desc: Build image
-          cmd: |
-            cd logical-backup
-            export TAG=$(git describe --tags --always --dirty)
-            IMAGE="registry-write.opensource.zalan.do/acid/logical-backup"
-            docker build --rm -t "$IMAGE:$TAG$CDP_TAG" .
-            docker push "$IMAGE:$TAG$CDP_TAG"
+      - desc: 'Build and push Docker image'
+        cmd: |
+          cd ui
+          if [ -z ${CDP_SOURCE_BRANCH} ]; then
+            IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-ui
+          else
+            IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-ui-test
+          fi
+          
+          make appjs
+          docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
+          docker buildx build --platform linux/amd64,linux/arm64 \
+                              --build-arg BASE_IMAGE="${PYTHON_BASE_IMAGE}" \
+                              -t ${IMAGE}:${CDP_BUILD_VERSION} \
+                              --push .
+
+          if [ -z ${CDP_SOURCE_BRANCH} ]; then
+            cdp-promote-image ${IMAGE}:${CDP_BUILD_VERSION}
+          fi
+
+  - id: build-logical-backup
+    env:
+      <<: *BUILD_ENV
+    type: script
+    vm_config:
+      type: linux
+
+    commands:
+      - desc: Build image
+        cmd: |
+          cd logical-backup
+          if [ -z ${CDP_SOURCE_BRANCH} ]; then
+            IMAGE=${MULTI_ARCH_REGISTRY}/logical-backup
+          else
+            IMAGE=${MULTI_ARCH_REGISTRY}/logical-backup-test
+          fi
+
+          docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
+          docker buildx build --platform linux/amd64,linux/arm64 \
+                              -t ${IMAGE}:${CDP_BUILD_VERSION} \
+                              --push .
+
+          if [ -z ${CDP_SOURCE_BRANCH} ]; then
+            cdp-promote-image ${IMAGE}:${CDP_BUILD_VERSION}
+          fi
