@@ -107,8 +107,13 @@ Those are top-level keys, containing both leaf keys and groups.
 * **kubernetes_use_configmaps**
   Select if setup uses endpoints (default), or configmaps to manage leader when
   DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to
-  use endpoints option, and configmaps is required. By default,
-  `kubernetes_use_configmaps: false`, meaning endpoints will be used.
+  use endpoints option, and configmaps is required. Starting with K8s 1.33,
+  endpoints are marked as deprecated. It's recommended to switch to config maps
+  instead. But, to do so make sure you scale the Postgres cluster down to just
+  one primary pod (e.g. using `max_instances` option). Otherwise, you risk
+  running into a split-brain scenario.
+  By default, `kubernetes_use_configmaps: false`, meaning endpoints will be used.
+  Starting from v1.16.0 the default will be changed to `true`.
 
 * **docker_image**
   Spilo Docker image for Postgres instances. For production, don't rely on the
@@ -209,7 +214,7 @@ under the `users` key.
   For all `LOGIN` roles that are not database owners the operator can rotate
   credentials in the corresponding K8s secrets by replacing the username and
   password. This means, new users will be added on each rotation inheriting
-  all priviliges from the original roles. The rotation date (in YYMMDD format)
+  all privileges from the original roles. The rotation date (in YYMMDD format)
   is appended to the names of the new user. The timestamp of the next rotation
   is written to the secret. The default is `false`.
 
@@ -552,7 +557,7 @@ configuration they are grouped under the `kubernetes` key.
   pods with `InitialDelaySeconds: 6`, `PeriodSeconds: 10`, `TimeoutSeconds: 5`,
   `SuccessThreshold: 1` and `FailureThreshold: 3`. When enabling readiness
   probes it is recommended to switch the `pod_management_policy` to `parallel`
-  to avoid unneccesary waiting times in case of multiple instances failing.
+  to avoid unnecessary waiting times in case of multiple instances failing.
   The default is `false`.
 
 * **storage_resize_mode**
@@ -701,7 +706,7 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   replaced by the cluster name, `{namespace}` is replaced with the namespace
   and `{hostedzone}` is replaced with the hosted zone (the value of the
   `db_hosted_zone` parameter). The `{team}` placeholder can still be used,
-  although it is not recommened because the team of a cluster can change.
+  although it is not recommended because the team of a cluster can change.
   If the cluster name starts with the `teamId` it will also be part of the
   DNS, aynway. No other placeholders are allowed!
 
@@ -720,7 +725,7 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   is replaced by the cluster name, `{namespace}` is replaced with the
   namespace and `{hostedzone}` is replaced with the hosted zone (the value of
   the `db_hosted_zone` parameter). The `{team}` placeholder can still be used,
-  although it is not recommened because the team of a cluster can change.
+  although it is not recommended because the team of a cluster can change.
   If the cluster name starts with the `teamId` it will also be part of the
   DNS, aynway. No other placeholders are allowed!
 
@@ -819,7 +824,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.

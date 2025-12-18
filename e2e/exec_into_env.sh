@@ -2,8 +2,8 @@
 
 export cluster_name="postgres-operator-e2e-tests"
 export kubeconfig_path="/tmp/kind-config-${cluster_name}"
-export operator_image="registry.opensource.zalan.do/acid/postgres-operator:latest"
-export e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:0.4"
+export operator_image="ghcr.io/zalando/postgres-operator:latest"
+export e2e_test_runner_image="ghcr.io/zalando/postgres-operator-e2e-tests-runner:latest"
 
 docker run -it --entrypoint /bin/bash --network=host -e "TERM=xterm-256color" \
     --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \

@@ -12,7 +12,8 @@ LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS)
 LDFLAGS ?= -X=main.version=$(VERSION)
 DOCKERDIR = docker
 
-IMAGE ?= registry.opensource.zalan.do/acid/$(BINARY)
+BASE_IMAGE ?= alpine:latest
+IMAGE ?= $(BINARY)
 TAG ?= $(VERSION)
 GITHEAD = $(shell git rev-parse --short HEAD)
 GITURL = $(shell git config --get remote.origin.url)
@@ -42,8 +43,9 @@ ifndef GOPATH
 	GOPATH := $(HOME)/go
 endif
 
-PATH := $(GOPATH)/bin:$(PATH)
-SHELL := env PATH=$(PATH) $(SHELL)
+PATH 		:= $(GOPATH)/bin:$(PATH)
+SHELL 		:= env PATH="$(PATH)" $(SHELL)
+IMAGE_TAG 	:= $(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)
 
 default: local
 
@@ -66,19 +68,16 @@ docker: ${DOCKERDIR}/${DOCKERFILE}
 	echo "Version ${VERSION}"
 	echo "CDP tag ${CDP_TAG}"
 	echo "git describe $(shell git describe --tags --always --dirty)"
-	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERDIR}/${DOCKERFILE}" --build-arg VERSION="${VERSION}" .
+	docker build --rm -t "$(IMAGE_TAG)" -f "${DOCKERDIR}/${DOCKERFILE}" --build-arg VERSION="${VERSION}" --build-arg BASE_IMAGE="${BASE_IMAGE}" .
 
 indocker-race:
-	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.23.4 bash -c "make linux"
-
-push:
-	docker push "$(IMAGE):$(TAG)$(CDP_TAG)"
+	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.25.3 bash -c "make linux"
 
 mocks:
 	GO111MODULE=on go generate ./...
 
 tools:
-	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.30.4
+	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.32.9
 	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.6.0
 	GO111MODULE=on go mod tidy
 

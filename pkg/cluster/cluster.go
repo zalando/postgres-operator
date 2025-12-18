@@ -841,6 +841,14 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		return false, "new service's owner references do not match the current ones"
 	}
 
+	if !reflect.DeepEqual(old.Spec.Selector, new.Spec.Selector) {
+		return false, "new service's selector does not match the current one"
+	}
+
+	if old.Spec.ExternalTrafficPolicy != new.Spec.ExternalTrafficPolicy {
+		return false, "new service's ExternalTrafficPolicy does not match the current one"
+	}
+
 	return true, ""
 }
 
@@ -1759,9 +1767,13 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 }
 
 func (c *Cluster) GetSwitchoverSchedule() string {
+	now := time.Now().UTC()
+	return c.getSwitchoverScheduleAtTime(now)
+}
+
+func (c *Cluster) getSwitchoverScheduleAtTime(now time.Time) string {
 	var possibleSwitchover, schedule time.Time
 
-	now := time.Now().UTC()
 	for _, window := range c.Spec.MaintenanceWindows {
 		// in the best case it is possible today
 		possibleSwitchover = time.Date(now.Year(), now.Month(), now.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
@@ -1780,7 +1792,7 @@ func (c *Cluster) GetSwitchoverSchedule() string {
 			}
 		}
 
-		if (schedule == time.Time{}) || possibleSwitchover.Before(schedule) {
+		if (schedule.Equal(time.Time{})) || possibleSwitchover.Before(schedule) {
 			schedule = possibleSwitchover
 		}
 	}

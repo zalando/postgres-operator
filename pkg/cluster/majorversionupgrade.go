@@ -16,7 +16,6 @@ import (
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"12": 120000,
 	"13": 130000,
 	"14": 140000,
 	"15": 150000,
@@ -237,7 +236,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	isUpgradeSuccess := true
 	numberOfPods := len(pods)
-	if allRunning && masterPod != nil {
+	if allRunning {
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
 			defer func() error {
@@ -277,7 +276,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 				isUpgradeSuccess = false
 				c.annotatePostgresResource(isUpgradeSuccess)
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, scriptErrMsg)
-				return fmt.Errorf(scriptErrMsg)
+				return fmt.Errorf("%s", scriptErrMsg)
 			}
 
 			c.annotatePostgresResource(isUpgradeSuccess)

@@ -9,7 +9,7 @@ IFS=$'\n\t'
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 readonly spilo_image="registry.opensource.zalan.do/acid/spilo-17-e2e:0.3"
-readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:0.4"
+readonly e2e_test_runner_image="ghcr.io/zalando/postgres-operator-e2e-tests-runner:latest"
 
 export GOPATH=${GOPATH-~/go}
 export PATH=${GOPATH}/bin:$PATH
@@ -19,11 +19,11 @@ echo "Kubeconfig path: ${kubeconfig_path}"
 
 function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
-  if [[ -z $(docker images -q registry.opensource.zalan.do/acid/postgres-operator:${operator_tag}) ]]
+  if [[ -z $(docker images -q ghcr.io/zalando/postgres-operator:${operator_tag}) ]]
   then
-    docker pull registry.opensource.zalan.do/acid/postgres-operator:latest
+    docker pull ghcr.io/zalando/postgres-operator:latest
   fi
-  operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
+  operator_image=$(docker images --filter=reference="ghcr.io/zalando/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
 }
 
 function start_kind(){
