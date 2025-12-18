@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -567,13 +568,6 @@ func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) 
 func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	var dummyUUID = "efd12e58-5786-11e8-b5a7-06148230260c"
 
-	expectedClusterNameLabel := []ExpectedValue{
-		{
-			envIndex:       5,
-			envVarConstant: "KUBERNETES_SCOPE_LABEL",
-			envVarValue:    "cluster-name",
-		},
-	}
 	expectedSpiloWalPathCompat := []ExpectedValue{
 		{
 			envIndex:       12,
@@ -784,7 +778,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			expectedValues:     expectedValuesGCPCreds,
 		},
 		{
-			subTest: "will not override global config KUBERNETES_SCOPE_LABEL parameter",
+			subTest: "will override global config KUBERNETES_SCOPE_LABEL parameter with user value",
 			opConfig: config.Config{
 				Resources: config.Resources{
 					ClusterNameLabel: "cluster-name",
@@ -795,7 +789,13 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			},
 			cloneDescription:   &acidv1.CloneDescription{},
 			standbyDescription: &acidv1.StandbyDescription{},
-			expectedValues:     expectedClusterNameLabel,
+			expectedValues: []ExpectedValue{
+				{
+					envIndex:       5,
+					envVarConstant: "KUBERNETES_SCOPE_LABEL",
+					envVarValue:    "my-scope-label",
+				},
+			},
 			pgsql: acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
 					Env: []v1.EnvVar{
@@ -1010,11 +1010,19 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		assert.NoError(t, err)
 
 		for _, ev := range tt.expectedValues {
-			env := actualEnvs[ev.envIndex]
+			// Find the environment variable by name instead of using index
+			var env *v1.EnvVar
+			for i := range actualEnvs {
+				if strings.EqualFold(actualEnvs[i].Name, ev.envVarConstant) {
+					env = &actualEnvs[i]
+					break
+				}
+			}
 
-			if env.Name != ev.envVarConstant {
-				t.Errorf("%s %s: expected env name %s, have %s instead",
-					t.Name(), tt.subTest, ev.envVarConstant, env.Name)
+			if env == nil {
+				t.Errorf("%s %s: expected env variable %s not found",
+					t.Name(), tt.subTest, ev.envVarConstant)
+				continue
 			}
 
 			if ev.envVarValueRef != nil {

@@ -1021,36 +1021,7 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_USE_CONFIGMAPS", Value: "true"})
 	}
 
-	// fetch cluster-specific variables that will override all subsequent global variables
-	if len(spec.Env) > 0 {
-		envVars = appendEnvVars(envVars, spec.Env...)
-	}
-
-	if spec.Clone != nil && spec.Clone.ClusterName != "" {
-		envVars = append(envVars, c.generateCloneEnvironment(spec.Clone)...)
-	}
-
-	if spec.StandbyCluster != nil {
-		envVars = append(envVars, c.generateStandbyEnvironment(spec.StandbyCluster)...)
-	}
-
-	// fetch variables from custom environment Secret
-	// that will override all subsequent global variables
-	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
-	if err != nil {
-		return nil, err
-	}
-	envVars = appendEnvVars(envVars, secretEnvVarsList...)
-
-	// fetch variables from custom environment ConfigMap
-	// that will override all subsequent global variables
-	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
-	if err != nil {
-		return nil, err
-	}
-	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
-
-	// global variables derived from operator configuration
+	// global variables derived from operator configuration (lowest priority - can be overridden)
 	opConfigEnvVars := make([]v1.EnvVar, 0)
 	if c.OpConfig.WALES3Bucket != "" {
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
@@ -1081,6 +1052,36 @@ func (c *Cluster) generateSpiloPodEnvVars(
 	}
 
 	envVars = appendEnvVars(envVars, opConfigEnvVars...)
+
+	// fetch variables from custom environment ConfigMap
+	// these will override operator configuration defaults
+	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
+	if err != nil {
+		return nil, err
+	}
+	envVars = appendEnvVars(envVars, configMapEnvVarsList...)
+
+	// fetch variables from custom environment Secret
+	// these will override configmap and operator configuration
+	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
+	if err != nil {
+		return nil, err
+	}
+	envVars = appendEnvVars(envVars, secretEnvVarsList...)
+
+	// Clone and Standby environments override configmap/secret for their specific variables
+	if spec.Clone != nil && spec.Clone.ClusterName != "" {
+		envVars = appendEnvVars(envVars, c.generateCloneEnvironment(spec.Clone)...)
+	}
+
+	if spec.StandbyCluster != nil {
+		envVars = appendEnvVars(envVars, c.generateStandbyEnvironment(spec.StandbyCluster)...)
+	}
+
+	// fetch cluster-specific variables from spec.env (highest priority - overrides everything)
+	if len(spec.Env) > 0 {
+		envVars = appendEnvVars(envVars, spec.Env...)
+	}
 
 	return envVars, nil
 }
