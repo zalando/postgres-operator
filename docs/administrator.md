@@ -926,6 +926,41 @@ For the `external-dns.alpha.kubernetes.io/hostname` annotation the `-pooler`
 suffix will be appended to the cluster name used in the template which is
 defined in `master|replica_dns_name_format`.
 
+## Node Ports
+
+Alternatively to Load Balancers Node Ports can be used. Kubernetes services with type
+`NodePort` redirect traffic from a specified port on your kubernetes nodes to your service.
+To expose your services to an external network with NodePorts you can set `enableMasterNodePort` and/or `enableReplicaNodePort` to `true`
+in your cluster manifest. In the case any of these variables are omitted from the manifest, the operator configuration settings `enable_master_node_port` and `enable_replica_node_port` apply.
+Note that the operator settings affect all Postgresql services running in all namespaces watched
+by the operator.
+
+**Enabling a NodePort configuration will override the corresponding LoadBalancer configuration.**
+
+There are multiple options to specify service annotations that will be merged
+with each other and override in the following order (where latter take
+precedence):
+
+1. Globally configured `custom_service_annotations`
+2. `serviceAnnotations` specified in the cluster manifest
+3. `masterServiceAnnotations` and `replicaServiceAnnotations` specified in the cluster manifest
+
+Load-Balancer specific annotations are not applied.
+
+Node port services can also be configured for the [connection pooler](user.md#connection-pooler) pods
+with the manifest flags `enableMasterPoolerNodePort` and/or `enableReplicaPoolerNodePort` or in the operator configuration with `enable_master_pooler_node_port`
+and/or `enable_replica_pooler_node_port`.
+
+To configure which ports Kubernetes should use for your NodePort service you can configure ports in your cluster manifest
+for each type:
+
+- masterNodePort
+- masterPoolerNodePort
+- replicaNodePort
+- replicaPoolerNodePort
+
+When not defined or set to 0 kubernetes will choose a port for you from [your kubernetes cluster's configured range](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport).
+
 ## Running periodic 'autorepair' scans of K8s objects
 
 The Postgres Operator periodically scans all K8s objects belonging to each
