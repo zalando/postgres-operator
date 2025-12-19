@@ -115,6 +115,8 @@ function aws_upload {
     [[ ! -z "$LOGICAL_BACKUP_S3_ENDPOINT" ]] && args+=("--endpoint-url=$LOGICAL_BACKUP_S3_ENDPOINT")
     [[ ! -z "$LOGICAL_BACKUP_S3_REGION" ]] && args+=("--region=$LOGICAL_BACKUP_S3_REGION")
     [[ ! -z "$LOGICAL_BACKUP_S3_SSE" ]] && args+=("--sse=$LOGICAL_BACKUP_S3_SSE")
+    [[ ! -z "$LOGICAL_BACKUP_S3_SSE_C" ]] && args+=("--sse-c=$LOGICAL_BACKUP_S3_SSE_C")
+    [[ ! -z "$LOGICAL_BACKUP_S3_SSE_C_KEY" ]] && args+=("--sse-c-key=$LOGICAL_BACKUP_S3_SSE_C_KEY")
 
     aws s3 cp - "$PATH_TO_BACKUP" "${args[@]//\'/}"
 }
