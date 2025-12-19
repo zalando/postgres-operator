@@ -354,6 +354,15 @@ spec:
                     type: integer
                   spilo_fsgroup:
                     type: integer
+                  spilo_runasnonroot:
+                    type: boolean
+                  spilo_seccompprofile:
+                    type: object
+                    properties:
+                      localhostProfile:
+                        type: string
+                      type:
+                        type: string
                   spilo_privileged:
                     type: boolean
                     default: false

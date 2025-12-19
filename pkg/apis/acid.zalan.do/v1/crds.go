@@ -750,6 +750,20 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"spiloFSGroup": {
 						Type: "integer",
 					},
+					"spiloRunAsNonRoot": {
+						Type: "boolean",
+					},
+					"spiloSeccompProfile": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"localhostProfile": {
+								Type: "string",
+							},
+							"type": {
+								Type: "string",
+							},
+						},
+					},
 					"standby": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
@@ -1523,6 +1537,20 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"spilo_fsgroup": {
 								Type: "integer",
+							},
+							"spilo_runasnonroot": {
+								Type: "boolean",
+							},
+							"spilo_seccompprofile": {
+								Type: "object",
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"localhostProfile": {
+										Type: "string",
+									},
+									"type": {
+										Type: "string",
+									},
+								},
 							},
 							"spilo_privileged": {
 								Type: "boolean",
