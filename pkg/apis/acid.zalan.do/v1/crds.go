@@ -111,6 +111,7 @@ var OperatorConfigCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition
 
 var min0 = 0.0
 var min1 = 1.0
+var minLength1 int64 = 1
 var minDisable = -1.0
 
 // PostgresCRDResourceValidation to check applied manifest parameters
@@ -891,6 +892,34 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "integer",
 									},
 								},
+							},
+						},
+					},
+					"topologySpreadConstraints": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"maxSkew": {
+										Type:    "integer",
+										Format:  "int32",
+										Minimum: &min1,
+									},
+									"topologyKey": {
+										Type:      "string",
+										MinLength: &minLength1,
+									},
+									"whenUnsatisfiable": {
+										Type: "string",
+										Enum: []apiextv1.JSON{
+											{Raw: []byte(`"DoNotSchedule"`)},
+											{Raw: []byte(`"ScheduleAnyway"`)},
+										},
+									},
+								},
+								Required: []string{"maxSkew", "topologyKey", "whenUnsatisfiable"},
 							},
 						},
 					},
