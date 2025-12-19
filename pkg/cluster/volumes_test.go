@@ -59,7 +59,7 @@ func TestResizeVolumeClaim(t *testing.T) {
 	assert.NoError(t, err)
 
 	// new cluster with pvc storage resize mode and configured labels
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				Resources: config.Resources{
@@ -185,7 +185,7 @@ func TestMigrateEBS(t *testing.T) {
 	namespace := "default"
 
 	// new cluster with pvc storage resize mode and configured labels
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				Resources: config.Resources{
@@ -293,7 +293,7 @@ func TestMigrateGp3Support(t *testing.T) {
 	namespace := "default"
 
 	// new cluster with pvc storage resize mode and configured labels
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				Resources: config.Resources{
@@ -355,7 +355,7 @@ func TestManualGp2Gp3Support(t *testing.T) {
 	namespace := "default"
 
 	// new cluster with pvc storage resize mode and configured labels
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				Resources: config.Resources{
@@ -415,7 +415,7 @@ func TestDontTouchType(t *testing.T) {
 	namespace := "default"
 
 	// new cluster with pvc storage resize mode and configured labels
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				Resources: config.Resources{

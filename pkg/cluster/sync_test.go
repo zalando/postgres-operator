@@ -88,7 +88,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -184,7 +184,7 @@ func TestPodAnnotationsSync(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PatroniAPICheckInterval: time.Duration(1),
@@ -369,7 +369,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -691,7 +691,7 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PatroniAPICheckInterval: time.Duration(1),
@@ -844,7 +844,7 @@ func TestUpdateSecret(t *testing.T) {
 	}
 
 	// new cluster with enabled password rotation
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				Auth: config.Auth{
@@ -988,7 +988,7 @@ func TestUpdateSecretNameConflict(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				Auth: config.Auth{
