@@ -15,14 +15,17 @@ const (
 	PostgresCRDResourceKind   = "postgresql"
 	PostgresCRDResourcePlural = "postgresqls"
 	PostgresCRDResourceList   = PostgresCRDResourceKind + "List"
-	PostgresCRDResouceName    = PostgresCRDResourcePlural + "." + acidzalando.GroupName
 	PostgresCRDResourceShort  = "pg"
 
 	OperatorConfigCRDResouceKind    = "OperatorConfiguration"
 	OperatorConfigCRDResourcePlural = "operatorconfigurations"
 	OperatorConfigCRDResourceList   = OperatorConfigCRDResouceKind + "List"
-	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
 	OperatorConfigCRDResourceShort  = "opconfig"
+)
+
+var (
+	PostgresCRDResouceName    = PostgresCRDResourcePlural + "." + acidzalando.GroupName
+	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
 )
 
 // PostgresCRDResourceColumns definition of AdditionalPrinterColumns for postgresql CRD
