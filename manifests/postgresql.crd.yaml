@@ -20,6 +20,10 @@ spec:
     storage: true
     subresources:
       status: {}
+      scale:
+          specReplicasPath: .spec.numberOfInstances
+          statusReplicasPath: .status.numberOfInstances
+          labelSelectorPath: .status.labelSelector
     additionalPrinterColumns:
     - name: Team
       type: string
@@ -51,7 +55,7 @@ spec:
     - name: Status
       type: string
       description: Current sync status of postgresql resource
-      jsonPath: .status.PostgresClusterStatus
+      jsonPath: .status.postgresClusterStatus
     schema:
       openAPIV3Schema:
         type: object
@@ -683,5 +687,30 @@ spec:
                     type: integer
           status:
             type: object
-            additionalProperties:
-              type: string
+            properties:
+              postgresClusterStatus:
+                type: string
+              numberOfInstances:
+                format: int32
+                type: integer
+              labelSelector:
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
