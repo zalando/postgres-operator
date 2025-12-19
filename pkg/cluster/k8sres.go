@@ -358,7 +358,7 @@ func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.
 
 	config.Bootstrap = pgBootstrap{}
 
-	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "md5"},
+	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "scram-sha-256"},
 		map[string]string{"auth-local": "trust"}}
 
 	initdbOptionNames := []string{}
