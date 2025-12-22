@@ -39,10 +39,6 @@ pipeline:
                     -f docker/Dockerfile \
                     --push .
 
-          if [ -z ${CDP_SOURCE_BRANCH} ]; then
-            cdp-promote-image ${IMAGE}:${CDP_BUILD_VERSION}
-          fi
-
   - id: build-operator-ui
     env:
       <<: *BUILD_ENV
