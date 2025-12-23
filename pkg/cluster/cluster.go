@@ -716,12 +716,12 @@ func compareSpiloConfiguration(configa, configb string) bool {
 	if err != nil {
 		return false
 	}
-	oa.Bootstrap.DCS = patroniDCS{}
 	err = json.Unmarshal([]byte(configb), &ob)
 	if err != nil {
 		return false
 	}
-	ob.Bootstrap.DCS = patroniDCS{}
+	// Compare the full configuration including DCS section
+	// This allows user-provided DCS settings (like ignore_slots) to trigger pod restarts
 	return reflect.DeepEqual(oa, ob)
 }
 

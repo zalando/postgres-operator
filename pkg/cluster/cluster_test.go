@@ -1202,8 +1202,9 @@ func TestCompareSpiloConfiguration(t *testing.T) {
 			true,
 		},
 		{
+			// This config has different max_connections (200 vs 100) in DCS, so it should not be equal
 			`{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"200","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
-			true,
+			false,
 		},
 		{
 			`{}`,
@@ -1249,6 +1250,7 @@ func TestCompareEnv(t *testing.T) {
 			ExpectedResult: true,
 		},
 		{
+			// spiloConfigDiff has different DCS settings, so it should not be equal
 			Envs: []v1.EnvVar{
 				{
 					Name:  "VARIABLE1",
@@ -1267,7 +1269,7 @@ func TestCompareEnv(t *testing.T) {
 					Value: spiloConfigDiff,
 				},
 			},
-			ExpectedResult: true,
+			ExpectedResult: false,
 		},
 		{
 			Envs: []v1.EnvVar{
