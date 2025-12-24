@@ -57,6 +57,7 @@ type patroniDCS struct {
 	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
 	Slots                    map[string]map[string]string `json:"slots,omitempty"`
 	FailsafeMode             *bool                        `json:"failsafe_mode,omitempty"`
+	IgnoreSlots              []map[string]string          `json:"ignore_slots,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -441,6 +442,10 @@ PatroniInitDBParams:
 		config.Bootstrap.DCS.FailsafeMode = opConfig.EnablePatroniFailsafeMode
 	}
 
+
+	if patroni.IgnoreSlots != nil {
+		config.Bootstrap.DCS.IgnoreSlots = patroni.IgnoreSlots
+	}
 	config.PgLocalConfiguration = make(map[string]interface{})
 
 	// the newer and preferred way to specify the PG version is to use the `PGVERSION` env variable

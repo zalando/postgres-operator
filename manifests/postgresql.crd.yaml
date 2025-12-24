@@ -327,6 +327,12 @@ spec:
                 properties:
                   failsafe_mode:
                     type: boolean
+                  ignore_slots:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties:
+                        type: string
                   initdb:
                     type: object
                     additionalProperties:
