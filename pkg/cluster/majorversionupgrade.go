@@ -243,8 +243,22 @@ func (c *Cluster) majorVersionUpgrade() error {
 				if err = c.criticalOperationLabel(pods, nil); err != nil {
 					return fmt.Errorf("failed to remove critical-operation label: %s", err)
 				}
+				// Delete the critical-op PDB after the critical operation is complete
+				if err = c.deleteCriticalOpPodDisruptionBudget(); err != nil {
+					c.logger.Warningf("failed to delete critical-op PDB: %s", err)
+				}
 				return nil
 			}()
+
+			// Create the critical-op PDB before starting the critical operation.
+			// This ensures protection is in place immediately, rather than waiting
+			// for a sync cycle. The sync function also creates the PDB if it detects
+			// pods with the critical-operation label, serving as a safety net for
+			// edge cases like operator restarts during critical operations.
+			if err = c.createCriticalOpPodDisruptionBudget(); err != nil {
+				c.logger.Warningf("failed to create critical-op PDB: %s", err)
+			}
+
 			val := "true"
 			if err = c.criticalOperationLabel(pods, &val); err != nil {
 				return fmt.Errorf("failed to assign critical-operation label: %s", err)

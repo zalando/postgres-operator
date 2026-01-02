@@ -499,7 +499,34 @@ func (c *Cluster) syncCriticalOpPodDisruptionBudget(isUpdate bool) error {
 		pdb *policyv1.PodDisruptionBudget
 		err error
 	)
-	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
+
+	// Check if any pods have the critical-operation label
+	hasCriticalOpPods, err := c.hasCriticalOperationPods()
+	if err != nil {
+		return fmt.Errorf("could not check for critical operation pods: %v", err)
+	}
+
+	pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{})
+	pdbExists := err == nil
+
+	if !pdbExists && !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get pod disruption budget: %v", err)
+	}
+
+	// If no pods have the critical-operation label, delete the PDB if it exists
+	if !hasCriticalOpPods {
+		if pdbExists {
+			c.CriticalOpPodDisruptionBudget = pdb
+			c.logger.Infof("no pods with critical-operation label, deleting critical-op PDB")
+			if err = c.deleteCriticalOpPodDisruptionBudget(); err != nil {
+				return fmt.Errorf("could not delete pod disruption budget for critical operations: %v", err)
+			}
+		}
+		return nil
+	}
+
+	// Pods have critical-operation label, ensure PDB exists
+	if pdbExists {
 		c.CriticalOpPodDisruptionBudget = pdb
 		newPDB := c.generateCriticalOpPodDisruptionBudget()
 		match, reason := c.comparePodDisruptionBudget(pdb, newPDB)
@@ -512,13 +539,10 @@ func (c *Cluster) syncCriticalOpPodDisruptionBudget(isUpdate bool) error {
 			c.CriticalOpPodDisruptionBudget = pdb
 		}
 		return nil
+	}
 
-	}
-	if !k8sutil.ResourceNotFound(err) {
-		return fmt.Errorf("could not get pod disruption budget: %v", err)
-	}
 	// no existing pod disruption budget, create new one
-	c.logger.Infof("could not find pod disruption budget for critical operations")
+	c.logger.Infof("pods with critical-operation label found, creating critical-op PDB")
 
 	if err = c.createCriticalOpPodDisruptionBudget(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
@@ -531,6 +555,21 @@ func (c *Cluster) syncCriticalOpPodDisruptionBudget(isUpdate bool) error {
 	}
 
 	return nil
+}
+
+// hasCriticalOperationPods checks if any pods in the cluster have the critical-operation=true label
+func (c *Cluster) hasCriticalOperationPods() (bool, error) {
+	pods, err := c.listPods()
+	if err != nil {
+		return false, err
+	}
+
+	for _, pod := range pods {
+		if val, ok := pod.Labels["critical-operation"]; ok && val == "true" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *Cluster) syncPodDisruptionBudgets(isUpdate bool) error {

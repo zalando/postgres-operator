@@ -1018,3 +1018,134 @@ func TestUpdateSecretNameConflict(t *testing.T) {
 	expectedError := fmt.Sprintf("syncing secret %s failed: could not update secret because of user name mismatch", "default/prepared-owner-user.acid-test-cluster.credentials")
 	assert.Contains(t, err.Error(), expectedError)
 }
+
+func TestSyncCriticalOpPodDisruptionBudget(t *testing.T) {
+	testName := "test syncing critical-op PDB on-demand"
+	clusterName := "acid-test-cluster-pdb"
+	namespace := "default"
+
+	clientSet := fake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+
+	client := k8sutil.KubernetesClient{
+		PodDisruptionBudgetsGetter: clientSet.PolicyV1(),
+		PodsGetter:                 clientSet.CoreV1(),
+		PostgresqlsGetter:          acidClientSet.AcidV1(),
+		StatefulSetsGetter:         clientSet.AppsV1(),
+	}
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			NumberOfInstances: 3,
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	cluster := New(
+		Config{
+			OpConfig: config.Config{
+				PDBNameFormat:             "postgres-{cluster}-pdb",
+				EnablePodDisruptionBudget: util.True(),
+				Resources: config.Resources{
+					ClusterLabels:         map[string]string{"application": "spilo"},
+					ClusterNameLabel:      "cluster-name",
+					PodRoleLabel:          "spilo-role",
+					ResourceCheckInterval: time.Duration(3),
+					ResourceCheckTimeout:  time.Duration(10),
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+
+	// Create pods without critical-operation label
+	for i := 0; i < 3; i++ {
+		pod := v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%d", clusterName, i),
+				Namespace: namespace,
+				Labels: map[string]string{
+					"application":  "spilo",
+					"cluster-name": clusterName,
+				},
+			},
+		}
+		_, err := cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+		assert.NoError(t, err)
+	}
+
+	// Test 1: Sync with no critical-operation labels - PDB should NOT be created
+	err := cluster.syncCriticalOpPodDisruptionBudget(false)
+	assert.NoError(t, err)
+
+	_, err = cluster.KubeClient.PodDisruptionBudgets(namespace).Get(context.TODO(), cluster.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{})
+	assert.Error(t, err, "%s: critical-op PDB should not exist when no pods have critical-operation label", testName)
+
+	// Test 2: Add critical-operation label to pods - PDB should be created
+	for i := 0; i < 3; i++ {
+		pod, err := cluster.KubeClient.Pods(namespace).Get(context.TODO(), fmt.Sprintf("%s-%d", clusterName, i), metav1.GetOptions{})
+		assert.NoError(t, err)
+		pod.Labels["critical-operation"] = "true"
+		_, err = cluster.KubeClient.Pods(namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+		assert.NoError(t, err)
+	}
+
+	err = cluster.syncCriticalOpPodDisruptionBudget(false)
+	assert.NoError(t, err)
+
+	pdb, err := cluster.KubeClient.PodDisruptionBudgets(namespace).Get(context.TODO(), cluster.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{})
+	assert.NoError(t, err, "%s: critical-op PDB should exist when pods have critical-operation label", testName)
+	assert.Equal(t, int32(3), pdb.Spec.MinAvailable.IntVal, "%s: minAvailable should be 3", testName)
+
+	// Test 3: Remove critical-operation label from pods - PDB should be deleted
+	for i := 0; i < 3; i++ {
+		pod, err := cluster.KubeClient.Pods(namespace).Get(context.TODO(), fmt.Sprintf("%s-%d", clusterName, i), metav1.GetOptions{})
+		assert.NoError(t, err)
+		delete(pod.Labels, "critical-operation")
+		_, err = cluster.KubeClient.Pods(namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+		assert.NoError(t, err)
+	}
+
+	err = cluster.syncCriticalOpPodDisruptionBudget(false)
+	assert.NoError(t, err)
+
+	_, err = cluster.KubeClient.PodDisruptionBudgets(namespace).Get(context.TODO(), cluster.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{})
+	assert.Error(t, err, "%s: critical-op PDB should be deleted when no pods have critical-operation label", testName)
+
+	// Test 4: Try to delete again when PDB is already deleted - should handle gracefully
+	err = cluster.syncCriticalOpPodDisruptionBudget(false)
+	assert.NoError(t, err, "%s: syncing when PDB already deleted should not error", testName)
+
+	// Test 5: Try to create when PDB already exists - should handle gracefully
+	// First, add labels back to pods
+	for i := 0; i < 3; i++ {
+		pod, err := cluster.KubeClient.Pods(namespace).Get(context.TODO(), fmt.Sprintf("%s-%d", clusterName, i), metav1.GetOptions{})
+		assert.NoError(t, err)
+		pod.Labels["critical-operation"] = "true"
+		_, err = cluster.KubeClient.Pods(namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+		assert.NoError(t, err)
+	}
+
+	// Create the PDB
+	err = cluster.syncCriticalOpPodDisruptionBudget(false)
+	assert.NoError(t, err)
+	_, err = cluster.KubeClient.PodDisruptionBudgets(namespace).Get(context.TODO(), cluster.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{})
+	assert.NoError(t, err, "%s: PDB should exist after sync with labeled pods", testName)
+
+	// Now sync again - should handle "already exists" gracefully
+	cluster.CriticalOpPodDisruptionBudget = nil // Simulate operator restart (in-memory state lost)
+	err = cluster.syncCriticalOpPodDisruptionBudget(false)
+	assert.NoError(t, err, "%s: syncing when PDB already exists should not error", testName)
+
+	// Verify PDB still exists and is properly tracked
+	pdb, err = cluster.KubeClient.PodDisruptionBudgets(namespace).Get(context.TODO(), cluster.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, int32(3), pdb.Spec.MinAvailable.IntVal)
+}
