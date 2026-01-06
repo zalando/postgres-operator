@@ -242,12 +242,13 @@ type PostgresStatus struct {
 // makes sense to expose. E.g. pool size (min/max boundaries), max client
 // connections etc.
 type ConnectionPooler struct {
-	NumberOfInstances *int32 `json:"numberOfInstances,omitempty"`
-	Schema            string `json:"schema,omitempty"`
-	User              string `json:"user,omitempty"`
-	Mode              string `json:"mode,omitempty"`
-	DockerImage       string `json:"dockerImage,omitempty"`
-	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
+	NumberOfInstances *int32                    `json:"numberOfInstances,omitempty"`
+	Schema            string                    `json:"schema,omitempty"`
+	User              string                    `json:"user,omitempty"`
+	Mode              string                    `json:"mode,omitempty"`
+	DockerImage       string                    `json:"dockerImage,omitempty"`
+	MaxDBConnections  *int32                    `json:"maxDBConnections,omitempty"`
+	ImagePullSecrets  []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	*Resources `json:"resources,omitempty"`
 }
