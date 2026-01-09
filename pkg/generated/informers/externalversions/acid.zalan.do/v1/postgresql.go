@@ -25,13 +25,13 @@ SOFTWARE.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	apisacidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/zalando/postgres-operator/pkg/generated/listers/acid.zalan.do/v1"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/generated/listers/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -42,7 +42,7 @@ import (
 // Postgresqls.
 type PostgresqlInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.PostgresqlLister
+	Lister() acidzalandov1.PostgresqlLister
 }
 
 type postgresqlInformer struct {
@@ -77,7 +77,7 @@ func NewFilteredPostgresqlInformer(client versioned.Interface, namespace string,
 				return client.AcidV1().Postgresqls(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&acidzalandov1.Postgresql{},
+		&apisacidzalandov1.Postgresql{},
 		resyncPeriod,
 		indexers,
 	)
@@ -88,9 +88,9 @@ func (f *postgresqlInformer) defaultInformer(client versioned.Interface, resyncP
 }
 
 func (f *postgresqlInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&acidzalandov1.Postgresql{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisacidzalandov1.Postgresql{}, f.defaultInformer)
 }
 
-func (f *postgresqlInformer) Lister() v1.PostgresqlLister {
-	return v1.NewPostgresqlLister(f.Informer().GetIndexer())
+func (f *postgresqlInformer) Lister() acidzalandov1.PostgresqlLister {
+	return acidzalandov1.NewPostgresqlLister(f.Informer().GetIndexer())
 }
