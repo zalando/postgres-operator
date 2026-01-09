@@ -523,13 +523,14 @@ func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinit
 				},
 			}
 		} else {
-			if c.OpConfig.NodeReadinessLabelMerge == "OR" {
+			switch c.OpConfig.NodeReadinessLabelMerge {
+			case "OR":
 				manifestTerms := nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
 				manifestTerms = append(manifestTerms, nodeReadinessSelectorTerm)
 				nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
 					NodeSelectorTerms: manifestTerms,
 				}
-			} else if c.OpConfig.NodeReadinessLabelMerge == "AND" {
+			case "AND":
 				for i, nodeSelectorTerm := range nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
 					manifestExpressions := nodeSelectorTerm.MatchExpressions
 					manifestExpressions = append(manifestExpressions, matchExpressions...)
@@ -1297,11 +1298,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	if spec.InitContainers != nil && len(spec.InitContainers) > 0 {
+	if len(spec.InitContainers) > 0 {
 		if c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
 			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
 		}
 		initContainers = spec.InitContainers
+		if err := c.validateContainers(initContainers); err != nil {
+			return nil, fmt.Errorf("invalid init containers: %v", err)
+		}
 	}
 
 	// backward compatible check for InitContainers
@@ -1400,7 +1404,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// generate container specs for sidecars specified in the cluster manifest
 	clusterSpecificSidecars := []v1.Container{}
-	if spec.Sidecars != nil && len(spec.Sidecars) > 0 {
+	if len(spec.Sidecars) > 0 {
 		// warn if sidecars are defined, but globally disabled (does not apply to globally defined sidecars)
 		if c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
 			c.logger.Warningf("sidecars specified but disabled in configuration - next statefulset creation would fail")
@@ -1454,6 +1458,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername))
 
+	if err := c.validateContainers(sidecarContainers); err != nil {
+		return nil, fmt.Errorf("invalid sidecar containers: %v", err)
+	}
+
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
@@ -1504,11 +1512,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	updateStrategy := appsv1.StatefulSetUpdateStrategy{Type: appsv1.OnDeleteStatefulSetStrategyType}
 
 	var podManagementPolicy appsv1.PodManagementPolicyType
-	if c.OpConfig.PodManagementPolicy == "ordered_ready" {
+	switch c.OpConfig.PodManagementPolicy {
+	case "ordered_ready":
 		podManagementPolicy = appsv1.OrderedReadyPodManagement
-	} else if c.OpConfig.PodManagementPolicy == "parallel" {
+	case "parallel":
 		podManagementPolicy = appsv1.ParallelPodManagement
-	} else {
+	default:
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
@@ -2589,4 +2598,16 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 		return path.Join(defaultDir, file)
 	}
 	return file
+}
+
+func (c *Cluster) validateContainers(containers []v1.Container) error {
+	for i, container := range containers {
+		if container.Name == "" {
+			return fmt.Errorf("container[%d]: name is required", i)
+		}
+		if container.Image == "" {
+			return fmt.Errorf("container '%v': image is required", container.Name)
+		}
+	}
+	return nil
 }

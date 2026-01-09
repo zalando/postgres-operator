@@ -1,6 +1,7 @@
 .PHONY: clean test appjs docker push mock
 
-IMAGE            ?= registry.opensource.zalan.do/acid/postgres-operator-ui
+IMAGE            ?= postgres-operator-ui
+BASE_IMAGE       ?= python:3.11-slim
 VERSION          ?= $(shell git describe --tags --always --dirty)
 TAG              ?= $(VERSION)
 GITHEAD          = $(shell git rev-parse --short HEAD)
@@ -30,10 +31,7 @@ docker: appjs
 	echo "Version ${VERSION}"
 	echo "CDP tag ${CDP_TAG}"
 	echo "git describe $(shell git describe --tags --always --dirty)"
-	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)" -f Dockerfile .
-
-push:
-	docker push "$(IMAGE):$(TAG)$(CDP_TAG)"
+	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)" -f Dockerfile --build-arg BASE_IMAGE="${BASE_IMAGE}" .
 
 mock:
 	docker run -it -p 8081:8081 "$(IMAGE):$(TAG)" --mock

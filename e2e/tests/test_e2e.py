@@ -14,7 +14,7 @@ from kubernetes.client.rest import ApiException
 
 SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-17-e2e:0.3"
 SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-17-e2e:0.4"
-SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-17:4.0-p2"
+SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-17:4.0-p3"
 
 def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
@@ -1003,7 +1003,8 @@ class EndToEndTestCase(unittest.TestCase):
                             "Origin": 2,
                             "IsDbOwner": False,
                             "Deleted": False,
-                            "Rotated": False
+                            "Rotated": False,
+                            "Degraded": False,
                         })
                         return True
                 except:

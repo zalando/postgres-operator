@@ -195,12 +195,14 @@ from numerous escape characters in the latter log entry, view it in CLI with
 used internally in K8s.
 
 The StatefulSet is replaced if the following properties change:
+
 - annotations
 - volumeClaimTemplates
 - template volumes
 
 The StatefulSet is replaced and a rolling updates is triggered if the following
 properties differ between the old and new state:
+
 - container name, ports, image, resources, env, envFrom, securityContext and volumeMounts
 - template labels, annotations, service account, securityContext, affinity, priority class and termination grace period
 
@@ -898,6 +900,7 @@ services:
 There are multiple options to specify service annotations that will be merged
 with each other and override in the following order (where latter take
 precedence):
+
 1. Default annotations if LoadBalancer is enabled
 2. Globally configured `custom_service_annotations`
 3. `serviceAnnotations` specified in the cluster manifest
@@ -1495,7 +1498,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t ghcr.io/zalando/postgres-operator-ui:v1.13.0 .
+docker build -t ghcr.io/zalando/postgres-operator-ui:v1.15.1 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/
