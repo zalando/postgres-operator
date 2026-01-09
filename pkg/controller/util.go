@@ -103,7 +103,11 @@ func (c *Controller) createOperatorCRD(desiredCrd *apiextv1.CustomResourceDefini
 }
 
 func (c *Controller) createPostgresCRD() error {
-	return c.createOperatorCRD(acidv1.PostgresCRD(c.opConfig.CRDCategories))
+	crd, err := acidv1.PostgresCRD(c.opConfig.CRDCategories)
+	if err != nil {
+		return fmt.Errorf("could not create Postgres CRD object: %v", err)
+	}
+	return c.createOperatorCRD(crd)
 }
 
 func (c *Controller) createConfigurationCRD() error {

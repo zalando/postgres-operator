@@ -55,6 +55,7 @@ default: local
 clean:
 	rm -rf build
 	rm $(GENERATED)
+	rm pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
 
 verify:
 	hack/verify-codegen.sh
@@ -72,6 +73,7 @@ $(GENERATED_CRDS): $(GENERATED)
 	@sed -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
 	@hack/adjust_postgresql_crd.sh
 	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
+	@cp manifests/postgresql.crd.yaml pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
 
 local: ${SOURCES} $(GENERATED_CRDS)
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)
@@ -103,7 +105,7 @@ vet:
 	@go vet $(PKG)
 	@staticcheck $(PKG)
 
-test: mocks $(GENERATED)
+test: mocks $(GENERATED) $(GENERATED_CRDS)
 	GO111MODULE=on go test ./...
 
 codegen: $(GENERATED)
