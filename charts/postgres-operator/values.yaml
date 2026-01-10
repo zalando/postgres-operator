@@ -216,6 +216,14 @@ configKubernetes:
   # group ID with write-access to volumes (required to run Spilo as non-root process)
   # spilo_fsgroup: 103
 
+  # sets runAsNonRoot in the security context. If this is set you also must set spilo_runasuser.
+  # spilo_runasnonroot: true
+
+  # sets seccompProfile in the security context
+  # spilo_seccompprofile:
+  #   type: Localhost
+  #   localhostProfile: profiles/audit.json
+
   # whether the Spilo container should run in privileged mode
   spilo_privileged: false
   # whether the Spilo container should run with additional permissions other than parent.

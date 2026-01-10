@@ -480,6 +480,15 @@ spec:
                 type: integer
               spiloFSGroup:
                 type: integer
+              spiloRunAsNonRoot:
+                type: boolean
+              spiloSeccompProfile:
+                type: object
+                properties:
+                  localhostProfile:
+                    type: string
+                  type:
+                    type: string
               standby:
                 type: object
                 properties:

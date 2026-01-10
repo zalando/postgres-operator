@@ -85,6 +85,13 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   requires a custom Spilo image. Note the FSGroup of a Pod cannot be changed
   without recreating a new Pod. Optional.
 
+* **spiloRunAsNonRoot**
+  boolean flag to set `runAsNonRoot` in the pod security context. If this is set
+  then `spiloRunAsUser` must also be set. Optional.
+
+* **spiloSeccompProfile**
+  sets the `seccompProfile` in the pod security context. Optional.
+
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_master_load_balancer` parameter) to define whether to enable the load
