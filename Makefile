@@ -21,6 +21,7 @@ GITSTATUS = $(shell git status --porcelain || echo "no changes")
 SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
 CRD_SOURCES    = $(shell find pkg/apis/zalando.org pkg/apis/acid.zalan.do -name '*.go' -not -name '*.deepcopy.go')
+GENERATED_CRDS = manifests/postgresteam.crd.yaml
 GENERATED      = pkg/apis/zalando.org/v1/zz_generated.deepcopy.go pkg/apis/acid.zalan.do/v1/zz_generated.deepcopy.go
 DIRS := cmd pkg
 PKG := `go list ./... | grep -v /vendor/`
@@ -60,13 +61,20 @@ verify:
 $(GENERATED): go.mod $(CRD_SOURCES)
 	hack/update-codegen.sh
 
-local: ${SOURCES} $(GENERATED)
+$(GENERATED_CRDS): $(GENERATED)
+	go tool controller-gen crd:crdVersions=v1,allowDangerousTypes=true paths=./pkg/apis/acid.zalan.do/... output:crd:dir=manifests
+	# only generate postgresteam.crd.yaml for now
+	@rm manifests/acid.zalan.do_operatorconfigurations.yaml
+	@rm manifests/acid.zalan.do_postgresqls.yaml
+	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
+
+local: ${SOURCES} $(GENERATED_CRDS)
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)
 
-linux: ${SOURCES} $(GENERATED)
+linux: ${SOURCES} $(GENERATED_CRDS)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
-macos: ${SOURCES} $(GENERATED)
+macos: ${SOURCES} $(GENERATED_CRDS)
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 docker: ${DOCKERDIR}/${DOCKERFILE}
