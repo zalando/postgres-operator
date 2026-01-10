@@ -1,3 +1,4 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -10,9 +11,9 @@ spec:
     plural: postgresqls
     singular: postgresql
     shortNames:
-    - pg
+      - pg
     categories:
-    - all
+      - all
   scope: Namespaced
   versions:
   - name: v1
@@ -21,37 +22,37 @@ spec:
     subresources:
       status: {}
     additionalPrinterColumns:
-    - name: Team
-      type: string
-      description: Team responsible for Postgres cluster
-      jsonPath: .spec.teamId
-    - name: Version
-      type: string
-      description: PostgreSQL version
-      jsonPath: .spec.postgresql.version
-    - name: Pods
-      type: integer
-      description: Number of Pods per Postgres cluster
-      jsonPath: .spec.numberOfInstances
-    - name: Volume
-      type: string
-      description: Size of the bound volume
-      jsonPath: .spec.volume.size
-    - name: CPU-Request
-      type: string
-      description: Requested CPU for Postgres containers
-      jsonPath: .spec.resources.requests.cpu
-    - name: Memory-Request
-      type: string
-      description: Requested memory for Postgres containers
-      jsonPath: .spec.resources.requests.memory
-    - name: Age
-      type: date
-      jsonPath: .metadata.creationTimestamp
-    - name: Status
-      type: string
-      description: Current sync status of postgresql resource
-      jsonPath: .status.PostgresClusterStatus
+      - name: Team
+        type: string
+        description: Team responsible for Postgres cluster
+        jsonPath: .spec.teamId
+      - name: Version
+        type: string
+        description: PostgreSQL version
+        jsonPath: .spec.postgresql.version
+      - name: Pods
+        type: integer
+        description: Number of Pods per Postgres cluster
+        jsonPath: .spec.numberOfInstances
+      - name: Volume
+        type: string
+        description: Size of the bound volume
+        jsonPath: .spec.volume.size
+      - name: CPU-Request
+        type: string
+        description: Requested CPU for Postgres containers
+        jsonPath: .spec.resources.requests.cpu
+      - name: Memory-Request
+        type: string
+        description: Requested memory for Postgres containers
+        jsonPath: .spec.resources.requests.memory
+      - name: Age
+        type: date
+        jsonPath: .metadata.creationTimestamp
+      - name: Status
+        type: string
+        description: Current sync status of postgresql resource
+        jsonPath: .status.PostgresClusterStatus
     schema:
       openAPIV3Schema:
         type: object
@@ -177,7 +178,7 @@ spec:
                 type: object
                 additionalProperties:
                   type: string
-                # Note: usernames specified here as database owners must be declared in the users key of the spec key.
+                  # Note: usernames specified here as database owners must be declared in the users key of the spec key.
               dockerImage:
                 type: string
               enableConnectionPooler:
@@ -237,8 +238,8 @@ spec:
                     items:
                       type: object
                       required:
-                      - preference
-                      - weight
+                        - preference
+                        - weight
                       properties:
                         preference:
                           type: object
@@ -248,8 +249,8 @@ spec:
                               items:
                                 type: object
                                 required:
-                                - key
-                                - operator
+                                  - key
+                                  - operator
                                 properties:
                                   key:
                                     type: string
@@ -264,8 +265,8 @@ spec:
                               items:
                                 type: object
                                 required:
-                                - key
-                                - operator
+                                  - key
+                                  - operator
                                 properties:
                                   key:
                                     type: string
@@ -280,7 +281,7 @@ spec:
                   requiredDuringSchedulingIgnoredDuringExecution:
                     type: object
                     required:
-                    - nodeSelectorTerms
+                      - nodeSelectorTerms
                     properties:
                       nodeSelectorTerms:
                         type: array
@@ -292,8 +293,8 @@ spec:
                               items:
                                 type: object
                                 required:
-                                - key
-                                - operator
+                                  - key
+                                  - operator
                                 properties:
                                   key:
                                     type: string
@@ -308,8 +309,8 @@ spec:
                               items:
                                 type: object
                                 required:
-                                - key
-                                - operator
+                                  - key
+                                  - operator
                                 properties:
                                   key:
                                     type: string
@@ -492,12 +493,12 @@ spec:
                   standby_port:
                     type: string
                 oneOf:
-                - required:
-                  - s3_wal_path
-                - required:
-                  - gs_wal_path
-                - required:
-                  - standby_host
+                  - required:
+                      - s3_wal_path
+                  - required:
+                      - gs_wal_path
+                  - required:
+                      - standby_host
               streams:
                 type: array
                 items:
@@ -592,34 +593,34 @@ spec:
                   items:
                     type: string
                     enum:
-                    - bypassrls
-                    - BYPASSRLS
-                    - nobypassrls
-                    - NOBYPASSRLS
-                    - createdb
-                    - CREATEDB
-                    - nocreatedb
-                    - NOCREATEDB
-                    - createrole
-                    - CREATEROLE
-                    - nocreaterole
-                    - NOCREATEROLE
-                    - inherit
-                    - INHERIT
-                    - noinherit
-                    - NOINHERIT
-                    - login
-                    - LOGIN
-                    - nologin
-                    - NOLOGIN
-                    - replication
-                    - REPLICATION
-                    - noreplication
-                    - NOREPLICATION
-                    - superuser
-                    - SUPERUSER
-                    - nosuperuser
-                    - NOSUPERUSER
+                      - bypassrls
+                      - BYPASSRLS
+                      - nobypassrls
+                      - NOBYPASSRLS
+                      - createdb
+                      - CREATEDB
+                      - nocreatedb
+                      - NOCREATEDB
+                      - createrole
+                      - CREATEROLE
+                      - nocreaterole
+                      - NOCREATEROLE
+                      - inherit
+                      - INHERIT
+                      - noinherit
+                      - NOINHERIT
+                      - login
+                      - LOGIN
+                      - nologin
+                      - NOLOGIN
+                      - replication
+                      - REPLICATION
+                      - noreplication
+                      - NOREPLICATION
+                      - superuser
+                      - SUPERUSER
+                      - nosuperuser
+                      - NOSUPERUSER
               usersIgnoringSecretRotation:
                 type: array
                 nullable: true
