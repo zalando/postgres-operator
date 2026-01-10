@@ -1287,9 +1287,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers      []v1.Container
 		sidecarContainers   []v1.Container
 		podTemplate         *v1.PodTemplateSpec
-		volumeClaimTemplate *v1.PersistentVolumeClaim
+		volumeClaimTemplate *[]v1.PersistentVolumeClaim
 		additionalVolumes   = spec.AdditionalVolumes
 	)
+
+	useEphemeralVolume := c.OpConfig.AllowEphemeralVolumes != nil && spec.UseEphemeralVolume != nil && (*c.OpConfig.AllowEphemeralVolumes && *spec.UseEphemeralVolume)
 
 	defaultResources := makeDefaultResources(&c.OpConfig)
 	resourceRequirements, err := c.generateResourceRequirements(
@@ -1498,9 +1500,23 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
-	if volumeClaimTemplate, err = c.generatePersistentVolumeClaimTemplate(spec.Volume.Size,
-		spec.Volume.StorageClass, spec.Volume.Selector); err != nil {
-		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
+	// Generate the volumes, optionally using an ephemeral volume
+	if useEphemeralVolume {
+		empty := make([]v1.PersistentVolumeClaim, 0)
+		volumeClaimTemplate = &empty
+
+		// Also add the ephemeral volume to the spec
+		podTemplate.Spec.Volumes = append(podTemplate.Spec.Volumes, v1.Volume{
+			Name: constants.DataVolumeName,
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		})
+	} else {
+		if volumeClaimTemplate, err = c.generatePersistentVolumeClaimTemplate(spec.Volume.Size,
+			spec.Volume.StorageClass, spec.Volume.Selector); err != nil {
+			return nil, fmt.Errorf("could not generate volume claim template: %v", err)
+		}
 	}
 
 	// global minInstances and maxInstances settings can overwrite manifest
@@ -1547,7 +1563,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			Selector:                             c.labelsSelector(),
 			ServiceName:                          c.serviceName(Master),
 			Template:                             *podTemplate,
-			VolumeClaimTemplates:                 []v1.PersistentVolumeClaim{*volumeClaimTemplate},
+			VolumeClaimTemplates:                 *volumeClaimTemplate,
 			UpdateStrategy:                       updateStrategy,
 			PodManagementPolicy:                  podManagementPolicy,
 			PersistentVolumeClaimRetentionPolicy: &persistentVolumeClaimRetentionPolicy,
@@ -1855,7 +1871,7 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 }
 
 func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string,
-	volumeSelector *metav1.LabelSelector) (*v1.PersistentVolumeClaim, error) {
+	volumeSelector *metav1.LabelSelector) (*[]v1.PersistentVolumeClaim, error) {
 
 	var storageClassName *string
 	if volumeStorageClass != "" {
@@ -1868,7 +1884,7 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 	}
 
 	volumeMode := v1.PersistentVolumeFilesystem
-	volumeClaim := &v1.PersistentVolumeClaim{
+	volumeClaim := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        constants.DataVolumeName,
 			Annotations: c.annotationsSet(nil),
@@ -1887,7 +1903,7 @@ func (c *Cluster) generatePersistentVolumeClaimTemplate(volumeSize, volumeStorag
 		},
 	}
 
-	return volumeClaim, nil
+	return &[]v1.PersistentVolumeClaim{volumeClaim}, nil
 }
 
 func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {

@@ -466,6 +466,11 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 	out.LogicalBackup = in.LogicalBackup
 	in.ConnectionPooler.DeepCopyInto(&out.ConnectionPooler)
 	in.Patroni.DeepCopyInto(&out.Patroni)
+	if in.AllowEphemeralVolumes != nil {
+		in, out := &in.AllowEphemeralVolumes, &out.AllowEphemeralVolumes
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -880,6 +885,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.UseEphemeralVolume != nil {
+		in, out := &in.UseEphemeralVolume, &out.UseEphemeralVolume
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }

@@ -93,6 +93,9 @@ type PostgresSpec struct {
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
 	PodPriorityClassNameOld string         `json:"pod_priority_class_name,omitempty"`
+
+	// Ephemeral settings
+	UseEphemeralVolume *bool `json:"useEphemeralVolume,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -456,6 +456,9 @@ configPatroni:
 # Zalando's internal CDC stream feature
 enableStreams: false
 
+# Allow ephemeral instances
+allowEphemeralVolumes: false
+
 rbac:
   # Specifies whether RBAC resources should be created
   create: true
