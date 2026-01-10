@@ -23,6 +23,10 @@ const (
 	OperatorConfigCRDResourceList   = OperatorConfigCRDResouceKind + "List"
 	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
 	OperatorConfigCRDResourceShort  = "opconfig"
+
+	specReplicasPath   = ".spec.numberOfInstances"
+	statusReplicasPath = ".status.numberOfInstances"
+	labelSelectorPath  = ".status.labelSelector"
 )
 
 // PostgresCRDResourceColumns definition of AdditionalPrinterColumns for postgresql CRD
@@ -72,7 +76,7 @@ var PostgresCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition{
 		Name:        "Status",
 		Type:        "string",
 		Description: "Current sync status of postgresql resource",
-		JSONPath:    ".status.PostgresClusterStatus",
+		JSONPath:    ".status.postgresClusterStatus",
 	},
 }
 
@@ -1102,9 +1106,46 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 			},
 			"status": {
 				Type: "object",
-				AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-					Schema: &apiextv1.JSONSchemaProps{
+				Properties: map[string]apiextv1.JSONSchemaProps{
+					"postgresClusterStatus": {
 						Type: "string",
+					},
+					"numberOfInstances": {
+						Type:   "integer",
+						Format: "int32",
+					},
+					"labelSelector": {
+						Type: "string",
+					},
+					"observedGeneration": {
+						Type:   "integer",
+						Format: "int64",
+					},
+					"conditions": {
+						Type: "array",
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"type": {
+										Type: "string",
+									},
+									"status": {
+										Type: "string",
+									},
+									"lastTransitionTime": {
+										Type:   "string",
+										Format: "date-time",
+									},
+									"reason": {
+										Type: "string",
+									},
+									"message": {
+										Type: "string",
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1983,7 +2024,7 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 func buildCRD(name, kind, plural, list, short string,
 	categories []string,
 	columns []apiextv1.CustomResourceColumnDefinition,
-	validation apiextv1.CustomResourceValidation) *apiextv1.CustomResourceDefinition {
+	validation apiextv1.CustomResourceValidation, specReplicasPath string, statusReplicasPath string, labelSelectorPath string) *apiextv1.CustomResourceDefinition {
 	return &apiextv1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", apiextv1.GroupName, apiextv1.SchemeGroupVersion.Version),
@@ -2010,6 +2051,11 @@ func buildCRD(name, kind, plural, list, short string,
 					Storage: true,
 					Subresources: &apiextv1.CustomResourceSubresources{
 						Status: &apiextv1.CustomResourceSubresourceStatus{},
+						Scale: &apiextv1.CustomResourceSubresourceScale{
+							SpecReplicasPath:   specReplicasPath,
+							StatusReplicasPath: statusReplicasPath,
+							LabelSelectorPath:  &labelSelectorPath,
+						},
 					},
 					AdditionalPrinterColumns: columns,
 					Schema:                   &validation,
@@ -2028,7 +2074,10 @@ func PostgresCRD(crdCategories []string) *apiextv1.CustomResourceDefinition {
 		PostgresCRDResourceShort,
 		crdCategories,
 		PostgresCRDResourceColumns,
-		PostgresCRDResourceValidation)
+		PostgresCRDResourceValidation,
+		specReplicasPath,
+		statusReplicasPath,
+		labelSelectorPath)
 }
 
 // ConfigurationCRD returns CustomResourceDefinition built from OperatorConfigCRDResource
@@ -2040,5 +2089,8 @@ func ConfigurationCRD(crdCategories []string) *apiextv1.CustomResourceDefinition
 		OperatorConfigCRDResourceShort,
 		crdCategories,
 		OperatorConfigCRDResourceColumns,
-		OperatorConfigCRDResourceValidation)
+		OperatorConfigCRDResourceValidation,
+		specReplicasPath,
+		statusReplicasPath,
+		labelSelectorPath)
 }
