@@ -138,6 +138,16 @@ spec:
               connectionPooler:
                 type: object
                 properties:
+                  imagePullSecrets:
+                    type: array
+                    nullable: true
+                    items:
+                      type: object
+                      required:
+                        - name
+                      properties:
+                        name:
+                          type: string
                   dockerImage:
                     type: string
                   maxDBConnections:

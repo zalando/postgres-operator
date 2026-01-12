@@ -220,6 +220,19 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"connectionPooler": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"imagePullSecrets": {
+								Type:     "array",
+								Nullable: true,
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type:     "object",
+										Required: []string{"name"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"name": {Type: "string"},
+										},
+									},
+								},
+							},
 							"dockerImage": {
 								Type: "string",
 							},
