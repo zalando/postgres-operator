@@ -3130,8 +3130,8 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		PodRoleLabel:         "spilo-role",
 	}
 
-	configResourcesWithoutEnforcements := configResources
-	configResourcesWithoutEnforcements.IgnoreResourcesLimitsAnnotationKey = "zalando.org/ignore-resources-limits"
+	configWithEnabledIgnoreResourcesLimits := configResources
+	configWithEnabledIgnoreResourcesLimits.IgnoreResourcesLimitsAnnotationKey = "zalando.org/ignore-resources-limits"
 
 	tests := []struct {
 		subTest           string
@@ -3468,14 +3468,15 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		{
 			subTest: "test enforcing min cpu and memory limit",
 			config: config.Config{
-				Resources:               configResources,
+				Resources:               configWithEnabledIgnoreResourcesLimits,
 				PodManagementPolicy:     "ordered_ready",
 				SetMemoryRequestToLimit: false,
 			},
 			pgSpec: acidv1.Postgresql{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      clusterName,
-					Namespace: namespace,
+					Name:        clusterName,
+					Namespace:   namespace,
+					Annotations: map[string]string{"zalando.org/ignore-resources-limits": "false"},
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
@@ -3496,7 +3497,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		{
 			subTest: "ingnore min cpu and memory limit threshold",
 			config: config.Config{
-				Resources:               configResourcesWithoutEnforcements,
+				Resources:               configWithEnabledIgnoreResourcesLimits,
 				PodManagementPolicy:     "ordered_ready",
 				SetMemoryRequestToLimit: false,
 			},
@@ -3559,14 +3560,15 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		{
 			subTest: "test enforcing max cpu and memory requests",
 			config: config.Config{
-				Resources:               configResources,
+				Resources:               configWithEnabledIgnoreResourcesLimits,
 				PodManagementPolicy:     "ordered_ready",
 				SetMemoryRequestToLimit: false,
 			},
 			pgSpec: acidv1.Postgresql{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      clusterName,
-					Namespace: namespace,
+					Name:        clusterName,
+					Namespace:   namespace,
+					Annotations: map[string]string{"zalando.org/ignore-resources-limits": "yes"},
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
@@ -3587,7 +3589,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		{
 			subTest: "ignore max cpu and memory requests limit",
 			config: config.Config{
-				Resources:               configResourcesWithoutEnforcements,
+				Resources:               configWithEnabledIgnoreResourcesLimits,
 				PodManagementPolicy:     "ordered_ready",
 				SetMemoryRequestToLimit: false,
 			},
