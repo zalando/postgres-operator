@@ -11,13 +11,25 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
 
 // Postgresql defines PostgreSQL Custom Resource Definition Object.
+// +kubebuilder:resource:categories=all,shortName=pg,scope=Namespaced
+// +kubebuilder:printcolumn:name="Team",type=string,JSONPath=`.spec.teamId`,description="Team responsible for Postgres cluster"
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.spec.postgresql.version`,description="PostgreSQL version"
+// +kubebuilder:printcolumn:name="Pods",type=integer,JSONPath=`.spec.numberOfInstances`,description="Number of Pods per Postgres cluster"
+// +kubebuilder:printcolumn:name="Volume",type=string,JSONPath=`.spec.volume.size`,description="Size of the bound volume"
+// +kubebuilder:printcolumn:name="CPU-Request",type=string,JSONPath=`.spec.resources.requests.cpu`,description="Requested CPU for Postgres containers"
+// +kubebuilder:printcolumn:name="Memory-Request",type=string,JSONPath=`.spec.resources.requests.memory`,description="Requested memory for Postgres containers"
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,description="Age of the PostgreSQL cluster"
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.PostgresClusterStatus`,description="Current sync status of postgresql resource"
+// +kubebuilder:subresource:status
 type Postgresql struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
-	Spec   PostgresSpec   `json:"spec"`
+	Spec PostgresSpec `json:"spec"`
+	// +optional
 	Status PostgresStatus `json:"status"`
 	Error  string         `json:"-"`
 }
@@ -25,9 +37,10 @@ type Postgresql struct {
 // PostgresSpec defines the specification for the PostgreSQL TPR.
 type PostgresSpec struct {
 	PostgresqlParam `json:"postgresql"`
-	Volume          `json:"volume,omitempty"`
-	Patroni         `json:"patroni,omitempty"`
-	*Resources      `json:"resources,omitempty"`
+	Volume          `json:"volume"`
+	// +optional
+	Patroni    `json:"patroni"`
+	*Resources `json:"resources,omitempty"`
 
 	EnableConnectionPooler        *bool             `json:"enableConnectionPooler,omitempty"`
 	EnableReplicaConnectionPooler *bool             `json:"enableReplicaConnectionPooler,omitempty"`
@@ -52,20 +65,33 @@ type PostgresSpec struct {
 
 	// deprecated load balancer settings maintained for backward compatibility
 	// see "Load balancers" operator docs
-	UseLoadBalancer     *bool `json:"useLoadBalancer,omitempty"`
+	UseLoadBalancer *bool `json:"useLoadBalancer,omitempty"`
+	// deprecated
 	ReplicaLoadBalancer *bool `json:"replicaLoadBalancer,omitempty"`
 
 	// load balancers' source ranges are the same for master and replica services
+	// +nullable
+	// +kubebuilder:validation:items:Pattern=`^(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\/(\d|[1-2]\d|3[0-2])$`
+	// +optional
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
-	Users                          map[string]UserFlags `json:"users,omitempty"`
-	UsersIgnoringSecretRotation    []string             `json:"usersIgnoringSecretRotation,omitempty"`
-	UsersWithSecretRotation        []string             `json:"usersWithSecretRotation,omitempty"`
-	UsersWithInPlaceSecretRotation []string             `json:"usersWithInPlaceSecretRotation,omitempty"`
+	Users map[string]UserFlags `json:"users,omitempty"`
+	// +nullable
+	UsersIgnoringSecretRotation []string `json:"usersIgnoringSecretRotation,omitempty"`
+	// +nullable
+	UsersWithSecretRotation []string `json:"usersWithSecretRotation,omitempty"`
+	// +nullable
+	UsersWithInPlaceSecretRotation []string `json:"usersWithInPlaceSecretRotation,omitempty"`
 
-	NumberOfInstances      int32                       `json:"numberOfInstances"`
-	MaintenanceWindows     []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                  *CloneDescription           `json:"clone,omitempty"`
+	// +kubebuilder:validation:Minimum=0
+	NumberOfInstances int32 `json:"numberOfInstances"`
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:validation:Type=array
+	// +kubebuilde:validation:items:Type=string
+	MaintenanceWindows []MaintenanceWindow `json:"maintenanceWindows,omitempty"`
+	Clone              *CloneDescription   `json:"clone,omitempty"`
+	// Note: usernames specified here as database owners must be declared
+	// in the users key of the spec key.
 	Databases              map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases      map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
 	SchedulerName          *string                     `json:"schedulerName,omitempty"`
@@ -77,10 +103,11 @@ type PostgresSpec struct {
 	ShmVolume              *bool                       `json:"enableShmVolume,omitempty"`
 	EnableLogicalBackup    bool                        `json:"enableLogicalBackup,omitempty"`
 	LogicalBackupRetention string                      `json:"logicalBackupRetention,omitempty"`
-	LogicalBackupSchedule  string                      `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster         *StandbyDescription         `json:"standby,omitempty"`
-	PodAnnotations         map[string]string           `json:"podAnnotations,omitempty"`
-	ServiceAnnotations     map[string]string           `json:"serviceAnnotations,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$`
+	LogicalBackupSchedule string              `json:"logicalBackupSchedule,omitempty"`
+	StandbyCluster        *StandbyDescription `json:"standby,omitempty"`
+	PodAnnotations        map[string]string   `json:"podAnnotations,omitempty"`
+	ServiceAnnotations    map[string]string   `json:"serviceAnnotations,omitempty"`
 	// MasterServiceAnnotations takes precedence over ServiceAnnotations for master role if not empty
 	MasterServiceAnnotations map[string]string `json:"masterServiceAnnotations,omitempty"`
 	// ReplicaServiceAnnotations takes precedence over ServiceAnnotations for replica role if not empty
@@ -90,9 +117,10 @@ type PostgresSpec struct {
 	Streams                   []Stream           `json:"streams,omitempty"`
 	Env                       []v1.EnvVar        `json:"env,omitempty"`
 
-	// deprecated json tags
-	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
-	PodPriorityClassNameOld string         `json:"pod_priority_class_name,omitempty"`
+	// deprecated
+	InitContainersOld []v1.Container `json:"init_containers,omitempty"`
+	// deprecated
+	PodPriorityClassNameOld string `json:"pod_priority_class_name,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -123,50 +151,84 @@ type PreparedSchema struct {
 type MaintenanceWindow struct {
 	Everyday  bool         `json:"everyday,omitempty"`
 	Weekday   time.Weekday `json:"weekday,omitempty"`
-	StartTime metav1.Time  `json:"startTime,omitempty"`
-	EndTime   metav1.Time  `json:"endTime,omitempty"`
+	StartTime metav1.Time  `json:"startTime"`
+	EndTime   metav1.Time  `json:"endTime"`
 }
 
 // Volume describes a single volume in the manifest.
 type Volume struct {
-	Selector      *metav1.LabelSelector `json:"selector,omitempty"`
-	Size          string                `json:"size"`
-	StorageClass  string                `json:"storageClass,omitempty"`
-	SubPath       string                `json:"subPath,omitempty"`
-	IsSubPathExpr *bool                 `json:"isSubPathExpr,omitempty"`
-	Iops          *int64                `json:"iops,omitempty"`
-	Throughput    *int64                `json:"throughput,omitempty"`
-	VolumeType    string                `json:"type,omitempty"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	Size          string `json:"size"`
+	StorageClass  string `json:"storageClass,omitempty"`
+	SubPath       string `json:"subPath,omitempty"`
+	IsSubPathExpr *bool  `json:"isSubPathExpr,omitempty"`
+	Iops          *int64 `json:"iops,omitempty"`
+	Throughput    *int64 `json:"throughput,omitempty"`
+	VolumeType    string `json:"type,omitempty"`
 }
 
 // AdditionalVolume specs additional optional volumes for statefulset
 type AdditionalVolume struct {
-	Name             string          `json:"name"`
-	MountPath        string          `json:"mountPath"`
-	SubPath          string          `json:"subPath,omitempty"`
-	IsSubPathExpr    *bool           `json:"isSubPathExpr,omitempty"`
-	TargetContainers []string        `json:"targetContainers"`
-	VolumeSource     v1.VolumeSource `json:"volumeSource"`
+	Name          string `json:"name"`
+	MountPath     string `json:"mountPath"`
+	SubPath       string `json:"subPath,omitempty"`
+	IsSubPathExpr *bool  `json:"isSubPathExpr,omitempty"`
+	// +nullable
+	// +optional
+	TargetContainers []string `json:"targetContainers"`
+	// +kubebuilder:validation:XPreserveUnknownFields
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:validation:Schemaless
+	VolumeSource v1.VolumeSource `json:"volumeSource"`
 }
 
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
 type PostgresqlParam struct {
+	// +kubebuilder:validation:Enum=13;14;15;16;17
 	PgVersion  string            `json:"version"`
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // ResourceDescription describes CPU and memory resources defined for a cluster.
 type ResourceDescription struct {
-	CPU          *string `json:"cpu,omitempty"`
-	Memory       *string `json:"memory,omitempty"`
+	// Decimal natural followed by m, or decimal natural followed by
+	// dot followed by up to three decimal digits.
+	//
+	// This is because the Kubernetes CPU resource has millis as the
+	// maximum precision.  The actual values are checked in code
+	// because the regular expression would be huge and horrible and
+	// not very helpful in validation error messages; this one checks
+	// only the format of the given number.
+	//
+	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+	//
+	// Note: the value specified here must not be zero or be lower
+	// than the corresponding request.
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	CPU *string `json:"cpu,omitempty"`
+	// You can express memory as a plain integer or as a fixed-point
+	// integer using one of these suffixes: E, P, T, G, M, k. You can
+	// also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
+	//
+	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+	//
+	// Note: the value specified here must not be zero or be higher
+	// than the corresponding limit.
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	Memory *string `json:"memory,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
 	HugePages2Mi *string `json:"hugepages-2Mi,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
 	HugePages1Gi *string `json:"hugepages-1Gi,omitempty"`
 }
 
 // Resources describes requests and limits for the cluster resouces.
 type Resources struct {
-	ResourceRequests ResourceDescription `json:"requests,omitempty"`
-	ResourceLimits   ResourceDescription `json:"limits,omitempty"`
+	// +optional
+	ResourceRequests ResourceDescription `json:"requests"`
+	// +optional
+	ResourceLimits ResourceDescription `json:"limits"`
 }
 
 // Patroni contains Patroni-specific configuration
@@ -176,7 +238,7 @@ type Patroni struct {
 	TTL                   uint32                       `json:"ttl,omitempty"`
 	LoopWait              uint32                       `json:"loop_wait,omitempty"`
 	RetryTimeout          uint32                       `json:"retry_timeout,omitempty"`
-	MaximumLagOnFailover  float32                      `json:"maximum_lag_on_failover,omitempty"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
+	MaximumLagOnFailover  int64                        `json:"maximum_lag_on_failover,omitempty"`
 	Slots                 map[string]map[string]string `json:"slots,omitempty"`
 	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
@@ -185,6 +247,7 @@ type Patroni struct {
 }
 
 // StandbyDescription contains remote primary config or s3/gs wal path
+// +kubebuilder:validation:ExactlyOneOf=s3_wal_path;gs_wal_path;standby_host
 type StandbyDescription struct {
 	S3WalPath   string `json:"s3_wal_path,omitempty"`
 	GSWalPath   string `json:"gs_wal_path,omitempty"`
@@ -194,6 +257,7 @@ type StandbyDescription struct {
 
 // TLSDescription specs TLS properties
 type TLSDescription struct {
+	// +required
 	SecretName      string `json:"secretName,omitempty"`
 	CertificateFile string `json:"certificateFile,omitempty"`
 	PrivateKeyFile  string `json:"privateKeyFile,omitempty"`
@@ -203,8 +267,14 @@ type TLSDescription struct {
 
 // CloneDescription describes which cluster the new should clone and up to which point in time
 type CloneDescription struct {
-	ClusterName       string `json:"cluster,omitempty"`
-	UID               string `json:"uid,omitempty"`
+	// +required
+	ClusterName string `json:"cluster,omitempty"`
+	// +kubebuilder:validation:Format=uuid
+	UID string `json:"uid,omitempty"`
+	// The regexp matches the date-time format (RFC 3339 Section 5.6) that specifies a timezone as an offset relative to UTC
+	// Example: 1996-12-19T16:39:57-08:00
+	// Note: this field requires a timezone
+	// +kubebuilder:validation:Pattern=`^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\.[0-9]+)?(([+-]([01][0-9]|2[0-3]):[0-5][0-9]))$`
 	EndTimestamp      string `json:"timestamp,omitempty"`
 	S3WalPath         string `json:"s3_wal_path,omitempty"`
 	S3Endpoint        string `json:"s3_endpoint,omitempty"`
@@ -224,6 +294,8 @@ type Sidecar struct {
 }
 
 // UserFlags defines flags (such as superuser, nologin) that could be assigned to individual users
+// +kubebuilder:validation:items:Enum=bypassrls;BYPASSRLS;nobypassrls;NOBYPASSRLS;createdb;CREATEDB;nocreatedb;NOCREATEDB;createrole;CREATEROLE;nocreaterole;NOCREATEROLE;inherit;INHERIT;noinherit;NOINHERIT;login;LOGIN;nologin;NOLOGIN;replication;REPLICATION;noreplication;NOREPLICATION;superuser;SUPERUSER;nosuperuser;NOSUPERUSER
+// +nullable
 type UserFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
@@ -242,26 +314,30 @@ type PostgresStatus struct {
 // makes sense to expose. E.g. pool size (min/max boundaries), max client
 // connections etc.
 type ConnectionPooler struct {
+	// +kubebuilder:validation:Minimum=1
 	NumberOfInstances *int32 `json:"numberOfInstances,omitempty"`
 	Schema            string `json:"schema,omitempty"`
 	User              string `json:"user,omitempty"`
-	Mode              string `json:"mode,omitempty"`
-	DockerImage       string `json:"dockerImage,omitempty"`
-	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
+	// +kubebuilder:validation:Enum=session;transaction
+	Mode             string `json:"mode,omitempty"`
+	DockerImage      string `json:"dockerImage,omitempty"`
+	MaxDBConnections *int32 `json:"maxDBConnections,omitempty"`
 
 	*Resources `json:"resources,omitempty"`
 }
 
 // Stream defines properties for creating FabricEventStream resources
 type Stream struct {
-	ApplicationId  string                 `json:"applicationId"`
-	Database       string                 `json:"database"`
-	Tables         map[string]StreamTable `json:"tables"`
-	Filter         map[string]*string     `json:"filter,omitempty"`
-	BatchSize      *uint32                `json:"batchSize,omitempty"`
-	CPU            *string                `json:"cpu,omitempty"`
-	Memory         *string                `json:"memory,omitempty"`
-	EnableRecovery *bool                  `json:"enableRecovery,omitempty"`
+	ApplicationId string                 `json:"applicationId"`
+	Database      string                 `json:"database"`
+	Tables        map[string]StreamTable `json:"tables"`
+	Filter        map[string]*string     `json:"filter,omitempty"`
+	BatchSize     *uint32                `json:"batchSize,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	CPU *string `json:"cpu,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	Memory         *string `json:"memory,omitempty"`
+	EnableRecovery *bool   `json:"enableRecovery,omitempty"`
 }
 
 // StreamTable defines properties of outbox tables for FabricEventStreams
