@@ -21,6 +21,7 @@ GITSTATUS = $(shell git status --porcelain || echo "no changes")
 SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
 CRD_SOURCES    = $(shell find pkg/apis/zalando.org pkg/apis/acid.zalan.do -name '*.go' -not -name '*.deepcopy.go')
+GENERATED_CRDS = manifests/postgresteam.crd.yaml manifests/postgresql.crd.yaml
 GENERATED      = pkg/apis/zalando.org/v1/zz_generated.deepcopy.go pkg/apis/acid.zalan.do/v1/zz_generated.deepcopy.go
 DIRS := cmd pkg
 PKG := `go list ./... | grep -v /vendor/`
@@ -53,6 +54,8 @@ default: local
 
 clean:
 	rm -rf build
+	rm $(GENERATED)
+	rm pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
 
 verify:
 	hack/verify-codegen.sh
@@ -60,13 +63,25 @@ verify:
 $(GENERATED): go.mod $(CRD_SOURCES)
 	hack/update-codegen.sh
 
-local: ${SOURCES} $(GENERATED)
+$(GENERATED_CRDS): $(GENERATED)
+	go tool controller-gen crd:crdVersions=v1,allowDangerousTypes=true paths=./pkg/apis/acid.zalan.do/... output:crd:dir=manifests
+	# only generate postgresteam.crd.yaml and postgresql.crd.yaml for now
+	@rm manifests/acid.zalan.do_operatorconfigurations.yaml
+	@mv manifests/acid.zalan.do_postgresqls.yaml manifests/postgresql.crd.yaml
+	@# hack to use lowercase kind and listKind
+	@sed -i -e 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml
+	@sed -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
+	@hack/adjust_postgresql_crd.sh
+	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
+	@cp manifests/postgresql.crd.yaml pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
+
+local: ${SOURCES} $(GENERATED_CRDS)
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)
 
-linux: ${SOURCES} $(GENERATED)
+linux: ${SOURCES} $(GENERATED_CRDS)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
-macos: ${SOURCES} $(GENERATED)
+macos: ${SOURCES} $(GENERATED_CRDS)
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 docker: ${DOCKERDIR}/${DOCKERFILE}
@@ -90,7 +105,7 @@ vet:
 	@go vet $(PKG)
 	@staticcheck $(PKG)
 
-test: mocks $(GENERATED)
+test: mocks $(GENERATED) $(GENERATED_CRDS)
 	GO111MODULE=on go test ./...
 
 codegen: $(GENERATED)
