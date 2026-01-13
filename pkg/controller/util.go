@@ -2,14 +2,12 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -65,15 +63,9 @@ func (c *Controller) createOperatorCRD(desiredCrd *apiextv1.CustomResourceDefini
 	}
 	if crd != nil {
 		c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
-		// copy annotations and labels from existing CRD since we do not define them
-		desiredCrd.Annotations = crd.Annotations
-		desiredCrd.Labels = crd.Labels
-		patch, err := json.Marshal(desiredCrd)
+		crd.Spec = desiredCrd.Spec
+		_, err := c.KubeClient.CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 		if err != nil {
-			return fmt.Errorf("could not marshal new customResourceDefintion %q: %v", desiredCrd.Name, err)
-		}
-		if _, err := c.KubeClient.CustomResourceDefinitions().Patch(
-			context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
 			return fmt.Errorf("could not update customResourceDefinition %q: %v", crd.Name, err)
 		}
 	}

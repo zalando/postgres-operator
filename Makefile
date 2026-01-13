@@ -21,7 +21,7 @@ GITSTATUS = $(shell git status --porcelain || echo "no changes")
 SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
 CRD_SOURCES    = $(shell find pkg/apis/zalando.org pkg/apis/acid.zalan.do -name '*.go' -not -name '*.deepcopy.go')
-GENERATED_CRDS = manifests/postgresteam.crd.yaml manifests/postgresql.crd.yaml
+GENERATED_CRDS = manifests/postgresteam.crd.yaml manifests/postgresql.crd.yaml pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
 GENERATED      = pkg/apis/zalando.org/v1/zz_generated.deepcopy.go pkg/apis/acid.zalan.do/v1/zz_generated.deepcopy.go
 DIRS := cmd pkg
 PKG := `go list ./... | grep -v /vendor/`
@@ -55,7 +55,7 @@ default: local
 clean:
 	rm -rf build
 	rm $(GENERATED)
-	rm pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
+	rm $(GENERATED_CRDS)
 
 verify:
 	hack/verify-codegen.sh
