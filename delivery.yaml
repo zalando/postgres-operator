@@ -17,8 +17,8 @@ pipeline:
       image: cdp-runtime/go
     cache:
       paths:
-        - /go/pkg/mod       # pkg cache for Go modules
-        - ~/.cache/go-build # Go build cache
+        - /go/pkg/mod        # pkg cache for Go modules
+        - ~/.cache/go-build  # Go build cache
     commands:
       - desc: Run unit tests
         cmd: |
@@ -65,7 +65,7 @@ pipeline:
           else
             IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-ui-test
           fi
-          
+
           make appjs
           docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
           docker buildx build --platform linux/amd64,linux/arm64 \
