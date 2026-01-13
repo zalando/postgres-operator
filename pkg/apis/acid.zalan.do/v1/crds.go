@@ -4,12 +4,11 @@ import (
 	_ "embed"
 	"fmt"
 
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/stretchr/testify/assert/yaml"
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	"github.com/zalando/postgres-operator/pkg/util"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 )
 
 // CRDResource* define names necesssary for the k8s CRD API
