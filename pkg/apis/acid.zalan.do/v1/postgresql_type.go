@@ -185,7 +185,7 @@ type AdditionalVolume struct {
 
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
 type PostgresqlParam struct {
-	// +kubebuilder:validation:Enum=13;14;15;16;17
+	// +kubebuilder:validation:Enum="13";"14";"15";"16";"17"
 	PgVersion  string            `json:"version"`
 	Parameters map[string]string `json:"parameters,omitempty"`
 }

@@ -3523,11 +3523,11 @@ spec:
                     type: object
                   version:
                     enum:
-                    - 13
-                    - 14
-                    - 15
-                    - 16
-                    - 17
+                    - "13"
+                    - "14"
+                    - "15"
+                    - "16"
+                    - "17"
                     type: string
                 required:
                 - version
