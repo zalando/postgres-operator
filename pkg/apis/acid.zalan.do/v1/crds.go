@@ -122,6 +122,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"ignore_instance_limits_annotation_key": {
 						Type: "string",
 					},
+					"ignore_resources_limits_annotation_key": {
+						Type: "string",
+					},
 					"kubernetes_use_configmaps": {
 						Type: "boolean",
 					},
