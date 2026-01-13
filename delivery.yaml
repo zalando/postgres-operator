@@ -22,7 +22,7 @@ pipeline:
     commands:
       - desc: Run unit tests
         cmd: |
-          make deps mocks test
+          make mocks test
 
       - desc: Build Docker image
         cmd: |

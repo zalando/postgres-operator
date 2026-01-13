@@ -283,6 +283,7 @@ func (c *Cluster) Create() (err error) {
 		}
 		if errStatus != nil {
 			c.logger.Warningf("could not set cluster status: %v", errStatus)
+			return
 		}
 		if pgUpdatedStatus != nil {
 			c.setSpec(pgUpdatedStatus)
@@ -997,6 +998,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 		if err != nil {
 			c.logger.Warningf("could not set cluster status: %v", err)
+			return
 		}
 		if pgUpdatedStatus != nil {
 			c.setSpec(pgUpdatedStatus)

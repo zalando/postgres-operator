@@ -106,3 +106,6 @@ mocks
 ui/.npm/
 
 .DS_Store
+
+# temp build files
+pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
