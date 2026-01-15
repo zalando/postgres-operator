@@ -477,6 +477,10 @@ Note that `s3_wal_path` and `gs_wal_path` are mutually exclusive.
   TCP port on which the primary is listening for connections. Patroni will
   use `"5432"` if not set.
 
+* **standby_primary_slot_name**
+  name of the replication slot to use on the primary server when streaming
+  from a remote primary. Optional.
+
 ## Volume properties
 
 Those parameters are grouped under the `volume` top-level key and define the

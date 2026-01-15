@@ -2207,6 +2207,12 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 				Value: description.StandbyPort,
 			})
 		}
+		if description.StandbyPrimarySlotName != "" {
+			result = append(result, v1.EnvVar{
+				Name:  "STANDBY_PRIMARY_SLOT_NAME",
+				Value: description.StandbyPrimarySlotName,
+			})
+		}
 	}
 
 	// WAL archive can be specified with or without standby_host
@@ -2226,10 +2232,6 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 		})
 		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
-	} else if description.StandbyHost == "" {
-		// Neither WAL path nor standby_host specified
-		c.logger.Error("no WAL path or standby_host specified in standby section")
-		return result
 	}
 
 	return result

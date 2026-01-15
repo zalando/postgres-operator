@@ -250,10 +250,11 @@ type Patroni struct {
 // standby_host can be specified alone or together with either s3_wal_path OR gs_wal_path (mutually exclusive).
 // At least one field must be specified. s3_wal_path and gs_wal_path are mutually exclusive.
 type StandbyDescription struct {
-	S3WalPath   string `json:"s3_wal_path,omitempty"`
-	GSWalPath   string `json:"gs_wal_path,omitempty"`
-	StandbyHost string `json:"standby_host,omitempty"`
-	StandbyPort string `json:"standby_port,omitempty"`
+	S3WalPath              string `json:"s3_wal_path,omitempty"`
+	GSWalPath              string `json:"gs_wal_path,omitempty"`
+	StandbyHost            string `json:"standby_host,omitempty"`
+	StandbyPort            string `json:"standby_port,omitempty"`
+	StandbyPrimarySlotName string `json:"standby_primary_slot_name,omitempty"`
 }
 
 // TLSDescription specs TLS properties
