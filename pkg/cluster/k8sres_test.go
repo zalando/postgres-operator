@@ -1370,7 +1370,20 @@ func TestStandbyEnv(t *testing.T) {
 			envLen: 2,
 		},
 		{
-			subTest: "from remote primary - ignore WAL path",
+			subTest: "from remote primary with S3 WAL path",
+			standbyOpts: &acidv1.StandbyDescription{
+				S3WalPath:   "s3://some/path/",
+				StandbyHost: "remote-primary",
+			},
+			env: v1.EnvVar{
+				Name:  "STANDBY_HOST",
+				Value: "remote-primary",
+			},
+			envPos: 0,
+			envLen: 4,
+		},
+		{
+			subTest: "from remote primary with GCS WAL path",
 			standbyOpts: &acidv1.StandbyDescription{
 				GSWalPath:   "gs://some/path/",
 				StandbyHost: "remote-primary",
@@ -1380,7 +1393,7 @@ func TestStandbyEnv(t *testing.T) {
 				Value: "remote-primary",
 			},
 			envPos: 0,
-			envLen: 1,
+			envLen: 4,
 		},
 	}
 

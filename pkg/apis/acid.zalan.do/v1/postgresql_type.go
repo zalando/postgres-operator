@@ -246,8 +246,9 @@ type Patroni struct {
 	FailsafeMode          *bool                        `json:"failsafe_mode,omitempty"`
 }
 
-// StandbyDescription contains remote primary config or s3/gs wal path
-// +kubebuilder:validation:ExactlyOneOf=s3_wal_path;gs_wal_path;standby_host
+// StandbyDescription contains remote primary config and/or s3/gs wal path.
+// standby_host can be specified alone or together with either s3_wal_path OR gs_wal_path (mutually exclusive).
+// At least one field must be specified. s3_wal_path and gs_wal_path are mutually exclusive.
 type StandbyDescription struct {
 	S3WalPath   string `json:"s3_wal_path,omitempty"`
 	GSWalPath   string `json:"gs_wal_path,omitempty"`

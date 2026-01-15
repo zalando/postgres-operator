@@ -2207,25 +2207,29 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 				Value: description.StandbyPort,
 			})
 		}
-	} else {
-		c.logger.Info("standby cluster streaming from WAL location")
-		if description.S3WalPath != "" {
-			result = append(result, v1.EnvVar{
-				Name:  "STANDBY_WALE_S3_PREFIX",
-				Value: description.S3WalPath,
-			})
-		} else if description.GSWalPath != "" {
-			result = append(result, v1.EnvVar{
-				Name:  "STANDBY_WALE_GS_PREFIX",
-				Value: description.GSWalPath,
-			})
-		} else {
-			c.logger.Error("no WAL path specified in standby section")
-			return result
-		}
+	}
 
+	// WAL archive can be specified with or without standby_host
+	if description.S3WalPath != "" {
+		c.logger.Info("standby cluster using S3 WAL archive")
+		result = append(result, v1.EnvVar{
+			Name:  "STANDBY_WALE_S3_PREFIX",
+			Value: description.S3WalPath,
+		})
 		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+	} else if description.GSWalPath != "" {
+		c.logger.Info("standby cluster using GCS WAL archive")
+		result = append(result, v1.EnvVar{
+			Name:  "STANDBY_WALE_GS_PREFIX",
+			Value: description.GSWalPath,
+		})
+		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
+		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+	} else if description.StandbyHost == "" {
+		// Neither WAL path nor standby_host specified
+		c.logger.Error("no WAL path or standby_host specified in standby section")
+		return result
 	}
 
 	return result
