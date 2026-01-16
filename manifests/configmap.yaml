@@ -5,6 +5,7 @@ metadata:
 data:
   # additional_owner_roles: "cron_admin"
   # additional_pod_capabilities: "SYS_NICE"
+  # dropped_pod_capabilities: "ALL"
   # additional_secret_mount: "some-secret-name"
   # additional_secret_mount_path: "/some/dir"
   api_port: "8080"

@@ -39,6 +39,7 @@ type Resources struct {
 	SpiloPrivileged               bool                `name:"spilo_privileged" default:"false"`
 	SpiloAllowPrivilegeEscalation *bool               `name:"spilo_allow_privilege_escalation" default:"true"`
 	AdditionalPodCapabilities     []string            `name:"additional_pod_capabilities" default:""`
+	DroppedPodCapabilities        []string            `name:"dropped_pod_capabilities" default:""`
 	ClusterLabels                 map[string]string   `name:"cluster_labels" default:"application:spilo"`
 	InheritedLabels               []string            `name:"inherited_labels" default:""`
 	InheritedAnnotations          []string            `name:"inherited_annotations" default:""`
