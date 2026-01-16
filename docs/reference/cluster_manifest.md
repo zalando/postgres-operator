@@ -479,7 +479,8 @@ Note that `s3_wal_path` and `gs_wal_path` are mutually exclusive.
 
 * **standby_primary_slot_name**
   name of the replication slot to use on the primary server when streaming
-  from a remote primary. Optional.
+  from a remote primary. See the Patroni documentation
+  [here](https://patroni.readthedocs.io/en/latest/standby_cluster.html) for more details. Optional.
 
 ## Volume properties
 
