@@ -42,8 +42,11 @@ const (
 	scalyrSidecarName              = "scalyr-sidecar"
 	logicalBackupContainerName     = "logical-backup"
 	connectionPoolerContainer      = "connection-pooler"
+	patroniApiPortName             = "patroni"
 	pgPort                         = 5432
+	pgPortName                     = "postgres"
 	operatorPort                   = 8080
+	operatorPortName               = "postgres-operator"
 )
 
 type patroniDCS struct {
@@ -704,14 +707,17 @@ func generateContainer(
 			{
 				ContainerPort: patroni.ApiPort,
 				Protocol:      v1.ProtocolTCP,
+				Name:          patroniApiPortName,
 			},
 			{
 				ContainerPort: pgPort,
 				Protocol:      v1.ProtocolTCP,
+				Name:          pgPortName,
 			},
 			{
 				ContainerPort: operatorPort,
 				Protocol:      v1.ProtocolTCP,
+				Name:          operatorPortName,
 			},
 		},
 		VolumeMounts: volumeMounts,
