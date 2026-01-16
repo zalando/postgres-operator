@@ -493,13 +493,19 @@ spec:
                     type: string
                   standby_port:
                     type: string
-                oneOf:
+                  standby_primary_slot_name:
+                    type: string
+                anyOf:
                 - required:
                   - s3_wal_path
                 - required:
                   - gs_wal_path
                 - required:
                   - standby_host
+                not:
+                  required:
+                    - s3_wal_path
+                    - gs_wal_path
               streams:
                 type: array
                 items:

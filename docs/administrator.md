@@ -1346,10 +1346,12 @@ If you are using [additional environment variables](#custom-pod-environment-vari
 to access your backup location you have to copy those variables and prepend
 the `STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
 
-Alternatively, standby clusters can also stream from a remote primary cluster.
+Standby clusters can also stream from a remote primary cluster.
 You have to specify the host address. Port is optional and defaults to 5432.
-Note, that only one of the options (`s3_wal_path`, `gs_wal_path`,
-`standby_host`) can be present under the `standby` top-level key.
+You can combine `standby_host` with either `s3_wal_path` or `gs_wal_path`
+for additional redundancy. Note that `s3_wal_path` and `gs_wal_path` are
+mutually exclusive. At least one of `s3_wal_path`, `gs_wal_path`, or
+`standby_host` must be specified under the `standby` top-level key.
 
 ## Logical backups
 

@@ -900,8 +900,9 @@ the PostgreSQL version between source and target cluster has to be the same.
 
 To start a cluster as standby, add the following `standby` section in the YAML
 file. You can stream changes from archived WAL files (AWS S3 or Google Cloud
-Storage) or from a remote primary. Only one option can be specified in the
-manifest:
+Storage), from a remote primary, or combine a remote primary with a WAL archive.
+At least one of `s3_wal_path`, `gs_wal_path`, or `standby_host` must be specified.
+Note that `s3_wal_path` and `gs_wal_path` are mutually exclusive.
 
 ```yaml
 spec:
@@ -927,6 +928,16 @@ spec:
   standby:
     standby_host: "acid-minimal-cluster.default"
     standby_port: "5433"
+```
+
+You can also combine a remote primary with a WAL archive for additional redundancy:
+
+```yaml
+spec:
+  standby:
+    standby_host: "acid-minimal-cluster.default"
+    standby_port: "5433"
+    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 Note, that the pods and services use the same role labels like for normal clusters:
