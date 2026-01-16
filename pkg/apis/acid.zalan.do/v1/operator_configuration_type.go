@@ -191,9 +191,10 @@ type TeamsAPIConfiguration struct {
 
 // LoggingRESTAPIConfiguration defines Logging API conf
 type LoggingRESTAPIConfiguration struct {
-	APIPort               int `json:"api_port,omitempty"`
-	RingLogLines          int `json:"ring_log_lines,omitempty"`
-	ClusterHistoryEntries int `json:"cluster_history_entries,omitempty"`
+	APIAddress            string `json:"api_address,omitempty"`
+	APIPort               int    `json:"api_port,omitempty"`
+	RingLogLines          int    `json:"ring_log_lines,omitempty"`
+	ClusterHistoryEntries int    `json:"cluster_history_entries,omitempty"`
 }
 
 // ScalyrConfiguration defines the configuration for ScalyrAPI
