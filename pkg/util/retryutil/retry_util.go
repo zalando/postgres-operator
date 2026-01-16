@@ -1,6 +1,7 @@
 package retryutil
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -25,12 +26,24 @@ func (t *Ticker) Tick() { <-t.ticker.C }
 
 // Retry is a wrapper around RetryWorker that provides a real RetryTicker
 func Retry(interval time.Duration, timeout time.Duration, f func() (bool, error)) error {
-	//TODO: make the retry exponential
+	// TODO: make the retry exponential
 	if timeout < interval {
 		return fmt.Errorf("timeout(%s) should be greater than interval(%v)", timeout, interval)
 	}
 	tick := &Ticker{time.NewTicker(interval)}
 	return RetryWorker(interval, timeout, tick, f)
+}
+
+// RetryWithContext is like Retry but checks for context cancellation before each attempt.
+func RetryWithContext(ctx context.Context, interval time.Duration, timeout time.Duration, f func() (bool, error)) error {
+	return Retry(interval, timeout, func() (bool, error) {
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		default:
+			return f()
+		}
+	})
 }
 
 // RetryWorker calls ConditionFunc until either:
@@ -41,8 +54,8 @@ func RetryWorker(
 	interval time.Duration,
 	timeout time.Duration,
 	tick RetryTicker,
-	f func() (bool, error)) error {
-
+	f func() (bool, error),
+) error {
 	maxRetries := int(timeout / interval)
 	defer tick.Stop()
 

@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,7 +25,7 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	var cluster = New(
+	cluster := New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				PatroniAPICheckInterval: time.Duration(1),

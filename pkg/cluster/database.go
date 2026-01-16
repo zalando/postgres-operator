@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"fmt"
 	"net"
@@ -121,26 +122,31 @@ func (c *Cluster) initDbConn() error {
 	if c.pgDb != nil {
 		return nil
 	}
-
 	return c.initDbConnWithName("")
 }
 
-// Worker function for connection initialization. This function does not check
-// if the connection is already open, if it is then it will be overwritten.
-// Callers need to make sure no connection is open, otherwise we could leak
-// connections
+// initDbConnWithName initializes a database connection using the cluster's context.
+// This function does not check if the connection is already open.
 func (c *Cluster) initDbConnWithName(dbname string) error {
+	return c.initDbConnWithNameContext(c.ctx, dbname)
+}
+
+// initDbConnWithNameContext initializes a database connection with an explicit context.
+// Use this when you need a custom context (e.g., different timeout, or context.Background()
+// for operations that should not be cancelled). This function does not check if the
+// connection is already open, callers need to ensure no connection is open to avoid leaks.
+func (c *Cluster) initDbConnWithNameContext(ctx context.Context, dbname string) error {
 	c.setProcessName("initializing db connection")
 
 	var conn *sql.DB
 	connstring := c.pgConnectionString(dbname)
 
-	finalerr := retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
+	finalerr := retryutil.RetryWithContext(ctx, constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
 			var err error
 			conn, err = sql.Open("postgres", connstring)
 			if err == nil {
-				err = conn.Ping()
+				err = conn.PingContext(ctx)
 			}
 
 			if err == nil {
@@ -268,9 +274,7 @@ func findUsersFromRotation(rotatedUsers []string, db *sql.DB) (map[string]string
 	}()
 
 	for rows.Next() {
-		var (
-			rolname, roldatesuffix string
-		)
+		var rolname, roldatesuffix string
 		err := rows.Scan(&rolname, &roldatesuffix)
 		if err != nil {
 			return nil, fmt.Errorf("error when processing rows of deprecated users: %v", err)
@@ -331,9 +335,7 @@ func (c *Cluster) cleanupRotatedUsers(rotatedUsers []string) error {
 // getDatabases returns the map of current databases with owners
 // The caller is responsible for opening and closing the database connection
 func (c *Cluster) getDatabases() (dbs map[string]string, err error) {
-	var (
-		rows *sql.Rows
-	)
+	var rows *sql.Rows
 
 	if rows, err = c.pgDb.Query(getDatabasesSQL); err != nil {
 		return nil, fmt.Errorf("could not query database: %v", err)
@@ -551,9 +553,7 @@ func (c *Cluster) getOwnerRoles(dbObjPath string, withUser bool) (owners []strin
 // getExtension returns the list of current database extensions
 // The caller is responsible for opening and closing the database connection
 func (c *Cluster) getExtensions() (dbExtensions map[string]string, err error) {
-	var (
-		rows *sql.Rows
-	)
+	var rows *sql.Rows
 
 	if rows, err = c.pgDb.Query(getExtensionsSQL); err != nil {
 		return nil, fmt.Errorf("could not query database extensions: %v", err)
@@ -598,7 +598,6 @@ func (c *Cluster) executeAlterExtension(extName, schemaName string) error {
 }
 
 func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doing, operation string) error {
-
 	c.logger.Infof("%s %q schema %q", doing, extName, schemaName)
 	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, extName, schemaName)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
@@ -610,9 +609,7 @@ func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doi
 // getPublications returns the list of current database publications with tables
 // The caller is responsible for opening and closing the database connection
 func (c *Cluster) getPublications() (publications map[string]string, err error) {
-	var (
-		rows *sql.Rows
-	)
+	var rows *sql.Rows
 
 	if rows, err = c.pgDb.Query(getPublicationsSQL); err != nil {
 		return nil, fmt.Errorf("could not query database publications: %v", err)
@@ -668,7 +665,6 @@ func (c *Cluster) executeAlterPublication(pubName, tableList string) error {
 }
 
 func (c *Cluster) execCreateOrAlterPublication(pubName, tableList, statement, doing, operation string) error {
-
 	c.logger.Debugf("%s %q with table list %q", doing, pubName, tableList)
 	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, pubName, tableList)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
@@ -743,7 +739,6 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 			constants.PostgresConnectTimeout,
 			constants.PostgresConnectRetryTimeout,
 			func() (bool, error) {
-
 				// At this moment we are not connected to any database
 				if err := c.initDbConnWithName(dbname); err != nil {
 					msg := "could not init database connection to %s"
