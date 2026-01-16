@@ -87,7 +87,7 @@ func NewEncryptor(encryption string) *Encryptor {
 	}
 	hasher, ok := m[encryption]
 	if !ok {
-		hasher = e.PGUserPasswordMD5
+		hasher = e.PGUserPasswordScramSHA256
 	}
 	e.encrypt = hasher
 	return &e
