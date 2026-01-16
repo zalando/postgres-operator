@@ -1033,12 +1033,20 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 
 		if c.Spec.StandbyCluster.StandbyHost != "" {
 			standbyOptionsToSet["host"] = c.Spec.StandbyCluster.StandbyHost
-			if c.Spec.StandbyCluster.StandbyPort != "" {
-				standbyOptionsToSet["port"] = c.Spec.StandbyCluster.StandbyPort
-			}
-			if c.Spec.StandbyCluster.StandbyPrimarySlotName != "" {
-				standbyOptionsToSet["primary_slot_name"] = c.Spec.StandbyCluster.StandbyPrimarySlotName
-			}
+		} else {
+			standbyOptionsToSet["host"] = nil
+		}
+
+		if c.Spec.StandbyCluster.StandbyPort != "" {
+			standbyOptionsToSet["port"] = c.Spec.StandbyCluster.StandbyPort
+		} else {
+			standbyOptionsToSet["port"] = nil
+		}
+
+		if c.Spec.StandbyCluster.StandbyPrimarySlotName != "" {
+			standbyOptionsToSet["primary_slot_name"] = c.Spec.StandbyCluster.StandbyPrimarySlotName
+		} else {
+			standbyOptionsToSet["primary_slot_name"] = nil
 		}
 	} else {
 		c.logger.Infof("promoting standby cluster and detach from source")

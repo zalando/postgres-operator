@@ -819,6 +819,23 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	// this should update the Patroni config with host, port and primary_slot_name
 	err = cluster.syncStandbyClusterConfiguration()
 	assert.NoError(t, err)
+
+	// test property deletion: remove standby_primary_slot_name
+	cluster.Spec.StandbyCluster = &acidv1.StandbyDescription{
+		StandbyHost: "remote-primary.example.com",
+		StandbyPort: "5433",
+	}
+	cluster.syncStatefulSet()
+	updatedSts5 := cluster.Statefulset
+
+	// check that STANDBY_PRIMARY_SLOT_NAME is not present
+	assert.Contains(t, updatedSts5.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_HOST", Value: "remote-primary.example.com"})
+	assert.Contains(t, updatedSts5.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PORT", Value: "5433"})
+	assert.NotContains(t, updatedSts5.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PRIMARY_SLOT_NAME", Value: "standby_slot"})
+
+	// this should update the Patroni config and set primary_slot_name to nil
+	err = cluster.syncStandbyClusterConfiguration()
+	assert.NoError(t, err)
 }
 
 func TestUpdateSecret(t *testing.T) {
