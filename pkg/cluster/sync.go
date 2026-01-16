@@ -20,6 +20,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -43,21 +44,19 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.setSpec(newSpec)
 
 	defer func() {
-		var (
-			pgUpdatedStatus *acidv1.Postgresql
-			errStatus       error
-		)
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
+			newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusSyncFailed
 		} else if !c.Status.Running() {
-			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusRunning
 		}
-		if errStatus != nil {
-			c.logger.Warningf("could not set cluster status: %v", errStatus)
-			return
-		}
-		if pgUpdatedStatus != nil {
+
+		if !equality.Semantic.DeepEqual(oldSpec.Status, newSpec.Status) {
+			pgUpdatedStatus, err := c.KubeClient.SetPostgresCRDStatus(c.clusterName(), newSpec)
+			if err != nil {
+				c.logger.Warningf("could not set cluster status: %v", err)
+				return
+			}
 			c.setSpec(pgUpdatedStatus)
 		}
 	}()
