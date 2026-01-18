@@ -313,6 +313,14 @@ func (c *Cluster) generateResourceRequirements(
 	specLimits := acidv1.ResourceDescription{}
 	result := v1.ResourceRequirements{}
 
+	enforceThresholds := true
+	resourcesLimitAnnotationKey := c.OpConfig.IgnoreResourcesLimitsAnnotationKey
+	if resourcesLimitAnnotationKey != "" {
+		if value, exists := c.ObjectMeta.Annotations[resourcesLimitAnnotationKey]; exists && value == "true" {
+			enforceThresholds = false
+		}
+	}
+
 	if resources != nil {
 		specRequests = resources.ResourceRequests
 		specLimits = resources.ResourceLimits
@@ -329,7 +337,7 @@ func (c *Cluster) generateResourceRequirements(
 	}
 
 	// enforce minimum cpu and memory limits for Postgres containers only
-	if containerName == constants.PostgresContainerName {
+	if containerName == constants.PostgresContainerName && enforceThresholds {
 		if err = c.enforceMinResourceLimits(&result); err != nil {
 			return nil, fmt.Errorf("could not enforce minimum resource limits: %v", err)
 		}
@@ -344,7 +352,7 @@ func (c *Cluster) generateResourceRequirements(
 	}
 
 	// enforce maximum cpu and memory requests for Postgres containers only
-	if containerName == constants.PostgresContainerName {
+	if containerName == constants.PostgresContainerName && enforceThresholds {
 		if err = c.enforceMaxResourceRequests(&result); err != nil {
 			return nil, fmt.Errorf("could not enforce maximum resource requests: %v", err)
 		}
@@ -412,7 +420,7 @@ PatroniInitDBParams:
 	}
 
 	if patroni.MaximumLagOnFailover >= 0 {
-		config.Bootstrap.DCS.MaximumLagOnFailover = patroni.MaximumLagOnFailover
+		config.Bootstrap.DCS.MaximumLagOnFailover = float32(patroni.MaximumLagOnFailover)
 	}
 	if patroni.LoopWait != 0 {
 		config.Bootstrap.DCS.LoopWait = patroni.LoopWait

@@ -14,6 +14,7 @@ configuration:
   enable_team_id_clustername_prefix: false
   etcd_host: ""
   # ignore_instance_limits_annotation_key: ""
+  # ignore_resources_limits_annotation_key: ""
   # kubernetes_use_configmaps: false
   max_instances: -1
   min_instances: -1

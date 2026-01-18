@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,13 +25,13 @@ SOFTWARE.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	apisacidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/zalando/postgres-operator/pkg/generated/listers/acid.zalan.do/v1"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/generated/listers/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -42,7 +42,7 @@ import (
 // PostgresTeams.
 type PostgresTeamInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.PostgresTeamLister
+	Lister() acidzalandov1.PostgresTeamLister
 }
 
 type postgresTeamInformer struct {
@@ -77,7 +77,7 @@ func NewFilteredPostgresTeamInformer(client versioned.Interface, namespace strin
 				return client.AcidV1().PostgresTeams(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&acidzalandov1.PostgresTeam{},
+		&apisacidzalandov1.PostgresTeam{},
 		resyncPeriod,
 		indexers,
 	)
@@ -88,9 +88,9 @@ func (f *postgresTeamInformer) defaultInformer(client versioned.Interface, resyn
 }
 
 func (f *postgresTeamInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&acidzalandov1.PostgresTeam{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisacidzalandov1.PostgresTeam{}, f.defaultInformer)
 }
 
-func (f *postgresTeamInformer) Lister() v1.PostgresTeamLister {
-	return v1.NewPostgresTeamLister(f.Informer().GetIndexer())
+func (f *postgresTeamInformer) Lister() acidzalandov1.PostgresTeamLister {
+	return acidzalandov1.NewPostgresTeamLister(f.Informer().GetIndexer())
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,10 +25,10 @@ SOFTWARE.
 package v1
 
 import (
-	"net/http"
+	http "net/http"
 
-	v1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
-	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
+	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -91,10 +91,10 @@ func New(c rest.Interface) *ZalandoV1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1.SchemeGroupVersion
+	gv := zalandoorgv1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

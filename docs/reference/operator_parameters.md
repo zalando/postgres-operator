@@ -163,7 +163,15 @@ Those are top-level keys, containing both leaf keys and groups.
   for some clusters it might be required to scale beyond the limits that can be
   configured with `min_instances` and `max_instances` options. You can define
   an annotation key that can be used as a toggle in cluster manifests to ignore
-  globally configured instance limits. The default is empty.
+  globally configured instance limits. The value must be `"true"` to be
+  effective. The default is empty which means the feature is disabled.
+
+* **ignore_resources_limits_annotation_key**
+  for some clusters it might be required to request resources beyond the globally
+  configured thresholds for maximum requests and minimum limits. You can define
+  an annotation key that can be used as a toggle in cluster manifests to ignore
+  the thresholds. The value must be `"true"` to be effective. The default is empty
+  which means the feature is disabled.
 
 * **resync_period**
   period between consecutive sync requests. The default is `30m`.

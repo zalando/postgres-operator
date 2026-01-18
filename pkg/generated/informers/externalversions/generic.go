@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ SOFTWARE.
 package externalversions
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
