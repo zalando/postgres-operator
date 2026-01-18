@@ -548,9 +548,10 @@ func (c *Cluster) syncCriticalOpPodDisruptionBudget(isUpdate bool) error {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("could not create pod disruption budget for critical operations: %v", err)
 		}
-		c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
-		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.criticalOpPodDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
-			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
+		pdbName := c.criticalOpPodDisruptionBudgetName()
+		c.logger.Infof("pod disruption budget %q already exists", pdbName)
+		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), pdbName, metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not fetch existing %q pod disruption budget", pdbName)
 		}
 	}
 
