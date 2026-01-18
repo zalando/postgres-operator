@@ -3130,6 +3130,9 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		PodRoleLabel:         "spilo-role",
 	}
 
+	configWithEnabledIgnoreResourcesLimits := configResources
+	configWithEnabledIgnoreResourcesLimits.IgnoreResourcesLimitsAnnotationKey = "zalando.org/ignore-resources-limits"
+
 	tests := []struct {
 		subTest           string
 		config            config.Config
@@ -3465,14 +3468,15 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		{
 			subTest: "test enforcing min cpu and memory limit",
 			config: config.Config{
-				Resources:               configResources,
+				Resources:               configWithEnabledIgnoreResourcesLimits,
 				PodManagementPolicy:     "ordered_ready",
 				SetMemoryRequestToLimit: false,
 			},
 			pgSpec: acidv1.Postgresql{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      clusterName,
-					Namespace: namespace,
+					Name:        clusterName,
+					Namespace:   namespace,
+					Annotations: map[string]string{"zalando.org/ignore-resources-limits": "false"},
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
@@ -3488,6 +3492,35 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			expectedResources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("250m"), Memory: k8sutil.StringToPointer("250Mi")},
+			},
+		},
+		{
+			subTest: "ingnore min cpu and memory limit threshold",
+			config: config.Config{
+				Resources:               configWithEnabledIgnoreResourcesLimits,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        clusterName,
+					Namespace:   namespace,
+					Annotations: map[string]string{"zalando.org/ignore-resources-limits": "true"},
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("200m"), Memory: k8sutil.StringToPointer("200Mi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("200m"), Memory: k8sutil.StringToPointer("200Mi")},
 			},
 		},
 		{
@@ -3527,14 +3560,15 @@ func TestGenerateResourceRequirements(t *testing.T) {
 		{
 			subTest: "test enforcing max cpu and memory requests",
 			config: config.Config{
-				Resources:               configResources,
+				Resources:               configWithEnabledIgnoreResourcesLimits,
 				PodManagementPolicy:     "ordered_ready",
 				SetMemoryRequestToLimit: false,
 			},
 			pgSpec: acidv1.Postgresql{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      clusterName,
-					Namespace: namespace,
+					Name:        clusterName,
+					Namespace:   namespace,
+					Annotations: map[string]string{"zalando.org/ignore-resources-limits": "yes"},
 				},
 				Spec: acidv1.PostgresSpec{
 					Resources: &acidv1.Resources{
@@ -3549,6 +3583,35 @@ func TestGenerateResourceRequirements(t *testing.T) {
 			},
 			expectedResources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("500m"), Memory: k8sutil.StringToPointer("1Gi")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("2"), Memory: k8sutil.StringToPointer("4Gi")},
+			},
+		},
+		{
+			subTest: "ignore max cpu and memory requests limit",
+			config: config.Config{
+				Resources:               configWithEnabledIgnoreResourcesLimits,
+				PodManagementPolicy:     "ordered_ready",
+				SetMemoryRequestToLimit: false,
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        clusterName,
+					Namespace:   namespace,
+					Annotations: map[string]string{"zalando.org/ignore-resources-limits": "true"},
+				},
+				Spec: acidv1.PostgresSpec{
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("2Gi")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("2"), Memory: k8sutil.StringToPointer("4Gi")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedResources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("2Gi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("2"), Memory: k8sutil.StringToPointer("4Gi")},
 			},
 		},
