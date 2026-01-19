@@ -288,7 +288,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		},
 	}
 
-	cluster := New(
+	cluster := New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PatroniAPICheckInterval: time.Duration(1),

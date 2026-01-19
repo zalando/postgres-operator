@@ -166,7 +166,7 @@ func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedNam
 		}
 	}
 
-	cl := cluster.New(c.makeClusterConfig(), c.KubeClient, *pgSpec, lg, c.eventRecorder)
+	cl := cluster.New(context.Background(), c.makeClusterConfig(), c.KubeClient, *pgSpec, lg, c.eventRecorder)
 	cl.Run(c.stopCh)
 	teamName := strings.ToLower(cl.Spec.TeamID)
 
@@ -258,13 +258,26 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		lg.Infoln("cluster has been created")
 	case EventUpdate:
-		lg.Infoln("update of the cluster started")
-
 		if !clusterFound {
 			lg.Warningln("cluster does not exist")
 			return
 		}
 		c.curWorkerCluster.Store(event.WorkerID, cl)
+
+		// Check if this cluster has been marked for deletion
+		if !event.NewSpec.ObjectMeta.DeletionTimestamp.IsZero() {
+			lg.Infof("cluster has a DeletionTimestamp of %s, starting deletion now.", event.NewSpec.ObjectMeta.DeletionTimestamp.Format(time.RFC3339))
+			cl.Cancel() // Cancel any ongoing operations
+			if err = cl.Delete(); err != nil {
+				cl.Error = fmt.Sprintf("error deleting cluster and its resources: %v", err)
+				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Delete", "%v", cl.Error)
+				lg.Error(cl.Error)
+				return
+			}
+			lg.Infoln("cluster has been deleted via update event")
+			return
+		}
+
 		err = cl.Update(event.OldSpec, event.NewSpec)
 		if err != nil {
 			cl.Error = fmt.Sprintf("could not update cluster: %v", err)
@@ -292,6 +305,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		// when using finalizers the deletion already happened
 		if c.opConfig.EnableFinalizers == nil || !*c.opConfig.EnableFinalizers {
 			lg.Infoln("deletion of the cluster started")
+			cl.Cancel() // Cancel any ongoing operations
 			if err := cl.Delete(); err != nil {
 				cl.Error = fmt.Sprintf("could not delete cluster: %v", err)
 				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Delete", "%v", cl.Error)
@@ -317,8 +331,6 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		lg.Infof("cluster has been deleted")
 	case EventSync:
-		lg.Infof("syncing of the cluster started")
-
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
 			cl, err = c.addCluster(lg, clusterName, event.NewSpec)
@@ -333,22 +345,42 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		// has this cluster been marked as deleted already, then we shall start cleaning up
 		if !cl.ObjectMeta.DeletionTimestamp.IsZero() {
 			lg.Infof("cluster has a DeletionTimestamp of %s, starting deletion now.", cl.ObjectMeta.DeletionTimestamp.Format(time.RFC3339))
+			cl.Cancel() // Cancel any ongoing operations
 			if err = cl.Delete(); err != nil {
 				cl.Error = fmt.Sprintf("error deleting cluster and its resources: %v", err)
 				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Delete", "%v", cl.Error)
 				lg.Error(cl.Error)
 				return
 			}
-		} else {
-			if err = cl.Sync(event.NewSpec); err != nil {
+			return
+		}
+
+		// Try to start sync - returns false if sync already running or cluster deleted
+		if !cl.StartSync() {
+			lg.Infof("sync already in progress, will resync when current sync completes")
+			return
+		}
+
+		// Run sync in background goroutine so we can process other events (like delete)
+		lg.Infof("syncing of the cluster started (background)")
+		go func() {
+			defer cl.EndSync()
+
+			if err := cl.Sync(event.NewSpec); err != nil {
 				cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
 				c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Sync", "%v", cl.Error)
 				lg.Error(cl.Error)
 				return
 			}
+			cl.Error = ""
 			lg.Infof("cluster has been synced")
-		}
-		cl.Error = ""
+
+			// Check if resync was requested while we were syncing
+			if cl.NeedsResync() {
+				lg.Infof("resync requested, queueing new sync event")
+				c.queueClusterEvent(nil, event.NewSpec, EventSync)
+			}
+		}()
 	}
 }
 
@@ -379,7 +411,6 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 }
 
 func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.PostgresSpec) {
-
 	deprecate := func(deprecated, replacement string) {
 		c.logger.Warningf("parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
 	}
@@ -425,7 +456,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		clusterError string
 	)
 
-	if informerOldSpec != nil { //update, delete
+	if informerOldSpec != nil { // update, delete
 		uid = informerOldSpec.GetUID()
 		clusterName = util.NameFromMeta(informerOldSpec.ObjectMeta)
 
@@ -440,7 +471,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		} else {
 			clusterError = informerOldSpec.Error
 		}
-	} else { //add, sync
+	} else { // add, sync
 		uid = informerNewSpec.GetUID()
 		clusterName = util.NameFromMeta(informerNewSpec.ObjectMeta)
 		clusterError = informerNewSpec.Error
@@ -463,6 +494,19 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 				return
 			}
 		}
+	}
+
+	// If the cluster is marked for deletion, cancel any ongoing operations immediately
+	// This unblocks stuck Sync operations so the delete can proceed
+	if informerNewSpec != nil && !informerNewSpec.ObjectMeta.DeletionTimestamp.IsZero() {
+		c.clustersMu.RLock()
+		if cl, found := c.clusters[clusterName]; found {
+			c.logger.WithField("cluster-name", clusterName).Infof(
+				"cluster marked for deletion (DeletionTimestamp: %s), cancelling ongoing operations",
+				informerNewSpec.ObjectMeta.DeletionTimestamp.Format(time.RFC3339))
+			cl.Cancel()
+		}
+		c.clustersMu.RUnlock()
 	}
 
 	if clusterError != "" && eventType != EventDelete {
@@ -539,12 +583,28 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	pgOld := c.postgresqlCheck(prev)
 	pgNew := c.postgresqlCheck(cur)
 	if pgOld != nil && pgNew != nil {
-		// Avoid the inifinite recursion for status updates
+		clusterName := util.NameFromMeta(pgNew.ObjectMeta)
+
+		// Check if DeletionTimestamp was set (resource marked for deletion)
+		deletionTimestampChanged := pgOld.ObjectMeta.DeletionTimestamp.IsZero() && !pgNew.ObjectMeta.DeletionTimestamp.IsZero()
+		if deletionTimestampChanged {
+			c.logger.WithField("cluster-name", clusterName).Infof(
+				"UPDATE event: DeletionTimestamp set to %s, queueing event",
+				pgNew.ObjectMeta.DeletionTimestamp.Format(time.RFC3339))
+			c.queueClusterEvent(pgOld, pgNew, EventUpdate)
+			return
+		}
+
+		// Avoid the infinite recursion for status updates
 		if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
 			if reflect.DeepEqual(pgNew.Annotations, pgOld.Annotations) {
+				c.logger.WithField("cluster-name", clusterName).Debugf(
+					"UPDATE event: no spec/annotation changes, skipping")
 				return
 			}
 		}
+
+		c.logger.WithField("cluster-name", clusterName).Infof("UPDATE event: spec or annotations changed, queueing event")
 		c.queueClusterEvent(pgOld, pgNew, EventUpdate)
 	}
 }
@@ -578,7 +638,6 @@ or config maps.
 The operator does not sync accounts/role bindings after creation.
 */
 func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
-
 	namespace := event.NewSpec.GetNamespace()
 
 	if err := c.createPodServiceAccount(namespace); err != nil {
@@ -592,7 +651,6 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 }
 
 func (c *Controller) createPodServiceAccount(namespace string) error {
-
 	podServiceAccountName := c.opConfig.PodServiceAccountName
 	_, err := c.KubeClient.ServiceAccounts(namespace).Get(context.TODO(), podServiceAccountName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
@@ -615,7 +673,6 @@ func (c *Controller) createPodServiceAccount(namespace string) error {
 }
 
 func (c *Controller) createRoleBindings(namespace string) error {
-
 	podServiceAccountName := c.opConfig.PodServiceAccountName
 	podServiceAccountRoleBindingName := c.PodServiceAccountRoleBinding.Name
 

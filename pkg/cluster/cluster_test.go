@@ -43,7 +43,7 @@ var logger = logrus.New().WithField("test", "cluster")
 // 1 cluster, primary endpoint, 2 services, the secrets, the statefulset and pods being ready
 var eventRecorder = record.NewFakeRecorder(7)
 
-var cl = New(
+var cl = New(context.Background(), 
 	Config{
 		OpConfig: config.Config{
 			PodManagementPolicy: "ordered_ready",
@@ -135,7 +135,7 @@ func TestCreate(t *testing.T) {
 	client.Postgresqls(clusterNamespace).Create(context.TODO(), &pg, metav1.CreateOptions{})
 	client.Pods(clusterNamespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -1629,7 +1629,7 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -1778,7 +1778,7 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ConnectionPooler: config.ConnectionPooler{

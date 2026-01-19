@@ -52,7 +52,7 @@ type ExpectedValue struct {
 }
 
 func TestGenerateSpiloJSONConfiguration(t *testing.T) {
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ProtectedRoles: []string{"admin"},
@@ -1143,7 +1143,7 @@ func TestGetNumberOfInstances(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		var cluster = New(
+		var cluster = New(context.Background(), 
 			Config{
 				OpConfig: tt.config,
 			}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
@@ -1210,7 +1210,7 @@ func TestCloneEnv(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				WALES3Bucket:   "wale-bucket",
@@ -1423,7 +1423,7 @@ func TestStandbyEnv(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	for _, tt := range tests {
@@ -1470,7 +1470,7 @@ func TestNodeAffinity(t *testing.T) {
 		}
 	}
 
-	cluster = New(
+	cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -1563,7 +1563,7 @@ func TestPodAffinity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		cluster := New(
+		cluster := New(context.Background(), 
 			Config{
 				OpConfig: config.Config{
 					EnablePodAntiAffinity:                    tt.anti,
@@ -1726,7 +1726,7 @@ func TestTLS(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -1981,7 +1981,7 @@ func TestAdditionalVolume(t *testing.T) {
 		},
 	}
 
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -2122,7 +2122,7 @@ func TestVolumeSelector(t *testing.T) {
 		},
 	}
 
-	cluster := New(
+	cluster := New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -2221,7 +2221,7 @@ func TestSidecars(t *testing.T) {
 		},
 	}
 
-	cluster = New(
+	cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -2530,7 +2530,7 @@ func TestContainerValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cluster := New(tc.clusterConfig, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+			cluster := New(context.Background(), tc.clusterConfig, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 			_, err := cluster.generateStatefulSet(&tc.spec)
 
@@ -2619,7 +2619,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 	}{
 		{
 			scenario: "With multiple instances",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2636,7 +2636,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With zero instances",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2653,7 +2653,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With PodDisruptionBudget disabled",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2670,7 +2670,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With non-default PDBNameFormat and PodDisruptionBudget explicitly enabled",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2687,7 +2687,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With PDBMasterLabelSelector disabled",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2704,7 +2704,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With OwnerReference enabled",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2739,7 +2739,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 	}{
 		{
 			scenario: "With multiple instances",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2756,7 +2756,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With zero instances",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2773,7 +2773,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With PodDisruptionBudget disabled",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2790,7 +2790,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			scenario: "With OwnerReference enabled",
-			spec: New(
+			spec: New(context.Background(), 
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role", EnableOwnerReferences: util.True()}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
@@ -2852,7 +2852,7 @@ func TestGenerateService(t *testing.T) {
 		EnableMasterLoadBalancer: &enableLB,
 	}
 
-	cluster = New(
+	cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -2903,7 +2903,7 @@ func TestGenerateService(t *testing.T) {
 }
 
 func TestCreateLoadBalancerLogic(t *testing.T) {
-	var cluster = New(
+	var cluster = New(context.Background(), 
 		Config{
 			OpConfig: config.Config{
 				ProtectedRoles: []string{"admin"},
@@ -3115,7 +3115,7 @@ func TestEnableLoadBalancers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		var cluster = New(
+		var cluster = New(context.Background(), 
 			Config{
 				OpConfig: tt.config,
 			}, client, tt.pgSpec, logger, eventRecorder)
@@ -3810,7 +3810,7 @@ func TestGenerateResourceRequirements(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		var cluster = New(
+		var cluster = New(context.Background(), 
 			Config{
 				OpConfig: tt.config,
 			}, client, tt.pgSpec, logger, newEventRecorder)
@@ -3995,7 +3995,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		var cluster = New(
+		var cluster = New(context.Background(), 
 			Config{
 				OpConfig: tt.config,
 			}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
