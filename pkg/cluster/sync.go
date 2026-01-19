@@ -1031,6 +1031,23 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 		standbyOptionsToSet["create_replica_methods"] = []string{"bootstrap_standby_with_wale", "basebackup_fast_xlog"}
 		standbyOptionsToSet["restore_command"] = "envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""
 
+		if c.Spec.StandbyCluster.StandbyHost != "" {
+			standbyOptionsToSet["host"] = c.Spec.StandbyCluster.StandbyHost
+		} else {
+			standbyOptionsToSet["host"] = nil
+		}
+
+		if c.Spec.StandbyCluster.StandbyPort != "" {
+			standbyOptionsToSet["port"] = c.Spec.StandbyCluster.StandbyPort
+		} else {
+			standbyOptionsToSet["port"] = nil
+		}
+
+		if c.Spec.StandbyCluster.StandbyPrimarySlotName != "" {
+			standbyOptionsToSet["primary_slot_name"] = c.Spec.StandbyCluster.StandbyPrimarySlotName
+		} else {
+			standbyOptionsToSet["primary_slot_name"] = nil
+		}
 	} else {
 		c.logger.Infof("promoting standby cluster and detach from source")
 		standbyOptionsToSet = nil
