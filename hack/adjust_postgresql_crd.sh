@@ -5,15 +5,17 @@
 #
 # Injections:
 #
-#  * oneOf: for the standby field to enforce that only one of s3_wal_path, gs_wal_path or standby_host is set.
-#    * This can later be done with // +kubebuilder:validation:ExactlyOneOf marker, but this requires latest Kubernetes version. (Currently the operator depends on v1.32.9)
+#  * oneOf: for the standby field to enforce validation rules:
+#    - s3_wal_path and gs_wal_path are mutually exclusive
+#    - standby_host can be specified alone or with either s3_wal_path OR gs_wal_path
+#    - at least one of s3_wal_path, gs_wal_path, or standby_host must be set
 #  * type: string and pattern for the maintenanceWindows items.
 
 file="${1:-"manifests/postgresql.crd.yaml"}"
 
 sed -i '/^[[:space:]]*standby:$/{
     # Capture the indentation
-    s/^\([[:space:]]*\)standby:$/\1standby:\n\1  oneOf:\n\1  - required:\n\1    - s3_wal_path\n\1  - required:\n\1    - gs_wal_path\n\1  - required:\n\1    - standby_host/
+    s/^\([[:space:]]*\)standby:$/\1standby:\n\1  anyOf:\n\1  - required:\n\1    - s3_wal_path\n\1  - required:\n\1    - gs_wal_path\n\1  - required:\n\1    - standby_host\n\1  not:\n\1    required:\n\1    - s3_wal_path\n\1    - gs_wal_path/
 }' "$file"
 
 sed -i '/^[[:space:]]*maintenanceWindows:$/{
