@@ -8,7 +8,7 @@ IFS=$'\n\t'
 
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
-readonly spilo_image="container-registry-test.zalando.net/acid/spilo-cdp-pr1156-18:4.1-p18"
+readonly spilo_image="ghcr.io/zalando/spilo-18-dev:6a722f01"
 readonly e2e_test_runner_image="ghcr.io/zalando/postgres-operator-e2e-tests-runner:latest"
 
 export GOPATH=${GOPATH-~/go}
