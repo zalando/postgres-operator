@@ -36,7 +36,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: container-registry-test.zalando.net/acid/spilo-cdp-pr1156-18:4.1-p18
+  docker_image: ghcr.io/zalando/spilo-18-dev:6a722f01
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
