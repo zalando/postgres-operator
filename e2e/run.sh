@@ -7,7 +7,7 @@ set -o pipefail
 IFS=$'\n\t'
 
 readonly cluster_name="postgres-operator-e2e-tests"
-readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
+readonly kubeconfig_path="${HOME}/kind-config-${cluster_name}"
 readonly spilo_image="ghcr.io/zalando/spilo-18-dev:6a722f01"
 readonly e2e_test_runner_image="ghcr.io/zalando/postgres-operator-e2e-tests-runner:latest"
 
@@ -19,11 +19,14 @@ echo "Kubeconfig path: ${kubeconfig_path}"
 
 function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
-  if [[ -z $(docker images -q ghcr.io/zalando/postgres-operator:${operator_tag}) ]]
+  target_image=docker.io/library/postgres-operator:${operator_tag}
+  if [[ -z $(docker images -q "${target_image}") ]]
   then
     docker pull ghcr.io/zalando/postgres-operator:latest
+    docker tag ghcr.io/zalando/postgres-operator:latest "${target_image}"
   fi
-  operator_image=$(docker images --filter=reference="ghcr.io/zalando/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
+  operator_image=${target_image}
+  echo "Using operator image: ${operator_image}"
 }
 
 function start_kind(){
@@ -52,7 +55,7 @@ function set_kind_api_server_ip(){
   # but update the IP address of the API server to the one from the Docker 'bridge' network
   readonly local kind_api_server_port=6443 # well-known in the 'kind' codebase
   readonly local kind_api_server=$(docker inspect --format "{{ .NetworkSettings.Networks.kind.IPAddress }}:${kind_api_server_port}" "${cluster_name}"-control-plane)
-  sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}"
+  sed "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}" > "${kubeconfig_path}".tmp && mv "${kubeconfig_path}".tmp "${kubeconfig_path}"
 }
 
 function generate_certificate(){
