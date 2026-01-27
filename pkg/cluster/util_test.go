@@ -288,6 +288,12 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		},
 	}
 
+	// add postgresql cluster to fake client
+	_, err := client.PostgresqlsGetter.Postgresqls(namespace).Create(context.TODO(), &pg, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	cluster := New(
 		Config{
 			OpConfig: config.Config{
@@ -321,7 +327,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		}, client, pg, logger, eventRecorder)
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
-	_, err := cluster.createStatefulSet()
+	_, err = cluster.createStatefulSet()
 	if err != nil {
 		return nil, err
 	}
