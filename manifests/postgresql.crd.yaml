@@ -290,7 +290,9 @@ spec:
                     a Container.
                   properties:
                     name:
-                      description: Name of the environment variable. Must be a C_IDENTIFIER.
+                      description: |-
+                        Name of the environment variable.
+                        May consist of any printable ASCII characters except '='.
                       type: string
                     value:
                       description: |-
@@ -346,6 +348,43 @@ spec:
                               type: string
                           required:
                           - fieldPath
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        fileKeyRef:
+                          description: |-
+                            FileKeyRef selects a key of the env file.
+                            Requires the EnvFiles feature gate to be enabled.
+                          properties:
+                            key:
+                              description: |-
+                                The key within the env file. An invalid key will prevent the pod from starting.
+                                The keys defined within a source may consist of any printable ASCII characters except '='.
+                                During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+                              type: string
+                            optional:
+                              default: false
+                              description: |-
+                                Specify whether the file or its key must be defined. If the file or key
+                                does not exist, then the env var is not published.
+                                If optional is set to true and the specified key does not exist,
+                                the environment variable will not be set in the Pod's containers.
+
+                                If optional is set to false and the specified key does not exist,
+                                an error will be returned during Pod creation.
+                              type: boolean
+                            path:
+                              description: |-
+                                The path within the volume from which to select the file.
+                                Must be relative and may not contain the '..' path or start with '..'.
+                              type: string
+                            volumeName:
+                              description: The name of the volume mount containing
+                                the env file.
+                              type: string
+                          required:
+                          - key
+                          - path
+                          - volumeName
                           type: object
                           x-kubernetes-map-type: atomic
                         resourceFieldRef:
@@ -444,8 +483,9 @@ spec:
                           in a Container.
                         properties:
                           name:
-                            description: Name of the environment variable. Must be
-                              a C_IDENTIFIER.
+                            description: |-
+                              Name of the environment variable.
+                              May consist of any printable ASCII characters except '='.
                             type: string
                           value:
                             description: |-
@@ -501,6 +541,43 @@ spec:
                                     type: string
                                 required:
                                 - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fileKeyRef:
+                                description: |-
+                                  FileKeyRef selects a key of the env file.
+                                  Requires the EnvFiles feature gate to be enabled.
+                                properties:
+                                  key:
+                                    description: |-
+                                      The key within the env file. An invalid key will prevent the pod from starting.
+                                      The keys defined within a source may consist of any printable ASCII characters except '='.
+                                      During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+                                    type: string
+                                  optional:
+                                    default: false
+                                    description: |-
+                                      Specify whether the file or its key must be defined. If the file or key
+                                      does not exist, then the env var is not published.
+                                      If optional is set to true and the specified key does not exist,
+                                      the environment variable will not be set in the Pod's containers.
+
+                                      If optional is set to false and the specified key does not exist,
+                                      an error will be returned during Pod creation.
+                                    type: boolean
+                                  path:
+                                    description: |-
+                                      The path within the volume from which to select the file.
+                                      Must be relative and may not contain the '..' path or start with '..'.
+                                    type: string
+                                  volumeName:
+                                    description: The name of the volume mount containing
+                                      the env file.
+                                    type: string
+                                required:
+                                - key
+                                - path
+                                - volumeName
                                 type: object
                                 x-kubernetes-map-type: atomic
                               resourceFieldRef:
@@ -563,14 +640,14 @@ spec:
                     envFrom:
                       description: |-
                         List of sources to populate environment variables in the container.
-                        The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-                        will be reported as an event when the container is starting. When a key exists in multiple
+                        The keys defined within a source may consist of any printable ASCII characters except '='.
+                        When a key exists in multiple
                         sources, the value associated with the last source will take precedence.
                         Values defined by an Env with a duplicate key will take precedence.
                         Cannot be updated.
                       items:
                         description: EnvFromSource represents the source of a set
-                          of ConfigMaps
+                          of ConfigMaps or Secrets
                         properties:
                           configMapRef:
                             description: The ConfigMap to select from
@@ -591,8 +668,9 @@ spec:
                             type: object
                             x-kubernetes-map-type: atomic
                           prefix:
-                            description: An optional identifier to prepend to each
-                              key in the ConfigMap. Must be a C_IDENTIFIER.
+                            description: |-
+                              Optional text to prepend to the name of each environment variable.
+                              May consist of any printable ASCII characters except '='.
                             type: string
                           secretRef:
                             description: The Secret to select from
@@ -855,6 +933,12 @@ spec:
                               - port
                               type: object
                           type: object
+                        stopSignal:
+                          description: |-
+                            StopSignal defines which signal will be sent to a container when it is being stopped.
+                            If not specified, the default is defined by the container runtime in use.
+                            StopSignal can only be set for Pods with a non-empty .spec.os.name
+                          type: string
                       type: object
                     livenessProbe:
                       description: |-
@@ -1257,7 +1341,7 @@ spec:
                             Claims lists the names of resources, defined in spec.resourceClaims,
                             that are used by this container.
 
-                            This is an alpha field and requires enabling the
+                            This field depends on the
                             DynamicResourceAllocation feature gate.
 
                             This field is immutable. It can only be set for containers.
@@ -1311,10 +1395,10 @@ spec:
                     restartPolicy:
                       description: |-
                         RestartPolicy defines the restart behavior of individual containers in a pod.
-                        This field may only be set for init containers, and the only allowed value is "Always".
-                        For non-init containers or when this field is not specified,
+                        This overrides the pod-level restart policy. When this field is not specified,
                         the restart behavior is defined by the Pod's restart policy and the container type.
-                        Setting the RestartPolicy as "Always" for the init container will have the following effect:
+                        Additionally, setting the RestartPolicy as "Always" for the init container will
+                        have the following effect:
                         this init container will be continually restarted on
                         exit until all regular containers have terminated. Once all regular
                         containers have completed, all init containers with restartPolicy "Always"
@@ -1326,6 +1410,59 @@ spec:
                         init container is started, or after any startupProbe has successfully
                         completed.
                       type: string
+                    restartPolicyRules:
+                      description: |-
+                        Represents a list of rules to be checked to determine if the
+                        container should be restarted on exit. The rules are evaluated in
+                        order. Once a rule matches a container exit condition, the remaining
+                        rules are ignored. If no rule matches the container exit condition,
+                        the Container-level restart policy determines the whether the container
+                        is restarted or not. Constraints on the rules:
+                        - At most 20 rules are allowed.
+                        - Rules can have the same action.
+                        - Identical rules are not forbidden in validations.
+                        When rules are specified, container MUST set RestartPolicy explicitly
+                        even it if matches the Pod's RestartPolicy.
+                      items:
+                        description: ContainerRestartRule describes how a container
+                          exit is handled.
+                        properties:
+                          action:
+                            description: |-
+                              Specifies the action taken on a container exit if the requirements
+                              are satisfied. The only possible value is "Restart" to restart the
+                              container.
+                            type: string
+                          exitCodes:
+                            description: Represents the exit codes to check on container
+                              exits.
+                            properties:
+                              operator:
+                                description: |-
+                                  Represents the relationship between the container exit code(s) and the
+                                  specified values. Possible values are:
+                                  - In: the requirement is satisfied if the container exit code is in the
+                                    set of specified values.
+                                  - NotIn: the requirement is satisfied if the container exit code is
+                                    not in the set of specified values.
+                                type: string
+                              values:
+                                description: |-
+                                  Specifies the set of values to check for container exit codes.
+                                  At most 255 elements are allowed.
+                                items:
+                                  format: int32
+                                  type: integer
+                                type: array
+                                x-kubernetes-list-type: set
+                            required:
+                            - operator
+                            type: object
+                        required:
+                        - action
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: atomic
                     securityContext:
                       description: |-
                         SecurityContext defines the security options the container should be run with.
@@ -1866,8 +2003,9 @@ spec:
                           in a Container.
                         properties:
                           name:
-                            description: Name of the environment variable. Must be
-                              a C_IDENTIFIER.
+                            description: |-
+                              Name of the environment variable.
+                              May consist of any printable ASCII characters except '='.
                             type: string
                           value:
                             description: |-
@@ -1923,6 +2061,43 @@ spec:
                                     type: string
                                 required:
                                 - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fileKeyRef:
+                                description: |-
+                                  FileKeyRef selects a key of the env file.
+                                  Requires the EnvFiles feature gate to be enabled.
+                                properties:
+                                  key:
+                                    description: |-
+                                      The key within the env file. An invalid key will prevent the pod from starting.
+                                      The keys defined within a source may consist of any printable ASCII characters except '='.
+                                      During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+                                    type: string
+                                  optional:
+                                    default: false
+                                    description: |-
+                                      Specify whether the file or its key must be defined. If the file or key
+                                      does not exist, then the env var is not published.
+                                      If optional is set to true and the specified key does not exist,
+                                      the environment variable will not be set in the Pod's containers.
+
+                                      If optional is set to false and the specified key does not exist,
+                                      an error will be returned during Pod creation.
+                                    type: boolean
+                                  path:
+                                    description: |-
+                                      The path within the volume from which to select the file.
+                                      Must be relative and may not contain the '..' path or start with '..'.
+                                    type: string
+                                  volumeName:
+                                    description: The name of the volume mount containing
+                                      the env file.
+                                    type: string
+                                required:
+                                - key
+                                - path
+                                - volumeName
                                 type: object
                                 x-kubernetes-map-type: atomic
                               resourceFieldRef:
@@ -1985,14 +2160,14 @@ spec:
                     envFrom:
                       description: |-
                         List of sources to populate environment variables in the container.
-                        The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-                        will be reported as an event when the container is starting. When a key exists in multiple
+                        The keys defined within a source may consist of any printable ASCII characters except '='.
+                        When a key exists in multiple
                         sources, the value associated with the last source will take precedence.
                         Values defined by an Env with a duplicate key will take precedence.
                         Cannot be updated.
                       items:
                         description: EnvFromSource represents the source of a set
-                          of ConfigMaps
+                          of ConfigMaps or Secrets
                         properties:
                           configMapRef:
                             description: The ConfigMap to select from
@@ -2013,8 +2188,9 @@ spec:
                             type: object
                             x-kubernetes-map-type: atomic
                           prefix:
-                            description: An optional identifier to prepend to each
-                              key in the ConfigMap. Must be a C_IDENTIFIER.
+                            description: |-
+                              Optional text to prepend to the name of each environment variable.
+                              May consist of any printable ASCII characters except '='.
                             type: string
                           secretRef:
                             description: The Secret to select from
@@ -2277,6 +2453,12 @@ spec:
                               - port
                               type: object
                           type: object
+                        stopSignal:
+                          description: |-
+                            StopSignal defines which signal will be sent to a container when it is being stopped.
+                            If not specified, the default is defined by the container runtime in use.
+                            StopSignal can only be set for Pods with a non-empty .spec.os.name
+                          type: string
                       type: object
                     livenessProbe:
                       description: |-
@@ -2679,7 +2861,7 @@ spec:
                             Claims lists the names of resources, defined in spec.resourceClaims,
                             that are used by this container.
 
-                            This is an alpha field and requires enabling the
+                            This field depends on the
                             DynamicResourceAllocation feature gate.
 
                             This field is immutable. It can only be set for containers.
@@ -2733,10 +2915,10 @@ spec:
                     restartPolicy:
                       description: |-
                         RestartPolicy defines the restart behavior of individual containers in a pod.
-                        This field may only be set for init containers, and the only allowed value is "Always".
-                        For non-init containers or when this field is not specified,
+                        This overrides the pod-level restart policy. When this field is not specified,
                         the restart behavior is defined by the Pod's restart policy and the container type.
-                        Setting the RestartPolicy as "Always" for the init container will have the following effect:
+                        Additionally, setting the RestartPolicy as "Always" for the init container will
+                        have the following effect:
                         this init container will be continually restarted on
                         exit until all regular containers have terminated. Once all regular
                         containers have completed, all init containers with restartPolicy "Always"
@@ -2748,6 +2930,59 @@ spec:
                         init container is started, or after any startupProbe has successfully
                         completed.
                       type: string
+                    restartPolicyRules:
+                      description: |-
+                        Represents a list of rules to be checked to determine if the
+                        container should be restarted on exit. The rules are evaluated in
+                        order. Once a rule matches a container exit condition, the remaining
+                        rules are ignored. If no rule matches the container exit condition,
+                        the Container-level restart policy determines the whether the container
+                        is restarted or not. Constraints on the rules:
+                        - At most 20 rules are allowed.
+                        - Rules can have the same action.
+                        - Identical rules are not forbidden in validations.
+                        When rules are specified, container MUST set RestartPolicy explicitly
+                        even it if matches the Pod's RestartPolicy.
+                      items:
+                        description: ContainerRestartRule describes how a container
+                          exit is handled.
+                        properties:
+                          action:
+                            description: |-
+                              Specifies the action taken on a container exit if the requirements
+                              are satisfied. The only possible value is "Restart" to restart the
+                              container.
+                            type: string
+                          exitCodes:
+                            description: Represents the exit codes to check on container
+                              exits.
+                            properties:
+                              operator:
+                                description: |-
+                                  Represents the relationship between the container exit code(s) and the
+                                  specified values. Possible values are:
+                                  - In: the requirement is satisfied if the container exit code is in the
+                                    set of specified values.
+                                  - NotIn: the requirement is satisfied if the container exit code is
+                                    not in the set of specified values.
+                                type: string
+                              values:
+                                description: |-
+                                  Specifies the set of values to check for container exit codes.
+                                  At most 255 elements are allowed.
+                                items:
+                                  format: int32
+                                  type: integer
+                                type: array
+                                x-kubernetes-list-type: set
+                            required:
+                            - operator
+                            type: object
+                        required:
+                        - action
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: atomic
                     securityContext:
                       description: |-
                         SecurityContext defines the security options the container should be run with.
@@ -3672,8 +3907,9 @@ spec:
                           in a Container.
                         properties:
                           name:
-                            description: Name of the environment variable. Must be
-                              a C_IDENTIFIER.
+                            description: |-
+                              Name of the environment variable.
+                              May consist of any printable ASCII characters except '='.
                             type: string
                           value:
                             description: |-
@@ -3729,6 +3965,43 @@ spec:
                                     type: string
                                 required:
                                 - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fileKeyRef:
+                                description: |-
+                                  FileKeyRef selects a key of the env file.
+                                  Requires the EnvFiles feature gate to be enabled.
+                                properties:
+                                  key:
+                                    description: |-
+                                      The key within the env file. An invalid key will prevent the pod from starting.
+                                      The keys defined within a source may consist of any printable ASCII characters except '='.
+                                      During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+                                    type: string
+                                  optional:
+                                    default: false
+                                    description: |-
+                                      Specify whether the file or its key must be defined. If the file or key
+                                      does not exist, then the env var is not published.
+                                      If optional is set to true and the specified key does not exist,
+                                      the environment variable will not be set in the Pod's containers.
+
+                                      If optional is set to false and the specified key does not exist,
+                                      an error will be returned during Pod creation.
+                                    type: boolean
+                                  path:
+                                    description: |-
+                                      The path within the volume from which to select the file.
+                                      Must be relative and may not contain the '..' path or start with '..'.
+                                    type: string
+                                  volumeName:
+                                    description: The name of the volume mount containing
+                                      the env file.
+                                    type: string
+                                required:
+                                - key
+                                - path
+                                - volumeName
                                 type: object
                                 x-kubernetes-map-type: atomic
                               resourceFieldRef:
@@ -3935,11 +4208,10 @@ spec:
                   required:
                   - s3_wal_path
                   - gs_wal_path
-                description: StandbyDescription contains remote primary config and/or
-                  s3/gs wal path. standby_host can be specified alone or together with
-                  either s3_wal_path OR gs_wal_path (mutually exclusive). At least
-                  one field must be specified. s3_wal_path and gs_wal_path are mutually
-                  exclusive.
+                description: |-
+                  StandbyDescription contains remote primary config and/or s3/gs wal path.
+                  standby_host can be specified alone or together with either s3_wal_path OR gs_wal_path (mutually exclusive).
+                  At least one field must be specified. s3_wal_path and gs_wal_path are mutually exclusive.
                 properties:
                   gs_wal_path:
                     type: string
