@@ -127,6 +127,29 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"kubernetes_use_configmaps": {
 						Type: "boolean",
 					},
+					"maintenance_windows": {
+						Type:     "array",
+						Nullable: true,
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"end_time": {
+										Type: "string",
+									},
+									"everyday": {
+										Type: "boolean",
+									},
+									"start_time": {
+										Type: "string",
+									},
+									"weekday": {
+										Type: "string",
+									},
+								},
+							},
+						},
+					},
 					"max_instances": {
 						Type:        "integer",
 						Description: "-1 = disabled",
@@ -968,7 +991,6 @@ func buildCRD(name, kind, plural, list, short string,
 	}
 }
 
-//go:embed postgresql.crd.yaml
 var postgresqlCRDYAML []byte
 
 // PostgresCRD returns CustomResourceDefinition built from PostgresCRDResource

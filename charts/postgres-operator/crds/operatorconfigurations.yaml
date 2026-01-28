@@ -101,6 +101,20 @@ spec:
               kubernetes_use_configmaps:
                 type: boolean
                 default: false
+              maintenance_windows:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  properties:
+                    endTime:
+                      type: string
+                    everyday:
+                      type: boolean
+                    startTime:
+                      type: string
+                    weekday:
+                      type: string
               max_instances:
                 type: integer
                 description: "-1 = disabled"
