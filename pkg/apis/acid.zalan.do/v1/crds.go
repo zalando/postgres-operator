@@ -128,25 +128,11 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "boolean",
 					},
 					"maintenance_windows": {
-						Type:     "array",
-						Nullable: true,
+						Type: "array",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"end_time": {
-										Type: "string",
-									},
-									"everyday": {
-										Type: "boolean",
-									},
-									"start_time": {
-										Type: "string",
-									},
-									"weekday": {
-										Type: "string",
-									},
-								},
+								Type:    "string",
+								Pattern: "^\\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))\\ *$",
 							},
 						},
 					},
