@@ -968,6 +968,7 @@ func buildCRD(name, kind, plural, list, short string,
 	}
 }
 
+//go:embed postgresql.crd.yaml
 var postgresqlCRDYAML []byte
 
 // PostgresCRD returns CustomResourceDefinition built from PostgresCRDResource
