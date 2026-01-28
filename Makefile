@@ -13,7 +13,7 @@ LDFLAGS ?= -X=main.version=$(VERSION)
 DOCKERDIR = docker
 
 BASE_IMAGE ?= alpine:latest
-IMAGE ?= $(BINARY)
+IMAGE ?= ghcr.io/zalando/$(BINARY)
 TAG ?= $(VERSION)
 GITHEAD = $(shell git rev-parse --short HEAD)
 GITURL = $(shell git config --get remote.origin.url)
