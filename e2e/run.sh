@@ -20,8 +20,9 @@ echo "Kubeconfig path: ${kubeconfig_path}"
 function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
   target_image=docker.io/library/postgres-operator:${operator_tag}
-  if [[ -z $(docker images -q "${target_image}") ]]
+  if [[ -z $(docker images -q "postgres-operator:${operator_tag}") ]]
   then
+    echo "Local image not found. Pulling operator image from ghcr.io and tagging it as ${target_image}"
     docker pull ghcr.io/zalando/postgres-operator:latest
     docker tag ghcr.io/zalando/postgres-operator:latest "${target_image}"
   fi
