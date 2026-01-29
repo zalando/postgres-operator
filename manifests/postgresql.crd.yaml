@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.3
+    controller-gen.kubebuilder.io/version: v0.20.0
   name: postgresqls.acid.zalan.do
 spec:
   group: acid.zalan.do
@@ -3935,11 +3935,10 @@ spec:
                   required:
                   - s3_wal_path
                   - gs_wal_path
-                description: StandbyDescription contains remote primary config and/or
-                  s3/gs wal path. standby_host can be specified alone or together with
-                  either s3_wal_path OR gs_wal_path (mutually exclusive). At least
-                  one field must be specified. s3_wal_path and gs_wal_path are mutually
-                  exclusive.
+                description: |-
+                  StandbyDescription contains remote primary config and/or s3/gs wal path.
+                  standby_host can be specified alone or together with either s3_wal_path OR gs_wal_path (mutually exclusive).
+                  At least one field must be specified. s3_wal_path and gs_wal_path are mutually exclusive.
                 properties:
                   gs_wal_path:
                     type: string
