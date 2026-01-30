@@ -266,6 +266,7 @@ type OperatorConfigurationData struct {
 	Workers                       uint32                             `json:"workers,omitempty"`
 	ResyncPeriod                  Duration                           `json:"resync_period,omitempty"`
 	RepairPeriod                  Duration                           `json:"repair_period,omitempty"`
+	MaintenanceWindows            []MaintenanceWindow                `json:"maintenance_windows,omitempty"`
 	SetMemoryRequestToLimit       bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                     *bool                              `json:"enable_shm_volume,omitempty"`
 	SidecarImages                 map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
@@ -285,10 +286,9 @@ type OperatorConfigurationData struct {
 	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
 	Patroni                       PatroniConfiguration               `json:"patroni"`
 
-	MinInstances                      int32  `json:"min_instances,omitempty"`
-	MaxInstances                      int32  `json:"max_instances,omitempty"`
-	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
-
+	MinInstances                       int32  `json:"min_instances,omitempty"`
+	MaxInstances                       int32  `json:"max_instances,omitempty"`
+	IgnoreInstanceLimitsAnnotationKey  string `json:"ignore_instance_limits_annotation_key,omitempty"`
 	IgnoreResourcesLimitsAnnotationKey string `json:"ignore_resources_limits_annotation_key,omitempty"`
 }
 

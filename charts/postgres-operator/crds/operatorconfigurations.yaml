@@ -101,6 +101,11 @@ spec:
               kubernetes_use_configmaps:
                 type: boolean
                 default: false
+              maintenance_windows:
+                items:
+                  pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
+                  type: string
+                type: array
               max_instances:
                 type: integer
                 description: "-1 = disabled"

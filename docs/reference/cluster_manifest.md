@@ -116,9 +116,9 @@ These parameters are grouped directly under  the `spec` key in the manifest.
 
 * **maintenanceWindows**
   a list which defines specific time frames when certain maintenance operations
-  such as automatic major upgrades or master pod migration. Accepted formats
-  are "01:00-06:00" for daily maintenance windows or "Sat:00:00-04:00" for specific
-  days, with all times in UTC.
+  such as automatic major upgrades or master pod migration are allowed to happen.
+  Accepted formats are "01:00-06:00" for daily maintenance windows or
+  "Sat:00:00-04:00" for specific days, with all times in UTC.
 
 * **users**
   a map of usernames to user flags for the users that should be created in the

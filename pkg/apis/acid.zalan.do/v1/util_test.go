@@ -91,6 +91,13 @@ var maintenanceWindows = []struct {
 		StartTime: mustParseTime("10:00"),
 		EndTime:   mustParseTime("20:00"),
 	}, nil},
+	{"regular every day scenario",
+		[]byte(`"05:00-07:00"`),
+		MaintenanceWindow{
+			Everyday:  true,
+			StartTime: mustParseTime("05:00"),
+			EndTime:   mustParseTime("07:00"),
+		}, nil},
 	{"starts and ends at the same time",
 		[]byte(`"Mon:10:00-10:00"`),
 		MaintenanceWindow{

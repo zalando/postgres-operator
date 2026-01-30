@@ -47,6 +47,10 @@ configGeneral:
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: false
 
+  # maintenance windows applied to all Postgres clusters unless overridden in the manifest
+  # maintenance_windows:
+  # - "Sun:01:00-06:00"
+
   # min number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # max number of instances in Postgres cluster. -1 = no limit

@@ -989,7 +989,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		return fmt.Errorf("could not set cluster status to updating: %w", err)
 	}
 
-	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
 		// do not apply any major version related changes yet
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
