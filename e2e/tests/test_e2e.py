@@ -2396,6 +2396,15 @@ class EndToEndTestCase(unittest.TestCase):
         # Verify we are in good state from potential previous tests
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
 
+        # patch the pvc retention policy to enable delete when scale down
+        patch_scaled_policy_delete = {
+            "data": {
+                "persistent_volume_claim_retention_policy": "when_deleted:retain,when_scaled:delete"
+            }
+        }
+        k8s.update_config(patch_scaled_policy_delete)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
         master_nodes, replica_nodes = k8s.get_cluster_nodes()
         self.assertNotEqual(master_nodes, [])
         self.assertNotEqual(replica_nodes, [])
@@ -2456,6 +2465,9 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default",
             "postgresqls", "acid-minimal-cluster",
             patch_topologySpreadConstraint_config)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_labels), 2, "Postgresql StatefulSet are scale to 2")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "All pods are running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_cluster_deletion(self):
