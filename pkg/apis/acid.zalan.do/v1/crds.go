@@ -127,6 +127,15 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"kubernetes_use_configmaps": {
 						Type: "boolean",
 					},
+					"maintenance_windows": {
+						Type: "array",
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:    "string",
+								Pattern: "^\\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))\\ *$",
+							},
+						},
+					},
 					"max_instances": {
 						Type:        "integer",
 						Description: "-1 = disabled",

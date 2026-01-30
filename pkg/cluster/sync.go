@@ -97,7 +97,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
 		// do not apply any major version related changes yet
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}

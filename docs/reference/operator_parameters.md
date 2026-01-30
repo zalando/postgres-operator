@@ -173,6 +173,14 @@ Those are top-level keys, containing both leaf keys and groups.
   the thresholds. The value must be `"true"` to be effective. The default is empty
   which means the feature is disabled.
 
+* **maintenance_windows**
+  a list which defines specific time frames when certain maintenance
+  operations such as automatic major upgrades or master pod migration are
+  allowed to happen for all database clusters. Accepted formats are
+  "01:00-06:00" for daily maintenance windows or "Sat:00:00-04:00" for
+  specific days, with all times in UTC. Locally defined maintenance
+  windows take precedence over globally configured ones.
+
 * **resync_period**
   period between consecutive sync requests. The default is `30m`.
 

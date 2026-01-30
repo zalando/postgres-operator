@@ -280,7 +280,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 
 	scheduleSwitchover := false
-	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+	if !c.isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
 		c.logger.Infof("postponing switchover, not in maintenance window")
 		scheduleSwitchover = true
 	}
