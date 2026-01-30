@@ -1660,6 +1660,7 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 					LogicalBackupS3SSE:                    "aws:kms",
 					LogicalBackupS3RetentionTime:          "3 months",
 					LogicalBackupCronjobEnvironmentSecret: "",
+					LogicalBackupFilenameDateFormat:       "+%s",
 				},
 			},
 		}, client, pg, logger, eventRecorder)
