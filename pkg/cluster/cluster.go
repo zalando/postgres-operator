@@ -134,7 +134,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	})
 	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
 	if !ok {
-		passwordEncryption = "md5"
+		passwordEncryption = "scram-sha-256"
 	}
 
 	cluster := &Cluster{
