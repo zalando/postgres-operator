@@ -735,7 +735,7 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 		{
 			name:          "global maintenance windows all day",
 			windows:       nil,
-			configWindows: []string{"00:00-23:59"},
+			configWindows: []string{"00:00-02:00", "02:00-23:59"},
 			expected:      true,
 		},
 	}
