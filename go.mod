@@ -18,6 +18,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.32.9
 	k8s.io/apimachinery v0.32.9
 	k8s.io/client-go v0.32.9
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -77,7 +78,6 @@ require (
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
 tool (

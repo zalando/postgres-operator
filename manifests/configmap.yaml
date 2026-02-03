@@ -102,6 +102,7 @@ data:
   logical_backup_s3_sse: "AES256"
   logical_backup_s3_retention_time: ""
   logical_backup_schedule: "30 00 * * *"
+  # maintenance_windows: "Sat:22:00-23:59,Sun:00:00-01:00"
   major_version_upgrade_mode: "manual"
   # major_version_upgrade_team_allow_list: ""
   master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"

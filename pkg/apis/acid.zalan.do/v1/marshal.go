@@ -31,7 +31,8 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 		err error
 	)
 
-	parts := strings.Split(string(data[1:len(data)-1]), "-")
+	dataStr := strings.Trim(string(data), "\"")
+	parts := strings.Split(dataStr, "-")
 	if len(parts) != 2 {
 		return fmt.Errorf("incorrect maintenance window format")
 	}

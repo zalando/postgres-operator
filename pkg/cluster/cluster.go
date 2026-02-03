@@ -32,6 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -271,26 +272,29 @@ func (c *Cluster) Create() (err error) {
 	)
 
 	defer func() {
-		var (
-			pgUpdatedStatus *acidv1.Postgresql
-			errStatus       error
-		)
-		if err == nil {
-			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
-		} else {
+		currentStatus := c.Status.DeepCopy()
+		pg := c.Postgresql.DeepCopy()
+		pg.Status.PostgresClusterStatus = acidv1.ClusterStatusRunning
+
+		if err != nil {
 			c.logger.Warningf("cluster created failed: %v", err)
-			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
+			pg.Status.PostgresClusterStatus = acidv1.ClusterStatusAddFailed
 		}
-		if errStatus != nil {
-			c.logger.Warningf("could not set cluster status: %v", errStatus)
-			return
-		}
-		if pgUpdatedStatus != nil {
+
+		if !equality.Semantic.DeepEqual(currentStatus, pg.Status) {
+			pgUpdatedStatus, err := c.KubeClient.SetPostgresCRDStatus(c.clusterName(), pg)
+			if err != nil {
+				c.logger.Warningf("could not set cluster status: %v", err)
+				return
+			}
 			c.setSpec(pgUpdatedStatus)
 		}
 	}()
 
-	pgCreateStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+	pg := c.Postgresql.DeepCopy()
+	pg.Status.PostgresClusterStatus = acidv1.ClusterStatusCreating
+
+	pgCreateStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), pg)
 	if err != nil {
 		return fmt.Errorf("could not set cluster status: %v", err)
 	}
@@ -978,29 +982,33 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdating)
+	newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusUpdating
 
-	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+	newSpec, err := c.KubeClient.SetPostgresCRDStatus(c.clusterName(), newSpec)
+	if err != nil {
+		return fmt.Errorf("could not set cluster status to updating: %w", err)
+	}
+
+	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
 		// do not apply any major version related changes yet
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
 	c.setSpec(newSpec)
 
 	defer func() {
-		var (
-			pgUpdatedStatus *acidv1.Postgresql
-			err             error
-		)
+		currentStatus := newSpec.Status.DeepCopy()
+		newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusRunning
+
 		if updateFailed {
-			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdateFailed)
-		} else {
-			pgUpdatedStatus, err = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusUpdateFailed
 		}
-		if err != nil {
-			c.logger.Warningf("could not set cluster status: %v", err)
-			return
-		}
-		if pgUpdatedStatus != nil {
+
+		if !equality.Semantic.DeepEqual(currentStatus, newSpec.Status) {
+			pgUpdatedStatus, err := c.KubeClient.SetPostgresCRDStatus(c.clusterName(), newSpec)
+			if err != nil {
+				c.logger.Warningf("could not set cluster status: %v", err)
+				return
+			}
 			c.setSpec(pgUpdatedStatus)
 		}
 	}()
