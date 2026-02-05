@@ -12,8 +12,8 @@ from kubernetes import client
 from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-17-e2e:0.3"
-SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-17-e2e:0.4"
+SPILO_CURRENT = "ghcr.io/zalando/spilo-17:4.0-p3"
+SPILO_LAZY = "ghcr.io/zalando/spilo-17:4.0-p2"
 SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-17:4.0-p3"
 
 def to_selector(labels):
