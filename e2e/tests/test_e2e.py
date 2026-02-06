@@ -151,6 +151,18 @@ class EndToEndTestCase(unittest.TestCase):
             'default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image))  # shows up after tests finish
 
+        # load minimal Postgres manifest and wait for cluster to be up and running
+        with open("manifests/minimal-postgres-manifest.yaml", 'r') as f:
+            postgres_manifest = yaml.safe_load(f)
+        
+        # specify SPILO_PROVIDER to local to avoid S3 connection attempts in tests
+        postgres_manifest.setdefault("spec", {})["env"] = [
+            {"name": "SPILO_PROVIDER", "value": "local"}
+        ]
+
+        with open("manifests/minimal-postgres-manifest.yaml", 'w') as f:
+            yaml.dump(postgres_manifest, f, Dumper=yaml.Dumper)
+
         result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         print('stdout: {}, stderr: {}'.format(result.stdout, result.stderr))
         try:
