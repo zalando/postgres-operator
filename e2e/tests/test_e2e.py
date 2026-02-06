@@ -154,11 +154,10 @@ class EndToEndTestCase(unittest.TestCase):
         # load minimal Postgres manifest and wait for cluster to be up and running
         with open("manifests/minimal-postgres-manifest.yaml", 'r') as f:
             postgres_manifest = yaml.safe_load(f)
-        
-        # specify SPILO_PROVIDER to local to avoid S3 connection attempts in tests
-        postgres_manifest.setdefault("spec", {})["env"] = [
-            {"name": "SPILO_PROVIDER", "value": "local"}
-        ]
+            # specify SPILO_PROVIDER to local to avoid S3 connection attempts in tests
+            postgres_manifest["spec"]["env"] = [
+                {"name": "SPILO_PROVIDER", "value": "local"}
+            ]
 
         with open("manifests/minimal-postgres-manifest.yaml", 'w') as f:
             yaml.dump(postgres_manifest, f, Dumper=yaml.Dumper)
@@ -1216,6 +1215,9 @@ class EndToEndTestCase(unittest.TestCase):
         with open("manifests/minimal-postgres-lowest-version-manifest.yaml", 'r+') as f:
             upgrade_manifest = yaml.safe_load(f)
             upgrade_manifest["spec"]["dockerImage"] = SPILO_FULL_IMAGE
+            upgrade_manifest["spec"]["env"] = [
+                {"name": "SPILO_PROVIDER", "value": "local"}
+            ]
 
         with open("manifests/minimal-postgres-lowest-version-manifest.yaml", 'w') as f:
             yaml.dump(upgrade_manifest, f, Dumper=yaml.Dumper)
