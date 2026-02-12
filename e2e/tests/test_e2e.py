@@ -12,9 +12,9 @@ from kubernetes import client
 from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "ghcr.io/zalando/spilo-18-dev:6a722f01"
-SPILO_LAZY = "ghcr.io/zalando/spilo-18-dev-e2e:0.1"
-SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-18-dev:6a722f01"
+SPILO_CURRENT = "ghcr.io/zalando/spilo-e2e:dev-18.1"
+SPILO_LAZY = "ghcr.io/zalando/spilo-e2e:dev-18.2"
+SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-e2e:dev-18-full"
 
 def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
@@ -152,16 +152,6 @@ class EndToEndTestCase(unittest.TestCase):
         print("Tested operator image: {}".format(actual_operator_image))  # shows up after tests finish
 
         # load minimal Postgres manifest and wait for cluster to be up and running
-        with open("manifests/minimal-postgres-manifest.yaml", 'r') as f:
-            postgres_manifest = yaml.safe_load(f)
-            # specify SPILO_PROVIDER to local to avoid S3 connection attempts in tests
-            postgres_manifest["spec"]["env"] = [
-                {"name": "SPILO_PROVIDER", "value": "local"}
-            ]
-
-        with open("manifests/minimal-postgres-manifest.yaml", 'w') as f:
-            yaml.dump(postgres_manifest, f, Dumper=yaml.Dumper)
-
         result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         print('stdout: {}, stderr: {}'.format(result.stdout, result.stderr))
         try:
@@ -1215,9 +1205,6 @@ class EndToEndTestCase(unittest.TestCase):
         with open("manifests/minimal-postgres-lowest-version-manifest.yaml", 'r+') as f:
             upgrade_manifest = yaml.safe_load(f)
             upgrade_manifest["spec"]["dockerImage"] = SPILO_FULL_IMAGE
-            upgrade_manifest["spec"]["env"] = [
-                {"name": "SPILO_PROVIDER", "value": "local"}
-            ]
 
         with open("manifests/minimal-postgres-lowest-version-manifest.yaml", 'w') as f:
             yaml.dump(upgrade_manifest, f, Dumper=yaml.Dumper)
