@@ -14,7 +14,7 @@ from kubernetes.client.rest import ApiException
 
 SPILO_CURRENT = "ghcr.io/zalando/spilo-e2e:dev-18.3"
 SPILO_LAZY = "ghcr.io/zalando/spilo-e2e:dev-18.4"
-SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-18-dev:183d3218"
+SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-18-dev:ee756c9e"
 
 def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
