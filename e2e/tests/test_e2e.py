@@ -72,7 +72,7 @@ class EndToEndTestCase(unittest.TestCase):
                 time.sleep(interval)
 
     @classmethod
-    @timeout_decorator.timeout(1800)
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def setUpClass(cls):
         '''
         Deploy operator to a "kind" cluster created by run.sh using examples from /manifests.
