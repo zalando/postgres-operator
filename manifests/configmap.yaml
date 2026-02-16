@@ -34,7 +34,7 @@ data:
   default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: ghcr.io/zalando/spilo-18-dev:6393e80e
+  docker_image: ghcr.io/zalando/spilo-18:4.1-p1
   # downscaler_annotations: "deployment-time,downscaler/*"
   enable_admin_role_for_users: "true"
   enable_crd_registration: "true"
