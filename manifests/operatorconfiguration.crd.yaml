@@ -66,7 +66,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "ghcr.io/zalando/spilo-18-dev:ee756c9e"
+                default: "ghcr.io/zalando/spilo-18-dev:6393e80e"
               enable_crd_registration:
                 type: boolean
                 default: true
