@@ -1050,6 +1050,6 @@ func TestUpdateSecretNameConflict(t *testing.T) {
 	assert.Error(t, err)
 
 	// the order of secrets to sync is not deterministic, check only first part of the error message
-	expectedError := fmt.Sprintf("syncing secret %s failed: could not update secret because of user name mismatch", "default/prepared-owner-user.acid-test-cluster.credentials")
+	expectedError := fmt.Sprintf("syncing secret %s failed: error while checking for password rotation: could not update secret because of user name mismatch", "default/prepared-owner-user.acid-test-cluster.credentials")
 	assert.Contains(t, err.Error(), expectedError)
 }

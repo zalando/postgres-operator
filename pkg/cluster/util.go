@@ -663,6 +663,15 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 	return resources, nil
 }
 
+func isStandbyCluster(spec *acidv1.PostgresSpec) bool {
+	for _, env := range spec.Env {
+		if env.Name == "STANDBY_WALE_S3_PREFIX" && env.Value != "" {
+			return true
+		}
+	}
+	return spec.StandbyCluster != nil
+}
+
 func (c *Cluster) isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
 	if len(specMaintenanceWindows) == 0 && len(c.OpConfig.MaintenanceWindows) == 0 {
 		return true

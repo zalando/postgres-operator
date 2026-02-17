@@ -385,7 +385,7 @@ func (c *Cluster) Create() (err error) {
 
 	// create database objects unless we are running without pods or disabled
 	// that feature explicitly
-	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || isStandbyCluster(&c.Spec)) {
 		c.logger.Infof("Create roles")
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
