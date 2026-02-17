@@ -8,7 +8,7 @@ IFS=$'\n\t'
 
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="${HOME}/kind-config-${cluster_name}"
-readonly spilo_image="registry.opensource.zalan.do/acid/spilo-17-e2e:0.3"
+readonly spilo_image="ghcr.io/zalando/spilo-18:4.1-p1"
 readonly e2e_test_runner_image="ghcr.io/zalando/postgres-operator-e2e-tests-runner:latest"
 
 export GOPATH=${GOPATH-~/go}
@@ -42,7 +42,10 @@ function start_kind(){
 
   export KUBECONFIG="${kubeconfig_path}"
   kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml  
-  docker pull "${spilo_image}"
+  
+  # Pull all platforms to satisfy Kind's --all-platforms requirement
+  docker pull --platform linux/amd64 "${spilo_image}"
+  docker pull --platform linux/arm64 "${spilo_image}"
   kind load docker-image "${spilo_image}" --name ${cluster_name}
 }
 

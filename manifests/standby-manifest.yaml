@@ -8,7 +8,7 @@ spec:
     size: 1Gi
   numberOfInstances: 1
   postgresql:
-    version: "17"
+    version: "18"
   # Make this a standby cluster. You can specify s3_wal_path or gs_wal_path for WAL archive,
   # standby_host for remote primary streaming, or combine standby_host with either WAL path.
   # Note: s3_wal_path and gs_wal_path are mutually exclusive.
