@@ -374,11 +374,11 @@ spec:
                   version:
                     type: string
                     enum:
-                      - "13"
                       - "14"
                       - "15"
                       - "16"
                       - "17"
+                      - "18"
                   parameters:
                     type: object
                     additionalProperties:
