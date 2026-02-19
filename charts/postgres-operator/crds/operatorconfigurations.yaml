@@ -454,6 +454,18 @@ spec:
                   enable_replica_pooler_load_balancer:
                     type: boolean
                     default: false
+                  enable_master_node_port:
+                    type: boolean
+                    default: false
+                  enable_master_pooler_node_port:
+                    type: boolean
+                    default: false
+                  enable_replica_node_port:
+                    type: boolean
+                    default: false
+                  enable_replica_pooler_node_port:
+                    type: boolean
+                    default: false
                   external_traffic_policy:
                     type: string
                     enum:

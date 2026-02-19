@@ -618,6 +618,18 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_replica_pooler_load_balancer": {
 								Type: "boolean",
 							},
+							"enable_master_node_port": {
+								Type: "boolean",
+							},
+							"enable_master_pooler_node_port": {
+								Type: "boolean",
+							},
+							"enable_replica_node_port": {
+								Type: "boolean",
+							},
+							"enable_replica_pooler_node_port": {
+								Type: "boolean",
+							},
 							"external_traffic_policy": {
 								Type: "string",
 								Enum: []apiextv1.JSON{

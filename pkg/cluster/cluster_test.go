@@ -1346,7 +1346,8 @@ func newService(
 	svcType v1.ServiceType,
 	sourceRanges []string,
 	selector map[string]string,
-	policy v1.ServiceExternalTrafficPolicyType) *v1.Service {
+	policy v1.ServiceExternalTrafficPolicyType,
+	nodePort *int32) *v1.Service {
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
 			Selector:                 selector,
@@ -1356,6 +1357,16 @@ func newService(
 		},
 	}
 	svc.Annotations = annotations
+
+	if nodePort != nil {
+		svc.Spec.Ports = []v1.ServicePort{
+			{
+				Name:     "port",
+				NodePort: *nodePort,
+			},
+		}
+	}
+
 	return svc
 }
 
@@ -1383,6 +1394,7 @@ func TestCompareServices(t *testing.T) {
 		[]string{"128.141.0.0/16", "137.138.0.0/16"},
 		nil,
 		defaultPolicy,
+		nil,
 	)
 
 	ownerRef := metav1.OwnerReference{
@@ -1393,6 +1405,9 @@ func TestCompareServices(t *testing.T) {
 	}
 
 	serviceWithOwnerReference.ObjectMeta.OwnerReferences = append(serviceWithOwnerReference.ObjectMeta.OwnerReferences, ownerRef)
+
+	portZero := int32(0)
+	portNotZero := int32(1337)
 
 	tests := []struct {
 		about   string
@@ -1410,7 +1425,7 @@ func TestCompareServices(t *testing.T) {
 				},
 				v1.ServiceTypeClusterIP,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
@@ -1418,7 +1433,7 @@ func TestCompareServices(t *testing.T) {
 				},
 				v1.ServiceTypeClusterIP,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			match: true,
 		},
 		{
@@ -1430,7 +1445,7 @@ func TestCompareServices(t *testing.T) {
 				},
 				v1.ServiceTypeClusterIP,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
@@ -1438,7 +1453,7 @@ func TestCompareServices(t *testing.T) {
 				},
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			match:  false,
 			reason: `new service's type "LoadBalancer" does not match the current one "ClusterIP"`,
 		},
@@ -1451,7 +1466,7 @@ func TestCompareServices(t *testing.T) {
 				},
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
@@ -1459,7 +1474,7 @@ func TestCompareServices(t *testing.T) {
 				},
 				v1.ServiceTypeLoadBalancer,
 				[]string{"185.249.56.0/22"},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
@@ -1472,7 +1487,7 @@ func TestCompareServices(t *testing.T) {
 				},
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
@@ -1480,7 +1495,7 @@ func TestCompareServices(t *testing.T) {
 				},
 				v1.ServiceTypeLoadBalancer,
 				[]string{},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
@@ -1493,7 +1508,7 @@ func TestCompareServices(t *testing.T) {
 				},
 				v1.ServiceTypeClusterIP,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			new:   serviceWithOwnerReference,
 			match: false,
 		},
@@ -1503,12 +1518,12 @@ func TestCompareServices(t *testing.T) {
 				map[string]string{},
 				v1.ServiceTypeClusterIP,
 				[]string{},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			new: newService(
 				map[string]string{},
 				v1.ServiceTypeClusterIP,
 				[]string{},
-				map[string]string{"cluster-name": "clstr", "spilo-role": "master"}, defaultPolicy),
+				map[string]string{"cluster-name": "clstr", "spilo-role": "master"}, defaultPolicy, nil),
 			match: false,
 		},
 		{
@@ -1517,13 +1532,41 @@ func TestCompareServices(t *testing.T) {
 				map[string]string{},
 				v1.ServiceTypeClusterIP,
 				[]string{},
-				nil, defaultPolicy),
+				nil, defaultPolicy, nil),
 			new: newService(
 				map[string]string{},
 				v1.ServiceTypeClusterIP,
 				[]string{},
-				nil, v1.ServiceExternalTrafficPolicyTypeLocal),
+				nil, v1.ServiceExternalTrafficPolicyTypeLocal, nil),
 			match: false,
+		},
+		{
+			about: "services differ on node port",
+			current: newService(
+				map[string]string{},
+				v1.ServiceTypeNodePort,
+				[]string{},
+				nil, defaultPolicy, &portZero),
+			new: newService(
+				map[string]string{},
+				v1.ServiceTypeNodePort,
+				[]string{},
+				nil, defaultPolicy, &portNotZero),
+			match: false,
+		},
+		{
+			about: "services do not differ on node port when requesting 0",
+			current: newService(
+				map[string]string{},
+				v1.ServiceTypeNodePort,
+				[]string{},
+				nil, defaultPolicy, &portNotZero),
+			new: newService(
+				map[string]string{},
+				v1.ServiceTypeNodePort,
+				[]string{},
+				nil, defaultPolicy, &portZero),
+			match: true,
 		},
 	}
 
