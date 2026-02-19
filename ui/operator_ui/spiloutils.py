@@ -325,7 +325,7 @@ def read_basebackups(
         backup_prefix = f'{prefix}{pg_cluster}{suffix}/wal/{vp}/basebackups_005/'
         logger.info(f"{bucket}/{backup_prefix}")
 
-        paginator = client('s3').get_paginator('list_objects_v2')
+        paginator = client('s3', endpoint_url=AWS_ENDPOINT).get_paginator('list_objects_v2')
         pages = paginator.paginate(Bucket=bucket, Prefix=backup_prefix)
 
         for page in pages:
@@ -334,7 +334,7 @@ def read_basebackups(
                 if not key.endswith("backup_stop_sentinel.json"):
                     continue
 
-                response = client('s3').get_object(Bucket=bucket, Key=key)
+                response = client('s3', endpoint_url=AWS_ENDPOINT).get_object(Bucket=bucket, Key=key)
                 backup_info = loads(response["Body"].read().decode("utf-8"))
                 last_modified = response["LastModified"].astimezone(timezone.utc).isoformat()
 
