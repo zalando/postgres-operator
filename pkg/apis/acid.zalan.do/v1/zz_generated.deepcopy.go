@@ -604,6 +604,19 @@ func (in *Patroni) DeepCopyInto(out *Patroni) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.IgnoreSlots != nil {
+		in, out := &in.IgnoreSlots, &out.IgnoreSlots
+		*out = make([]map[string]string, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = make(map[string]string, len(*in))
+				for key, val := range *in {
+					(*out)[key] = val
+				}
+			}
+		}
+	}
 	return
 }
 

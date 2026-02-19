@@ -135,6 +135,17 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 			},
 			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/18/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"failsafe_mode":true}}}`,
 		},
+		{
+			subtest: "Patroni ignore_slots configured for PostgreSQL 17 slot sync",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "17"},
+			patroni: &acidv1.Patroni{
+				IgnoreSlots: []map[string]string{
+					{"type": "logical"},
+				},
+			},
+			opConfig: &config.Config{},
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/17/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"dcs":{"ignore_slots":[{"type":"logical"}]}}}`,
+		},
 	}
 	for _, tt := range tests {
 		cluster.OpConfig = *tt.opConfig
