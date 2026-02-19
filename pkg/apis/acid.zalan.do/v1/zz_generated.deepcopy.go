@@ -796,6 +796,13 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(corev1.NodeAffinity)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.TopologySpreadConstraints != nil {
+		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
+		*out = make([]corev1.TopologySpreadConstraint, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
 		*out = make([]corev1.Toleration, len(*in))
