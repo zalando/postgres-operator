@@ -541,6 +541,10 @@ configuration they are grouped under the `kubernetes` key.
   PodSecruityPolicy allows the capabilities listed here. Otherwise, the
   container will not start. The default is empty.
 
+* **dropped_pod_capabilities**
+  list of capabilities to be dropped from the postgres container's
+  SecurityContext (e.g. ALL etc.).
+
 * **master_pod_move_timeout**
   The period of time to wait for the success of migration of master pods from
   an unschedulable node. The migration includes Patroni switchovers to

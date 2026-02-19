@@ -4230,41 +4230,53 @@ func TestGenerateLogicalBackupPodEnvVars(t *testing.T) {
 func TestGenerateCapabilities(t *testing.T) {
 	tests := []struct {
 		subTest      string
-		configured   []string
+		added        []string
+		dropped      []string
 		capabilities *v1.Capabilities
-		err          error
 	}{
 		{
 			subTest:      "no capabilities",
-			configured:   nil,
 			capabilities: nil,
-			err:          fmt.Errorf("could not parse capabilities configuration of nil"),
 		},
 		{
 			subTest:      "empty capabilities",
-			configured:   []string{},
+			added:        []string{},
+			dropped:      []string{},
 			capabilities: nil,
-			err:          fmt.Errorf("could not parse empty capabilities configuration"),
 		},
 		{
-			subTest:    "configured capability",
-			configured: []string{"SYS_NICE"},
+			subTest: "added one capability",
+			added:   []string{"SYS_NICE"},
 			capabilities: &v1.Capabilities{
 				Add: []v1.Capability{"SYS_NICE"},
 			},
-			err: fmt.Errorf("could not generate one configured capability"),
 		},
 		{
-			subTest:    "configured capabilities",
-			configured: []string{"SYS_NICE", "CHOWN"},
+			subTest: "added two capabilities",
+			added:   []string{"SYS_NICE", "CHOWN"},
 			capabilities: &v1.Capabilities{
 				Add: []v1.Capability{"SYS_NICE", "CHOWN"},
 			},
-			err: fmt.Errorf("could not generate multiple configured capabilities"),
+		},
+		{
+			subTest: "dropped capabilities",
+			dropped: []string{"ALL"},
+			capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
+		},
+		{
+			subTest: "added and dropped capabilities",
+			added:   []string{"CHOWN"},
+			dropped: []string{"SYS_NICE"},
+			capabilities: &v1.Capabilities{
+				Add:  []v1.Capability{"CHOWN"},
+				Drop: []v1.Capability{"SYS_NICE"},
+			},
 		},
 	}
 	for _, tt := range tests {
-		caps := generateCapabilities(tt.configured)
+		caps := generateCapabilities(tt.added, tt.dropped)
 		if !reflect.DeepEqual(caps, tt.capabilities) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
 				t.Name(), tt.subTest, tt.capabilities, caps)

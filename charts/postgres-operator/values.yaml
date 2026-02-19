@@ -103,6 +103,10 @@ configKubernetes:
   # additional_pod_capabilities:
   # - "SYS_NICE"
 
+  # list of dropped capabilities for postgres container
+  # dropped_pod_capabilities:
+  # - "ALL"
+
   # default DNS domain of K8s cluster where operator is running
   cluster_domain: cluster.local
   # additional labels assigned to the cluster objects

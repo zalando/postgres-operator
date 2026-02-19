@@ -48,6 +48,8 @@ configuration:
   kubernetes:
     # additional_pod_capabilities:
     # - "SYS_NICE"
+    # dropped_pod_capabilities:
+    # - "ALL"
     cluster_domain: cluster.local
     cluster_labels:
       application: spilo
