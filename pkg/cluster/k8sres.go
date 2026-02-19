@@ -842,7 +842,9 @@ func (c *Cluster) generatePodTemplate(
 	securityContext := v1.PodSecurityContext{}
 
 	if spiloRunAsUser != nil {
+		var isNoRootPid = (*spiloRunAsUser > int64(0))
 		securityContext.RunAsUser = spiloRunAsUser
+		securityContext.RunAsNonRoot = &isNoRootPid
 	}
 
 	if spiloRunAsGroup != nil {
