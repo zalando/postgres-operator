@@ -50,6 +50,14 @@ function az_upload {
     az storage blob upload --file "$1" --account-name "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_NAME" --account-key "$LOGICAL_BACKUP_AZURE_STORAGE_ACCOUNT_KEY" -c "$LOGICAL_BACKUP_AZURE_STORAGE_CONTAINER" -n "$PATH_TO_BACKUP"
 }
 
+function aws_init_profile {
+
+    if [[ ! -z "$AWS_PROFILE_CONTENT" ]] ; then
+        mkdir -p $HOME/.aws
+        echo "$AWS_PROFILE_CONTENT" > $HOME/.aws/config
+    fi
+}
+
 function aws_delete_objects {
     args=(
       "--bucket=$LOGICAL_BACKUP_S3_BUCKET"
@@ -111,8 +119,14 @@ function aws_upload {
 
     args=()
 
+    if [[ ! -z "$LOGICAL_BACKUP_S3_ACCELERATE_ENDPOINT" ]] ; then
+        # use accelerate_endpoint on upload
+        args+=("--endpoint-url=$LOGICAL_BACKUP_S3_ACCELERATE_ENDPOINT")
+    elif [[ ! -z "$LOGICAL_BACKUP_S3_ENDPOINT" ]]; then
+        args+=("--endpoint-url=$LOGICAL_BACKUP_S3_ENDPOINT")
+    fi
+
     [[ ! -z "$EXPECTED_SIZE" ]] && args+=("--expected-size=$EXPECTED_SIZE")
-    [[ ! -z "$LOGICAL_BACKUP_S3_ENDPOINT" ]] && args+=("--endpoint-url=$LOGICAL_BACKUP_S3_ENDPOINT")
     [[ ! -z "$LOGICAL_BACKUP_S3_REGION" ]] && args+=("--region=$LOGICAL_BACKUP_S3_REGION")
     [[ ! -z "$LOGICAL_BACKUP_S3_SSE" ]] && args+=("--sse=$LOGICAL_BACKUP_S3_SSE")
 
@@ -145,6 +159,7 @@ function upload {
             gcs_upload
             ;;
         "s3")
+            aws_init_profile
             aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
             aws_delete_outdated
             ;;
