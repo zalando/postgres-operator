@@ -465,20 +465,13 @@ func (c *Cluster) createCriticalOpPodDisruptionBudget() error {
 }
 
 func (c *Cluster) createPodDisruptionBudgets() error {
-	errors := make([]string, 0)
-
+	// Only create the primary PDB during cluster creation.
+	// The critical-op PDB is created on-demand during critical operations
+	// (e.g., major version upgrades) to avoid false alerts when no pods
+	// have the critical-operation label.
 	err := c.createPrimaryPodDisruptionBudget()
 	if err != nil {
-		errors = append(errors, fmt.Sprintf("could not create primary pod disruption budget: %v", err))
-	}
-
-	err = c.createCriticalOpPodDisruptionBudget()
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("could not create pod disruption budget for critical operations: %v", err))
-	}
-
-	if len(errors) > 0 {
-		return fmt.Errorf("%v", strings.Join(errors, `', '`))
+		return fmt.Errorf("could not create primary pod disruption budget: %v", err)
 	}
 	return nil
 }
