@@ -233,6 +233,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.RoleDeletionSuffix = util.Coalesce(fromCRD.TeamsAPI.RoleDeletionSuffix, "_deleted")
 
 	// logging REST API config
+	result.APIAddress = util.Coalesce(fromCRD.LoggingRESTAPI.APIAddress, "")
 	result.APIPort = util.CoalesceInt(fromCRD.LoggingRESTAPI.APIPort, 8080)
 	result.RingLogLines = util.CoalesceInt(fromCRD.LoggingRESTAPI.RingLogLines, 100)
 	result.ClusterHistoryEntries = util.CoalesceInt(fromCRD.LoggingRESTAPI.ClusterHistoryEntries, 1000)

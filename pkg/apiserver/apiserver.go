@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/pprof"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -72,7 +74,7 @@ var (
 )
 
 // New creates new HTTP API server
-func New(controller controllerInformer, port int, logger *logrus.Logger) *Server {
+func New(controller controllerInformer, address string, port int, logger *logrus.Logger) *Server {
 	s := &Server{
 		logger:     logger.WithField("pkg", "apiserver"),
 		controller: controller,
@@ -94,7 +96,7 @@ func New(controller controllerInformer, port int, logger *logrus.Logger) *Server
 	mux.HandleFunc("/databases/", s.databases)
 
 	s.http = http.Server{
-		Addr:        fmt.Sprintf(":%d", port),
+		Addr:        net.JoinHostPort(strings.Trim(address, "[]"), strconv.Itoa(port)),
 		Handler:     http.TimeoutHandler(mux, httpAPITimeout, ""),
 		ReadTimeout: httpReadTimeout,
 	}

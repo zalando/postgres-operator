@@ -314,6 +314,8 @@ configDebug:
 
 # parameters affecting logging and REST API listener
 configLoggingRestApi:
+  # REST API listener binds to this address
+  # api_address: ""
   # REST API listener listens to this port
   api_port: 8080
   # number of entries in the cluster history ring buffer

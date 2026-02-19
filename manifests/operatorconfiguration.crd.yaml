@@ -621,6 +621,9 @@ spec:
               logging_rest_api:
                 type: object
                 properties:
+                  api_address:
+                    type: string
+                    default: ""
                   api_port:
                     type: integer
                     default: 8080
