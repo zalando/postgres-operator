@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -665,7 +666,8 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 
 func isStandbyCluster(spec *acidv1.PostgresSpec) bool {
 	for _, env := range spec.Env {
-		if env.Name == "STANDBY_WALE_S3_PREFIX" && env.Value != "" {
+		hasStandbyEnv, _ := regexp.MatchString(`^STANDBY_WALE_(S3|GS|GSC|SWIFT)_PREFIX$`, env.Name)
+		if hasStandbyEnv && env.Value != "" {
 			return true
 		}
 	}
