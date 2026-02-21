@@ -1211,6 +1211,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s.create_with_kubectl("manifests/minimal-postgres-lowest-version-manifest.yaml")
         self.eventuallyEqual(lambda: k8s.count_running_pods(labels=cluster_label), 2, "No 2 pods running")
+        print('Operator log: {}'.format(k8s.get_operator_log()))
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(check_version, 14, "Version is not correct")
 
