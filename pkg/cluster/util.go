@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -661,6 +662,16 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 		return acidv1.Resources{}, fmt.Errorf("could not unmarshal K8s resources requirements into acidv1.Resources struct")
 	}
 	return resources, nil
+}
+
+func isStandbyCluster(spec *acidv1.PostgresSpec) bool {
+	for _, env := range spec.Env {
+		hasStandbyEnv, _ := regexp.MatchString(`^STANDBY_WALE_(S3|GS|GSC|SWIFT)_PREFIX$`, env.Name)
+		if hasStandbyEnv && env.Value != "" {
+			return true
+		}
+	}
+	return spec.StandbyCluster != nil
 }
 
 func (c *Cluster) isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
