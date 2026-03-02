@@ -433,6 +433,13 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.MaintenanceWindows != nil {
+		in, out := &in.MaintenanceWindows, &out.MaintenanceWindows
+		*out = make([]MaintenanceWindow, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.ShmVolume != nil {
 		in, out := &in.ShmVolume, &out.ShmVolume
 		*out = new(bool)

@@ -13,7 +13,7 @@ LDFLAGS ?= -X=main.version=$(VERSION)
 DOCKERDIR = docker
 
 BASE_IMAGE ?= alpine:latest
-IMAGE ?= $(BINARY)
+IMAGE ?= ghcr.io/zalando/$(BINARY)
 TAG ?= $(VERSION)
 GITHEAD = $(shell git rev-parse --short HEAD)
 GITURL = $(shell git config --get remote.origin.url)
@@ -84,7 +84,7 @@ linux: ${SOURCES} $(GENERATED_CRDS)
 macos: ${SOURCES} $(GENERATED_CRDS)
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
-docker: ${DOCKERDIR}/${DOCKERFILE}
+docker: $(GENERATED_CRDS) ${DOCKERDIR}/${DOCKERFILE}
 	echo `(env)`
 	echo "Tag ${TAG}"
 	echo "Version ${VERSION}"
