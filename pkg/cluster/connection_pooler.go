@@ -24,6 +24,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	"maps"
 )
 
 var poolerRunAsUser = int64(100)
@@ -531,6 +532,15 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 func (c *Cluster) generatePoolerServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
 	var dnsString string
 	annotations := c.getCustomServiceAnnotations(role, spec)
+
+	if spec != nil {
+		switch role {
+		case Master:
+			maps.Copy(annotations, spec.MasterPoolerServiceAnnotations)
+		case Replica:
+			maps.Copy(annotations, spec.ReplicaPoolerServiceAnnotations)
+		}
+	}
 
 	if c.shouldCreateLoadBalancerForPoolerService(role, spec) {
 		// set ELB Timeout annotation with default value

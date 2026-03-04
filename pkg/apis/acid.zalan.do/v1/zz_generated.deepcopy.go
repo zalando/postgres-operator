@@ -855,6 +855,20 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.MasterPoolerServiceAnnotations != nil {
+		in, out := &in.MasterPoolerServiceAnnotations, &out.MasterPoolerServiceAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.ReplicaPoolerServiceAnnotations != nil {
+		in, out := &in.ReplicaPoolerServiceAnnotations, &out.ReplicaPoolerServiceAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.TLS != nil {
 		in, out := &in.TLS, &out.TLS
 		*out = new(TLSDescription)

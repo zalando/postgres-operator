@@ -905,6 +905,7 @@ precedence):
 2. Globally configured `custom_service_annotations`
 3. `serviceAnnotations` specified in the cluster manifest
 4. `masterServiceAnnotations` and `replicaServiceAnnotations` specified in the cluster manifest
+5. `masterPoolerServiceAnnotations` and `replicaPoolerServiceAnnotations` specified in the cluster manifest (only for connection pooler services)
 
 To limit the range of IP addresses that can reach a load balancer, specify the
 desired ranges in the `allowedSourceRanges` field (applies to both master and
