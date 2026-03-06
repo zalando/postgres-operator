@@ -1053,3 +1053,136 @@ func TestUpdateSecretNameConflict(t *testing.T) {
 	expectedError := fmt.Sprintf("syncing secret %s failed: error while checking for password rotation: could not update secret because of user name mismatch", "default/prepared-owner-user.acid-test-cluster.credentials")
 	assert.Contains(t, err.Error(), expectedError)
 }
+
+func TestSyncStatefulSetNonRunningPodsDoNotBlockRecreation(t *testing.T) {
+	testName := "test that non-running pods do not block rolling update"
+	client, _ := newFakeK8sSyncClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			NumberOfInstances: 1,
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PatroniAPICheckInterval: time.Duration(1),
+				PatroniAPICheckTimeout:  time.Duration(5),
+				PodManagementPolicy:     "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:         map[string]string{"application": "spilo"},
+					ClusterNameLabel:      "cluster-name",
+					DefaultCPURequest:     "300m",
+					DefaultCPULimit:       "300m",
+					DefaultMemoryRequest:  "300Mi",
+					DefaultMemoryLimit:    "300Mi",
+					PodRoleLabel:          "spilo-role",
+					ResourceCheckInterval: time.Duration(3),
+					ResourceCheckTimeout:  time.Duration(10),
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+
+	// mock Patroni API that always fails (simulates unreachable pod)
+	mockClient := mocks.NewMockHTTPClient(ctrl)
+	mockClient.EXPECT().Do(gomock.Any()).Return(nil, fmt.Errorf("connection refused")).AnyTimes()
+	mockClient.EXPECT().Get(gomock.Any()).Return(nil, fmt.Errorf("connection refused")).AnyTimes()
+	cluster.patroni = patroni.New(patroniLogger, mockClient)
+
+	// test allPodsRunning with non-running pods returns false
+	nonRunningPods := []v1.Pod{
+		{
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{
+								Reason:  "CreateContainerConfigError",
+								Message: `secret "old-secret" not found`,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if cluster.allPodsRunning(nonRunningPods) {
+		t.Errorf("%s: allPodsRunning should return false for pods in CreateContainerConfigError", testName)
+	}
+
+	// test allPodsRunning with running pods returns true
+	runningPods := []v1.Pod{
+		{
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !cluster.allPodsRunning(runningPods) {
+		t.Errorf("%s: allPodsRunning should return true for running pods", testName)
+	}
+
+	// test mixed: 3-node cluster with 1 broken replica
+	mixedPods := []v1.Pod{
+		{
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+				},
+			},
+		},
+		{
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+				},
+			},
+		},
+		{
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{
+								Reason: "CreateContainerConfigError",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if cluster.allPodsRunning(mixedPods) {
+		t.Errorf("%s: allPodsRunning should return false when one pod is in CreateContainerConfigError", testName)
+	}
+}

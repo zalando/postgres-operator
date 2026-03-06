@@ -376,6 +376,30 @@ func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) 
 	return memberData, nil
 }
 
+// podIsNotRunning returns true if a pod is not in a healthy running state,
+// e.g. stuck in CreateContainerConfigError, CrashLoopBackOff, ImagePullBackOff, etc.
+func podIsNotRunning(pod *v1.Pod) bool {
+	if pod.Status.Phase != v1.PodRunning {
+		return true
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.State.Waiting != nil || cs.State.Terminated != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// allPodsRunning returns true only if every pod in the list is in a healthy running state.
+func (c *Cluster) allPodsRunning(pods []v1.Pod) bool {
+	for i := range pods {
+		if podIsNotRunning(&pods[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	stopCh := make(chan struct{})
 	ch := c.registerPodSubscriber(podName)
@@ -444,7 +468,8 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 		// switchover if
 		// 1. we have not observed a new master pod when re-creating former replicas
 		// 2. we know possible switchover targets even when no replicas were recreated
-		if newMasterPod == nil && len(replicas) > 0 {
+		// 3. the master pod is actually running (can't switchover a dead master)
+		if newMasterPod == nil && len(replicas) > 0 && !podIsNotRunning(masterPod) {
 			masterCandidate, err := c.getSwitchoverCandidate(masterPod)
 			if err != nil {
 				// do not recreate master now so it will keep the update flag and switchover will be retried on next sync
@@ -455,6 +480,9 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 			}
 		} else if newMasterPod == nil && len(replicas) == 0 {
 			c.logger.Warningf("cannot perform switch over before re-creating the pod: no replicas")
+		} else if podIsNotRunning(masterPod) {
+			c.logger.Warningf("master pod %q is not running, skipping switchover and recreating directly",
+				util.NameFromMeta(masterPod.ObjectMeta))
 		}
 		c.logger.Infof("recreating old master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
