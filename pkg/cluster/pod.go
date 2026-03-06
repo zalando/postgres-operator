@@ -376,9 +376,15 @@ func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) 
 	return memberData, nil
 }
 
-// podIsNotRunning returns true if a pod is not in a healthy running state,
+// podIsNotRunning returns true if a pod is known to be in a non-running state,
 // e.g. stuck in CreateContainerConfigError, CrashLoopBackOff, ImagePullBackOff, etc.
+// Pods with no status information are not considered non-running, as they may
+// simply not have reported status yet.
 func podIsNotRunning(pod *v1.Pod) bool {
+	if pod.Status.Phase == "" {
+		// No status reported yet — don't treat as non-running
+		return false
+	}
 	if pod.Status.Phase != v1.PodRunning {
 		return true
 	}

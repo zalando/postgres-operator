@@ -121,6 +121,13 @@ func TestPodIsNotRunning(t *testing.T) {
 		expected bool
 	}{
 		{
+			subtest: "pod with no status reported yet",
+			pod: v1.Pod{
+				Status: v1.PodStatus{},
+			},
+			expected: false,
+		},
+		{
 			subtest: "pod running with all containers ready",
 			pod: v1.Pod{
 				Status: v1.PodStatus{
@@ -380,6 +387,18 @@ func TestAllPodsRunning(t *testing.T) {
 		{
 			subtest:  "empty pod list",
 			pods:     []v1.Pod{},
+			expected: true,
+		},
+		{
+			subtest: "pods with no status reported yet",
+			pods: []v1.Pod{
+				{
+					Status: v1.PodStatus{},
+				},
+				{
+					Status: v1.PodStatus{},
+				},
+			},
 			expected: true,
 		},
 	}
