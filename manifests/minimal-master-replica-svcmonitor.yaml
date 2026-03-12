@@ -28,7 +28,7 @@ spec:
   preparedDatabases:
     bar: {}
   postgresql:
-    version: "13"
+    version: "18"
   sidecars:
     - name: "exporter"
       image: "quay.io/prometheuscommunity/postgres-exporter:v0.15.0"
