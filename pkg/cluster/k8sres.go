@@ -2047,11 +2047,6 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 	if c.shouldCreateLoadBalancerForService(role, spec) {
 		dnsName := c.dnsName(role)
 
-		// Just set ELB Timeout annotation with default value, if it does not
-		// have a custom value
-		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
-			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
-		}
 		// External DNS name annotation is not customizable
 		annotations[constants.ZalandoDNSNameAnnotation] = dnsName
 	}

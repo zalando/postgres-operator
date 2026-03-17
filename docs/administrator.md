@@ -887,15 +887,13 @@ cluster manifest. In the case any of these variables are omitted from the
 manifest, the operator configuration settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in all namespaces watched by the operator.
-If load balancing is enabled two default annotations will be applied to its
-services:
+If load balancing is enabled the following default annotation will be applied to
+its services:
 
 - `external-dns.alpha.kubernetes.io/hostname` with the value defined by the
   operator configs `master_dns_name_format` and `replica_dns_name_format`.
   This value can't be overwritten. If any changing in its value is needed, it
   MUST be done changing the DNS format operator config parameters; and
-- `service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout` with
-  a default value of "3600".
 
 There are multiple options to specify service annotations that will be merged
 with each other and override in the following order (where latter take
