@@ -68,7 +68,7 @@ spec:
                   type: string
               docker_image:
                 type: string
-                default: "ghcr.io/zalando/spilo-17:4.0-p3"
+                default: "ghcr.io/zalando/spilo-18:4.1-p1"
               enable_crd_registration:
                 type: boolean
                 default: true
@@ -96,9 +96,16 @@ spec:
                 default: ""
               ignore_instance_limits_annotation_key:
                 type: string
+              ignore_resources_limits_annotation_key:
+                type: string
               kubernetes_use_configmaps:
                 type: boolean
                 default: false
+              maintenance_windows:
+                items:
+                  pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
+                  type: string
+                type: array
               max_instances:
                 type: integer
                 description: "-1 = disabled"
@@ -167,10 +174,10 @@ spec:
                       type: string
                   minimal_major_version:
                     type: string
-                    default: "13"
+                    default: "14"
                   target_major_version:
                     type: string
-                    default: "17"
+                    default: "18"
               kubernetes:
                 type: object
                 properties:
@@ -510,7 +517,7 @@ spec:
                     pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                   logical_backup_docker_image:
                     type: string
-                    default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
+                    default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:

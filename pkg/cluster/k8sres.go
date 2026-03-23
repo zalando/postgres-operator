@@ -313,6 +313,14 @@ func (c *Cluster) generateResourceRequirements(
 	specLimits := acidv1.ResourceDescription{}
 	result := v1.ResourceRequirements{}
 
+	enforceThresholds := true
+	resourcesLimitAnnotationKey := c.OpConfig.IgnoreResourcesLimitsAnnotationKey
+	if resourcesLimitAnnotationKey != "" {
+		if value, exists := c.ObjectMeta.Annotations[resourcesLimitAnnotationKey]; exists && value == "true" {
+			enforceThresholds = false
+		}
+	}
+
 	if resources != nil {
 		specRequests = resources.ResourceRequests
 		specLimits = resources.ResourceLimits
@@ -329,7 +337,7 @@ func (c *Cluster) generateResourceRequirements(
 	}
 
 	// enforce minimum cpu and memory limits for Postgres containers only
-	if containerName == constants.PostgresContainerName {
+	if containerName == constants.PostgresContainerName && enforceThresholds {
 		if err = c.enforceMinResourceLimits(&result); err != nil {
 			return nil, fmt.Errorf("could not enforce minimum resource limits: %v", err)
 		}
@@ -344,7 +352,7 @@ func (c *Cluster) generateResourceRequirements(
 	}
 
 	// enforce maximum cpu and memory requests for Postgres containers only
-	if containerName == constants.PostgresContainerName {
+	if containerName == constants.PostgresContainerName && enforceThresholds {
 		if err = c.enforceMaxResourceRequests(&result); err != nil {
 			return nil, fmt.Errorf("could not enforce maximum resource requests: %v", err)
 		}
@@ -412,7 +420,7 @@ PatroniInitDBParams:
 	}
 
 	if patroni.MaximumLagOnFailover >= 0 {
-		config.Bootstrap.DCS.MaximumLagOnFailover = patroni.MaximumLagOnFailover
+		config.Bootstrap.DCS.MaximumLagOnFailover = float32(patroni.MaximumLagOnFailover)
 	}
 	if patroni.LoopWait != 0 {
 		config.Bootstrap.DCS.LoopWait = patroni.LoopWait
@@ -1303,6 +1311,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
 		}
 		initContainers = spec.InitContainers
+		if err := c.validateContainers(initContainers); err != nil {
+			return nil, fmt.Errorf("invalid init containers: %v", err)
+		}
 	}
 
 	// backward compatible check for InitContainers
@@ -1454,6 +1465,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername))
+
+	if err := c.validateContainers(sidecarContainers); err != nil {
+		return nil, fmt.Errorf("invalid sidecar containers: %v", err)
+	}
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
@@ -1676,7 +1691,7 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 		}
 	}
 
-	if spec.StandbyCluster != nil {
+	if isStandbyCluster(spec) {
 		if newcur == 1 {
 			min = newcur
 			max = newcur
@@ -2192,23 +2207,29 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 				Value: description.StandbyPort,
 			})
 		}
-	} else {
-		c.logger.Info("standby cluster streaming from WAL location")
-		if description.S3WalPath != "" {
+		if description.StandbyPrimarySlotName != "" {
 			result = append(result, v1.EnvVar{
-				Name:  "STANDBY_WALE_S3_PREFIX",
-				Value: description.S3WalPath,
+				Name:  "STANDBY_PRIMARY_SLOT_NAME",
+				Value: description.StandbyPrimarySlotName,
 			})
-		} else if description.GSWalPath != "" {
-			result = append(result, v1.EnvVar{
-				Name:  "STANDBY_WALE_GS_PREFIX",
-				Value: description.GSWalPath,
-			})
-		} else {
-			c.logger.Error("no WAL path specified in standby section")
-			return result
 		}
+	}
 
+	// WAL archive can be specified with or without standby_host
+	if description.S3WalPath != "" {
+		c.logger.Info("standby cluster using S3 WAL archive")
+		result = append(result, v1.EnvVar{
+			Name:  "STANDBY_WALE_S3_PREFIX",
+			Value: description.S3WalPath,
+		})
+		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
+		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+	} else if description.GSWalPath != "" {
+		c.logger.Info("standby cluster using GCS WAL archive")
+		result = append(result, v1.EnvVar{
+			Name:  "STANDBY_WALE_GS_PREFIX",
+			Value: description.GSWalPath,
+		})
 		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
@@ -2591,4 +2612,16 @@ func ensurePath(file string, defaultDir string, defaultFile string) string {
 		return path.Join(defaultDir, file)
 	}
 	return file
+}
+
+func (c *Cluster) validateContainers(containers []v1.Container) error {
+	for i, container := range containers {
+		if container.Name == "" {
+			return fmt.Errorf("container[%d]: name is required", i)
+		}
+		if container.Image == "" {
+			return fmt.Errorf("container '%v': image is required", container.Name)
+		}
+	}
+	return nil
 }

@@ -801,6 +801,41 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	// this should update the Patroni config again
 	err = cluster.syncStandbyClusterConfiguration()
 	assert.NoError(t, err)
+
+	// test with standby_host, standby_port and standby_primary_slot_name
+	cluster.Spec.StandbyCluster = &acidv1.StandbyDescription{
+		StandbyHost:            "remote-primary.example.com",
+		StandbyPort:            "5433",
+		StandbyPrimarySlotName: "standby_slot",
+	}
+	cluster.syncStatefulSet()
+	updatedSts4 := cluster.Statefulset
+
+	// check that pods have all three STANDBY_* environment variables
+	assert.Contains(t, updatedSts4.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_HOST", Value: "remote-primary.example.com"})
+	assert.Contains(t, updatedSts4.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PORT", Value: "5433"})
+	assert.Contains(t, updatedSts4.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PRIMARY_SLOT_NAME", Value: "standby_slot"})
+
+	// this should update the Patroni config with host, port and primary_slot_name
+	err = cluster.syncStandbyClusterConfiguration()
+	assert.NoError(t, err)
+
+	// test property deletion: remove standby_primary_slot_name
+	cluster.Spec.StandbyCluster = &acidv1.StandbyDescription{
+		StandbyHost: "remote-primary.example.com",
+		StandbyPort: "5433",
+	}
+	cluster.syncStatefulSet()
+	updatedSts5 := cluster.Statefulset
+
+	// check that STANDBY_PRIMARY_SLOT_NAME is not present
+	assert.Contains(t, updatedSts5.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_HOST", Value: "remote-primary.example.com"})
+	assert.Contains(t, updatedSts5.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PORT", Value: "5433"})
+	assert.NotContains(t, updatedSts5.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PRIMARY_SLOT_NAME", Value: "standby_slot"})
+
+	// this should update the Patroni config and set primary_slot_name to nil
+	err = cluster.syncStandbyClusterConfiguration()
+	assert.NoError(t, err)
 }
 
 func TestUpdateSecret(t *testing.T) {
@@ -963,4 +998,58 @@ func TestUpdateSecret(t *testing.T) {
 	if currentUsername != appUser {
 		t.Errorf("%s: updated secret does not contain expected username: expected %s, got %s", testName, appUser, currentUsername)
 	}
+}
+
+func TestUpdateSecretNameConflict(t *testing.T) {
+	client, _ := newFakeK8sSyncSecretsClient()
+
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	secretTemplate := config.StringTemplate("{username}.{cluster}.credentials")
+
+	// define manifest user that has the same name as a prepared database owner user except for dashes vs underscores
+	// because of this the operator cannot create both secrets because underscores are not allowed in k8s secret names
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			PreparedDatabases: map[string]acidv1.PreparedDatabase{"prepared": {DefaultUsers: true}},
+			Users:             map[string]acidv1.UserFlags{"prepared-owner-user": {}},
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				Auth: config.Auth{
+					SuperUsername:       "postgres",
+					ReplicationUsername: "standby",
+					SecretNameTemplate:  secretTemplate,
+				},
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: "cluster-name",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+	cluster.pgUsers = map[string]spec.PgUser{}
+
+	// init all users
+	cluster.initUsers()
+	// create secrets and fail because of user name mismatch
+	// prepared-owner-user from manifest vs prepared_owner_user from prepared database
+	err := cluster.syncSecrets()
+	assert.Error(t, err)
+
+	// the order of secrets to sync is not deterministic, check only first part of the error message
+	expectedError := fmt.Sprintf("syncing secret %s failed: error while checking for password rotation: could not update secret because of user name mismatch", "default/prepared-owner-user.acid-test-cluster.credentials")
+	assert.Contains(t, err.Error(), expectedError)
 }
