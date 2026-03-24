@@ -2103,10 +2103,13 @@ func TestGetSwitchoverSchedule(t *testing.T) {
 	pastWindowTimeStart := pastTimeStart.Format("15:04")
 	pastWindowTimeEnd := now.Add(-1 * time.Hour).Format("15:04")
 
+	defaultWindowStr := fmt.Sprintf("%s-%s", futureWindowTimeStart, futureWindowTimeEnd)
+
 	tests := []struct {
-		name     string
-		windows  []acidv1.MaintenanceWindow
-		expected string
+		name           string
+		windows        []acidv1.MaintenanceWindow
+		defaultWindows []string
+		expected       string
 	}{
 		{
 			name: "everyday maintenance windows is later today",
@@ -2168,11 +2171,40 @@ func TestGetSwitchoverSchedule(t *testing.T) {
 			},
 			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
 		},
+		{
+			name:           "fallback to operator default window when spec is empty",
+			windows:        []acidv1.MaintenanceWindow{},
+			defaultWindows: []string{defaultWindowStr},
+			expected:       futureTimeStart.Format("2006-01-02T15:04+00"),
+		},
+		{
+			name:           "no windows defined returns empty string",
+			windows:        []acidv1.MaintenanceWindow{},
+			defaultWindows: nil,
+			expected:       "",
+		},
+		{
+			name: "choose the earliest window from multiple in spec",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.AddDate(0, 0, 2).Weekday(),
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+				{
+					Weekday:   now.AddDate(0, 0, 1).Weekday(),
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster.Spec.MaintenanceWindows = tt.windows
+			cluster.OpConfig.MaintenanceWindows = tt.defaultWindows
 			schedule := cluster.getSwitchoverScheduleAtTime(now)
 			if schedule != tt.expected {
 				t.Errorf("Expected GetSwitchoverSchedule to return %s, returned: %s", tt.expected, schedule)
