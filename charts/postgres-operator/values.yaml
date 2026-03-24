@@ -466,6 +466,11 @@ rbac:
   create: true
   # Specifies whether ClusterRoles that are aggregated into the K8s default roles should be created. (https://kubernetes.io/docs/reference/access-authn-authz/rbac/#default-roles-and-role-bindings)
   createAggregateClusterRoles: false
+  # If cluster is set to run as privileged - which pod security policy should be used
+  operatorRunWithPsp: false
+  spiloRunWithPsp: false
+  spiloPrivilegedPodSecurityPolicy: privileged
+  operatorPrivilegedPodSecurityPolicy: privileged
 
 serviceAccount:
   # Specifies whether a ServiceAccount should be created
