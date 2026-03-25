@@ -14,6 +14,13 @@ readonly e2e_test_runner_image="ghcr.io/zalando/postgres-operator-e2e-tests-runn
 export GOPATH=${GOPATH-~/go}
 export PATH=${GOPATH}/bin:$PATH
 
+# detect system architecture for pulling the correct Spilo image
+case "$(uname -m)" in
+    x86_64)  readonly PLATFORM="linux/amd64" ;;
+    aarch64|arm64) readonly PLATFORM="linux/arm64" ;;
+    *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+esac
+
 echo "Clustername: ${cluster_name}"
 echo "Kubeconfig path: ${kubeconfig_path}"
 
@@ -43,9 +50,8 @@ function start_kind(){
   export KUBECONFIG="${kubeconfig_path}"
   kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml  
   
-  # Pull all platforms to satisfy Kind's --all-platforms requirement
-  docker pull --platform linux/amd64 "${spilo_image}"
-  docker pull --platform linux/arm64 "${spilo_image}"
+  echo "Pulling Spilo image for platform ${PLATFORM}"
+  docker pull --platform ${PLATFORM} "${spilo_image}"
   kind load docker-image "${spilo_image}" --name ${cluster_name}
 }
 
