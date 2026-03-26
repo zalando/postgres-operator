@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,12 +25,12 @@ SOFTWARE.
 package v1
 
 import (
-	"context"
+	context "context"
 
 	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rest "k8s.io/client-go/rest"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // OperatorConfigurationsGetter has a method to return a OperatorConfigurationInterface.
@@ -41,33 +41,24 @@ type OperatorConfigurationsGetter interface {
 
 // OperatorConfigurationInterface has methods to work with OperatorConfiguration resources.
 type OperatorConfigurationInterface interface {
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*acidzalandov1.OperatorConfiguration, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*acidzalandov1.OperatorConfiguration, error)
 	OperatorConfigurationExpansion
 }
 
 // operatorConfigurations implements OperatorConfigurationInterface
 type operatorConfigurations struct {
-	client rest.Interface
-	ns     string
+	*gentype.Client[*acidzalandov1.OperatorConfiguration]
 }
 
 // newOperatorConfigurations returns a OperatorConfigurations
 func newOperatorConfigurations(c *AcidV1Client, namespace string) *operatorConfigurations {
 	return &operatorConfigurations{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClient[*acidzalandov1.OperatorConfiguration](
+			"operatorconfigurations",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *acidzalandov1.OperatorConfiguration { return &acidzalandov1.OperatorConfiguration{} },
+		),
 	}
-}
-
-// Get takes name of the operatorConfiguration, and returns the corresponding operatorConfiguration object, and an error if there is any.
-func (c *operatorConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *acidzalandov1.OperatorConfiguration, err error) {
-	result = &acidzalandov1.OperatorConfiguration{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("operatorconfigurations").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
 }

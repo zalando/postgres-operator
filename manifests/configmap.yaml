@@ -34,7 +34,7 @@ data:
   default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: ghcr.io/zalando/spilo-17:4.0-p3
+  docker_image: ghcr.io/zalando/spilo-18:4.1-p1
   # downscaler_annotations: "deployment-time,downscaler/*"
   enable_admin_role_for_users: "true"
   enable_crd_registration: "true"
@@ -75,6 +75,7 @@ data:
   # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
   # infrastructure_roles_secrets: "secretname:monitoring-roles,userkey:user,passwordkey:password,rolekey:inrole"
   # ignore_instance_limits_annotation_key: ""
+  # ignore_resources_limits_annotation_key: ""
   # inherited_annotations: owned-by
   # inherited_labels: application,environment
   # kube_iam_role: ""
@@ -101,6 +102,7 @@ data:
   logical_backup_s3_sse: "AES256"
   logical_backup_s3_retention_time: ""
   logical_backup_schedule: "30 00 * * *"
+  # maintenance_windows: "Sat:22:00-23:59,Sun:00:00-01:00"
   major_version_upgrade_mode: "manual"
   # major_version_upgrade_team_allow_list: ""
   master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
@@ -112,7 +114,7 @@ data:
   min_cpu_limit: 250m
   min_instances: "-1"
   min_memory_limit: 250Mi
-  minimal_major_version: "13"
+  minimal_major_version: "14"
   # node_readiness_label: "status:ready"
   # node_readiness_label_merge: "OR"
   oauth_token_secret_name: postgresql-operator
@@ -162,7 +164,7 @@ data:
   spilo_privileged: "false"
   storage_resize_mode: "pvc"
   super_username: postgres
-  target_major_version: "17"
+  target_major_version: "18"
   team_admin_role: "admin"
   team_api_role_configuration: "log_statement:all"
   teams_api_url: http://fake-teams-api.default.svc.cluster.local

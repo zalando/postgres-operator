@@ -49,8 +49,8 @@ type PostgresUsersConfiguration struct {
 type MajorVersionUpgradeConfiguration struct {
 	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"manual"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
 	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
-	MinimalMajorVersion              string   `json:"minimal_major_version" default:"13"`
-	TargetMajorVersion               string   `json:"target_major_version" default:"17"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"14"`
+	TargetMajorVersion               string   `json:"target_major_version" default:"18"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
@@ -266,6 +266,7 @@ type OperatorConfigurationData struct {
 	Workers                       uint32                             `json:"workers,omitempty"`
 	ResyncPeriod                  Duration                           `json:"resync_period,omitempty"`
 	RepairPeriod                  Duration                           `json:"repair_period,omitempty"`
+	MaintenanceWindows            []MaintenanceWindow                `json:"maintenance_windows,omitempty"`
 	SetMemoryRequestToLimit       bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                     *bool                              `json:"enable_shm_volume,omitempty"`
 	SidecarImages                 map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
@@ -285,9 +286,10 @@ type OperatorConfigurationData struct {
 	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
 	Patroni                       PatroniConfiguration               `json:"patroni"`
 
-	MinInstances                      int32  `json:"min_instances,omitempty"`
-	MaxInstances                      int32  `json:"max_instances,omitempty"`
-	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
+	MinInstances                       int32  `json:"min_instances,omitempty"`
+	MaxInstances                       int32  `json:"max_instances,omitempty"`
+	IgnoreInstanceLimitsAnnotationKey  string `json:"ignore_instance_limits_annotation_key,omitempty"`
+	IgnoreResourcesLimitsAnnotationKey string `json:"ignore_resources_limits_annotation_key,omitempty"`
 }
 
 // Duration shortens this frequently used name
