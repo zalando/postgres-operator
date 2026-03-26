@@ -7,23 +7,36 @@ set -o pipefail
 IFS=$'\n\t'
 
 readonly cluster_name="postgres-operator-e2e-tests"
-readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
-readonly spilo_image="registry.opensource.zalan.do/acid/spilo-17-e2e:0.3"
-readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:0.4"
+readonly kubeconfig_path="${HOME}/kind-config-${cluster_name}"
+readonly spilo_image="ghcr.io/zalando/spilo-18:4.1-p1"
+readonly e2e_test_runner_image="ghcr.io/zalando/postgres-operator-e2e-tests-runner:latest"
 
 export GOPATH=${GOPATH-~/go}
 export PATH=${GOPATH}/bin:$PATH
+
+# detect system architecture for pulling the correct Spilo image
+case "$(uname -m)" in
+    x86_64)  readonly PLATFORM="linux/amd64" ;;
+    aarch64|arm64) readonly PLATFORM="linux/arm64" ;;
+    *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+esac
 
 echo "Clustername: ${cluster_name}"
 echo "Kubeconfig path: ${kubeconfig_path}"
 
 function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
-  if [[ -z $(docker images -q registry.opensource.zalan.do/acid/postgres-operator:${operator_tag}) ]]
+  image_name="ghcr.io/zalando/postgres-operator:${operator_tag}"
+  if [[ -z $(docker images -q "${image_name}") ]]
   then
-    docker pull registry.opensource.zalan.do/acid/postgres-operator:latest
+    if ! docker pull "${image_name}"
+    then
+      echo "Failed to pull operator image: ${image_name}"
+      exit 1
+    fi
   fi
-  operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
+  operator_image="${image_name}"
+  echo "Using operator image: ${operator_image}"
 }
 
 function start_kind(){
@@ -36,7 +49,9 @@ function start_kind(){
 
   export KUBECONFIG="${kubeconfig_path}"
   kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml  
-  docker pull "${spilo_image}"
+  
+  echo "Pulling Spilo image for platform ${PLATFORM}"
+  docker pull --platform ${PLATFORM} "${spilo_image}"
   kind load docker-image "${spilo_image}" --name ${cluster_name}
 }
 
@@ -52,7 +67,7 @@ function set_kind_api_server_ip(){
   # but update the IP address of the API server to the one from the Docker 'bridge' network
   readonly local kind_api_server_port=6443 # well-known in the 'kind' codebase
   readonly local kind_api_server=$(docker inspect --format "{{ .NetworkSettings.Networks.kind.IPAddress }}:${kind_api_server_port}" "${cluster_name}"-control-plane)
-  sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}"
+  sed "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}" > "${kubeconfig_path}".tmp && mv "${kubeconfig_path}".tmp "${kubeconfig_path}"
 }
 
 function generate_certificate(){

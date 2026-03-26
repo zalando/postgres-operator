@@ -288,6 +288,12 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		},
 	}
 
+	// add postgresql cluster to fake client
+	_, err := client.PostgresqlsGetter.Postgresqls(namespace).Create(context.TODO(), &pg, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	cluster := New(
 		Config{
 			OpConfig: config.Config{
@@ -321,7 +327,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		}, client, pg, logger, eventRecorder)
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
-	_, err := cluster.createStatefulSet()
+	_, err = cluster.createStatefulSet()
 	if err != nil {
 		return nil, err
 	}
@@ -651,6 +657,22 @@ func Test_trimCronjobName(t *testing.T) {
 }
 
 func TestIsInMaintenanceWindow(t *testing.T) {
+	cluster := New(
+		Config{
+			OpConfig: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+
 	now := time.Now()
 	futureTimeStart := now.Add(1 * time.Hour)
 	futureTimeStartFormatted := futureTimeStart.Format("15:04")
@@ -658,14 +680,16 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 	futureTimeEndFormatted := futureTimeEnd.Format("15:04")
 
 	tests := []struct {
-		name     string
-		windows  []acidv1.MaintenanceWindow
-		expected bool
+		name          string
+		windows       []acidv1.MaintenanceWindow
+		configWindows []string
+		expected      bool
 	}{
 		{
-			name:     "no maintenance windows",
-			windows:  nil,
-			expected: true,
+			name:          "no maintenance windows",
+			windows:       nil,
+			configWindows: nil,
+			expected:      true,
 		},
 		{
 			name: "maintenance windows with everyday",
@@ -676,7 +700,8 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 					EndTime:   mustParseTime("23:59"),
 				},
 			},
-			expected: true,
+			configWindows: nil,
+			expected:      true,
 		},
 		{
 			name: "maintenance windows with weekday",
@@ -687,7 +712,8 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 					EndTime:   mustParseTime("23:59"),
 				},
 			},
-			expected: true,
+			configWindows: nil,
+			expected:      true,
 		},
 		{
 			name: "maintenance windows with future interval time",
@@ -700,12 +726,25 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name:          "global maintenance windows with future interval time",
+			windows:       nil,
+			configWindows: []string{fmt.Sprintf("%s-%s", futureTimeStartFormatted, futureTimeEndFormatted)},
+			expected:      false,
+		},
+		{
+			name:          "global maintenance windows all day",
+			windows:       nil,
+			configWindows: []string{"00:00-02:00", "02:00-23:59"},
+			expected:      true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			cluster.OpConfig.MaintenanceWindows = tt.configWindows
 			cluster.Spec.MaintenanceWindows = tt.windows
-			if isInMaintenanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
+			if cluster.isInMaintenanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {
 				t.Errorf("Expected isInMaintenanceWindow to return %t", tt.expected)
 			}
 		})

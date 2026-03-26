@@ -1,6 +1,6 @@
 package volumes
 
-//go:generate mockgen -package mocks -destination=../../../mocks/$GOFILE -source=$GOFILE -build_flags=-mod=vendor
+//go:generate go tool mockgen -package mocks -destination=../../../mocks/$GOFILE -source=$GOFILE
 
 import v1 "k8s.io/api/core/v1"
 

@@ -29,13 +29,13 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 17, starting from 13+
+* Supports PostgreSQL 18, starting from 14+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
-[pg_basebackup](https://www.postgresql.org/docs/17/app-pgbasebackup.html) /
+[pg_basebackup](https://www.postgresql.org/docs/18/app-pgbasebackup.html) /
 [WAL-G](https://github.com/wal-g/wal-g) or [WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
 * Preload libraries: [bg_mon](https://github.com/CyberDem0n/bg_mon),
-[pg_stat_statements](https://www.postgresql.org/docs/17/pgstatstatements.html),
+[pg_stat_statements](https://www.postgresql.org/docs/18/pgstatstatements.html),
 [pgextwlist](https://github.com/dimitri/pgextwlist),
 [pg_auth_mon](https://github.com/RafiaSabih/pg_auth_mon)
 * Incl. popular Postgres extensions such as
@@ -63,7 +63,7 @@ production for over five years.
 
 | Release   | Postgres versions | K8s versions      | Golang  |
 | :-------- | :---------------: | :---------------: | :-----: |
-| v1.15.0   | 13 &rarr; 17      | 1.27+             | 1.25.3  |
+| v1.15.1   | 13 &rarr; 17      | 1.27+             | 1.25.3  |
 | v1.14.0   | 13 &rarr; 17      | 1.27+             | 1.23.4  |
 | v1.13.0   | 12 &rarr; 16      | 1.27+             | 1.22.5  |
 | v1.12.0   | 11 &rarr; 16      | 1.27+             | 1.22.3  |
