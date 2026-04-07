@@ -41,6 +41,12 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	defer c.mu.Unlock()
 
 	oldSpec := c.Postgresql
+
+	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
+
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -95,11 +101,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		if nil != err {
 			return err
 		}
-	}
-
-	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
-		// do not apply any major version related changes yet
-		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
 
 	if err = c.syncStatefulSet(); err != nil {
