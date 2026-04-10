@@ -79,7 +79,7 @@ local: ${SOURCES} $(GENERATED_CRDS)
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)
 
 wasm: ${SOURCES} $(GENERATED_CRDS)
-	GOOS=wasip1 GOARCH=wasm CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY}.wasm $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)
+	GOOS=wasip1 GOARCH=wasm CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY}.wasm ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 linux: ${SOURCES} $(GENERATED_CRDS)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
