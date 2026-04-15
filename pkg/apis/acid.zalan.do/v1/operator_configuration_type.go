@@ -209,16 +209,18 @@ type ScalyrConfiguration struct {
 
 // ConnectionPoolerConfiguration defines default configuration for connection pooler
 type ConnectionPoolerConfiguration struct {
-	NumberOfInstances    *int32 `json:"connection_pooler_number_of_instances,omitempty"`
-	Schema               string `json:"connection_pooler_schema,omitempty"`
-	User                 string `json:"connection_pooler_user,omitempty"`
-	Image                string `json:"connection_pooler_image,omitempty"`
-	Mode                 string `json:"connection_pooler_mode,omitempty"`
-	MaxDBConnections     *int32 `json:"connection_pooler_max_db_connections,omitempty"`
-	DefaultCPURequest    string `json:"connection_pooler_default_cpu_request,omitempty"`
-	DefaultMemoryRequest string `json:"connection_pooler_default_memory_request,omitempty"`
-	DefaultCPULimit      string `json:"connection_pooler_default_cpu_limit,omitempty"`
-	DefaultMemoryLimit   string `json:"connection_pooler_default_memory_limit,omitempty"`
+	NumberOfInstances    *int32            `json:"connection_pooler_number_of_instances,omitempty"`
+	Schema               string            `json:"connection_pooler_schema,omitempty"`
+	User                 string            `json:"connection_pooler_user,omitempty"`
+	Image                string            `json:"connection_pooler_image,omitempty"`
+	Mode                 string            `json:"connection_pooler_mode,omitempty"`
+	MaxDBConnections     *int32            `json:"connection_pooler_max_db_connections,omitempty"`
+	Labels               map[string]string `json:"connection_pooler_labels,omitempty"`
+	RoleLabel            string            `json:"connection_pooler_role_label,omitempty"`
+	DefaultCPURequest    string            `json:"connection_pooler_default_cpu_request,omitempty"`
+	DefaultMemoryRequest string            `json:"connection_pooler_default_memory_request,omitempty"`
+	DefaultCPULimit      string            `json:"connection_pooler_default_cpu_limit,omitempty"`
+	DefaultMemoryLimit   string            `json:"connection_pooler_default_memory_limit,omitempty"`
 }
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup

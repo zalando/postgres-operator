@@ -45,7 +45,7 @@ func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
 	for _, role := range [2]PostgresRole{Master, Replica} {
 
 		poolerLabels := cluster.labelsSet(false)
-		poolerLabels["application"] = "db-connection-pooler"
+		poolerLabels["component"] = "db-connection-pooler"
 		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
 
 		if cluster.ConnectionPooler[role] != nil && cluster.ConnectionPooler[role].Deployment != nil &&
@@ -65,7 +65,7 @@ func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
 
 	for _, role := range []PostgresRole{Master, Replica} {
 		poolerLabels := cluster.labelsSet(false)
-		poolerLabels["application"] = "db-connection-pooler"
+		poolerLabels["component"] = "db-connection-pooler"
 		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
 
 		if cluster.ConnectionPooler[role].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[role].Deployment.Labels, poolerLabels) {
@@ -86,7 +86,7 @@ func MasterObjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error
 	}
 
 	poolerLabels := cluster.labelsSet(false)
-	poolerLabels["application"] = "db-connection-pooler"
+	poolerLabels["component"] = "db-connection-pooler"
 	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(Master)
 
 	if cluster.ConnectionPooler[Master].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[Master].Deployment.Labels, poolerLabels) {
@@ -106,7 +106,7 @@ func ReplicaObjectsAreSaved(cluster *Cluster, err error, reason SyncReason) erro
 	}
 
 	poolerLabels := cluster.labelsSet(false)
-	poolerLabels["application"] = "db-connection-pooler"
+	poolerLabels["component"] = "db-connection-pooler"
 	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(Replica)
 
 	if cluster.ConnectionPooler[Replica].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[Replica].Deployment.Labels, poolerLabels) {
@@ -170,6 +170,8 @@ func TestNeedConnectionPooler(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
@@ -301,6 +303,8 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 		Config{
 			OpConfig: config.Config{
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
@@ -336,7 +340,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 	}
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		poolerLabels := cluster.labelsSet(false)
-		poolerLabels["application"] = "db-connection-pooler"
+		poolerLabels["component"] = "db-connection-pooler"
 		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
 
 		if cluster.ConnectionPooler[role] != nil {
@@ -409,6 +413,8 @@ func TestConnectionPoolerSync(t *testing.T) {
 		Config{
 			OpConfig: config.Config{
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
@@ -678,6 +684,8 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				PodServiceAccountName: "postgres-pod",
 				ConnectionPooler: config.ConnectionPooler{
 					MaxDBConnections:                     k8sutil.Int32ToPointer(60),
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
@@ -789,6 +797,8 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
@@ -1003,6 +1013,8 @@ func TestPoolerTLS(t *testing.T) {
 					SpiloFSGroup:         &spiloFSGroup,
 				},
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
@@ -1072,6 +1084,8 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",

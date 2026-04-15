@@ -3022,6 +3022,8 @@ func TestEnableLoadBalancers(t *testing.T) {
 			subTest: "LBs enabled in config, disabled in manifest",
 			config: config.Config{
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
@@ -3069,6 +3071,8 @@ func TestEnableLoadBalancers(t *testing.T) {
 			subTest: "LBs enabled in manifest, disabled in config",
 			config: config.Config{
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",

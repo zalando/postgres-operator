@@ -115,8 +115,9 @@ func (c *Cluster) poolerUser(spec *acidv1.PostgresSpec) string {
 func (c *Cluster) poolerLabelsSet(addExtraLabels bool) labels.Set {
 	poolerLabels := c.labelsSet(addExtraLabels)
 
-	// TODO should be config values
-	poolerLabels["application"] = "db-connection-pooler"
+	for k, v := range c.OpConfig.ConnectionPooler.Labels {
+		poolerLabels[k] = v
+	}
 
 	return poolerLabels
 }
@@ -134,7 +135,7 @@ func (c *Cluster) connectionPoolerLabels(role PostgresRole, addExtraLabels bool)
 
 	if addExtraLabels {
 		extraLabels := map[string]string{}
-		extraLabels[c.OpConfig.PodRoleLabel] = string(role)
+		extraLabels[c.OpConfig.ConnectionPooler.RoleLabel] = string(role)
 
 		poolerLabelsSet = labels.Merge(poolerLabelsSet, extraLabels)
 	}

@@ -898,6 +898,17 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"connection_pooler_image": {
 								Type: "string",
 							},
+							"connection_pooler_labels": {
+								Type: "object",
+								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
+							"connection_pooler_role_label": {
+								Type: "string",
+							},
 							"connection_pooler_max_db_connections": {
 								Type: "integer",
 							},

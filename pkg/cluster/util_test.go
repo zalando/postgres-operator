@@ -301,6 +301,8 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 				PatroniAPICheckTimeout:  time.Duration(5),
 				KubernetesUseConfigMaps: true,
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",

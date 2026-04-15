@@ -152,16 +152,18 @@ type LogicalBackup struct {
 
 // Operator options for connection pooler
 type ConnectionPooler struct {
-	NumberOfInstances                    *int32 `name:"connection_pooler_number_of_instances" default:"2"`
-	Schema                               string `name:"connection_pooler_schema" default:"pooler"`
-	User                                 string `name:"connection_pooler_user" default:"pooler"`
-	Image                                string `name:"connection_pooler_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
-	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
-	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
-	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request"`
-	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request"`
-	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit"`
-	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit"`
+	NumberOfInstances                    *int32            `name:"connection_pooler_number_of_instances" default:"2"`
+	Schema                               string            `name:"connection_pooler_schema" default:"pooler"`
+	User                                 string            `name:"connection_pooler_user" default:"pooler"`
+	Image                                string            `name:"connection_pooler_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
+	Mode                                 string            `name:"connection_pooler_mode" default:"transaction"`
+	MaxDBConnections                     *int32            `name:"connection_pooler_max_db_connections" default:"60"`
+	Labels                               map[string]string `name:"connection_pooler_labels,omitempty" default:"component:db-connection-pooler"`
+	RoleLabel                            string            `name:"connection_pooler_role_label" default:"pooler-role"`
+	ConnectionPoolerDefaultCPURequest    string            `name:"connection_pooler_default_cpu_request"`
+	ConnectionPoolerDefaultMemoryRequest string            `name:"connection_pooler_default_memory_request"`
+	ConnectionPoolerDefaultCPULimit      string            `name:"connection_pooler_default_cpu_limit"`
+	ConnectionPoolerDefaultMemoryLimit   string            `name:"connection_pooler_default_memory_limit"`
 }
 
 // Config describes operator config
@@ -302,6 +304,11 @@ func Copy(c *Config) Config {
 	cfg.ClusterLabels = make(map[string]string, len(c.ClusterLabels))
 	for k, v := range c.ClusterLabels {
 		cfg.ClusterLabels[k] = v
+	}
+
+	cfg.ConnectionPooler.Labels = make(map[string]string, len(c.ConnectionPooler.Labels))
+	for k, v := range c.ConnectionPooler.Labels {
+		cfg.ConnectionPooler.Labels[k] = v
 	}
 
 	return cfg

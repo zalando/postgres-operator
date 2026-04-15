@@ -10,13 +10,13 @@ echo
 echo 'Pods'
 kubectl get pods -l application=spilo -o wide --all-namespaces
 echo
-kubectl get pods -l application=db-connection-pooler -o wide --all-namespaces
+kubectl get pods -l application=spilo,component=db-connection-pooler -o wide --all-namespaces
 echo
 echo 'Statefulsets'
 kubectl get statefulsets --all-namespaces
 echo
 echo 'Deployments'
-kubectl get deployments --all-namespaces -l application=db-connection-pooler
+kubectl get deployments --all-namespaces -l application=spilo,component=db-connection-pooler
 kubectl get deployments --all-namespaces -l application=postgres-operator
 echo
 echo

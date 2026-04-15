@@ -4,19 +4,22 @@ kind: Deployment
 metadata:
   name: acid-minimal-cluster-pooler
   labels:
-    application: db-connection-pooler
+    application: spilo
+    component: db-connection-pooler
     connection-pooler: acid-minimal-cluster-pooler
 spec:
   replicas: 1
   selector:
     matchLabels:
-      application: db-connection-pooler
+      application: spilo
+      component: db-connection-pooler
       connection-pooler: acid-minimal-cluster-pooler
       cluster-name: acid-minimal-cluster
   template:
     metadata:
       labels:
-        application: db-connection-pooler
+        application: spilo
+        component: db-connection-pooler
         connection-pooler: acid-minimal-cluster-pooler
         cluster-name: acid-minimal-cluster
     spec:
