@@ -47,6 +47,9 @@ configGeneral:
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: false
 
+  # toogle to use maintenance windows feature
+  enable_maintenance_windows: true
+
   # maintenance windows applied to all Postgres clusters unless overridden in the manifest
   # maintenance_windows:
   # - "Sun:01:00-06:00"

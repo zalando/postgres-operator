@@ -173,14 +173,15 @@ type Config struct {
 	LogicalBackup
 	ConnectionPooler
 
-	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
-	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	MaintenanceWindows      []string          `name:"maintenance_windows"`
-	DockerImage             string            `name:"docker_image" default:"ghcr.io/zalando/spilo-18:4.1-p1"`
-	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
-	SidecarContainers       []v1.Container    `name:"sidecars"`
-	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
+	WatchedNamespace         string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	KubernetesUseConfigMaps  bool              `name:"kubernetes_use_configmaps" default:"false"`
+	EtcdHost                 string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
+	EnableMaintenanceWindows *bool             `name:"enable_maintenance_windows" default:"true"`
+	MaintenanceWindows       []string          `name:"maintenance_windows"`
+	DockerImage              string            `name:"docker_image" default:"ghcr.io/zalando/spilo-18:4.1-p1"`
+	SidecarImages            map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
+	SidecarContainers        []v1.Container    `name:"sidecars"`
+	PodServiceAccountName    string            `name:"pod_service_account_name" default:"postgres-pod"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition              string            `name:"pod_service_account_definition" default:""`
 	PodServiceAccountRoleBindingDefinition   string            `name:"pod_service_account_role_binding_definition" default:""`
