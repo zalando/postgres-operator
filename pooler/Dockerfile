@@ -14,13 +14,12 @@ RUN git clone \
     https://github.com/pgbouncer/pgbouncer.git .
 
 RUN git submodule init && git submodule update
-RUN ln -s /usr/bin/rst2man.py /usr/bin/rst2man
-RUN ./autogen.sh
-RUN ./configure --prefix=/pgbouncer --with-libevent=/usr/lib
 
-RUN sed -i '/dist_man_MANS/d' Makefile
-RUN make
-RUN make install
+RUN ./autogen.sh && \
+    ./configure --prefix=/pgbouncer --with-libevent=/usr/lib && \
+    sed -i '/dist_man_MANS/d' Makefile && \
+    make && \
+    make install
 
 FROM ${BASE_IMAGE}
 
