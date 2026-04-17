@@ -8,6 +8,7 @@ configuration:
   # crd_categories:
   # - all
   # enable_lazy_spilo_upgrade: false
+  enable_maintenance_windows: true
   enable_pgversion_env_var: true
   # enable_shm_volume: true
   enable_spilo_wal_path_compat: false
