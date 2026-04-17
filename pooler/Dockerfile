@@ -1,4 +1,5 @@
-FROM container-registry.zalando.net/library/alpine-3.19:latest AS build_stage
+ARG BASE_IMAGE=alpine:3.19
+FROM $BASE_IMAGE AS build_stage
 
 WORKDIR /
 RUN apk --update add \
@@ -28,7 +29,7 @@ RUN make install
 WORKDIR /src/test
 RUN make check
 
-FROM container-registry.zalando.net/library/alpine-3.19:latest
+FROM $BASE_IMAGE
 RUN apk -U upgrade --no-cache \
     && apk --no-cache add bash c-ares ca-certificates gettext libevent openssl postgresql-client
 
