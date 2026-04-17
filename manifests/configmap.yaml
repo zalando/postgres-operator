@@ -46,6 +46,7 @@ data:
   enable_ebs_gp3_migration_max_size: "1000"
   enable_init_containers: "true"
   enable_lazy_spilo_upgrade: "false"
+  enable_maintenance_windows: "true"
   enable_master_load_balancer: "false"
   enable_master_pooler_load_balancer: "false"
   enable_password_rotation: "false"
