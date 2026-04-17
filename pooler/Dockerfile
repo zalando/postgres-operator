@@ -16,7 +16,6 @@ WORKDIR /bin
 RUN ln -s ../usr/bin/rst2man.py rst2man
 
 WORKDIR /src
-RUN mkdir /pgbouncer
 RUN git submodule init
 RUN git submodule update
 RUN ./autogen.sh
