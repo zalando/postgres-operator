@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -14,15 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// VersionMap Map of version numbers
-var VersionMap = map[string]int{
-	"13": 130000,
-	"14": 140000,
-	"15": 150000,
-	"16": 160000,
-	"17": 170000,
-}
-
 const (
 	majorVersionUpgradeSuccessAnnotation = "last-major-upgrade-success"
 	majorVersionUpgradeFailureAnnotation = "last-major-upgrade-failure"
@@ -30,21 +22,22 @@ const (
 
 // IsBiggerPostgresVersion Compare two Postgres version numbers
 func IsBiggerPostgresVersion(old string, new string) bool {
-	oldN := VersionMap[old]
-	newN := VersionMap[new]
+	oldN, _ := strconv.Atoi(old)
+	newN, _ := strconv.Atoi(new)
 	return newN > oldN
 }
 
 // GetDesiredMajorVersionAsInt Convert string to comparable integer of PG version
 func (c *Cluster) GetDesiredMajorVersionAsInt() int {
-	return VersionMap[c.GetDesiredMajorVersion()]
+	version, _ := strconv.Atoi(c.GetDesiredMajorVersion())
+	return version * 10000
 }
 
 // GetDesiredMajorVersion returns major version to use, incl. potential auto upgrade
 func (c *Cluster) GetDesiredMajorVersion() string {
 
 	if c.Config.OpConfig.MajorVersionUpgradeMode == "full" {
-		// e.g. current is 13, minimal is 13 allowing 13 to 17 clusters, everything below is upgraded
+		// e.g. current is 14, minimal is 14 allowing 14 to 18 clusters, everything below is upgraded
 		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.MinimalMajorVersion) {
 			c.logger.Infof("overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
 			return c.Config.OpConfig.TargetMajorVersion
@@ -275,6 +268,10 @@ func (c *Cluster) majorVersionUpgrade() error {
 			if err != nil {
 				isUpgradeSuccess = false
 				c.annotatePostgresResource(isUpgradeSuccess)
+				c.logger.Errorf("upgrade action triggered but command failed: %v", err)
+				if strings.TrimSpace(scriptErrMsg) == "" {
+					scriptErrMsg = err.Error()
+				}
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, scriptErrMsg)
 				return fmt.Errorf("%s", scriptErrMsg)
 			}

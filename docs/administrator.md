@@ -65,7 +65,10 @@ the `PGVERSION` environment variable is set for the database pods. Since
 In-place major version upgrades can be configured to be executed by the
 operator with the `major_version_upgrade_mode` option. By default, it is
 enabled (mode: `manual`). In any case, altering the version in the manifest
-will trigger a rolling update of pods to update the `PGVERSION` env variable.
+will update the desired `PGVERSION`. If `maintenanceWindows` are configured,
+major-version-related pod rotation is deferred until the next maintenance
+window. Without maintenance windows, the operator will trigger a rolling
+update of pods to apply the new `PGVERSION`.
 Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
 script will notice the version mismatch but start the current version again.
 
@@ -92,10 +95,11 @@ Thus, the `full` mode can create drift between desired and actual state.
 
 ### Upgrade during maintenance windows
 
-When `maintenanceWindows` are defined in the Postgres manifest the operator
-will trigger a major version upgrade only during these periods. Make sure they
-are at least twice as long as your configured `resync_period` to guarantee
-that operator actions can be triggered.
+When `maintenanceWindows` are defined in the Postgres manifest or in the global
+config the operator will trigger major-version-related pod rotation and the
+major version upgrade only during these periods. Make sure they are at least
+twice as long as your configured `resync_period` to guarantee that operator
+actions can be triggered.
 
 ### Upgrade annotations
 
@@ -1347,7 +1351,7 @@ aws_or_gcp:
 
 If cluster members have to be (re)initialized restoring physical backups
 happens automatically either from the backup location or by running
-[pg_basebackup](https://www.postgresql.org/docs/17/app-pgbasebackup.html)
+[pg_basebackup](https://www.postgresql.org/docs/18/app-pgbasebackup.html)
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.

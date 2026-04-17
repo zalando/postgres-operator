@@ -23,7 +23,10 @@ pipeline:
       - desc: Run unit tests
         cmd: |
           make mocks test
-
+          if ! git diff --quiet; then
+            echo "Build resulted in files being changed, likely they were not checked in"
+            exit 1
+          fi
       - desc: Build Docker image
         cmd: |
           if [ -z ${CDP_SOURCE_BRANCH} ]; then

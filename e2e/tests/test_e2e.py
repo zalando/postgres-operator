@@ -12,9 +12,9 @@ from kubernetes import client
 from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-17-e2e:0.3"
-SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-17-e2e:0.4"
-SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-17:4.0-p3"
+SPILO_CURRENT = "ghcr.io/zalando/spilo-e2e:dev-18.3"
+SPILO_LAZY = "ghcr.io/zalando/spilo-e2e:dev-18.4"
+SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-18:4.1-p1"
 
 def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
@@ -151,6 +151,7 @@ class EndToEndTestCase(unittest.TestCase):
             'default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image))  # shows up after tests finish
 
+        # load minimal Postgres manifest and wait for cluster to be up and running
         result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         print('stdout: {}, stderr: {}'.format(result.stdout, result.stderr))
         try:
@@ -1211,25 +1212,25 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.create_with_kubectl("manifests/minimal-postgres-lowest-version-manifest.yaml")
         self.eventuallyEqual(lambda: k8s.count_running_pods(labels=cluster_label), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(check_version, 13, "Version is not correct")
+        self.eventuallyEqual(check_version, 14, "Version is not correct")
 
         master_nodes, _ = k8s.get_cluster_nodes(cluster_labels=cluster_label)
         # should upgrade immediately
-        pg_patch_version_14 = {
+        pg_patch_version_higher_version = {
             "spec": {
                 "postgresql": {
-                    "version": "14"
+                    "version": "15"
                 }
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_14)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_higher_version)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 14, "Version should be upgraded from 13 to 14")
+        self.eventuallyEqual(check_version, 15, "Version should be upgraded from 14 to 15")
 
         # check if annotation for last upgrade's success is set
         annotations = get_annotations()
@@ -1238,10 +1239,10 @@ class EndToEndTestCase(unittest.TestCase):
         # should not upgrade because current time is not in maintenanceWindow
         current_time = datetime.now()
         maintenance_window_future = f"{(current_time+timedelta(minutes=60)).strftime('%H:%M')}-{(current_time+timedelta(minutes=120)).strftime('%H:%M')}"
-        pg_patch_version_15_outside_mw = {
+        pg_patch_version_higher_version_outside_mw = {
             "spec": {
                 "postgresql": {
-                    "version": "15"
+                    "version": "16"
                 },
                 "maintenanceWindows": [
                     maintenance_window_future
@@ -1249,23 +1250,23 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15_outside_mw)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_higher_version_outside_mw)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # no pod replacement outside of the maintenance window
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 14, "Version should not be upgraded")
+        self.eventuallyEqual(check_version, 15, "Version should not be upgraded")
 
         second_annotations = get_annotations()
         self.assertIsNone(second_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure should not be set")
 
         # change maintenanceWindows to current
         maintenance_window_current = f"{(current_time-timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=30)).strftime('%H:%M')}"
-        pg_patch_version_15_in_mw = {
+        pg_patch_version_higher_version_in_mw = {
             "spec": {
                 "postgresql": {
-                    "version": "15"
+                    "version": "16"
                 },
                 "maintenanceWindows": [
                     maintenance_window_current
@@ -1274,13 +1275,13 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15_in_mw)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_higher_version_in_mw)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 15, "Version should be upgraded from 14 to 15")
+        self.eventuallyEqual(check_version, 16, "Version should be upgraded from 15 to 16")
 
         # check if annotation for last upgrade's success is updated after second upgrade
         third_annotations = get_annotations()
@@ -1288,7 +1289,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertNotEqual(annotations.get("last-major-upgrade-success"), third_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not updated")
 
         # test upgrade with failed upgrade annotation
-        pg_patch_version_17 = {
+        pg_patch_version_highest_version = {
             "metadata": {
                 "annotations": {
                     "last-major-upgrade-failure": "2024-01-02T15:04:05Z"
@@ -1296,28 +1297,28 @@ class EndToEndTestCase(unittest.TestCase):
             },
             "spec": {
                 "postgresql": {
-                    "version": "17"
+                    "version": "18"
                 },
             },
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_17)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_highest_version)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 15, "Version should not be upgraded because annotation for last upgrade's failure is set")
+        self.eventuallyEqual(check_version, 16, "Version should not be upgraded because annotation for last upgrade's failure is set")
 
-        # change the version back to 15 and should remove failure annotation
+        # change the version back to 16 and should remove failure annotation
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15_in_mw)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_higher_version_in_mw)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
-        self.eventuallyEqual(check_version, 15, "Version should not be upgraded from 15")
+        self.eventuallyEqual(check_version, 16, "Version should not be upgraded from 16")
         fourth_annotations = get_annotations()
         self.assertIsNone(fourth_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure is not removed")
 

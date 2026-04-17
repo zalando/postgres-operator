@@ -385,7 +385,7 @@ func (c *Cluster) Create() (err error) {
 
 	// create database objects unless we are running without pods or disabled
 	// that feature explicitly
-	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || isStandbyCluster(&c.Spec)) {
 		c.logger.Infof("Create roles")
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
@@ -1792,7 +1792,20 @@ func (c *Cluster) GetSwitchoverSchedule() string {
 func (c *Cluster) getSwitchoverScheduleAtTime(now time.Time) string {
 	var possibleSwitchover, schedule time.Time
 
-	for _, window := range c.Spec.MaintenanceWindows {
+	maintenanceWindows := c.Spec.MaintenanceWindows
+	if len(maintenanceWindows) == 0 {
+		maintenanceWindows = make([]acidv1.MaintenanceWindow, 0, len(c.OpConfig.MaintenanceWindows))
+		for _, windowStr := range c.OpConfig.MaintenanceWindows {
+			var window acidv1.MaintenanceWindow
+			if err := window.UnmarshalJSON([]byte(windowStr)); err != nil {
+				c.logger.Errorf("could not parse default maintenance window %q: %v", windowStr, err)
+				continue
+			}
+			maintenanceWindows = append(maintenanceWindows, window)
+		}
+	}
+
+	for _, window := range maintenanceWindows {
 		// in the best case it is possible today
 		possibleSwitchover = time.Date(now.Year(), now.Month(), now.Day(), window.StartTime.Hour(), window.StartTime.Minute(), 0, 0, time.UTC)
 		if window.Everyday {
@@ -1814,6 +1827,11 @@ func (c *Cluster) getSwitchoverScheduleAtTime(now time.Time) string {
 			schedule = possibleSwitchover
 		}
 	}
+
+	if schedule.IsZero() {
+		return ""
+	}
+
 	return schedule.Format("2006-01-02T15:04+00")
 }
 

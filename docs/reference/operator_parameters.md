@@ -173,6 +173,9 @@ Those are top-level keys, containing both leaf keys and groups.
   the thresholds. The value must be `"true"` to be effective. The default is empty
   which means the feature is disabled.
 
+* **enable_maintenance_windows**
+  toggle for using the maintenance windows feature. Default is `"true"`.
+
 * **maintenance_windows**
   a list which defines specific time frames when certain maintenance
   operations such as automatic major upgrades or master pod migration are
@@ -268,12 +271,12 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
-  when `major_version_upgrade_mode` is set to `"full"`. The default is `"13"`.
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"14"`.
 
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
   which violate the configured allowed `minimal_major_version` when
-  `major_version_upgrade_mode` is set to `"full"`. The default is `"17"`.
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"18"`.
 
 ## Kubernetes resources
 

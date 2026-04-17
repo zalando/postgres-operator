@@ -160,7 +160,9 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   a list which defines specific time frames when certain maintenance operations
   such as automatic major upgrades or master pod migration are allowed to happen.
   Accepted formats are "01:00-06:00" for daily maintenance windows or
-  "Sat:00:00-04:00" for specific days, with all times in UTC.
+  "Sat:00:00-04:00" for specific days, with all times in UTC. Note, when the
+  global config option `enable_maintenance_windows` is false, the specified
+  windows will be ignored.
 
 * **users**
   a map of usernames to user flags for the users that should be created in the
@@ -689,7 +691,7 @@ the global configuration before adding the `tls` section'.
 ## Change data capture streams
 
 This sections enables change data capture (CDC) streams via Postgres' 
-[logical decoding](https://www.postgresql.org/docs/17/logicaldecoding.html)
+[logical decoding](https://www.postgresql.org/docs/18/logicaldecoding.html)
 feature and `pgoutput` plugin. While the Postgres operator takes responsibility
 for providing the setup to publish change events, it relies on external tools
 to consume them. At Zalando, we are using a workflow based on
@@ -722,7 +724,7 @@ can have the following properties:
   The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
   The application is responsible for putting events into a (JSON/B or VARCHAR)
   payload column of the outbox table in the structure of the specified target
-  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/17/logical-replication-publication.html)
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/18/logical-replication-publication.html)
   in Postgres for all tables specified for one `database` and `applicationId`.
   The CDC operator will consume from it shortly after transactions are
   committed to the outbox table. The `idColumn` will be used in telemetry for

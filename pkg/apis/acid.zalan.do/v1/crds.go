@@ -105,6 +105,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enable_lazy_spilo_upgrade": {
 						Type: "boolean",
 					},
+					"enable_maintenance_windows": {
+						Type: "boolean",
+					},
 					"enable_shm_volume": {
 						Type: "boolean",
 					},
