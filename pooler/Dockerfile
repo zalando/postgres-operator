@@ -7,7 +7,7 @@ RUN apk --update add \
 
 RUN git clone \
     --single-branch \
-    --branch=stable-1.23 \
+    --branch=stable-1.25 \
     --depth 1 \
     https://github.com/pgbouncer/pgbouncer.git src
 
