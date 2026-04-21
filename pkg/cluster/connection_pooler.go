@@ -320,6 +320,18 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	}
 	envVars = append(envVars, c.getConnectionPoolerEnvVars()...)
 
+	infraRolesList := make([]string, 0)
+	for infraRoleName := range c.Config.InfrastructureRoles {
+		infraRolesList = append(infraRolesList, infraRoleName)
+	}
+
+	if len(infraRolesList) > 0 {
+		envVars = append(envVars, v1.EnvVar{
+			Name:  "INFRASTRUCTURE_ROLES_LIST",
+			Value: strings.Join(infraRolesList, ","),
+		})
+	}
+
 	poolerContainer := v1.Container{
 		Name:            connectionPoolerContainer,
 		Image:           effectiveDockerImage,
