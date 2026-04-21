@@ -7,8 +7,6 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 
-	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
-
 	apiacidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	zalandoclient "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
@@ -24,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
@@ -59,9 +58,9 @@ type KubernetesClient struct {
 	appsv1.StatefulSetsGetter
 	appsv1.DeploymentsGetter
 	rbacv1.RoleBindingsGetter
+	batchv1.CronJobsGetter
 	policyv1.PodDisruptionBudgetsGetter
 	apiextv1client.CustomResourceDefinitionsGetter
-	clientbatchv1.CronJobsGetter
 	acidv1.OperatorConfigurationsGetter
 	acidv1.PostgresTeamsGetter
 	acidv1.PostgresqlsGetter
@@ -192,24 +191,8 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 }
 
 // SetPostgresCRDStatus of Postgres cluster
-func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string) (*apiacidv1.Postgresql, error) {
-	var pg *apiacidv1.Postgresql
-	var pgStatus apiacidv1.PostgresStatus
-	pgStatus.PostgresClusterStatus = status
-
-	patch, err := json.Marshal(struct {
-		PgStatus interface{} `json:"status"`
-	}{&pgStatus})
-
-	if err != nil {
-		return pg, fmt.Errorf("could not marshal status: %v", err)
-	}
-
-	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
-	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
-	// we should take advantage of it.
-	pg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
-		context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, pg *apiacidv1.Postgresql) (*apiacidv1.Postgresql, error) {
+	pg, err := client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).UpdateStatus(context.TODO(), pg, metav1.UpdateOptions{})
 	if err != nil {
 		return pg, fmt.Errorf("could not update status: %v", err)
 	}
@@ -373,7 +356,7 @@ func (mock *mockDeployment) Get(ctx context.Context, name string, opts metav1.Ge
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
-						v1.Container{
+						{
 							Image: "pooler:1.0",
 						},
 					},

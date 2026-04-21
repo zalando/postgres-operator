@@ -3,18 +3,23 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: ghcr.io/zalando/spilo-16:3.2-p3
+  docker_image: ghcr.io/zalando/spilo-18:4.1-p1
   # enable_crd_registration: true
   # crd_categories:
   # - all
   # enable_lazy_spilo_upgrade: false
+  enable_maintenance_windows: true
   enable_pgversion_env_var: true
   # enable_shm_volume: true
   enable_spilo_wal_path_compat: false
   enable_team_id_clustername_prefix: false
   etcd_host: ""
   # ignore_instance_limits_annotation_key: ""
+  # ignore_resources_limits_annotation_key: ""
   # kubernetes_use_configmaps: false
+  # maintenance_windows:
+  # - "Sat:22:00-23:59"
+  # - "Sun:00:00-01:00"
   max_instances: -1
   min_instances: -1
   resync_period: 30m
@@ -36,11 +41,11 @@ configuration:
     replication_username: standby
     super_username: postgres
   major_version_upgrade:
-    major_version_upgrade_mode: "off"
+    major_version_upgrade_mode: "manual"
     # major_version_upgrade_team_allow_list:
     # - acid
-    minimal_major_version: "12"
-    target_major_version: "16"
+    minimal_major_version: "14"
+    target_major_version: "18"
   kubernetes:
     # additional_pod_capabilities:
     # - "SYS_NICE"
@@ -59,11 +64,12 @@ configuration:
     # enable_cross_namespace_secret: "false"
     enable_finalizers: false
     enable_init_containers: true
-    enable_secrets_deletion: true
+    enable_owner_references: false
     enable_persistent_volume_claim_deletion: true
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
     enable_readiness_probe: false
+    enable_secrets_deletion: true
     enable_sidecars: true
     # ignored_annotations:
     # - k8s.v1.cni.cncf.io/network-status
@@ -167,7 +173,7 @@ configuration:
     # logical_backup_cpu_request: ""
     # logical_backup_memory_limit: ""
     # logical_backup_memory_request: ""
-    logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"
+    logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
     # logical_backup_google_application_credentials: ""
     logical_backup_job_prefix: "logical-backup-"
     logical_backup_provider: "s3"

@@ -594,6 +594,12 @@ new
         {{#if enableReplicaPoolerLoadBalancer}}
         enableReplicaPoolerLoadBalancer: true
         {{/if}}
+        {{#if maintenanceWindows}}
+        maintenanceWindows:
+        {{#each maintenanceWindows}}
+          - "{{ this }}"
+        {{/each}}
+        {{/if}}
         volume:
           size: "{{ volumeSize }}Gi"{{#if volumeStorageClass}}
           storageClass: "{{ volumeStorageClass }}"{{/if}}{{#if iops}}
@@ -651,6 +657,7 @@ new
         enableReplicaConnectionPooler: this.enableReplicaConnectionPooler,
         enableMasterPoolerLoadBalancer: this.enableMasterPoolerLoadBalancer,
         enableReplicaPoolerLoadBalancer: this.enableReplicaPoolerLoadBalancer,
+        maintenanceWindows: this.maintenanceWindows,
         volumeSize: this.volumeSize,
         volumeStorageClass: this.volumeStorageClass,
         iops: this.iops,
@@ -725,6 +732,10 @@ new
 
     this.toggleEnableReplicaPoolerLoadBalancer = e => {
       this.enableReplicaPoolerLoadBalancer = !this.enableReplicaPoolerLoadBalancer
+    }
+
+    this.maintenanceWindows = e => {
+      this.maintenanceWindows = e.target.value
     }
 
     this.volumeChange = e => {
@@ -1042,6 +1053,7 @@ new
       this.enableReplicaConnectionPooler = false
       this.enableMasterPoolerLoadBalancer = false
       this.enableReplicaPoolerLoadBalancer = false
+      this.maintenanceWindows = {}
 
       this.postgresqlVersion = this.postgresqlVersion = (
         this.config.postgresql_versions[0]

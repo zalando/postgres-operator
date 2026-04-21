@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "16"
+    version: "18"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -109,7 +109,7 @@ metadata:
 spec:
   [...]
   postgresql:
-    version: "16"
+    version: "18"
     parameters:
       password_encryption: scram-sha-256
 ```
@@ -517,7 +517,7 @@ Postgres Operator will create the following NOLOGIN roles:
 
 The `<dbname>_owner` role is the database owner and should be used when creating
 new database objects. All members of the `admin` role, e.g. teams API roles, can
-become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/16/sql-alterdefaultprivileges.html)
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/18/sql-alterdefaultprivileges.html)
 are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
@@ -594,7 +594,7 @@ spec:
 
 ### Schema `search_path` for default roles
 
-The schema [`search_path`](https://www.postgresql.org/docs/16/ddl-schemas.html#DDL-SCHEMAS-PATH)
+The schema [`search_path`](https://www.postgresql.org/docs/18/ddl-schemas.html#DDL-SCHEMAS-PATH)
 for each role will include the role name and the schemas, this role should have
 access to. So `foo_bar_writer` does not have to schema-qualify tables from
 schemas `foo_bar_writer, bar`, while `foo_writer` can look up `foo_writer` and
@@ -695,7 +695,7 @@ handle it.
 
 ### HugePages support
 
-The operator supports [HugePages](https://www.postgresql.org/docs/16/kernel-resources.html#LINUX-HUGEPAGES).
+The operator supports [HugePages](https://www.postgresql.org/docs/18/kernel-resources.html#LINUX-HUGEPAGES).
 To enable HugePages, set the matching resource requests and/or limits in the manifest:
 
 ```yaml
@@ -757,8 +757,8 @@ If you need to define a `nodeAffinity` for all your Postgres clusters use the
 
 ## In-place major version upgrade
 
-Starting with Spilo 13, operator supports in-place major version upgrade to a
-higher major version (e.g. from PG 11 to PG 13). To trigger the upgrade,
+Starting with Spilo 14, operator supports in-place major version upgrade to a
+higher major version (e.g. from PG 14 to PG 16). To trigger the upgrade,
 simply increase the version in the manifest. It is your responsibility to test
 your applications against the new version before the upgrade; downgrading is
 not supported. The easiest way to do so is to try the upgrade on the cloned
@@ -792,7 +792,7 @@ spec:
   clone:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-minimal-cluster"
-    timestamp: "2017-12-19T12:40:33+01:00"
+    timestamp: "2025-12-19T12:40:33+01:00"
 ```
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
@@ -827,7 +827,7 @@ spec:
   clone:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-minimal-cluster"
-    timestamp: "2017-12-19T12:40:33+01:00"
+    timestamp: "2025-12-19T12:40:33+01:00"
     s3_wal_path: "s3://custom/path/to/bucket"
     s3_endpoint: https://s3.acme.org
     s3_access_key_id: 0123456789abcdef0123456789abcdef
@@ -838,7 +838,7 @@ spec:
 ### Clone directly
 
 Another way to get a fresh copy of your source DB cluster is via
-[pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html). To
+[pg_basebackup](https://www.postgresql.org/docs/18/app-pgbasebackup.html). To
 use this feature simply leave out the timestamp field from the clone section.
 The operator will connect to the service of the source cluster by name. If the
 cluster is called test, then the connection string will look like host=test
@@ -900,8 +900,9 @@ the PostgreSQL version between source and target cluster has to be the same.
 
 To start a cluster as standby, add the following `standby` section in the YAML
 file. You can stream changes from archived WAL files (AWS S3 or Google Cloud
-Storage) or from a remote primary. Only one option can be specfied in the
-manifest:
+Storage), from a remote primary, or combine a remote primary with a WAL archive.
+At least one of `s3_wal_path`, `gs_wal_path`, or `standby_host` must be specified.
+Note that `s3_wal_path` and `gs_wal_path` are mutually exclusive.
 
 ```yaml
 spec:
@@ -911,7 +912,7 @@ spec:
 
 For GCS, you have to define STANDBY_GOOGLE_APPLICATION_CREDENTIALS as a
 [custom pod environment variable](administrator.md#custom-pod-environment-variables).
-It is not set from the config to allow for overridding.
+It is not set from the config to allow for overriding.
 
 ```yaml
 spec:
@@ -927,6 +928,16 @@ spec:
   standby:
     standby_host: "acid-minimal-cluster.default"
     standby_port: "5433"
+```
+
+You can also combine a remote primary with a WAL archive for additional redundancy:
+
+```yaml
+spec:
+  standby:
+    standby_host: "acid-minimal-cluster.default"
+    standby_port: "5433"
+    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 Note, that the pods and services use the same role labels like for normal clusters:
@@ -1005,6 +1016,7 @@ spec:
       env:
         - name: "ENV_VAR_NAME"
           value: "any-k8s-env-things"
+      command: ['sh', '-c', 'echo "logging" > /opt/logs.txt']
 ```
 
 In addition to any environment variables you specify, the following environment
@@ -1281,7 +1293,7 @@ minutes if the certificates have changed and reloads postgres accordingly.
 ### TLS certificates for connection pooler
 
 By default, the pgBouncer image generates its own TLS certificate like Spilo.
-When the `tls` section is specfied in the manifest it will be used for the
+When the `tls` section is specified in the manifest it will be used for the
 connection pooler pod(s) as well. The security context options are hard coded
 to `runAsUser: 100` and `runAsGroup: 101`. The `fsGroup` will be the same
 like for Spilo.

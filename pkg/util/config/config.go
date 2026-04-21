@@ -25,6 +25,7 @@ type CRD struct {
 
 // Resources describes kubernetes resource specific configuration parameters
 type Resources struct {
+	EnableOwnerReferences         *bool               `name:"enable_owner_references" default:"false"`
 	ResourceCheckInterval         time.Duration       `name:"resource_check_interval" default:"3s"`
 	ResourceCheckTimeout          time.Duration       `name:"resource_check_timeout" default:"10m"`
 	PodLabelWaitTimeout           time.Duration       `name:"pod_label_wait_timeout" default:"10m"`
@@ -62,9 +63,10 @@ type Resources struct {
 	NodeReadinessLabelMerge       string              `name:"node_readiness_label_merge" default:"OR"`
 	ShmVolume                     *bool               `name:"enable_shm_volume" default:"true"`
 
-	MaxInstances                      int32  `name:"max_instances" default:"-1"`
-	MinInstances                      int32  `name:"min_instances" default:"-1"`
-	IgnoreInstanceLimitsAnnotationKey string `name:"ignore_instance_limits_annotation_key"`
+	MaxInstances                       int32  `name:"max_instances" default:"-1"`
+	MinInstances                       int32  `name:"min_instances" default:"-1"`
+	IgnoreInstanceLimitsAnnotationKey  string `name:"ignore_instance_limits_annotation_key"`
+	IgnoreResourcesLimitsAnnotationKey string `name:"ignore_resources_limits_annotation_key"`
 }
 
 type InfrastructureRole struct {
@@ -126,7 +128,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v1.12.2"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
 	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
@@ -171,13 +173,15 @@ type Config struct {
 	LogicalBackup
 	ConnectionPooler
 
-	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
-	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"ghcr.io/zalando/spilo-16:3.2-p3"`
-	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
-	SidecarContainers       []v1.Container    `name:"sidecars"`
-	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
+	WatchedNamespace         string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	KubernetesUseConfigMaps  bool              `name:"kubernetes_use_configmaps" default:"false"`
+	EtcdHost                 string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
+	EnableMaintenanceWindows *bool             `name:"enable_maintenance_windows" default:"true"`
+	MaintenanceWindows       []string          `name:"maintenance_windows"`
+	DockerImage              string            `name:"docker_image" default:"ghcr.io/zalando/spilo-18:4.1-p1"`
+	SidecarImages            map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
+	SidecarContainers        []v1.Container    `name:"sidecars"`
+	PodServiceAccountName    string            `name:"pod_service_account_name" default:"postgres-pod"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition              string            `name:"pod_service_account_definition" default:""`
 	PodServiceAccountRoleBindingDefinition   string            `name:"pod_service_account_role_binding_definition" default:""`
@@ -191,7 +195,7 @@ type Config struct {
 	GCPCredentials                           string            `name:"gcp_credentials"`
 	WALAZStorageAccount                      string            `name:"wal_az_storage_account"`
 	AdditionalSecretMount                    string            `name:"additional_secret_mount"`
-	AdditionalSecretMountPath                string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
+	AdditionalSecretMountPath                string            `name:"additional_secret_mount_path"`
 	EnableEBSGp3Migration                    bool              `name:"enable_ebs_gp3_migration" default:"false"`
 	EnableEBSGp3MigrationMaxSize             int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
 	DebugLogging                             bool              `name:"debug_logging" default:"true"`
@@ -243,10 +247,10 @@ type Config struct {
 	EnablePgVersionEnvVar                    bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat                 bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	EnableTeamIdClusternamePrefix            bool              `name:"enable_team_id_clustername_prefix" default:"false"`
-	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"off"`
+	MajorVersionUpgradeMode                  string            `name:"major_version_upgrade_mode" default:"manual"`
 	MajorVersionUpgradeTeamAllowList         []string          `name:"major_version_upgrade_team_allow_list" default:""`
-	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"12"`
-	TargetMajorVersion                       string            `name:"target_major_version" default:"16"`
+	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"14"`
+	TargetMajorVersion                       string            `name:"target_major_version" default:"18"`
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`

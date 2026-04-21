@@ -143,7 +143,7 @@ func (c *Controller) acquireInitialListOfClusters() error {
 	if list, err = c.listClusters(metav1.ListOptions{ResourceVersion: "0"}); err != nil {
 		return err
 	}
-	c.logger.Debugf("acquiring initial list of clusters")
+	c.logger.Debug("acquiring initial list of clusters")
 	for _, pg := range list.Items {
 		// XXX: check the cluster status field instead
 		if pg.Error != "" {
@@ -161,7 +161,8 @@ func (c *Controller) acquireInitialListOfClusters() error {
 func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) (*cluster.Cluster, error) {
 	if c.opConfig.EnableTeamIdClusternamePrefix {
 		if _, err := acidv1.ExtractClusterName(clusterName.Name, pgSpec.Spec.TeamID); err != nil {
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusInvalid)
+			pgSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusInvalid
+			c.KubeClient.SetPostgresCRDStatus(clusterName, pgSpec)
 			return nil, err
 		}
 	}
@@ -384,19 +385,11 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.Postg
 		c.logger.Warningf("parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
 	}
 
-	noeffect := func(param string, explanation string) {
-		c.logger.Warningf("parameter %q takes no effect. %s", param, explanation)
-	}
-
 	if spec.UseLoadBalancer != nil {
 		deprecate("useLoadBalancer", "enableMasterLoadBalancer")
 	}
 	if spec.ReplicaLoadBalancer != nil {
 		deprecate("replicaLoadBalancer", "enableReplicaLoadBalancer")
-	}
-
-	if len(spec.MaintenanceWindows) > 0 {
-		noeffect("maintenanceWindows", "Not implemented.")
 	}
 
 	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
@@ -454,19 +447,22 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		clusterError = informerNewSpec.Error
 	}
 
-	// only allow deletion if delete annotations are set and conditions are met
 	if eventType == EventDelete {
-		if err := c.meetsClusterDeleteAnnotations(informerOldSpec); err != nil {
-			c.logger.WithField("cluster-name", clusterName).Warnf(
-				"ignoring %q event for cluster %q - manifest does not fulfill delete requirements: %s", eventType, clusterName, err)
-			c.logger.WithField("cluster-name", clusterName).Warnf(
-				"please, recreate Postgresql resource %q and set annotations to delete properly", clusterName)
-			if currentManifest, marshalErr := json.Marshal(informerOldSpec); marshalErr != nil {
-				c.logger.WithField("cluster-name", clusterName).Warnf("could not marshal current manifest:\n%+v", informerOldSpec)
-			} else {
-				c.logger.WithField("cluster-name", clusterName).Warnf("%s\n", string(currentManifest))
+		// when owner references are used operator cannot block deletion
+		if c.opConfig.EnableOwnerReferences == nil || !*c.opConfig.EnableOwnerReferences {
+			// only allow deletion if delete annotations are set and conditions are met
+			if err := c.meetsClusterDeleteAnnotations(informerOldSpec); err != nil {
+				c.logger.WithField("cluster-name", clusterName).Warnf(
+					"ignoring %q event for cluster %q - manifest does not fulfill delete requirements: %s", eventType, clusterName, err)
+				c.logger.WithField("cluster-name", clusterName).Warnf(
+					"please, recreate Postgresql resource %q and set annotations to delete properly", clusterName)
+				if currentManifest, marshalErr := json.Marshal(informerOldSpec); marshalErr != nil {
+					c.logger.WithField("cluster-name", clusterName).Warnf("could not marshal current manifest:\n%+v", informerOldSpec)
+				} else {
+					c.logger.WithField("cluster-name", clusterName).Warnf("%s\n", string(currentManifest))
+				}
+				return
 			}
-			return
 		}
 	}
 
@@ -475,13 +471,25 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 
 		switch eventType {
 		case EventAdd:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusAddFailed)
+			informerNewSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusAddFailed
+			_, err := c.KubeClient.SetPostgresCRDStatus(clusterName, informerNewSpec)
+			if err != nil {
+				c.logger.WithField("cluster-name", clusterName).Errorf("could not set PostgresCRD status: %v", err)
+			}
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Create", "%v", clusterError)
 		case EventUpdate:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusUpdateFailed)
+			informerNewSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusUpdateFailed
+			_, err := c.KubeClient.SetPostgresCRDStatus(clusterName, informerNewSpec)
+			if err != nil {
+				c.logger.WithField("cluster-name", clusterName).Errorf("could not set PostgresCRD status: %v", err)
+			}
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Update", "%v", clusterError)
 		default:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusSyncFailed)
+			informerNewSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusSyncFailed
+			_, err := c.KubeClient.SetPostgresCRDStatus(clusterName, informerNewSpec)
+			if err != nil {
+				c.logger.WithField("cluster-name", clusterName).Errorf("could not set PostgresCRD status: %v", err)
+			}
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Sync", "%v", clusterError)
 		}
 
@@ -602,7 +610,7 @@ func (c *Controller) createPodServiceAccount(namespace string) error {
 	_, err := c.KubeClient.ServiceAccounts(namespace).Get(context.TODO(), podServiceAccountName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 
-		c.logger.Infof(fmt.Sprintf("creating pod service account %q in the %q namespace", podServiceAccountName, namespace))
+		c.logger.Infof("creating pod service account %q in the %q namespace", podServiceAccountName, namespace)
 
 		// get a separate copy of service account
 		// to prevent a race condition when setting a namespace for many clusters

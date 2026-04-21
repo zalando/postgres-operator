@@ -53,6 +53,9 @@ spec:
         - name: CONTROLLER_ID
           value: {{ template "postgres-operator.controllerID" . }}
       {{- end }}
+      {{- if .Values.extraEnvs }}
+{{ toYaml .Values.extraEnvs | indent 8 }}
+      {{- end }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         securityContext:

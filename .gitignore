@@ -104,3 +104,5 @@ e2e/tls
 mocks
 
 ui/.npm/
+
+.DS_Store

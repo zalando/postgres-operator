@@ -18,9 +18,11 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
@@ -69,11 +71,11 @@ var cl = New(
 		Spec: acidv1.PostgresSpec{
 			EnableConnectionPooler: util.True(),
 			Streams: []acidv1.Stream{
-				acidv1.Stream{
+				{
 					ApplicationId: "test-app",
 					Database:      "test_db",
 					Tables: map[string]acidv1.StreamTable{
-						"test_table": acidv1.StreamTable{
+						"test_table": {
 							EventType: "test-app.test",
 						},
 					},
@@ -93,6 +95,7 @@ func TestCreate(t *testing.T) {
 
 	client := k8sutil.KubernetesClient{
 		DeploymentsGetter:            clientSet.AppsV1(),
+		CronJobsGetter:               clientSet.BatchV1(),
 		EndpointsGetter:              clientSet.CoreV1(),
 		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
 		PodDisruptionBudgetsGetter:   clientSet.PolicyV1(),
@@ -109,6 +112,7 @@ func TestCreate(t *testing.T) {
 			Namespace: clusterNamespace,
 		},
 		Spec: acidv1.PostgresSpec{
+			EnableLogicalBackup: true,
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
@@ -1337,14 +1341,21 @@ func TestCompareEnv(t *testing.T) {
 	}
 }
 
-func newService(ann map[string]string, svcT v1.ServiceType, lbSr []string) *v1.Service {
+func newService(
+	annotations map[string]string,
+	svcType v1.ServiceType,
+	sourceRanges []string,
+	selector map[string]string,
+	policy v1.ServiceExternalTrafficPolicyType) *v1.Service {
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type:                     svcT,
-			LoadBalancerSourceRanges: lbSr,
+			Selector:                 selector,
+			Type:                     svcType,
+			LoadBalancerSourceRanges: sourceRanges,
+			ExternalTrafficPolicy:    policy,
 		},
 	}
-	svc.Annotations = ann
+	svc.Annotations = annotations
 	return svc
 }
 
@@ -1361,6 +1372,28 @@ func TestCompareServices(t *testing.T) {
 		},
 	}
 
+	defaultPolicy := v1.ServiceExternalTrafficPolicyTypeCluster
+
+	serviceWithOwnerReference := newService(
+		map[string]string{
+			constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
+			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+		},
+		v1.ServiceTypeClusterIP,
+		[]string{"128.141.0.0/16", "137.138.0.0/16"},
+		nil,
+		defaultPolicy,
+	)
+
+	ownerRef := metav1.OwnerReference{
+		APIVersion: "acid.zalan.do/v1",
+		Controller: boolToPointer(true),
+		Kind:       "Postgresql",
+		Name:       "clstr",
+	}
+
+	serviceWithOwnerReference.ObjectMeta.OwnerReferences = append(serviceWithOwnerReference.ObjectMeta.OwnerReferences, ownerRef)
+
 	tests := []struct {
 		about   string
 		current *v1.Service
@@ -1376,14 +1409,16 @@ func TestCompareServices(t *testing.T) {
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			match: true,
 		},
 		{
@@ -1394,14 +1429,16 @@ func TestCompareServices(t *testing.T) {
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			match:  false,
 			reason: `new service's type "LoadBalancer" does not match the current one "ClusterIP"`,
 		},
@@ -1413,14 +1450,16 @@ func TestCompareServices(t *testing.T) {
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"185.249.56.0/22"}),
+				[]string{"185.249.56.0/22"},
+				nil, defaultPolicy),
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
@@ -1432,16 +1471,59 @@ func TestCompareServices(t *testing.T) {
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
 					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{}),
+				[]string{},
+				nil, defaultPolicy),
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
+		},
+		{
+			about: "new service doesn't have owner references",
+			current: newService(
+				map[string]string{
+					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
+					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+				},
+				v1.ServiceTypeClusterIP,
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
+			new:   serviceWithOwnerReference,
+			match: false,
+		},
+		{
+			about: "new service has a label selector",
+			current: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				nil, defaultPolicy),
+			new: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				map[string]string{"cluster-name": "clstr", "spilo-role": "master"}, defaultPolicy),
+			match: false,
+		},
+		{
+			about: "services differ on external traffic policy",
+			current: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				nil, defaultPolicy),
+			new: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				nil, v1.ServiceExternalTrafficPolicyTypeLocal),
+			match: false,
 		},
 	}
 
@@ -1464,7 +1546,7 @@ func TestCompareServices(t *testing.T) {
 	}
 }
 
-func newCronJob(image, schedule string, vars []v1.EnvVar) *batchv1.CronJob {
+func newCronJob(image, schedule string, vars []v1.EnvVar, mounts []v1.VolumeMount) *batchv1.CronJob {
 	cron := &batchv1.CronJob{
 		Spec: batchv1.CronJobSpec{
 			Schedule: schedule,
@@ -1473,10 +1555,41 @@ func newCronJob(image, schedule string, vars []v1.EnvVar) *batchv1.CronJob {
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
-								v1.Container{
+								{
 									Name:  "logical-backup",
 									Image: image,
 									Env:   vars,
+									Ports: []v1.ContainerPort{
+										{
+											ContainerPort: patroni.ApiPort,
+											Protocol:      v1.ProtocolTCP,
+										},
+										{
+											ContainerPort: pgPort,
+											Protocol:      v1.ProtocolTCP,
+										},
+										{
+											ContainerPort: operatorPort,
+											Protocol:      v1.ProtocolTCP,
+										},
+									},
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+									},
+									SecurityContext: &v1.SecurityContext{
+										AllowPrivilegeEscalation: nil,
+										Privileged:               util.False(),
+										ReadOnlyRootFilesystem:   util.False(),
+										Capabilities:             nil,
+									},
+									VolumeMounts: mounts,
 								},
 							},
 						},
@@ -1493,37 +1606,110 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 	img1 := "registry.opensource.zalan.do/acid/logical-backup:v1.0"
 	img2 := "registry.opensource.zalan.do/acid/logical-backup:v2.0"
 
+	clientSet := fake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	namespace := "default"
+
+	client := k8sutil.KubernetesClient{
+		CronJobsGetter:    clientSet.BatchV1(),
+		PostgresqlsGetter: acidClientSet.AcidV1(),
+	}
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "acid-cron-cluster",
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+			EnableLogicalBackup:    true,
+			LogicalBackupSchedule:  "0 0 * * *",
+			LogicalBackupRetention: "3 months",
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+				},
+				LogicalBackup: config.LogicalBackup{
+					LogicalBackupSchedule:                 "30 00 * * *",
+					LogicalBackupDockerImage:              img1,
+					LogicalBackupJobPrefix:                "logical-backup-",
+					LogicalBackupCPURequest:               "100m",
+					LogicalBackupCPULimit:                 "100m",
+					LogicalBackupMemoryRequest:            "100Mi",
+					LogicalBackupMemoryLimit:              "100Mi",
+					LogicalBackupProvider:                 "s3",
+					LogicalBackupS3Bucket:                 "testBucket",
+					LogicalBackupS3BucketPrefix:           "spilo",
+					LogicalBackupS3Region:                 "eu-central-1",
+					LogicalBackupS3Endpoint:               "https://s3.amazonaws.com",
+					LogicalBackupS3AccessKeyID:            "access",
+					LogicalBackupS3SecretAccessKey:        "secret",
+					LogicalBackupS3SSE:                    "aws:kms",
+					LogicalBackupS3RetentionTime:          "3 months",
+					LogicalBackupCronjobEnvironmentSecret: "",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	desiredCronJob, err := cluster.generateLogicalBackupJob()
+	if err != nil {
+		t.Errorf("Could not generate logical backup job with error: %v", err)
+	}
+
+	err = cluster.createLogicalBackupJob()
+	if err != nil {
+		t.Errorf("Could not create logical backup job with error: %v", err)
+	}
+
+	currentCronJob, err := cluster.KubeClient.CronJobs(namespace).Get(context.TODO(), cluster.getLogicalBackupJobName(), metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Could not create logical backup job with error: %v", err)
+	}
+
 	tests := []struct {
 		about   string
-		current *batchv1.CronJob
-		new     *batchv1.CronJob
+		cronjob *batchv1.CronJob
 		match   bool
 		reason  string
 	}{
 		{
 			about:   "two equal cronjobs",
-			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}),
-			new:     newCronJob(img1, "0 0 * * *", []v1.EnvVar{}),
+			cronjob: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}, []v1.VolumeMount{}),
 			match:   true,
 		},
 		{
 			about:   "two cronjobs with different image",
-			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}),
-			new:     newCronJob(img2, "0 0 * * *", []v1.EnvVar{}),
+			cronjob: newCronJob(img2, "0 0 * * *", []v1.EnvVar{}, []v1.VolumeMount{}),
 			match:   false,
 			reason:  fmt.Sprintf("new job's image %q does not match the current one %q", img2, img1),
 		},
 		{
 			about:   "two cronjobs with different schedule",
-			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}),
-			new:     newCronJob(img1, "0 * * * *", []v1.EnvVar{}),
+			cronjob: newCronJob(img1, "0 * * * *", []v1.EnvVar{}, []v1.VolumeMount{}),
 			match:   false,
 			reason:  fmt.Sprintf("new job's schedule %q does not match the current one %q", "0 * * * *", "0 0 * * *"),
 		},
 		{
+			about:   "two cronjobs with empty and nil volume mounts",
+			cronjob: newCronJob(img1, "0 0 * * *", []v1.EnvVar{}, nil),
+			match:   true,
+		},
+		{
 			about:   "two cronjobs with different environment variables",
-			current: newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "spilo"}}),
-			new:     newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "logical-backup"}}),
+			cronjob: newCronJob(img1, "0 0 * * *", []v1.EnvVar{{Name: "LOGICAL_BACKUP_S3_BUCKET_PREFIX", Value: "logical-backup"}}, []v1.VolumeMount{}),
 			match:   false,
 			reason:  "logical backup container specs do not match: new cronjob container's logical-backup (index 0) environment does not match the current one",
 		},
@@ -1531,12 +1717,32 @@ func TestCompareLogicalBackupJob(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.about, func(t *testing.T) {
-			match, reason := cl.compareLogicalBackupJob(tt.current, tt.new)
-			if match != tt.match {
-				t.Errorf("%s - unexpected match result %t when comparing cronjobs %q and %q", t.Name(), match, tt.current, tt.new)
-			} else {
-				if !strings.HasPrefix(reason, tt.reason) {
-					t.Errorf("%s - expected reason prefix %s, found %s", t.Name(), tt.reason, reason)
+			desiredCronJob.Spec.Schedule = tt.cronjob.Spec.Schedule
+			desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image = tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+			desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts
+
+			for _, testEnv := range tt.cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+				for i, env := range desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+					if env.Name == testEnv.Name {
+						desiredCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i] = testEnv
+					}
+				}
+			}
+
+			cmp := cluster.compareLogicalBackupJob(currentCronJob, desiredCronJob)
+			if cmp.match != tt.match {
+				t.Errorf("%s - unexpected match result %t when comparing cronjobs %#v and %#v", t.Name(), cmp.match, currentCronJob, desiredCronJob)
+			} else if !cmp.match {
+				found := false
+				for _, reason := range cmp.reasons {
+					if strings.HasPrefix(reason, tt.reason) {
+						found = true
+						break
+					}
+					found = false
+				}
+				if !found {
+					t.Errorf("%s - expected reason prefix %s, not found in %#v", t.Name(), tt.reason, cmp.reasons)
 				}
 			}
 		})
@@ -1725,6 +1931,306 @@ func TestComparePorts(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			got := comparePorts(testCase.setA, testCase.setB)
 			assert.Equal(t, testCase.expected, got)
+		})
+	}
+}
+
+func TestCompareVolumeMounts(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mountsA  []v1.VolumeMount
+		mountsB  []v1.VolumeMount
+		expected bool
+	}{
+		{
+			name:     "empty vs nil",
+			mountsA:  []v1.VolumeMount{},
+			mountsB:  nil,
+			expected: true,
+		},
+		{
+			name:     "both empty",
+			mountsA:  []v1.VolumeMount{},
+			mountsB:  []v1.VolumeMount{},
+			expected: true,
+		},
+		{
+			name: "same mounts",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "different mounts",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:        "data",
+					ReadOnly:    false,
+					MountPath:   "/data",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "one equal mount one different",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:        "poddata",
+					ReadOnly:    false,
+					MountPath:   "/poddata",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "same mounts, different order",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "new mounts added",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "one mount removed",
+			mountsA: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+				{
+					Name:      "etc",
+					ReadOnly:  true,
+					MountPath: "/etc",
+				},
+			},
+			mountsB: []v1.VolumeMount{
+				{
+					Name:      "data",
+					ReadOnly:  false,
+					MountPath: "/data",
+					SubPath:   "subdir",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareVolumeMounts(tt.mountsA, tt.mountsB)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestGetSwitchoverSchedule(t *testing.T) {
+	now, _ := time.Parse(time.RFC3339, "2025-11-11T12:35:00Z")
+
+	futureTimeStart := now.Add(1 * time.Hour)
+	futureWindowTimeStart := futureTimeStart.Format("15:04")
+	futureWindowTimeEnd := now.Add(2 * time.Hour).Format("15:04")
+	pastTimeStart := now.Add(-2 * time.Hour)
+	pastWindowTimeStart := pastTimeStart.Format("15:04")
+	pastWindowTimeEnd := now.Add(-1 * time.Hour).Format("15:04")
+
+	defaultWindowStr := fmt.Sprintf("%s-%s", futureWindowTimeStart, futureWindowTimeEnd)
+
+	tests := []struct {
+		name           string
+		windows        []acidv1.MaintenanceWindow
+		defaultWindows []string
+		expected       string
+	}{
+		{
+			name: "everyday maintenance windows is later today",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Everyday:  true,
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+			},
+			expected: futureTimeStart.Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "everyday maintenance window is tomorrow",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Everyday:  true,
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "weekday maintenance windows is later today",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+			},
+			expected: futureTimeStart.Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "weekday maintenance windows is passed for today",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.Weekday(),
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 7).Format("2006-01-02T15:04+00"),
+		},
+		{
+			name: "choose the earliest window",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.AddDate(0, 0, 2).Weekday(),
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+				{
+					Everyday:  true,
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
+		},
+		{
+			name:           "fallback to operator default window when spec is empty",
+			windows:        []acidv1.MaintenanceWindow{},
+			defaultWindows: []string{defaultWindowStr},
+			expected:       futureTimeStart.Format("2006-01-02T15:04+00"),
+		},
+		{
+			name:           "no windows defined returns empty string",
+			windows:        []acidv1.MaintenanceWindow{},
+			defaultWindows: nil,
+			expected:       "",
+		},
+		{
+			name: "choose the earliest window from multiple in spec",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.AddDate(0, 0, 2).Weekday(),
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+				{
+					Weekday:   now.AddDate(0, 0, 1).Weekday(),
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster.Spec.MaintenanceWindows = tt.windows
+			cluster.OpConfig.MaintenanceWindows = tt.defaultWindows
+			schedule := cluster.getSwitchoverScheduleAtTime(now)
+			if schedule != tt.expected {
+				t.Errorf("Expected GetSwitchoverSchedule to return %s, returned: %s", tt.expected, schedule)
+			}
 		})
 	}
 }

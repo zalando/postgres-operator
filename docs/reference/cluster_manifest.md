@@ -114,6 +114,14 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   this parameter. Optional, when empty the load balancer service becomes
   inaccessible from outside of the Kubernetes cluster.
 
+* **maintenanceWindows**
+  a list which defines specific time frames when certain maintenance operations
+  such as automatic major upgrades or master pod migration are allowed to happen.
+  Accepted formats are "01:00-06:00" for daily maintenance windows or
+  "Sat:00:00-04:00" for specific days, with all times in UTC. Note, when the
+  global config option `enable_maintenance_windows` is false, the specified
+  windows will be ignored.
+
 * **users**
   a map of usernames to user flags for the users that should be created in the
   cluster by the operator. User flags are a list, allowed elements are
@@ -241,7 +249,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   [kubernetes volumeSource](https://godoc.org/k8s.io/api/core/v1#VolumeSource).
   It allows you to mount existing PersistentVolumeClaims, ConfigMaps and Secrets inside the StatefulSet.
   Also an `emptyDir` volume can be shared between initContainer and statefulSet.
-  Additionaly, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
+  Additionally, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
   Set `isSubPathExpr` to true if you want to include [API environment variables](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath-expanded-environment).
   You can also specify in which container the additional Volumes will be mounted with the `targetContainers` array option.
   If `targetContainers` is empty, additional volumes will be mounted only in the `postgres` container.
@@ -251,7 +259,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
 ## Prepared Databases
 
 The operator can create databases with default owner, reader and writer roles
-without the need to specifiy them under `users` or `databases` sections. Those
+without the need to specify them under `users` or `databases` sections. Those
 parameters are grouped under the `preparedDatabases` top-level key. For more
 information, see [user docs](../user.md#prepared-databases-with-roles-and-default-privileges).
 
@@ -451,21 +459,30 @@ under the `clone` top-level key and do not affect the already running cluster.
 
 On startup, an existing `standby` top-level key creates a standby Postgres
 cluster streaming from a remote location - either from a S3 or GCS WAL
-archive or a remote primary. Only one of options is allowed and required
-if the `standby` key is present.
+archive, a remote primary, or a combination of both. At least one of
+`s3_wal_path`, `gs_wal_path`, or `standby_host` must be specified.
+Note that `s3_wal_path` and `gs_wal_path` are mutually exclusive.
 
 * **s3_wal_path**
   the url to S3 bucket containing the WAL archive of the remote primary.
+  Can be combined with `standby_host` for additional redundancy.
 
 * **gs_wal_path**
   the url to GS bucket containing the WAL archive of the remote primary.
+  Can be combined with `standby_host` for additional redundancy.
 
 * **standby_host**
   hostname or IP address of the primary to stream from.
+  Can be specified alone or combined with either `s3_wal_path` or `gs_wal_path`.
 
 * **standby_port**
   TCP port on which the primary is listening for connections. Patroni will
   use `"5432"` if not set.
+
+* **standby_primary_slot_name**
+  name of the replication slot to use on the primary server when streaming
+  from a remote primary. See the Patroni documentation
+  [here](https://patroni.readthedocs.io/en/latest/standby_cluster.html) for more details. Optional.
 
 ## Volume properties
 
@@ -632,7 +649,7 @@ the global configuration before adding the `tls` section'.
 ## Change data capture streams
 
 This sections enables change data capture (CDC) streams via Postgres' 
-[logical decoding](https://www.postgresql.org/docs/16/logicaldecoding.html)
+[logical decoding](https://www.postgresql.org/docs/18/logicaldecoding.html)
 feature and `pgoutput` plugin. While the Postgres operator takes responsibility
 for providing the setup to publish change events, it relies on external tools
 to consume them. At Zalando, we are using a workflow based on
@@ -646,11 +663,11 @@ can have the following properties:
 
 * **applicationId**
   The application name to which the database and CDC belongs to. For each
-  set of streams with a distinct `applicationId` a separate stream CR as well
-  as a separate logical replication slot will be created. This means there can
-  be different streams in the same database and streams with the same
-  `applicationId` are bundled in one stream CR. The stream CR will be called
-  like the Postgres cluster plus "-<applicationId>" suffix. Required.
+  set of streams with a distinct `applicationId` a separate stream resource as
+  well as a separate logical replication slot will be created. This means there
+  can be different streams in the same database and streams with the same
+  `applicationId` are bundled in one stream resource. The stream resource will
+  be called like the Postgres cluster plus "-<applicationId>" suffix. Required.
 
 * **database**
   Name of the database from where events will be published via Postgres'
@@ -661,21 +678,37 @@ can have the following properties:
 
 * **tables**
   Defines a map of table names and their properties (`eventType`, `idColumn`
-  and `payloadColumn`). The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
+  and `payloadColumn`). Required.
+  The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
   The application is responsible for putting events into a (JSON/B or VARCHAR)
   payload column of the outbox table in the structure of the specified target
-  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/16/logical-replication-publication.html)
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/18/logical-replication-publication.html)
   in Postgres for all tables specified for one `database` and `applicationId`.
   The CDC operator will consume from it shortly after transactions are
   committed to the outbox table. The `idColumn` will be used in telemetry for
   the CDC operator. The names for `idColumn` and `payloadColumn` can be
   configured. Defaults are `id` and `payload`. The target `eventType` has to
-  be defined. Required.
+  be defined. One can also specify a `recoveryEventType` that will be used
+  for a dead letter queue. By enabling `ignoreRecovery`, you can choose to
+  ignore failing events.
 
 * **filter**
   Streamed events can be filtered by a jsonpath expression for each table.
   Optional.
 
+* **enableRecovery**
+  Flag to enable a dead letter queue recovery for all streams tables.
+  Alternatively, recovery can also be enable for single outbox tables by only
+  specifying a `recoveryEventType` and no `enableRecovery` flag. When set to
+  false or missing, events will be retried until consuming succeeded. You can
+  use a `filter` expression to get rid of poison pills. Optional.
+
 * **batchSize**
   Defines the size of batches in which events are consumed. Optional.
   Defaults to 1.
+
+* **cpu**
+  CPU requests to be set as an annotation on the stream resource. Optional.
+
+* **memory**
+  memory requests to be set as an annotation on the stream resource. Optional.

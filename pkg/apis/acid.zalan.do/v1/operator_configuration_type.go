@@ -47,14 +47,15 @@ type PostgresUsersConfiguration struct {
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
 type MajorVersionUpgradeConfiguration struct {
-	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
+	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"manual"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
 	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
-	MinimalMajorVersion              string   `json:"minimal_major_version" default:"12"`
-	TargetMajorVersion               string   `json:"target_major_version" default:"16"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"14"`
+	TargetMajorVersion               string   `json:"target_major_version" default:"18"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
 type KubernetesMetaConfiguration struct {
+	EnableOwnerReferences *bool  `json:"enable_owner_references,omitempty"`
 	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
 	// TODO: change it to the proper json
 	PodServiceAccountDefinition            string                       `json:"pod_service_account_definition,omitempty"`
@@ -159,7 +160,7 @@ type AWSGCPConfiguration struct {
 	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
 	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
 	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
-	AdditionalSecretMountPath    string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	AdditionalSecretMountPath    string `json:"additional_secret_mount_path,omitempty"`
 	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration" default:"false"`
 	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size" default:"1000"`
 }
@@ -265,6 +266,8 @@ type OperatorConfigurationData struct {
 	Workers                       uint32                             `json:"workers,omitempty"`
 	ResyncPeriod                  Duration                           `json:"resync_period,omitempty"`
 	RepairPeriod                  Duration                           `json:"repair_period,omitempty"`
+	EnableMaintenanceWindows      *bool                              `json:"enable_maintenance_windows,omitempty"`
+	MaintenanceWindows            []MaintenanceWindow                `json:"maintenance_windows,omitempty"`
 	SetMemoryRequestToLimit       bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                     *bool                              `json:"enable_shm_volume,omitempty"`
 	SidecarImages                 map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
@@ -284,9 +287,10 @@ type OperatorConfigurationData struct {
 	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
 	Patroni                       PatroniConfiguration               `json:"patroni"`
 
-	MinInstances                      int32  `json:"min_instances,omitempty"`
-	MaxInstances                      int32  `json:"max_instances,omitempty"`
-	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
+	MinInstances                       int32  `json:"min_instances,omitempty"`
+	MaxInstances                       int32  `json:"max_instances,omitempty"`
+	IgnoreInstanceLimitsAnnotationKey  string `json:"ignore_instance_limits_annotation_key,omitempty"`
+	IgnoreResourcesLimitsAnnotationKey string `json:"ignore_resources_limits_annotation_key,omitempty"`
 }
 
 // Duration shortens this frequently used name

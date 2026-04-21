@@ -16,7 +16,7 @@ under the ~/go/src sub directories.
 
 Given the schema above, the Postgres Operator source code located at
 `github.com/zalando/postgres-operator` should be put at
--`~/go/src/github.com/zalando/postgres-operator`.
+`~/go/src/github.com/zalando/postgres-operator`.
 
 ```bash
 export GOPATH=~/go
@@ -33,17 +33,14 @@ by setting the `GO111MODULE` environment variable to `on`. The make targets do
 this for you, so simply run
 
 ```bash
-make deps
+make
 ```
-
-This would take a while to complete. You have to redo `make deps` every time
-your dependencies list changes, i.e. after adding a new library dependency.
 
 Build the operator with the `make docker` command. You may define the TAG
 variable to assign an explicit tag to your Docker image and the IMAGE to set
 the image name. By default, the tag is computed with
 `git describe --tags --always --dirty` and the image is
-`registry.opensource.zalan.do/acid/postgres-operator`
+`ghcr.io/zalando/postgres-operator`
 
 ```bash
 export TAG=$(git describe --tags --always --dirty)
@@ -72,7 +69,7 @@ make docker
 
 # kind
 make docker
-kind load docker-image registry.opensource.zalan.do/acid/postgres-operator:${TAG} --name <kind-cluster-name>
+kind load docker-image ghcr.io/zalando/postgres-operator:${TAG} --name <kind-cluster-name>
 ```
 
 Then create a new Postgres Operator deployment.
@@ -105,6 +102,7 @@ and K8s-like APIs for its custom resource definitions, namely the
 Postgres CRD and the operator CRD. The usage of the code generation follows
 conventions from the K8s community. Relevant scripts live in the `hack`
 directory:
+
 * `update-codegen.sh` triggers code generation for the APIs defined in `pkg/apis/acid.zalan.do/`,
 * `verify-codegen.sh` checks if the generated code is up-to-date (to be used within CI).
 
@@ -112,6 +110,7 @@ The `/pkg/generated/` contains the resultant code. To make these scripts work,
 you may need to `export GOPATH=$(go env GOPATH)`
 
 References for code generation are:
+
 * [Relevant pull request](https://github.com/zalando/postgres-operator/pull/369)
 See comments there for minor issues that can sometimes broke the generation process.
 * [Code generator source code](https://github.com/kubernetes/code-generator)
@@ -186,7 +185,7 @@ go get -u github.com/derekparker/delve/cmd/dlv
 
 ```
 RUN apk --no-cache add go git musl-dev
-RUN go get -d github.com/derekparker/delve/cmd/dlv
+RUN go get github.com/derekparker/delve/cmd/dlv
 ```
 
 * Update the `Makefile` to build the project with debugging symbols. For that
@@ -221,14 +220,13 @@ dlv connect 127.0.0.1:DLV_PORT
 Prerequisites:
 
 ```bash
-make deps
 make mocks
 ```
 
 To run all unit tests, you can simply do:
 
 ```bash
-go test ./pkg/...
+make test
 ```
 
 In case if you need to debug your unit test, it's possible to use delve:
@@ -274,10 +272,10 @@ Examples for fake K8s objects can be found in:
 
 The operator provides reference end-to-end (e2e) tests to
 ensure various infrastructure parts work smoothly together. The test code is available at `e2e/tests`.
-The special `registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner` image is used to run the tests. The container mounts the local `e2e/tests` directory at runtime, so whatever you modify in your local copy of the tests will be executed by a test runner. By maintaining a separate test runner image we avoid the need to re-build the e2e test image on every build. 
+The special `ghcr.io/zalando/postgres-operator-e2e-tests-runner` image is used to run the tests. The container mounts the local `e2e/tests` directory at runtime, so whatever you modify in your local copy of the tests will be executed by a test runner. By maintaining a separate test runner image we avoid the need to re-build the e2e test image on every build.
 
-Each e2e execution tests a Postgres Operator image built from the current git branch. The test
-runner creates a new local K8s cluster using [kind](https://kind.sigs.k8s.io/),
+Each e2e execution tests a Postgres Operator image built from the current git branch.
+The test runner creates a new local K8s cluster using [kind](https://kind.sigs.k8s.io/),
 utilizes provided manifest examples, and runs e2e tests contained in the `tests`
 folder. The K8s API client in the container connects to the `kind` cluster via
 the standard Docker `bridge` network. The kind cluster is deleted if tests
@@ -315,6 +313,7 @@ precedence.
 
 Update the following Go files that obtain the configuration parameter from the
 manifest files:
+
 * [operator_configuration_type.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/operator_configuration_type.go)
 * [operator_config.go](https://github.com/zalando/postgres-operator/blob/master/pkg/controller/operator_config.go)
 * [config.go](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go)
@@ -323,6 +322,7 @@ Postgres manifest parameters are defined in the [api package](https://github.com
 The operator behavior has to be implemented at least in [k8sres.go](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/k8sres.go).
 Validation of CRD parameters is controlled in [crds.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/crds.go).
 Please, reflect your changes in tests, for example in:
+
 * [config_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config_test.go)
 * [k8sres_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/k8sres_test.go)
 * [util_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/util_test.go)
@@ -330,6 +330,7 @@ Please, reflect your changes in tests, for example in:
 ### Updating manifest files
 
 For the CRD-based configuration, please update the following files:
+
 * the default [OperatorConfiguration](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
 * the CRD's [validation](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml)
 * the CRD's validation in the [Helm chart](https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator/crds/operatorconfigurations.yaml)
@@ -342,6 +343,7 @@ Last but no least, update the [ConfigMap](https://github.com/zalando/postgres-op
 
 Finally, add a section for each new configuration option and/or cluster manifest
 parameter in the reference documents:
+
 * [config reference](reference/operator_parameters.md)
 * [manifest reference](reference/cluster_manifest.md)
 
