@@ -9,7 +9,6 @@ pool_mode = $CONNECTION_POOLER_MODE
 listen_port = $CONNECTION_POOLER_PORT
 listen_addr = *
 admin_users = $PGUSER
-stats_users = $INFRASTRUCTURE_ROLES
 auth_dbname = postgres
 auth_file = /etc/pgbouncer/auth_file.txt
 auth_query = SELECT * FROM $PGSCHEMA.user_lookup($1)

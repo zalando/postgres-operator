@@ -320,15 +320,16 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	}
 	envVars = append(envVars, c.getConnectionPoolerEnvVars()...)
 
+	// allow infrastructure roles to be added to pgBouncer auth_file
 	infraRolesList := make([]string, 0)
-	for infraRoleName := range c.InfrastructureRoles {
-		infraRolesList = append(infraRolesList, infraRoleName)
+	for infraRoleName, infraRole := range c.InfrastructureRoles {
+		infraRolesList = append(infraRolesList, fmt.Sprintf("%s %s", infraRoleName, infraRole.Password))
 	}
 
 	if len(infraRolesList) > 0 {
 		envVars = append(envVars, v1.EnvVar{
 			Name:  "INFRASTRUCTURE_ROLES",
-			Value: strings.Join(infraRolesList, ","),
+			Value: strings.Join(infraRolesList, "\n"),
 		})
 	}
 

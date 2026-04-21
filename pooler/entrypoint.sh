@@ -17,4 +17,17 @@ fi
 envsubst < /etc/pgbouncer/pgbouncer.ini.tmpl > /etc/pgbouncer/pgbouncer.ini
 envsubst < /etc/pgbouncer/auth_file.txt.tmpl > /etc/pgbouncer/auth_file.txt
 
+# --- Append Infrastructure Roles ---
+if [ -n "${INFRASTRUCTURE_ROLES}" ]; then
+    # Use a loop to read each line from the multi-line variable
+    echo "${INFRASTRUCTURE_ROLES}" | while IFS= read -r line; do
+        # Skip empty lines
+        [ -z "${line}" ] && continue
+
+        # Append formatted "user" "password" pair to the auth file
+        # This assumes each line of $INFRASTRUCTURE_ROLES is "user password"
+        echo "${line}" | awk '{printf "\"%s\" \"%s\"\n", $1, $2}' >> /etc/pgbouncer/auth_file.txt
+    done
+fi
+
 exec /bin/pgbouncer /etc/pgbouncer/pgbouncer.ini
