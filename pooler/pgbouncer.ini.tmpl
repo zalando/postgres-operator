@@ -24,8 +24,9 @@ client_tls_sslmode = require
 client_tls_key_file = /etc/ssl/certs/pgbouncer.key
 client_tls_cert_file = /etc/ssl/certs/pgbouncer.crt
 
-log_connections = 0
-log_disconnections = 0
+log_connections = 1
+log_disconnections = 1
+verbose = 1
 
 # Number of prepared statements to cache on a server connection (zero value
 # disables support of prepared statements).
