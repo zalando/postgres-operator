@@ -698,7 +698,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_running_pods(master_pooler_label), 2, "No pooler pods found")
         self.eventuallyEqual(lambda: k8s.count_running_pods(replica_pooler_label), 2, "No pooler replica pods found")
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label), 2, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label), 1, "Pooler secret not created")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label), 3, "Not all pooler secrets found")
 
         # TLS still enabled so check existing env variables and volume mounts
         self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("CONNECTION_POOLER_CLIENT_TLS_CRT", pooler_label), 4, "TLS env variable CONNECTION_POOLER_CLIENT_TLS_CRT missing in pooler pods")
@@ -758,7 +758,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              1, "No pooler service found")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
-                             1, "Secret not created")
+                             2, "Not all pooler secrets created")
 
         # Turn off only replica connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -786,7 +786,7 @@ class EndToEndTestCase(unittest.TestCase):
                              'ClusterIP',
                              "Expected LoadBalancer service type for master, found {}")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
-                             1, "Secret not created")
+                             2, "Not all pooler secrets created")
 
         # scale up connection pooler deployment
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -821,8 +821,8 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler pods not scaled down")
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              0, "Pooler service not removed")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
-                             4, "Secrets not deleted")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
+                             0, "Not all pooler secrets deleted")
 
         # Verify that all the databases have pooler schema installed.
         # Do this via psql, since otherwise we need to deal with

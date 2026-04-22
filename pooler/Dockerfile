@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=alpine:3.19
+ARG BASE_IMAGE=alpine:3.22
 FROM ${BASE_IMAGE} AS build_stage
 
 RUN apk --update add \

@@ -81,7 +81,7 @@ jobs:
         with:
           context: pooler
           push: true
-          build-args: BASE_IMAGE=alpine:3.19
+          build-args: BASE_IMAGE=alpine:3.22
           tags: "${{ steps.image_pooler.outputs.POOLER_IMAGE }}"
           platforms: linux/amd64,linux/arm64
 
