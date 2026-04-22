@@ -31,7 +31,6 @@ RUN addgroup -g 101 -S pgbouncer && \
     mkdir -p /etc/pgbouncer /var/log/pgbouncer /var/run/pgbouncer /etc/ssl/certs
 
 COPY --from=build_stage /pgbouncer/bin/pgbouncer /bin/pgbouncer
-COPY pgbouncer.ini.tmpl auth_file.txt.tmpl /etc/pgbouncer/
 COPY entrypoint.sh /entrypoint.sh
 
 RUN chown -R pgbouncer:pgbouncer \
