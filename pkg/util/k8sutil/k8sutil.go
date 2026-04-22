@@ -67,6 +67,7 @@ type KubernetesClient struct {
 	zalandov1.FabricEventStreamsGetter
 
 	RESTClient         rest.Interface
+	Clientset          *kubernetes.Clientset
 	AcidV1ClientSet    *zalandoclient.Clientset
 	Zalandov1ClientSet *zalandoclient.Clientset
 }
@@ -148,6 +149,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 		return kubeClient, fmt.Errorf("could not get clientset: %v", err)
 	}
 
+	kubeClient.Clientset = client
 	kubeClient.PodsGetter = client.CoreV1()
 	kubeClient.ServicesGetter = client.CoreV1()
 	kubeClient.EndpointsGetter = client.CoreV1()
