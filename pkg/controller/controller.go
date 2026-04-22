@@ -26,6 +26,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	informers_core_v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -401,16 +402,8 @@ func (c *Controller) initSharedInformers() {
 	}
 
 	// Pods
-	podLw := &cache.ListWatch{
-		ListFunc:  c.podListFunc,
-		WatchFunc: c.podWatchFunc,
-	}
-
-	c.podInformer = cache.NewSharedIndexInformer(
-		podLw,
-		&v1.Pod{},
-		constants.QueueResyncPeriodPod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	c.podInformer = informers_core_v1.NewPodInformer(c.KubeClient.Clientset,
+		c.opConfig.WatchedNamespace, constants.QueueResyncPeriodPod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.podAdd,
@@ -419,15 +412,7 @@ func (c *Controller) initSharedInformers() {
 	})
 
 	// Kubernetes Nodes
-	nodeLw := &cache.ListWatch{
-		ListFunc:  c.nodeListFunc,
-		WatchFunc: c.nodeWatchFunc,
-	}
-
-	c.nodesInformer = cache.NewSharedIndexInformer(
-		nodeLw,
-		&v1.Node{},
-		constants.QueueResyncPeriodNode,
+	informers_core_v1.NewNodeInformer(c.KubeClient.Clientset, constants.QueueResyncPeriodNode,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.nodesInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
