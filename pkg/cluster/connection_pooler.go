@@ -31,6 +31,7 @@ var poolerRunAsGroup = int64(101)
 
 // ConnectionPoolerObjects K8s objects that are belong to connection pooler
 type ConnectionPoolerObjects struct {
+	AuthSecret  *v1.Secret
 	Deployment  *appsv1.Deployment
 	Service     *v1.Service
 	Name        string
@@ -165,6 +166,38 @@ func (c *Cluster) createConnectionPooler(LookupFunction InstallFunction) (SyncRe
 		return reason, err
 	}
 	return reason, nil
+}
+
+func (c *Cluster) generateUserlist() string {
+	var sb strings.Builder
+
+	poolerAdminUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
+	fmt.Fprintf(&sb, "\"%s\" \"%s\"\n", poolerAdminUser.Name, poolerAdminUser.Password)
+
+	for roleName, infraRole := range c.InfrastructureRoles {
+		if infraRole.Password != "" {
+			fmt.Fprintf(&sb, "\"%s\" \"%s\"\n", roleName, infraRole.Password)
+		}
+	}
+
+	return sb.String()
+}
+
+func (c *Cluster) generateConnectionPoolerAuthSecret(connectionPooler *ConnectionPoolerObjects) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:          c.connectionPoolerLabels(connectionPooler.Role, true).MatchLabels,
+			Name:            fmt.Sprintf("%s-userlist", connectionPooler.Name),
+			Namespace:       connectionPooler.Namespace,
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
+		},
+		Type: v1.SecretTypeOpaque,
+		// Secret data must be bytes. Kubernetes handles the encoding.
+		StringData: map[string]string{
+			"userlist.txt": c.generateUserlist(),
+		},
+	}
 }
 
 // Generate pool size related environment variables.
@@ -320,16 +353,15 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	}
 	envVars = append(envVars, c.getConnectionPoolerEnvVars()...)
 
-	// allow infrastructure roles to be added to pgBouncer auth_file
 	infraRolesList := make([]string, 0)
-	for infraRoleName, infraRole := range c.InfrastructureRoles {
-		infraRolesList = append(infraRolesList, fmt.Sprintf("%s %s", infraRoleName, infraRole.Password))
+	for infraRoleName := range c.InfrastructureRoles {
+		infraRolesList = append(infraRolesList, infraRoleName)
 	}
 
 	if len(infraRolesList) > 0 {
 		envVars = append(envVars, v1.EnvVar{
 			Name:  "INFRASTRUCTURE_ROLES",
-			Value: strings.Join(infraRolesList, "\n"),
+			Value: strings.Join(infraRolesList, ","),
 		})
 	}
 
@@ -356,12 +388,29 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 	}
 
+	var poolerVolumes []v1.Volume
+	var volumeMounts []v1.VolumeMount
+
+	// mount secret volume with userlist.txt for pgBouncer to authenticate users
+	poolerVolumes = append(poolerVolumes, v1.Volume{
+		Name: fmt.Sprintf("%s-userlist-volume", c.connectionPoolerName(role)),
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: fmt.Sprintf("%s-userlist", c.connectionPoolerName(role)),
+			},
+		},
+	})
+	volumeMounts = append(volumeMounts, v1.VolumeMount{
+		Name:      fmt.Sprintf("%s-userlist-volume", c.connectionPoolerName(role)),
+		MountPath: "/etc/pgbouncer/userlist.txt",
+		SubPath:   "userlist.txt",
+		ReadOnly:  true,
+	})
+
 	// If the cluster has custom TLS certificates configured, we do the following:
 	//  1. Add environment variables to tell pgBouncer where to find the TLS certificates
 	//  2. Reference the secret in a volume
 	//  3. Mount the volume to the container at /tls
-	var poolerVolumes []v1.Volume
-	var volumeMounts []v1.VolumeMount
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
 		getPoolerTLSEnv := func(k string) string {
 			keyName := ""
@@ -652,12 +701,31 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 		c.logger.Infof("connection pooler service %s has been deleted for role %s", service.Name, role)
 	}
 
+	// Repeat the same for the auth secret
+	authSecret := c.ConnectionPooler[role].AuthSecret
+	if authSecret == nil {
+		c.logger.Debug("no connection pooler auth secret to delete")
+	} else {
+		err := c.KubeClient.
+			Secrets(c.Namespace).
+			Delete(context.TODO(), authSecret.Name, metav1.DeleteOptions{})
+
+		if k8sutil.ResourceNotFound(err) {
+			c.logger.Debugf("connection pooler auth secret %s for role %s has already been deleted", authSecret.Name, role)
+		} else if err != nil {
+			return fmt.Errorf("could not delete connection pooler auth secret: %v", err)
+		}
+
+		c.logger.Infof("connection pooler auth secret %s has been deleted for role %s", authSecret.Name, role)
+	}
+
+	c.ConnectionPooler[role].AuthSecret = nil
 	c.ConnectionPooler[role].Deployment = nil
 	c.ConnectionPooler[role].Service = nil
 	return nil
 }
 
-// delete connection pooler
+// delete connection pooler secret
 func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 	// Repeat the same for the secret object
 	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
@@ -673,6 +741,7 @@ func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 			return fmt.Errorf("could not delete pooler secret: %v", err)
 		}
 	}
+
 	return nil
 }
 
@@ -988,11 +1057,42 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		pods          []v1.Pod
 		service       *v1.Service
 		newService    *v1.Service
+		authSecret    *v1.Secret
+		newAuthSecret *v1.Secret
 		err           error
 	)
 
 	updatedPodAnnotations := map[string]*string{}
 	syncReason := make([]string, 0)
+
+	// create extra secret for connection pooler authentication
+	newAuthSecret = c.generateConnectionPoolerAuthSecret(c.ConnectionPooler[role])
+	if authSecret, err = c.KubeClient.Secrets(c.Namespace).Get(context.TODO(), fmt.Sprintf("%s-userlist", c.connectionPoolerName(role)), metav1.GetOptions{}); err == nil {
+		c.ConnectionPooler[role].AuthSecret = authSecret
+		// make sure existing annotations are preserved
+		newAuthSecret.Annotations = c.annotationsSet(authSecret.Annotations)
+		authSecret, err = c.KubeClient.Secrets(authSecret.Namespace).Update(context.TODO(), newAuthSecret, metav1.UpdateOptions{})
+		if err != nil {
+			return NoSync, fmt.Errorf("could not update connection pooler auth secret: %v", err)
+		}
+		c.ConnectionPooler[role].AuthSecret = authSecret
+	} else if !k8sutil.ResourceNotFound(err) {
+		return NoSync, fmt.Errorf("could not get auth secret for connection pooler to sync: %v", err)
+	}
+
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Warningf("auth secret %s for connection pooler is not found, create it", fmt.Sprintf("%s-userlist", c.connectionPoolerName(role)))
+		authSecret, err = c.KubeClient.
+			Secrets(newAuthSecret.Namespace).
+			Create(context.TODO(), newAuthSecret, metav1.CreateOptions{})
+
+		if err != nil {
+			return NoSync, err
+		}
+		c.ConnectionPooler[role].AuthSecret = authSecret
+	}
+
+	// next the pooler deployment
 	deployment, err = c.KubeClient.
 		Deployments(c.Namespace).
 		Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{})
