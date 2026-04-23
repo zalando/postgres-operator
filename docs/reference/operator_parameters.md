@@ -455,8 +455,8 @@ configuration they are grouped under the `kubernetes` key.
   pooler deployment. The default is empty.
 
 * **pod_role_label**
-  name of the label assigned to the Postgres pods (and services/endpoints) by
-  the operator. The default is `spilo-role`.
+  name of the label assigned to most cluster resources to distinguish objects
+  with relation to the primary instance from the replica(s). The default is `spilo-role`.
 
 * **cluster_labels**
   list of `name:value` pairs for additional labels assigned to the cluster
@@ -1084,6 +1084,14 @@ operator being able to provide some reasonable defaults.
 
 * **connection_pooler_mode**
   Default pooler mode, `session` or `transaction`. Default is `transaction`.
+
+* **connection_pooler_labels**
+  List of `name:value` pairs for additional labels assigned to the pooler
+  objects. The default is `component:db-connection-pooler`.
+
+* **connection_pooler_role_label**
+  name of the label assigned to most pooler resources to distinguish objects
+  with relation to the primary instance from the replica(s). The default is `pooler-role`.
 
 * **connection_pooler_default_cpu_request**
   **connection_pooler_default_memory_reques**

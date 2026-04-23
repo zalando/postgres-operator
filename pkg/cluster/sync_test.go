@@ -192,6 +192,8 @@ func TestPodAnnotationsSync(t *testing.T) {
 				PodManagementPolicy:     "ordered_ready",
 				CustomPodAnnotations:    customPodAnnotations,
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",

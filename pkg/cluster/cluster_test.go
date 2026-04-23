@@ -1782,6 +1782,8 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 		Config{
 			OpConfig: config.Config{
 				ConnectionPooler: config.ConnectionPooler{
+					Labels:                               map[string]string{"component": "db-connection-pooler"},
+					RoleLabel:                            "pooler-role",
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",

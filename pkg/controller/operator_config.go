@@ -281,6 +281,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		fromCRD.ConnectionPooler.Mode,
 		constants.ConnectionPoolerDefaultMode)
 
+	result.ConnectionPooler.Labels = util.CoalesceStrMap(fromCRD.ConnectionPooler.Labels, map[string]string{"application": "spilo"})
+	result.ConnectionPooler.RoleLabel = util.Coalesce(fromCRD.ConnectionPooler.RoleLabel, "pooler-role")
 	result.ConnectionPooler.ConnectionPoolerDefaultCPURequest = fromCRD.ConnectionPooler.DefaultCPURequest
 	result.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest = fromCRD.ConnectionPooler.DefaultMemoryRequest
 	result.ConnectionPooler.ConnectionPoolerDefaultCPULimit = fromCRD.ConnectionPooler.DefaultCPULimit

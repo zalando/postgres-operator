@@ -678,7 +678,7 @@ class EndToEndTestCase(unittest.TestCase):
         the end turn connection pooler off to not interfere with other tests.
         '''
         k8s = self.k8s
-        pooler_label = 'application=db-connection-pooler,cluster-name=acid-minimal-cluster'
+        pooler_label = 'application=spilo,component=db-connection-pooler,cluster-name=acid-minimal-cluster'
         master_pooler_label = 'connection-pooler=acid-minimal-cluster-pooler'
         replica_pooler_label = master_pooler_label + '-repl'
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
