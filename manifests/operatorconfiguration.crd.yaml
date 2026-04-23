@@ -77,6 +77,9 @@ spec:
               enable_lazy_spilo_upgrade:
                 type: boolean
                 default: false
+              enable_maintenance_windows:
+                type: boolean
+                default: true
               enable_pgversion_env_var:
                 type: boolean
                 default: true

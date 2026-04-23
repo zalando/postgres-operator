@@ -173,6 +173,9 @@ Those are top-level keys, containing both leaf keys and groups.
   the thresholds. The value must be `"true"` to be effective. The default is empty
   which means the feature is disabled.
 
+* **enable_maintenance_windows**
+  toggle for using the maintenance windows feature. Default is `"true"`.
+
 * **maintenance_windows**
   a list which defines specific time frames when certain maintenance
   operations such as automatic major upgrades or master pod migration are

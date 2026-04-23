@@ -95,11 +95,11 @@ Thus, the `full` mode can create drift between desired and actual state.
 
 ### Upgrade during maintenance windows
 
-When `maintenanceWindows` are defined in the Postgres manifest the operator
-will trigger major-version-related pod rotation and the major version upgrade
-only during these periods. Make sure they are at least twice as long as your
-configured `resync_period` to guarantee
-that operator actions can be triggered.
+When `maintenanceWindows` are defined in the Postgres manifest or in the global
+config the operator will trigger major-version-related pod rotation and the
+major version upgrade only during these periods. Make sure they are at least
+twice as long as your configured `resync_period` to guarantee that operator
+actions can be triggered.
 
 ### Upgrade annotations
 

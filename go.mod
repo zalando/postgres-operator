@@ -6,11 +6,11 @@ require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/aws/aws-sdk-go v1.55.8
 	github.com/golang/mock v1.6.0
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.11.2
 	github.com/motomux/pretty v0.0.0-20161209205251-b2aad2c9a95d
 	github.com/pkg/errors v0.9.1
 	github.com/r3labs/diff v1.1.0
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.45.0
 	gopkg.in/yaml.v2 v2.4.0
