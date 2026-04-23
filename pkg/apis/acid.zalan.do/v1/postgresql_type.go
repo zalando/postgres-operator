@@ -63,6 +63,18 @@ type PostgresSpec struct {
 	EnableReplicaLoadBalancer       *bool `json:"enableReplicaLoadBalancer,omitempty"`
 	EnableReplicaPoolerLoadBalancer *bool `json:"enableReplicaPoolerLoadBalancer,omitempty"`
 
+	// vars to enable and configure nodeport services
+	// set ports to 0 or nil to let kubernetes decide which port to use
+	// overrides loadbalancer configuration
+	EnableMasterNodePort        *bool  `json:"enableMasterNodePort,omitempty"`
+	MasterNodePort              *int32 `json:"masterNodePort,omitempty"`
+	EnableMasterPoolerNodePort  *bool  `json:"enableMasterPoolerNodePort,omitempty"`
+	MasterPoolerNodePort        *int32 `json:"masterPoolerNodePort,omitempty"`
+	EnableReplicaNodePort       *bool  `json:"enableReplicaNodePort,omitempty"`
+	ReplicaNodePort             *int32 `json:"replicaNodePort,omitempty"`
+	EnableReplicaPoolerNodePort *bool  `json:"enableReplicaPoolerNodePort,omitempty"`
+	ReplicaPoolerNodePort       *int32 `json:"replicaPoolerNodePort,omitempty"`
+
 	// deprecated load balancer settings maintained for backward compatibility
 	// see "Load balancers" operator docs
 	UseLoadBalancer *bool `json:"useLoadBalancer,omitempty"`

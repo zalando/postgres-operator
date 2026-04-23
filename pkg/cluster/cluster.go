@@ -854,6 +854,14 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		return false, "new service's ExternalTrafficPolicy does not match the current one"
 	}
 
+	if len(old.Spec.Ports) > 0 && len(new.Spec.Ports) > 0 {
+		// we need to check whether the new port is not zero (=user-defined)
+		// and only overwrite if it is
+		if new.Spec.Ports[0].NodePort != 0 && old.Spec.Ports[0].NodePort != new.Spec.Ports[0].NodePort {
+			return false, "new service's NodePort does not match the current one"
+		}
+	}
+
 	return true, ""
 }
 
