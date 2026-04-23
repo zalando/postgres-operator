@@ -412,7 +412,7 @@ func (c *Controller) initSharedInformers() {
 	})
 
 	// Kubernetes Nodes
-	informers_core_v1.NewNodeInformer(c.KubeClient.Clientset, constants.QueueResyncPeriodNode,
+	c.nodesInformer = informers_core_v1.NewNodeInformer(c.KubeClient.Clientset, constants.QueueResyncPeriodNode,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.nodesInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
