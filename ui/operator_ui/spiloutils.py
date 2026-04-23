@@ -321,11 +321,18 @@ def read_basebackups(
     suffix = '' if uid == 'base' else '/' + uid
     backups = []
 
+    # Reuse a single S3 client configured with AWS_ENDPOINT so MinIO /
+    # other S3-compatible backends are hit for list+get calls too. The
+    # previous plain client('s3') fell back to the default AWS endpoint
+    # and returned empty data against a custom endpoint; read_stored_clusters
+    # and read_versions already pass endpoint_url=AWS_ENDPOINT (#3078).
+    s3_client = client('s3', endpoint_url=AWS_ENDPOINT)
+
     for vp in postgresql_versions:
         backup_prefix = f'{prefix}{pg_cluster}{suffix}/wal/{vp}/basebackups_005/'
         logger.info(f"{bucket}/{backup_prefix}")
 
-        paginator = client('s3').get_paginator('list_objects_v2')
+        paginator = s3_client.get_paginator('list_objects_v2')
         pages = paginator.paginate(Bucket=bucket, Prefix=backup_prefix)
 
         for page in pages:
@@ -334,7 +341,7 @@ def read_basebackups(
                 if not key.endswith("backup_stop_sentinel.json"):
                     continue
 
-                response = client('s3').get_object(Bucket=bucket, Key=key)
+                response = s3_client.get_object(Bucket=bucket, Key=key)
                 backup_info = loads(response["Body"].read().decode("utf-8"))
                 last_modified = response["LastModified"].astimezone(timezone.utc).isoformat()
 
