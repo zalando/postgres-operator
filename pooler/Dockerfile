@@ -7,11 +7,8 @@ RUN apk --update add \
 
 WORKDIR /src
 
-RUN git clone \
-    --single-branch \
-    --branch=stable-1.23 \
-    --depth 1 \
-    https://github.com/pgbouncer/pgbouncer.git .
+RUN git clone --single-branch --depth 1 https://github.com/pgbouncer/pgbouncer.git . && \
+    git checkout $(git describe --tags $(git rev-list --tags --max-count=1))
 
 RUN git submodule init && git submodule update
 
