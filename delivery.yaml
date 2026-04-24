@@ -54,9 +54,9 @@ pipeline:
         cmd: |
           cd pooler
           if [ -z ${CDP_SOURCE_BRANCH} ]; then
-            IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-pooler
+            IMAGE=${MULTI_ARCH_REGISTRY}/pgbouncer
           else
-            IMAGE=${MULTI_ARCH_REGISTRY}/postgres-operator-pooler-test
+            IMAGE=${MULTI_ARCH_REGISTRY}/pgbouncer-test
           fi
 
           docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
