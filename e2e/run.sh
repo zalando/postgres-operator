@@ -28,7 +28,7 @@ function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
   declare -A images=(
     ["postgres-operator"]="ghcr.io/zalando/postgres-operator:${operator_tag}"
-    ["pgbouncer"]="ghcr.io/zalando/postgres-operator/pgbouncer:${operator_tag}"
+    ["pooler"]="ghcr.io/zalando/postgres-operator/pgbouncer:${operator_tag}"
   )
 
   for component in "${!images[@]}"; do
@@ -47,13 +47,13 @@ function pull_images(){
     # Set variables for later use
     if [[ "$component" == "postgres-operator" ]]; then
       operator_image="$image"
-    elif [[ "$component" == "pgbouncer" ]]; then
-      pgbouncer_image="$image"
+    elif [[ "$component" == "pooler" ]]; then
+      pooler_image="$image"
     fi
   done
 
   echo "Using operator image: $operator_image"
-  echo "Using pgbouncer image: $pgbouncer_image"
+  echo "Using pooler image: $pooler_image"
 }
 
 function start_kind(){
@@ -72,10 +72,11 @@ function start_kind(){
   kind load docker-image "${spilo_image}" --name ${cluster_name}
 }
 
-function load_operator_image() {
-  echo "Loading operator image"
+function load_operator_images() {
+  echo "Loading operator images"
   export KUBECONFIG="${kubeconfig_path}"
   kind load docker-image "${operator_image}" --name ${cluster_name}
+  kind load docker-image "${pooler_image}" --name ${cluster_name}
 }
 
 function set_kind_api_server_ip(){
@@ -102,7 +103,7 @@ function run_tests(){
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
   --mount type=bind,source="$(readlink -f scripts)",target=/scripts \
-  -e OPERATOR_IMAGE="${operator_image}" -e POOLER_IMAGE="${pgbouncer_image}" \
+  -e OPERATOR_IMAGE="${operator_image}" -e POOLER_IMAGE="${pooler_image}" \
   "${e2e_test_runner_image}" ${E2E_TEST_CASE-} $@
 }
 
@@ -118,7 +119,7 @@ function main(){
   [[ -z ${NOCLEANUP-} ]] && trap "cleanup" QUIT TERM EXIT
   pull_images
   [[ ! -f ${kubeconfig_path} ]] && start_kind
-  load_operator_image
+  load_operator_images
   set_kind_api_server_ip
   generate_certificate
 
