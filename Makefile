@@ -1,4 +1,4 @@
-.PHONY: clean local test linux macos mocks docker push e2e
+.PHONY: clean local test linux macos mocks docker pooler push e2e
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
@@ -97,7 +97,7 @@ docker: $(GENERATED_CRDS) ${DOCKERDIR}/${DOCKERFILE}
 	docker build --rm -t "$(IMAGE_TAG)" -f "${DOCKERDIR}/${DOCKERFILE}" --build-arg VERSION="${VERSION}" --build-arg BASE_IMAGE="${BASE_IMAGE}" .
 
 pooler:
-	docker build --rm -t "$(POOLER_TAG)" -f "pooler/Dockerfile" --build-arg VERSION="${VERSION}" --build-arg BASE_IMAGE="${BASE_IMAGE}" .
+	cd pooler; docker build --rm -t "$(POOLER_TAG)" --build-arg VERSION="${VERSION}" --build-arg BASE_IMAGE="${BASE_IMAGE}" .
 
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.25.3 bash -c "make linux"

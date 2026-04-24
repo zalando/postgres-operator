@@ -26,13 +26,12 @@ echo "Kubeconfig path: ${kubeconfig_path}"
 
 function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
-  declare -A images=(
-    ["postgres-operator"]="ghcr.io/zalando/postgres-operator:${operator_tag}"
-    ["pooler"]="ghcr.io/zalando/postgres-operator/pgbouncer:${operator_tag}"
-  )
+  components=("postgres-operator" "pooler")
+  image_urls=("ghcr.io/zalando/postgres-operator:${operator_tag}" "ghcr.io/zalando/postgres-operator/pgbouncer:${operator_tag}")
 
-  for component in "${!images[@]}"; do
-    image="${images[$component]}"
+  for i in "${!components[@]}"; do
+    component="${components[$i]}"
+    image="${image_urls[$i]}"
 
     if [[ -z $(docker images -q "$image") ]]; then
       echo "Pulling $component image: $image"
