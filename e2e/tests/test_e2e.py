@@ -116,6 +116,7 @@ class EndToEndTestCase(unittest.TestCase):
             configmap["data"]["workers"] = "1"
             configmap["data"]["docker_image"] = SPILO_CURRENT
             configmap["data"]["major_version_upgrade_mode"] = "full"
+            configmap["data"]["connection_pooler_image"] = os.environ['POOLER_IMAGE']
 
         with open("manifests/configmap.yaml", 'w') as f:
             yaml.dump(configmap, f, Dumper=yaml.Dumper)
