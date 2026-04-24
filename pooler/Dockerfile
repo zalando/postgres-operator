@@ -1,9 +1,19 @@
 ARG BASE_IMAGE=alpine:3.22
 FROM ${BASE_IMAGE} AS build_stage
 
-RUN apk --update add \
-    autoconf automake build-base c-ares-dev git libevent-dev libtool m4 \
-    openssl-dev py3-docutils py3-pip python3
+RUN apk add -U --no-cache \
+    autoconf \
+    automake \
+    curl \
+    gcc \
+    libc-dev \
+    libevent \
+    libevent-dev \
+    libtool \
+    make \
+    openssl-dev \
+    pkgconfig \
+    git
 
 WORKDIR /src
 
