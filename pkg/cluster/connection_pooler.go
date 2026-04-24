@@ -533,10 +533,6 @@ func (c *Cluster) generatePoolerServiceAnnotations(role PostgresRole, spec *acid
 	annotations := c.getCustomServiceAnnotations(role, spec)
 
 	if c.shouldCreateLoadBalancerForPoolerService(role, spec) {
-		// set ELB Timeout annotation with default value
-		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
-			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
-		}
 		// -repl suffix will be added by replicaDNSName
 		clusterNameWithPoolerSuffix := c.connectionPoolerName(Master)
 		if role == Master {
