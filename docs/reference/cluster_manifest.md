@@ -109,10 +109,11 @@ These parameters are grouped directly under  the `spec` key in the manifest.
 
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter
-  defines the comma-separated range of IP networks (in CIDR-notation). The
-  corresponding load balancer is accessible only to the networks defined by
-  this parameter. Optional, when empty the load balancer service becomes
-  inaccessible from outside of the Kubernetes cluster.
+  defines the comma-separated range of IP networks (in CIDR-notation). Both
+  IPv4 (e.g. `192.168.1.0/24`) and IPv6 (e.g. `fd01::/48`) CIDR ranges are
+  supported. The corresponding load balancer is accessible only to the networks
+  defined by this parameter. Optional, when empty the load balancer service
+  becomes inaccessible from outside of the Kubernetes cluster.
 
 * **maintenanceWindows**
   a list which defines specific time frames when certain maintenance operations
