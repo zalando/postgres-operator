@@ -2020,6 +2020,9 @@ func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourc
 
 	c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
 	serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy)
+	if c.OpConfig.LoadBalancerClass != "" {
+		serviceSpec.LoadBalancerClass = &c.OpConfig.LoadBalancerClass
+	}
 	serviceSpec.Type = v1.ServiceTypeLoadBalancer
 }
 

@@ -719,6 +719,13 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   defines external traffic policy for load
   balancers. Allowed values are `Cluster` (default) and `Local`.
 
+* **load_balancer_class**
+  specifies the load balancer class to use for LoadBalancer services. This is
+  useful when running multiple load balancer providers in the same cluster,
+  allowing you to select which provider should handle the service. For example,
+  `service.k8s.aws/nlb` for AWS Network Load Balancer. When not set, the
+  cluster's default load balancer class is used.
+
 * **master_dns_name_format**
   defines the DNS name string template for the master load balancer cluster.
   The default is `{cluster}.{namespace}.{hostedzone}`, where `{cluster}` is
