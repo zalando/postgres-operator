@@ -167,8 +167,8 @@ type AWSGCPConfiguration struct {
 
 // OperatorDebugConfiguration defines options for the debug mode
 type OperatorDebugConfiguration struct {
-	DebugLogging   bool `json:"debug_logging,omitempty"`
-	EnableDBAccess bool `json:"enable_database_access,omitempty"`
+	DebugLogging   *bool `json:"debug_logging,omitempty"`
+	EnableDBAccess *bool `json:"enable_database_access,omitempty"`
 }
 
 // TeamsAPIConfiguration defines the configuration of TeamsAPI

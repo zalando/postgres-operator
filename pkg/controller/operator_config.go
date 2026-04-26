@@ -214,8 +214,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupMemoryLimit = fromCRD.LogicalBackup.MemoryLimit
 
 	// debug config
-	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
-	result.EnableDBAccess = fromCRD.OperatorDebug.EnableDBAccess
+	result.DebugLogging = *util.CoalesceBool(fromCRD.OperatorDebug.DebugLogging, util.True())
+	result.EnableDBAccess = *util.CoalesceBool(fromCRD.OperatorDebug.EnableDBAccess, util.True())
 
 	// Teams API config
 	result.EnableTeamsAPI = fromCRD.TeamsAPI.EnableTeamsAPI
