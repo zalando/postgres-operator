@@ -2385,6 +2385,10 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 	// configure a cron job
 
 	jobTemplateSpec := batchv1.JobTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:      labels,
+			Annotations: c.annotationsSet(annotations),
+		},
 		Spec: jobSpec,
 	}
 
@@ -2397,8 +2401,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.getLogicalBackupJobName(),
 			Namespace:       c.Namespace,
-			Labels:          c.labelsSet(true),
-			Annotations:     c.annotationsSet(nil),
+			Labels:          labels,
+			Annotations:     c.annotationsSet(annotations),
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: batchv1.CronJobSpec{
