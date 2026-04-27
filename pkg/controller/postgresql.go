@@ -161,7 +161,8 @@ func (c *Controller) acquireInitialListOfClusters() error {
 func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) (*cluster.Cluster, error) {
 	if c.opConfig.EnableTeamIdClusternamePrefix {
 		if _, err := acidv1.ExtractClusterName(clusterName.Name, pgSpec.Spec.TeamID); err != nil {
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusInvalid)
+			pgSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusInvalid
+			c.KubeClient.SetPostgresCRDStatus(clusterName, pgSpec)
 			return nil, err
 		}
 	}
@@ -470,13 +471,25 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 
 		switch eventType {
 		case EventAdd:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusAddFailed)
+			informerNewSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusAddFailed
+			_, err := c.KubeClient.SetPostgresCRDStatus(clusterName, informerNewSpec)
+			if err != nil {
+				c.logger.WithField("cluster-name", clusterName).Errorf("could not set PostgresCRD status: %v", err)
+			}
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Create", "%v", clusterError)
 		case EventUpdate:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusUpdateFailed)
+			informerNewSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusUpdateFailed
+			_, err := c.KubeClient.SetPostgresCRDStatus(clusterName, informerNewSpec)
+			if err != nil {
+				c.logger.WithField("cluster-name", clusterName).Errorf("could not set PostgresCRD status: %v", err)
+			}
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Update", "%v", clusterError)
 		default:
-			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusSyncFailed)
+			informerNewSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusSyncFailed
+			_, err := c.KubeClient.SetPostgresCRDStatus(clusterName, informerNewSpec)
+			if err != nil {
+				c.logger.WithField("cluster-name", clusterName).Errorf("could not set PostgresCRD status: %v", err)
+			}
 			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Sync", "%v", clusterError)
 		}
 
@@ -597,7 +610,7 @@ func (c *Controller) createPodServiceAccount(namespace string) error {
 	_, err := c.KubeClient.ServiceAccounts(namespace).Get(context.TODO(), podServiceAccountName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 
-		c.logger.Infof(fmt.Sprintf("creating pod service account %q in the %q namespace", podServiceAccountName, namespace))
+		c.logger.Infof("creating pod service account %q in the %q namespace", podServiceAccountName, namespace)
 
 		// get a separate copy of service account
 		// to prevent a race condition when setting a namespace for many clusters

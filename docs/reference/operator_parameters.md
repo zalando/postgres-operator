@@ -107,8 +107,13 @@ Those are top-level keys, containing both leaf keys and groups.
 * **kubernetes_use_configmaps**
   Select if setup uses endpoints (default), or configmaps to manage leader when
   DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to
-  use endpoints option, and configmaps is required. By default,
-  `kubernetes_use_configmaps: false`, meaning endpoints will be used.
+  use endpoints option, and configmaps is required. Starting with K8s 1.33,
+  endpoints are marked as deprecated. It's recommended to switch to config maps
+  instead. But, to do so make sure you scale the Postgres cluster down to just
+  one primary pod (e.g. using `max_instances` option). Otherwise, you risk
+  running into a split-brain scenario.
+  By default, `kubernetes_use_configmaps: false`, meaning endpoints will be used.
+  Starting from v1.16.0 the default will be changed to `true`.
 
 * **docker_image**
   Spilo Docker image for Postgres instances. For production, don't rely on the
@@ -158,7 +163,26 @@ Those are top-level keys, containing both leaf keys and groups.
   for some clusters it might be required to scale beyond the limits that can be
   configured with `min_instances` and `max_instances` options. You can define
   an annotation key that can be used as a toggle in cluster manifests to ignore
-  globally configured instance limits. The default is empty.
+  globally configured instance limits. The value must be `"true"` to be
+  effective. The default is empty which means the feature is disabled.
+
+* **ignore_resources_limits_annotation_key**
+  for some clusters it might be required to request resources beyond the globally
+  configured thresholds for maximum requests and minimum limits. You can define
+  an annotation key that can be used as a toggle in cluster manifests to ignore
+  the thresholds. The value must be `"true"` to be effective. The default is empty
+  which means the feature is disabled.
+
+* **enable_maintenance_windows**
+  toggle for using the maintenance windows feature. Default is `"true"`.
+
+* **maintenance_windows**
+  a list which defines specific time frames when certain maintenance
+  operations such as automatic major upgrades or master pod migration are
+  allowed to happen for all database clusters. Accepted formats are
+  "01:00-06:00" for daily maintenance windows or "Sat:00:00-04:00" for
+  specific days, with all times in UTC. Locally defined maintenance
+  windows take precedence over globally configured ones.
 
 * **resync_period**
   period between consecutive sync requests. The default is `30m`.
@@ -247,12 +271,12 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
 
 * **minimal_major_version**
   The minimal Postgres major version that will not automatically be upgraded
-  when `major_version_upgrade_mode` is set to `"full"`. The default is `"13"`.
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"14"`.
 
 * **target_major_version**
   The target Postgres major version when upgrading clusters automatically
   which violate the configured allowed `minimal_major_version` when
-  `major_version_upgrade_mode` is set to `"full"`. The default is `"17"`.
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"18"`.
 
 ## Kubernetes resources
 
@@ -819,7 +843,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.13.0"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -875,6 +899,19 @@ grouped under the `logical_backup` key.
 
 * **logical_backup_cronjob_environment_secret**
   Reference to a Kubernetes secret, which keys will be added as environment variables to the cronjob. Default: ""
+
+The following environment variables can be passed to the logical backup
+cronjob via `logical_backup_cronjob_environment_secret` to control
+connectivity checks before the backup starts:
+
+* **LOGICAL_BACKUP_CONNECT_RETRIES**
+  Number of times to retry connecting to the target PostgreSQL pod before
+  giving up. This is useful when NetworkPolicy enforcement introduces a
+  short delay before a newly-created pod's IP is allowed through ingress
+  rules on the destination node. Default: "10"
+
+* **LOGICAL_BACKUP_CONNECT_RETRY_DELAY**
+  Delay in seconds between connectivity retries. Default: "2"
 
 ## Debugging the operator
 

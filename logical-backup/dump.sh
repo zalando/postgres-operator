@@ -122,7 +122,21 @@ function aws_upload {
 function gcs_upload {
     PATH_TO_BACKUP=gs://$LOGICAL_BACKUP_S3_BUCKET"/"$LOGICAL_BACKUP_S3_BUCKET_PREFIX"/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
 
-    gsutil -o Credentials:gs_service_key_file=$LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS cp - "$PATH_TO_BACKUP"
+    #Set local LOGICAL_GOOGLE_APPLICATION_CREDENTIALS to nothing or
+    #value of LOGICAL_GOOGLE_APPLICATION_CREDENTIALS env var. Needed
+    #because `set -o nounset` is globally set
+    local LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS=${LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS:-}
+
+    GSUTIL_OPTIONS=("-o" "Credentials:gs_service_key_file=$LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS")
+
+    #If GOOGLE_APPLICATION_CREDENTIALS is not set try to get
+    #creds from metadata
+    if [[ -z $LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS ]]
+    then
+	    GSUTIL_OPTIONS[1]="GoogleCompute:service_account=default"
+    fi
+
+    gsutil ${GSUTIL_OPTIONS[@]} cp - "$PATH_TO_BACKUP"
 }
 
 function upload {
@@ -169,6 +183,25 @@ function get_master_pod {
     get_pods "labelSelector=${CLUSTER_NAME_LABEL}%3D${SCOPE},spilo-role%3Dmaster" | tee | head -n 1
 }
 
+# Wait for TCP connectivity to the target PostgreSQL pod.
+# When NetworkPolicy is enforced via iptables, a newly-created pod's IP may not
+# yet be present in the destination node's ingress allow lists, causing
+# cross-node connections to be rejected until the next policy sync.
+function wait_for_pg {
+    local retries=${LOGICAL_BACKUP_CONNECT_RETRIES:-10}
+    local delay=${LOGICAL_BACKUP_CONNECT_RETRY_DELAY:-2}
+    local i
+    for (( i=1; i<=retries; i++ )); do
+        if "$PG_BIN"/pg_isready -h "$PGHOST" -p "${PGPORT:-5432}" -q 2>/dev/null; then
+            return 0
+        fi
+        echo "waiting for $PGHOST:${PGPORT:-5432} to become reachable (attempt $i/$retries)..."
+        sleep "$delay"
+    done
+    echo "ERROR: $PGHOST:${PGPORT:-5432} not reachable after $((retries * delay))s"
+    return 1
+}
+
 CURRENT_NODENAME=$(get_current_pod | jq .items[].spec.nodeName --raw-output)
 export CURRENT_NODENAME
 
@@ -182,6 +215,8 @@ for search in "${search_strategy[@]}"; do
     fi
 
 done
+
+wait_for_pg
 
 set -x
 if [ "$LOGICAL_BACKUP_PROVIDER" == "az" ]; then

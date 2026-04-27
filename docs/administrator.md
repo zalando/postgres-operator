@@ -65,7 +65,10 @@ the `PGVERSION` environment variable is set for the database pods. Since
 In-place major version upgrades can be configured to be executed by the
 operator with the `major_version_upgrade_mode` option. By default, it is
 enabled (mode: `manual`). In any case, altering the version in the manifest
-will trigger a rolling update of pods to update the `PGVERSION` env variable.
+will update the desired `PGVERSION`. If `maintenanceWindows` are configured,
+major-version-related pod rotation is deferred until the next maintenance
+window. Without maintenance windows, the operator will trigger a rolling
+update of pods to apply the new `PGVERSION`.
 Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
 script will notice the version mismatch but start the current version again.
 
@@ -92,10 +95,11 @@ Thus, the `full` mode can create drift between desired and actual state.
 
 ### Upgrade during maintenance windows
 
-When `maintenanceWindows` are defined in the Postgres manifest the operator
-will trigger a major version upgrade only during these periods. Make sure they
-are at least twice as long as your configured `resync_period` to guarantee
-that operator actions can be triggered.
+When `maintenanceWindows` are defined in the Postgres manifest or in the global
+config the operator will trigger major-version-related pod rotation and the
+major version upgrade only during these periods. Make sure they are at least
+twice as long as your configured `resync_period` to guarantee that operator
+actions can be triggered.
 
 ### Upgrade annotations
 
@@ -195,12 +199,14 @@ from numerous escape characters in the latter log entry, view it in CLI with
 used internally in K8s.
 
 The StatefulSet is replaced if the following properties change:
+
 - annotations
 - volumeClaimTemplates
 - template volumes
 
 The StatefulSet is replaced and a rolling updates is triggered if the following
 properties differ between the old and new state:
+
 - container name, ports, image, resources, env, envFrom, securityContext and volumeMounts
 - template labels, annotations, service account, securityContext, affinity, priority class and termination grace period
 
@@ -885,19 +891,18 @@ cluster manifest. In the case any of these variables are omitted from the
 manifest, the operator configuration settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in all namespaces watched by the operator.
-If load balancing is enabled two default annotations will be applied to its
-services:
+If load balancing is enabled the following default annotation will be applied to
+its services:
 
 - `external-dns.alpha.kubernetes.io/hostname` with the value defined by the
   operator configs `master_dns_name_format` and `replica_dns_name_format`.
   This value can't be overwritten. If any changing in its value is needed, it
   MUST be done changing the DNS format operator config parameters; and
-- `service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout` with
-  a default value of "3600".
 
 There are multiple options to specify service annotations that will be merged
 with each other and override in the following order (where latter take
 precedence):
+
 1. Default annotations if LoadBalancer is enabled
 2. Globally configured `custom_service_annotations`
 3. `serviceAnnotations` specified in the cluster manifest
@@ -1309,7 +1314,7 @@ aws_or_gcp:
 
 If cluster members have to be (re)initialized restoring physical backups
 happens automatically either from the backup location or by running
-[pg_basebackup](https://www.postgresql.org/docs/17/app-pgbasebackup.html)
+[pg_basebackup](https://www.postgresql.org/docs/18/app-pgbasebackup.html)
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.
@@ -1343,10 +1348,12 @@ If you are using [additional environment variables](#custom-pod-environment-vari
 to access your backup location you have to copy those variables and prepend
 the `STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
 
-Alternatively, standby clusters can also stream from a remote primary cluster.
+Standby clusters can also stream from a remote primary cluster.
 You have to specify the host address. Port is optional and defaults to 5432.
-Note, that only one of the options (`s3_wal_path`, `gs_wal_path`,
-`standby_host`) can be present under the `standby` top-level key.
+You can combine `standby_host` with either `s3_wal_path` or `gs_wal_path`
+for additional redundancy. Note that `s3_wal_path` and `gs_wal_path` are
+mutually exclusive. At least one of `s3_wal_path`, `gs_wal_path`, or
+`standby_host` must be specified under the `standby` top-level key.
 
 ## Logical backups
 
@@ -1495,7 +1502,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t ghcr.io/zalando/postgres-operator-ui:v1.13.0 .
+docker build -t ghcr.io/zalando/postgres-operator-ui:v1.15.1 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/

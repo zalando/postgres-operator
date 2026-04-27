@@ -1,6 +1,6 @@
 {
   "name": "postgres-operator-ui",
-  "version": "1.14.0",
+  "version": "1.15.1",
   "description": "PostgreSQL Operator UI",
   "main": "src/app.js",
   "config": {
@@ -38,7 +38,7 @@
     "brfs": "^2.0.2",
     "dedent-js": "1.0.1",
     "eslint": "^8.32.0",
-    "js-yaml": "4.1.0",
+    "js-yaml": "4.1.1",
     "pug": "^3.0.2",
     "rimraf": "^4.1.2",
     "riot": "^3.13.2",

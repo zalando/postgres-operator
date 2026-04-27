@@ -3,11 +3,10 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -281,7 +280,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 
 	scheduleSwitchover := false
-	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+	if !c.isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
 		c.logger.Infof("postponing switchover, not in maintenance window")
 		scheduleSwitchover = true
 	}
@@ -433,9 +432,10 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 		}
 
 		newRole := PostgresRole(newPod.Labels[c.OpConfig.PodRoleLabel])
-		if newRole == Replica {
+		switch newRole {
+		case Replica:
 			replicas = append(replicas, util.NameFromMeta(pod.ObjectMeta))
-		} else if newRole == Master {
+		case Master:
 			newMasterPod = newPod
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -257,9 +258,9 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	if teamID == "" {
 		msg := "no teamId specified"
 		if c.OpConfig.EnableTeamIdClusternamePrefix {
-			return nil, fmt.Errorf(msg)
+			return nil, fmt.Errorf("%s", msg)
 		}
-		c.logger.Warnf(msg)
+		c.logger.Warnf("%s", msg)
 		return nil, nil
 	}
 
@@ -663,15 +664,40 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 	return resources, nil
 }
 
-func isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
-	if len(specMaintenanceWindows) == 0 {
+func isStandbyCluster(spec *acidv1.PostgresSpec) bool {
+	for _, env := range spec.Env {
+		hasStandbyEnv, _ := regexp.MatchString(`^STANDBY_WALE_(S3|GS|GSC|SWIFT)_PREFIX$`, env.Name)
+		if hasStandbyEnv && env.Value != "" {
+			return true
+		}
+	}
+	return spec.StandbyCluster != nil
+}
+
+func (c *Cluster) isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
+	ignoreMaintenanceWindows := c.OpConfig.EnableMaintenanceWindows != nil && !*c.OpConfig.EnableMaintenanceWindows
+	noWindowsDefined := len(specMaintenanceWindows) == 0 && len(c.OpConfig.MaintenanceWindows) == 0
+	if noWindowsDefined || ignoreMaintenanceWindows {
 		return true
 	}
 	now := time.Now()
 	currentDay := now.Weekday()
 	currentTime := now.Format("15:04")
 
-	for _, window := range specMaintenanceWindows {
+	maintenanceWindows := specMaintenanceWindows
+	if len(maintenanceWindows) == 0 {
+		maintenanceWindows = make([]acidv1.MaintenanceWindow, 0, len(c.OpConfig.MaintenanceWindows))
+		for _, windowStr := range c.OpConfig.MaintenanceWindows {
+			var window acidv1.MaintenanceWindow
+			if err := window.UnmarshalJSON([]byte(windowStr)); err != nil {
+				c.logger.Errorf("could not parse default maintenance window %q: %v", windowStr, err)
+				continue
+			}
+			maintenanceWindows = append(maintenanceWindows, window)
+		}
+	}
+
+	for _, window := range maintenanceWindows {
 		startTime := window.StartTime.Format("15:04")
 		endTime := window.EndTime.Format("15:04")
 

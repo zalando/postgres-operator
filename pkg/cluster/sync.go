@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -15,11 +17,10 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -40,23 +41,28 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	defer c.mu.Unlock()
 
 	oldSpec := c.Postgresql
+
+	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
+
 	c.setSpec(newSpec)
 
 	defer func() {
-		var (
-			pgUpdatedStatus *acidv1.Postgresql
-			errStatus       error
-		)
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
+			newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusSyncFailed
 		} else if !c.Status.Running() {
-			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusRunning
 		}
-		if errStatus != nil {
-			c.logger.Warningf("could not set cluster status: %v", errStatus)
-		}
-		if pgUpdatedStatus != nil {
+
+		if !equality.Semantic.DeepEqual(oldSpec.Status, newSpec.Status) {
+			pgUpdatedStatus, err := c.KubeClient.SetPostgresCRDStatus(c.clusterName(), newSpec)
+			if err != nil {
+				c.logger.Warningf("could not set cluster status: %v", err)
+				return
+			}
 			c.setSpec(pgUpdatedStatus)
 		}
 	}()
@@ -95,11 +101,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		if nil != err {
 			return err
 		}
-	}
-
-	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
-		// do not apply any major version related changes yet
-		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
 
 	if err = c.syncStatefulSet(); err != nil {
@@ -1030,6 +1031,23 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 		standbyOptionsToSet["create_replica_methods"] = []string{"bootstrap_standby_with_wale", "basebackup_fast_xlog"}
 		standbyOptionsToSet["restore_command"] = "envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""
 
+		if c.Spec.StandbyCluster.StandbyHost != "" {
+			standbyOptionsToSet["host"] = c.Spec.StandbyCluster.StandbyHost
+		} else {
+			standbyOptionsToSet["host"] = nil
+		}
+
+		if c.Spec.StandbyCluster.StandbyPort != "" {
+			standbyOptionsToSet["port"] = c.Spec.StandbyCluster.StandbyPort
+		} else {
+			standbyOptionsToSet["port"] = nil
+		}
+
+		if c.Spec.StandbyCluster.StandbyPrimarySlotName != "" {
+			standbyOptionsToSet["primary_slot_name"] = c.Spec.StandbyCluster.StandbyPrimarySlotName
+		} else {
+			standbyOptionsToSet["primary_slot_name"] = nil
+		}
 	} else {
 		c.logger.Infof("promoting standby cluster and detach from source")
 		standbyOptionsToSet = nil
@@ -1059,38 +1077,43 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 func (c *Cluster) syncSecrets() error {
 	c.logger.Debug("syncing secrets")
 	c.setProcessName("syncing secrets")
+	errors := make([]string, 0)
 	generatedSecrets := c.generateUserSecrets()
 	retentionUsers := make([]string, 0)
 	currentTime := time.Now()
 
 	for secretUsername, generatedSecret := range generatedSecrets {
-		secret, err := c.KubeClient.Secrets(generatedSecret.Namespace).Create(context.TODO(), generatedSecret, metav1.CreateOptions{})
+		pgUserDegraded := false
+		createdSecret, err := c.KubeClient.Secrets(generatedSecret.Namespace).Create(context.TODO(), generatedSecret, metav1.CreateOptions{})
 		if err == nil {
-			c.Secrets[secret.UID] = secret
-			c.logger.Infof("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), generatedSecret.Namespace, secret.UID)
+			c.Secrets[createdSecret.UID] = createdSecret
+			c.logger.Infof("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(createdSecret.ObjectMeta), generatedSecret.Namespace, createdSecret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
-			if err = c.updateSecret(secretUsername, generatedSecret, &retentionUsers, currentTime); err != nil {
-				c.logger.Warningf("syncing secret %s failed: %v", util.NameFromMeta(secret.ObjectMeta), err)
+			updatedSecret, err := c.updateSecret(secretUsername, generatedSecret, &retentionUsers, currentTime)
+			if err == nil {
+				c.Secrets[updatedSecret.UID] = updatedSecret
+				continue
 			}
+			errors = append(errors, fmt.Sprintf("syncing secret %s failed: %v", util.NameFromMeta(generatedSecret.ObjectMeta), err))
+			pgUserDegraded = true
 		} else {
-			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err)
+			errors = append(errors, fmt.Sprintf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err))
+			pgUserDegraded = true
 		}
+		c.updatePgUser(secretUsername, pgUserDegraded)
 	}
 
 	// remove rotation users that exceed the retention interval
 	if len(retentionUsers) > 0 {
-		err := c.initDbConn()
-		if err != nil {
-			return fmt.Errorf("could not init db connection: %v", err)
+		if err := c.cleanupRotatedUsers(retentionUsers); err != nil {
+			errors = append(errors, fmt.Sprintf("error removing users exceeding configured retention interval: %v", err))
 		}
-		if err = c.cleanupRotatedUsers(retentionUsers, c.pgDb); err != nil {
-			return fmt.Errorf("error removing users exceeding configured retention interval: %v", err)
-		}
-		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection after removing users exceeding configured retention interval: %v", err)
-		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", strings.Join(errors, `', '`))
 	}
 
 	return nil
@@ -1105,7 +1128,7 @@ func (c *Cluster) updateSecret(
 	secretUsername string,
 	generatedSecret *v1.Secret,
 	retentionUsers *[]string,
-	currentTime time.Time) error {
+	currentTime time.Time) (*v1.Secret, error) {
 	var (
 		secret          *v1.Secret
 		err             error
@@ -1115,20 +1138,21 @@ func (c *Cluster) updateSecret(
 
 	// get the secret first
 	if secret, err = c.KubeClient.Secrets(generatedSecret.Namespace).Get(context.TODO(), generatedSecret.Name, metav1.GetOptions{}); err != nil {
-		return fmt.Errorf("could not get current secret: %v", err)
+		return generatedSecret, fmt.Errorf("could not get current secret: %v", err)
 	}
 	c.Secrets[secret.UID] = secret
 
 	// fetch user map to update later
 	var userMap map[string]spec.PgUser
 	var userKey string
-	if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
+	switch secretUsername {
+	case c.systemUsers[constants.SuperuserKeyName].Name:
 		userKey = constants.SuperuserKeyName
 		userMap = c.systemUsers
-	} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
+	case c.systemUsers[constants.ReplicationUserKeyName].Name:
 		userKey = constants.ReplicationUserKeyName
 		userMap = c.systemUsers
-	} else {
+	default:
 		userKey = secretUsername
 		userMap = c.pgUsers
 	}
@@ -1151,36 +1175,14 @@ func (c *Cluster) updateSecret(
 	pwdUser := userMap[userKey]
 	secretName := util.NameFromMeta(secret.ObjectMeta)
 
-	// if password rotation is enabled update password and username if rotation interval has been passed
-	// rotation can be enabled globally or via the manifest (excluding the Postgres superuser)
-	rotationEnabledInManifest := secretUsername != constants.SuperuserKeyName &&
-		(slices.Contains(c.Spec.UsersWithSecretRotation, secretUsername) ||
-			slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
-
-	// globally enabled rotation is only allowed for manifest and bootstrapped roles
-	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
-	rotationAllowed := !pwdUser.IsDbOwner && slices.Contains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
-
-	// users can ignore any kind of rotation
-	isIgnoringRotation := slices.Contains(c.Spec.UsersIgnoringSecretRotation, secretUsername)
-
-	if ((c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest) && !isIgnoringRotation {
-		updateSecretMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
+	// do not perform any rotation of reset for standby clusters
+	if !isStandbyCluster(&c.Spec) {
+		updateSecretMsg, err = c.checkForPasswordRotation(secret, secretUsername, pwdUser, retentionUsers, currentTime)
 		if err != nil {
-			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
+			return nil, fmt.Errorf("error while checking for password rotation: %v", err)
 		}
 		if updateSecretMsg != "" {
 			updateSecret = true
-		}
-	} else {
-		// username might not match if password rotation has been disabled again
-		if secretUsername != string(secret.Data["username"]) {
-			*retentionUsers = append(*retentionUsers, secretUsername)
-			secret.Data["username"] = []byte(secretUsername)
-			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
-			secret.Data["nextRotation"] = []byte{}
-			updateSecret = true
-			updateSecretMsg = fmt.Sprintf("secret %s does not contain the role %s - updating username and resetting password", secretName, secretUsername)
 		}
 	}
 
@@ -1208,26 +1210,73 @@ func (c *Cluster) updateSecret(
 	}
 
 	if updateSecret {
-		c.logger.Infof(updateSecretMsg)
+		c.logger.Infof("%s", updateSecretMsg)
 		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("could not update secret %s: %v", secretName, err)
+			return nil, fmt.Errorf("could not update secret: %v", err)
 		}
-		c.Secrets[secret.UID] = secret
 	}
 
 	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations, nil); changed {
 		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
 		if err != nil {
-			return fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
+			return nil, fmt.Errorf("could not form patch for secret annotations: %v", err)
 		}
 		secret, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
-			return fmt.Errorf("could not patch annotations for secret %q: %v", secret.Name, err)
+			return nil, fmt.Errorf("could not patch annotations for secret: %v", err)
 		}
-		c.Secrets[secret.UID] = secret
 	}
 
-	return nil
+	return secret, nil
+}
+
+func (c *Cluster) checkForPasswordRotation(
+	secret *v1.Secret,
+	secretUsername string,
+	pwdUser spec.PgUser,
+	retentionUsers *[]string,
+	currentTime time.Time) (string, error) {
+
+	var (
+		passwordRotationMsg string
+		err                 error
+	)
+
+	// if password rotation is enabled update password and username if rotation interval has been passed
+	// rotation can be enabled globally or via the manifest (excluding the Postgres superuser)
+	rotationEnabledInManifest := secretUsername != constants.SuperuserKeyName &&
+		(slices.Contains(c.Spec.UsersWithSecretRotation, secretUsername) ||
+			slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
+
+	// globally enabled rotation is only allowed for manifest and bootstrapped roles
+	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
+	rotationAllowed := !pwdUser.IsDbOwner && slices.Contains(allowedRoleTypes, pwdUser.Origin)
+
+	// users can ignore any kind of rotation
+	isIgnoringRotation := slices.Contains(c.Spec.UsersIgnoringSecretRotation, secretUsername)
+
+	if ((c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest) && !isIgnoringRotation {
+		passwordRotationMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
+		if err != nil {
+			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
+		}
+	} else {
+		// username might not match if password rotation has been disabled again
+		usernameFromSecret := string(secret.Data["username"])
+		if secretUsername != usernameFromSecret {
+			// handle edge case when manifest user conflicts with a user from prepared databases
+			if strings.Replace(usernameFromSecret, "-", "_", -1) == strings.Replace(secretUsername, "-", "_", -1) {
+				return "", fmt.Errorf("could not update secret because of user name mismatch: expected: %s, got: %s", secretUsername, usernameFromSecret)
+			}
+			*retentionUsers = append(*retentionUsers, secretUsername)
+			secret.Data["username"] = []byte(secretUsername)
+			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+			secret.Data["nextRotation"] = []byte{}
+			passwordRotationMsg = fmt.Sprintf("secret does not contain the role %s - updating username and resetting password", secretUsername)
+		}
+	}
+
+	return passwordRotationMsg, nil
 }
 
 func (c *Cluster) rotatePasswordInSecret(
@@ -1331,6 +1380,23 @@ func (c *Cluster) rotatePasswordInSecret(
 	}
 
 	return updateSecretMsg, nil
+}
+
+func (c *Cluster) updatePgUser(secretUsername string, degraded bool) {
+	for key, pgUser := range c.pgUsers {
+		if pgUser.Name == secretUsername {
+			pgUser.Degraded = degraded
+			c.pgUsers[key] = pgUser
+			return
+		}
+	}
+	for key, pgUser := range c.systemUsers {
+		if pgUser.Name == secretUsername {
+			pgUser.Degraded = degraded
+			c.systemUsers[key] = pgUser
+			return
+		}
+	}
 }
 
 func (c *Cluster) syncRoles() (err error) {

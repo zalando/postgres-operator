@@ -680,8 +680,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations:          make(map[string]string),
 			serviceAnnotations:           make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 			},
 		},
 		{
@@ -702,8 +701,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations:        make(map[string]string),
 			serviceAnnotations:         make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 			},
 		},
 		{
@@ -714,8 +712,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations:        make(map[string]string),
 			serviceAnnotations:         map[string]string{"foo": "bar"},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 				"foo": "bar",
 			},
 		},
@@ -737,8 +734,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations:        map[string]string{"foo": "bar"},
 			serviceAnnotations:         make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 				"foo": "bar",
 			},
 		},
@@ -780,8 +776,7 @@ func TestServiceAnnotations(t *testing.T) {
 				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 			},
 		},
 		{
@@ -792,8 +787,7 @@ func TestServiceAnnotations(t *testing.T) {
 			serviceAnnotations:         make(map[string]string),
 			operatorAnnotations:        make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
 			},
 		},
 		{
@@ -835,8 +829,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations:           make(map[string]string),
 			serviceAnnotations:            make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 			},
 		},
 		{
@@ -857,8 +850,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations:         make(map[string]string),
 			serviceAnnotations:          make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 			},
 		},
 		{
@@ -869,8 +861,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations:         make(map[string]string),
 			serviceAnnotations:          map[string]string{"foo": "bar"},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 				"foo": "bar",
 			},
 		},
@@ -892,8 +883,7 @@ func TestServiceAnnotations(t *testing.T) {
 			operatorAnnotations:         map[string]string{"foo": "bar"},
 			serviceAnnotations:          make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 				"foo": "bar",
 			},
 		},
@@ -935,8 +925,7 @@ func TestServiceAnnotations(t *testing.T) {
 				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 			},
 		},
 		{
@@ -947,8 +936,7 @@ func TestServiceAnnotations(t *testing.T) {
 			serviceAnnotations:          make(map[string]string),
 			operatorAnnotations:         make(map[string]string),
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
-				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
 			},
 		},
 		{
@@ -1341,14 +1329,21 @@ func TestCompareEnv(t *testing.T) {
 	}
 }
 
-func newService(ann map[string]string, svcT v1.ServiceType, lbSr []string) *v1.Service {
+func newService(
+	annotations map[string]string,
+	svcType v1.ServiceType,
+	sourceRanges []string,
+	selector map[string]string,
+	policy v1.ServiceExternalTrafficPolicyType) *v1.Service {
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type:                     svcT,
-			LoadBalancerSourceRanges: lbSr,
+			Selector:                 selector,
+			Type:                     svcType,
+			LoadBalancerSourceRanges: sourceRanges,
+			ExternalTrafficPolicy:    policy,
 		},
 	}
-	svc.Annotations = ann
+	svc.Annotations = annotations
 	return svc
 }
 
@@ -1365,13 +1360,17 @@ func TestCompareServices(t *testing.T) {
 		},
 	}
 
+	defaultPolicy := v1.ServiceExternalTrafficPolicyTypeCluster
+
 	serviceWithOwnerReference := newService(
 		map[string]string{
 			constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 		},
 		v1.ServiceTypeClusterIP,
-		[]string{"128.141.0.0/16", "137.138.0.0/16"})
+		[]string{"128.141.0.0/16", "137.138.0.0/16"},
+		nil,
+		defaultPolicy,
+	)
 
 	ownerRef := metav1.OwnerReference{
 		APIVersion: "acid.zalan.do/v1",
@@ -1394,17 +1393,17 @@ func TestCompareServices(t *testing.T) {
 			current: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			match: true,
 		},
 		{
@@ -1412,17 +1411,17 @@ func TestCompareServices(t *testing.T) {
 			current: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			match:  false,
 			reason: `new service's type "LoadBalancer" does not match the current one "ClusterIP"`,
 		},
@@ -1431,17 +1430,17 @@ func TestCompareServices(t *testing.T) {
 			current: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"185.249.56.0/22"}),
+				[]string{"185.249.56.0/22"},
+				nil, defaultPolicy),
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
@@ -1450,17 +1449,17 @@ func TestCompareServices(t *testing.T) {
 			current: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeLoadBalancer,
-				[]string{}),
+				[]string{},
+				nil, defaultPolicy),
 			match:  false,
 			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
@@ -1469,11 +1468,39 @@ func TestCompareServices(t *testing.T) {
 			current: newService(
 				map[string]string{
 					constants.ZalandoDNSNameAnnotation: "clstr.acid.zalan.do",
-					constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 				},
 				v1.ServiceTypeClusterIP,
-				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
+				[]string{"128.141.0.0/16", "137.138.0.0/16"},
+				nil, defaultPolicy),
 			new:   serviceWithOwnerReference,
+			match: false,
+		},
+		{
+			about: "new service has a label selector",
+			current: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				nil, defaultPolicy),
+			new: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				map[string]string{"cluster-name": "clstr", "spilo-role": "master"}, defaultPolicy),
+			match: false,
+		},
+		{
+			about: "services differ on external traffic policy",
+			current: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				nil, defaultPolicy),
+			new: newService(
+				map[string]string{},
+				v1.ServiceTypeClusterIP,
+				[]string{},
+				nil, v1.ServiceExternalTrafficPolicyTypeLocal),
 			match: false,
 		},
 	}
@@ -2067,7 +2094,7 @@ func TestCompareVolumeMounts(t *testing.T) {
 }
 
 func TestGetSwitchoverSchedule(t *testing.T) {
-	now := time.Now()
+	now, _ := time.Parse(time.RFC3339, "2025-11-11T12:35:00Z")
 
 	futureTimeStart := now.Add(1 * time.Hour)
 	futureWindowTimeStart := futureTimeStart.Format("15:04")
@@ -2076,10 +2103,13 @@ func TestGetSwitchoverSchedule(t *testing.T) {
 	pastWindowTimeStart := pastTimeStart.Format("15:04")
 	pastWindowTimeEnd := now.Add(-1 * time.Hour).Format("15:04")
 
+	defaultWindowStr := fmt.Sprintf("%s-%s", futureWindowTimeStart, futureWindowTimeEnd)
+
 	tests := []struct {
-		name     string
-		windows  []acidv1.MaintenanceWindow
-		expected string
+		name           string
+		windows        []acidv1.MaintenanceWindow
+		defaultWindows []string
+		expected       string
 	}{
 		{
 			name: "everyday maintenance windows is later today",
@@ -2141,12 +2171,41 @@ func TestGetSwitchoverSchedule(t *testing.T) {
 			},
 			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
 		},
+		{
+			name:           "fallback to operator default window when spec is empty",
+			windows:        []acidv1.MaintenanceWindow{},
+			defaultWindows: []string{defaultWindowStr},
+			expected:       futureTimeStart.Format("2006-01-02T15:04+00"),
+		},
+		{
+			name:           "no windows defined returns empty string",
+			windows:        []acidv1.MaintenanceWindow{},
+			defaultWindows: nil,
+			expected:       "",
+		},
+		{
+			name: "choose the earliest window from multiple in spec",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Weekday:   now.AddDate(0, 0, 2).Weekday(),
+					StartTime: mustParseTime(futureWindowTimeStart),
+					EndTime:   mustParseTime(futureWindowTimeEnd),
+				},
+				{
+					Weekday:   now.AddDate(0, 0, 1).Weekday(),
+					StartTime: mustParseTime(pastWindowTimeStart),
+					EndTime:   mustParseTime(pastWindowTimeEnd),
+				},
+			},
+			expected: pastTimeStart.AddDate(0, 0, 1).Format("2006-01-02T15:04+00"),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster.Spec.MaintenanceWindows = tt.windows
-			schedule := cluster.GetSwitchoverSchedule()
+			cluster.OpConfig.MaintenanceWindows = tt.defaultWindows
+			schedule := cluster.getSwitchoverScheduleAtTime(now)
 			if schedule != tt.expected {
 				t.Errorf("Expected GetSwitchoverSchedule to return %s, returned: %s", tt.expected, schedule)
 			}

@@ -2,8 +2,52 @@ apiVersion: v1
 entries:
   postgres-operator:
   - apiVersion: v2
+    appVersion: 1.15.1
+    created: "2025-12-17T14:48:33.832345061+01:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
+    digest: 9f3edc3d796105c02c04eaae28a78e58fb08c1847a9de012245fd6ac2c0d2c00
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-1.15.1.tgz
+    version: 1.15.1
+  - apiVersion: v2
+    appVersion: 1.15.0
+    created: "2025-12-17T14:48:33.826117296+01:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
+    digest: 002dd47647bf51fbba023bd1762d807be478cf37de7a44b80cd01ac1f20bd94a
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-1.15.0.tgz
+    version: 1.15.0
+  - apiVersion: v2
     appVersion: 1.14.0
-    created: "2024-12-23T11:25:32.596716566+01:00"
+    created: "2025-12-17T14:48:33.819729144+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 36e1571f3f455b213f16cdda7b1158648e8e84deb804ba47ed6b9b6d19263ba8
@@ -25,7 +69,7 @@ entries:
     version: 1.14.0
   - apiVersion: v2
     appVersion: 1.13.0
-    created: "2024-12-23T11:25:32.591136261+01:00"
+    created: "2025-12-17T14:48:33.81038602+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: a839601689aea0a7e6bc0712a5244d435683cf3314c95794097ff08540e1dfef
@@ -47,7 +91,7 @@ entries:
     version: 1.13.0
   - apiVersion: v2
     appVersion: 1.12.2
-    created: "2024-12-23T11:25:32.585419709+01:00"
+    created: "2025-12-17T14:48:33.803256825+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 65858d14a40d7fd90c32bd9fc60021acc9555c161079f43a365c70171eaf21d8
@@ -69,7 +113,7 @@ entries:
     version: 1.12.2
   - apiVersion: v2
     appVersion: 1.11.0
-    created: "2024-12-23T11:25:32.580077286+01:00"
+    created: "2025-12-17T14:48:33.797369053+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 3914b5e117bda0834f05c9207f007e2ac372864cf6e86dcc2e1362bbe46c14d9
@@ -91,7 +135,7 @@ entries:
     version: 1.11.0
   - apiVersion: v2
     appVersion: 1.10.1
-    created: "2024-12-23T11:25:32.574641578+01:00"
+    created: "2025-12-17T14:48:33.791368349+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: cc3baa41753da92466223d0b334df27e79c882296577b404a8e9071411fcf19c
@@ -111,26 +155,4 @@ entries:
     urls:
     - postgres-operator-1.10.1.tgz
     version: 1.10.1
-  - apiVersion: v2
-    appVersion: 1.9.0
-    created: "2024-12-23T11:25:32.604748814+01:00"
-    description: Postgres Operator creates and manages PostgreSQL clusters running
-      in Kubernetes
-    digest: 64df90c898ca591eb3a330328173ffaadfbf9ddd474d8c42ed143edc9e3f4276
-    home: https://github.com/zalando/postgres-operator
-    keywords:
-    - postgres
-    - operator
-    - cloud-native
-    - patroni
-    - spilo
-    maintainers:
-    - email: opensource@zalando.de
-      name: Zalando
-    name: postgres-operator
-    sources:
-    - https://github.com/zalando/postgres-operator
-    urls:
-    - postgres-operator-1.9.0.tgz
-    version: 1.9.0
-generated: "2024-12-23T11:25:32.568598763+01:00"
+generated: "2025-12-17T14:48:33.785159183+01:00"
