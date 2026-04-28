@@ -368,7 +368,7 @@ func (c *Controller) initController() {
 		})
 	}
 
-	c.apiserver = apiserver.New(c, c.opConfig.APIPort, c.logger.Logger)
+	c.apiserver = apiserver.New(c, c.opConfig.APIAddress, c.opConfig.APIPort, c.logger.Logger)
 }
 
 func (c *Controller) initSharedInformers() {
