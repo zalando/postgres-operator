@@ -908,7 +908,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 
 			// in this case also do not forget to install lookup function
 			// skip installation in standby clusters, since they are read-only
-			if !c.ConnectionPooler[role].LookupFunction && c.Spec.StandbyCluster == nil {
+			if !c.ConnectionPooler[role].LookupFunction && !isStandbyCluster(&newSpec.Spec) {
 				connectionPooler := c.Spec.ConnectionPooler
 				specSchema := ""
 				specUser := ""
