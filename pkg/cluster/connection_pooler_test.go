@@ -30,6 +30,7 @@ func newFakeK8sPoolerTestClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 		StatefulSetsGetter: clientSet.AppsV1(),
 		DeploymentsGetter:  clientSet.AppsV1(),
 		ServicesGetter:     clientSet.CoreV1(),
+		SecretsGetter:      clientSet.CoreV1(),
 	}, clientSet
 }
 
@@ -803,6 +804,7 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 	}
 	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
 		Master: {
+			AuthSecret:     nil,
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: true,
@@ -1019,6 +1021,7 @@ func TestPoolerTLS(t *testing.T) {
 	// create pooler resources
 	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
 	cluster.ConnectionPooler[Master] = &ConnectionPoolerObjects{
+		AuthSecret:     nil,
 		Deployment:     nil,
 		Service:        nil,
 		Name:           cluster.connectionPoolerName(Master),
@@ -1089,12 +1092,14 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 	}
 	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
 		Master: {
+			AuthSecret:     nil,
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: false,
 			Role:           Master,
 		},
 		Replica: {
+			AuthSecret:     nil,
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: false,

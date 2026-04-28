@@ -42,6 +42,33 @@ pipeline:
                     -f docker/Dockerfile \
                     --push .
 
+  - id: build-pooler
+    env:
+      <<: *BUILD_ENV
+    type: script
+    vm_config:
+      type: linux
+
+    commands:
+      - desc: Build image
+        cmd: |
+          cd pooler
+          if [ -z ${CDP_SOURCE_BRANCH} ]; then
+            IMAGE=${MULTI_ARCH_REGISTRY}/pgbouncer
+          else
+            IMAGE=${MULTI_ARCH_REGISTRY}/pgbouncer-test
+          fi
+
+          docker buildx create --config /etc/cdp-buildkitd.toml --driver-opt network=host --bootstrap --use
+          docker buildx build --platform "linux/amd64,linux/arm64" \
+                    --build-arg BASE_IMAGE="${ALPINE_BASE_IMAGE}" \
+                    -t "${IMAGE}:${CDP_BUILD_VERSION}" \
+                    --push .
+
+          if [ -z ${CDP_SOURCE_BRANCH} ]; then
+            cdp-promote-image ${IMAGE}:${CDP_BUILD_VERSION}
+          fi
+
   - id: build-operator-ui
     env:
       <<: *BUILD_ENV
