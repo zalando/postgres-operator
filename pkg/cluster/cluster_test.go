@@ -1014,6 +1014,136 @@ func TestServiceAnnotations(t *testing.T) {
 	}
 }
 
+func TestPoolerServiceAnnotations(t *testing.T) {
+	enabled := true
+	tests := []struct {
+		about                           string
+		role                            PostgresRole
+		enableMasterPoolerLoadBalancer  *bool
+		enableReplicaPoolerLoadBalancer *bool
+		operatorAnnotations             map[string]string
+		serviceAnnotations              map[string]string
+		masterServiceAnnotations        map[string]string
+		replicaServiceAnnotations       map[string]string
+		masterPoolerServiceAnnotations  map[string]string
+		replicaPoolerServiceAnnotations map[string]string
+		expect                          map[string]string
+	}{
+		{
+			about:               "Master pooler annotations override service annotations",
+			role:                "master",
+			operatorAnnotations: make(map[string]string),
+			serviceAnnotations: map[string]string{
+				"foo": "bar",
+			},
+			masterServiceAnnotations: map[string]string{
+				"baz": "qux",
+			},
+			masterPoolerServiceAnnotations: map[string]string{
+				"foo":    "pooler-bar",
+				"pooler": "master",
+			},
+			expect: map[string]string{
+				"foo":    "pooler-bar",
+				"baz":    "qux",
+				"pooler": "master",
+			},
+		},
+		{
+			about:               "Replica pooler annotations override service annotations",
+			role:                "replica",
+			operatorAnnotations: make(map[string]string),
+			serviceAnnotations: map[string]string{
+				"foo": "bar",
+			},
+			replicaServiceAnnotations: map[string]string{
+				"baz": "qux",
+			},
+			replicaPoolerServiceAnnotations: map[string]string{
+				"foo":    "pooler-bar",
+				"pooler": "replica",
+			},
+			expect: map[string]string{
+				"foo":    "pooler-bar",
+				"baz":    "qux",
+				"pooler": "replica",
+			},
+		},
+		{
+			about:               "Master pooler with load balancer and pooler annotations",
+			role:                "master",
+			enableMasterPoolerLoadBalancer: &enabled,
+			operatorAnnotations: make(map[string]string),
+			serviceAnnotations:  make(map[string]string),
+			masterPoolerServiceAnnotations: map[string]string{
+				"pooler-key": "pooler-value",
+			},
+			expect: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname":                            "acid-test-pooler-stg.test.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"pooler-key": "pooler-value",
+			},
+		},
+		{
+			about:               "Master pooler annotations not applied to replica pooler",
+			role:                "replica",
+			operatorAnnotations: make(map[string]string),
+			serviceAnnotations:  make(map[string]string),
+			masterPoolerServiceAnnotations: map[string]string{
+				"master-only": "value",
+			},
+			expect: make(map[string]string),
+		},
+		{
+			about:               "Replica pooler annotations not applied to master pooler",
+			role:                "master",
+			operatorAnnotations: make(map[string]string),
+			serviceAnnotations:  make(map[string]string),
+			replicaPoolerServiceAnnotations: map[string]string{
+				"replica-only": "value",
+			},
+			expect: make(map[string]string),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.about, func(t *testing.T) {
+			cl.OpConfig.CustomServiceAnnotations = tt.operatorAnnotations
+			cl.OpConfig.EnableMasterPoolerLoadBalancer = false
+			cl.OpConfig.EnableReplicaPoolerLoadBalancer = false
+			cl.OpConfig.MasterDNSNameFormat = "{cluster}-stg.{namespace}.{hostedzone}"
+			cl.OpConfig.MasterLegacyDNSNameFormat = "{cluster}-stg.{team}.{hostedzone}"
+			cl.OpConfig.ReplicaDNSNameFormat = "{cluster}-stg-repl.{namespace}.{hostedzone}"
+			cl.OpConfig.ReplicaLegacyDNSNameFormat = "{cluster}-stg-repl.{team}.{hostedzone}"
+			cl.OpConfig.DbHostedZone = "db.example.com"
+
+			cl.Postgresql.Spec.ClusterName = ""
+			cl.Postgresql.Spec.TeamID = "acid"
+			cl.Postgresql.Spec.ServiceAnnotations = tt.serviceAnnotations
+			cl.Postgresql.Spec.MasterServiceAnnotations = tt.masterServiceAnnotations
+			cl.Postgresql.Spec.ReplicaServiceAnnotations = tt.replicaServiceAnnotations
+			cl.Postgresql.Spec.MasterPoolerServiceAnnotations = tt.masterPoolerServiceAnnotations
+			cl.Postgresql.Spec.ReplicaPoolerServiceAnnotations = tt.replicaPoolerServiceAnnotations
+			cl.Postgresql.Spec.EnableMasterPoolerLoadBalancer = tt.enableMasterPoolerLoadBalancer
+			cl.Postgresql.Spec.EnableReplicaPoolerLoadBalancer = tt.enableReplicaPoolerLoadBalancer
+
+			got := cl.generatePoolerServiceAnnotations(tt.role, &cl.Postgresql.Spec)
+			if got == nil {
+				got = make(map[string]string)
+			}
+			if len(tt.expect) != len(got) {
+				t.Errorf("expected %d annotation(s), got %d: %v", len(tt.expect), len(got), got)
+				return
+			}
+			for k, v := range got {
+				if tt.expect[k] != v {
+					t.Errorf("expected annotation '%v' with value '%v', got value '%v'", k, tt.expect[k], v)
+				}
+			}
+		})
+	}
+}
+
 func TestInitSystemUsers(t *testing.T) {
 	// reset system users, pooler and stream section
 	cl.systemUsers = make(map[string]spec.PgUser)

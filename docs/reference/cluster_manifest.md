@@ -205,6 +205,18 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   This field overrides `serviceAnnotations` with the same key for the replica
   service if not empty.
 
+* **masterPoolerServiceAnnotations**
+  A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+  to the master connection pooler service created for the database cluster.
+  This field overrides `serviceAnnotations` and `masterServiceAnnotations`
+  with the same key for the master pooler service if not empty.
+
+* **replicaPoolerServiceAnnotations**
+  A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+  to the replica connection pooler service created for the database cluster.
+  This field overrides `serviceAnnotations` and `replicaServiceAnnotations`
+  with the same key for the replica pooler service if not empty.
+
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default Docker
   limit `/dev/shm` to `64M` (see e.g. the [docker
