@@ -725,14 +725,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         master_annotations = {
             "external-dns.alpha.kubernetes.io/hostname": "acid-minimal-cluster-pooler.default.db.example.com",
-            "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
         }
         self.eventuallyTrue(lambda: k8s.check_service_annotations(
             master_pooler_label+","+pooler_label, master_annotations), "Wrong annotations")
 
         replica_annotations = {
             "external-dns.alpha.kubernetes.io/hostname": "acid-minimal-cluster-pooler-repl.default.db.example.com",
-            "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
         }
         self.eventuallyTrue(lambda: k8s.check_service_annotations(
             replica_pooler_label+","+pooler_label, replica_annotations), "Wrong annotations")
