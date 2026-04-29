@@ -618,6 +618,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
 		newCheck("new %s's %s (index %d) readiness probe does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.ReadinessProbe, b.ReadinessProbe) }),
+		newCheck("new %s's %s (index %d) liveness probe does not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.LivenessProbe, b.LivenessProbe) }),
 		newCheck("new %s's %s (index %d) ports do not match the current one",
 			func(a, b v1.Container) bool { return !comparePorts(a.Ports, b.Ports) }),
 		newCheck("new %s's %s (index %d) resources do not match the current ones",

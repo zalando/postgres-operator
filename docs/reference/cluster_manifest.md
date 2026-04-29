@@ -85,6 +85,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   requires a custom Spilo image. Note the FSGroup of a Pod cannot be changed
   without recreating a new Pod. Optional.
 
+* **livenessProbe**
+  Allows for adding a liveness probe to the Spilo container to detect if it's
+  running properly.
+
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_master_load_balancer` parameter) to define whether to enable the load

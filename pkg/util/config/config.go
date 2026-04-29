@@ -62,6 +62,7 @@ type Resources struct {
 	NodeReadinessLabel            map[string]string   `name:"node_readiness_label" default:""`
 	NodeReadinessLabelMerge       string              `name:"node_readiness_label_merge" default:"OR"`
 	ShmVolume                     *bool               `name:"enable_shm_volume" default:"true"`
+	LivenessProbe                 *v1.Probe           `name:"liveness_probe"`
 
 	MaxInstances                       int32  `name:"max_instances" default:"-1"`
 	MinInstances                       int32  `name:"min_instances" default:"-1"`
@@ -253,6 +254,7 @@ type Config struct {
 	TargetMajorVersion                       string            `name:"target_major_version" default:"18"`
 	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
 	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
+	LivenessProbe                            *v1.Probe         `json:"liveness_probe,omitempty"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
 	EnableSecretsDeletion                    *bool             `name:"enable_secrets_deletion" default:"true"`
 	EnablePersistentVolumeClaimDeletion      *bool             `name:"enable_persistent_volume_claim_deletion" default:"true"`
