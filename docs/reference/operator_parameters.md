@@ -900,6 +900,19 @@ grouped under the `logical_backup` key.
 * **logical_backup_cronjob_environment_secret**
   Reference to a Kubernetes secret, which keys will be added as environment variables to the cronjob. Default: ""
 
+The following environment variables can be passed to the logical backup
+cronjob via `logical_backup_cronjob_environment_secret` to control
+connectivity checks before the backup starts:
+
+* **LOGICAL_BACKUP_CONNECT_RETRIES**
+  Number of times to retry connecting to the target PostgreSQL pod before
+  giving up. This is useful when NetworkPolicy enforcement introduces a
+  short delay before a newly-created pod's IP is allowed through ingress
+  rules on the destination node. Default: "10"
+
+* **LOGICAL_BACKUP_CONNECT_RETRY_DELAY**
+  Delay in seconds between connectivity retries. Default: "2"
+
 ## Debugging the operator
 
 Options to aid debugging of the operator itself. Grouped under the `debug` key.
@@ -1062,7 +1075,7 @@ operator being able to provide some reasonable defaults.
 
 * **connection_pooler_image**
   Docker image to use for connection pooler deployment.
-  Default: "registry.opensource.zalan.do/acid/pgbouncer"
+  Default: "ghcr.io/zalando/postgres-operator/pgbouncer:latest"
 
 * **connection_pooler_max_db_connections**
   How many connections the pooler can max hold. This value is divided among the
