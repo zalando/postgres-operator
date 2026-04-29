@@ -220,6 +220,7 @@ type Config struct {
 	StorageResizeMode                        string            `name:"storage_resize_mode" default:"pvc"`
 	EnableLoadBalancer                       *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
 	ExternalTrafficPolicy                    string            `name:"external_traffic_policy" default:"Cluster"`
+	LoadBalancerClass                        string            `name:"load_balancer_class"`
 	MasterDNSNameFormat                      StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{namespace}.{hostedzone}"`
 	MasterLegacyDNSNameFormat                StringTemplate    `name:"master_legacy_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat                     StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{namespace}.{hostedzone}"`

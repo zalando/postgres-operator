@@ -473,6 +473,9 @@ spec:
                   replica_legacy_dns_name_format:
                     type: string
                     default: "{cluster}-repl.{team}.{hostedzone}"
+                  load_balancer_class:
+                    type: string
+                    description: "LoadBalancerClass to use for LoadBalancer services"
               aws_or_gcp:
                 type: object
                 properties:
