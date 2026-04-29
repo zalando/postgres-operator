@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -663,8 +664,20 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 	return resources, nil
 }
 
+func isStandbyCluster(spec *acidv1.PostgresSpec) bool {
+	for _, env := range spec.Env {
+		hasStandbyEnv, _ := regexp.MatchString(`^STANDBY_WALE_(S3|GS|GSC|SWIFT)_PREFIX$`, env.Name)
+		if hasStandbyEnv && env.Value != "" {
+			return true
+		}
+	}
+	return spec.StandbyCluster != nil
+}
+
 func (c *Cluster) isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
-	if len(specMaintenanceWindows) == 0 && len(c.OpConfig.MaintenanceWindows) == 0 {
+	ignoreMaintenanceWindows := c.OpConfig.EnableMaintenanceWindows != nil && !*c.OpConfig.EnableMaintenanceWindows
+	noWindowsDefined := len(specMaintenanceWindows) == 0 && len(c.OpConfig.MaintenanceWindows) == 0
+	if noWindowsDefined || ignoreMaintenanceWindows {
 		return true
 	}
 	now := time.Now()

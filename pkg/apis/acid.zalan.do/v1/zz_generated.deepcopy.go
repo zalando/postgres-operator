@@ -433,6 +433,11 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.EnableMaintenanceWindows != nil {
+		in, out := &in.EnableMaintenanceWindows, &out.EnableMaintenanceWindows
+		*out = new(bool)
+		**out = **in
+	}
 	if in.MaintenanceWindows != nil {
 		in, out := &in.MaintenanceWindows, &out.MaintenanceWindows
 		*out = make([]MaintenanceWindow, len(*in))

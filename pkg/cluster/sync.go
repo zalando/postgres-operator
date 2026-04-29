@@ -41,6 +41,12 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	defer c.mu.Unlock()
 
 	oldSpec := c.Postgresql
+
+	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
+
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -95,11 +101,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		if nil != err {
 			return err
 		}
-	}
-
-	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
-		// do not apply any major version related changes yet
-		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
 
 	if err = c.syncStatefulSet(); err != nil {
@@ -718,14 +719,26 @@ func (c *Cluster) syncStatefulSet() error {
 	if configPatched, restartPrimaryFirst, restartWait, err = c.syncPatroniConfig(pods, c.Spec.Patroni, requiredPgParameters); err != nil {
 		c.logger.Warningf("Patroni config updated? %v - errors during config sync: %v", configPatched, err)
 		postponeReasons = append(postponeReasons, "errors during Patroni config sync")
-		isSafeToRecreatePods = false
+		// Only mark unsafe if all pods are running. If some pods are not running,
+		// Patroni API errors are expected and should not block pod recreation,
+		// which is the only way to fix non-running pods.
+		if c.allPodsRunning(pods) {
+			isSafeToRecreatePods = false
+		} else {
+			c.logger.Warningf("ignoring Patroni config sync errors because some pods are not running")
+		}
 	}
 
 	// restart Postgres where it is still pending
 	if err = c.restartInstances(pods, restartWait, restartPrimaryFirst); err != nil {
 		c.logger.Errorf("errors while restarting Postgres in pods via Patroni API: %v", err)
 		postponeReasons = append(postponeReasons, "errors while restarting Postgres via Patroni API")
-		isSafeToRecreatePods = false
+		// Same logic: don't let unreachable non-running pods block recreation.
+		if c.allPodsRunning(pods) {
+			isSafeToRecreatePods = false
+		} else {
+			c.logger.Warningf("ignoring Patroni restart errors because some pods are not running")
+		}
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
@@ -1174,41 +1187,14 @@ func (c *Cluster) updateSecret(
 	pwdUser := userMap[userKey]
 	secretName := util.NameFromMeta(secret.ObjectMeta)
 
-	// if password rotation is enabled update password and username if rotation interval has been passed
-	// rotation can be enabled globally or via the manifest (excluding the Postgres superuser)
-	rotationEnabledInManifest := secretUsername != constants.SuperuserKeyName &&
-		(slices.Contains(c.Spec.UsersWithSecretRotation, secretUsername) ||
-			slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
-
-	// globally enabled rotation is only allowed for manifest and bootstrapped roles
-	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
-	rotationAllowed := !pwdUser.IsDbOwner && slices.Contains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
-
-	// users can ignore any kind of rotation
-	isIgnoringRotation := slices.Contains(c.Spec.UsersIgnoringSecretRotation, secretUsername)
-
-	if ((c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest) && !isIgnoringRotation {
-		updateSecretMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
+	// do not perform any rotation of reset for standby clusters
+	if !isStandbyCluster(&c.Spec) {
+		updateSecretMsg, err = c.checkForPasswordRotation(secret, secretUsername, pwdUser, retentionUsers, currentTime)
 		if err != nil {
-			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
+			return nil, fmt.Errorf("error while checking for password rotation: %v", err)
 		}
 		if updateSecretMsg != "" {
 			updateSecret = true
-		}
-	} else {
-		// username might not match if password rotation has been disabled again
-		usernameFromSecret := string(secret.Data["username"])
-		if secretUsername != usernameFromSecret {
-			// handle edge case when manifest user conflicts with a user from prepared databases
-			if strings.Replace(usernameFromSecret, "-", "_", -1) == strings.Replace(secretUsername, "-", "_", -1) {
-				return nil, fmt.Errorf("could not update secret because of user name mismatch: expected: %s, got: %s", secretUsername, usernameFromSecret)
-			}
-			*retentionUsers = append(*retentionUsers, secretUsername)
-			secret.Data["username"] = []byte(secretUsername)
-			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
-			secret.Data["nextRotation"] = []byte{}
-			updateSecret = true
-			updateSecretMsg = fmt.Sprintf("secret does not contain the role %s - updating username and resetting password", secretUsername)
 		}
 	}
 
@@ -1254,6 +1240,55 @@ func (c *Cluster) updateSecret(
 	}
 
 	return secret, nil
+}
+
+func (c *Cluster) checkForPasswordRotation(
+	secret *v1.Secret,
+	secretUsername string,
+	pwdUser spec.PgUser,
+	retentionUsers *[]string,
+	currentTime time.Time) (string, error) {
+
+	var (
+		passwordRotationMsg string
+		err                 error
+	)
+
+	// if password rotation is enabled update password and username if rotation interval has been passed
+	// rotation can be enabled globally or via the manifest (excluding the Postgres superuser)
+	rotationEnabledInManifest := secretUsername != constants.SuperuserKeyName &&
+		(slices.Contains(c.Spec.UsersWithSecretRotation, secretUsername) ||
+			slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
+
+	// globally enabled rotation is only allowed for manifest and bootstrapped roles
+	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
+	rotationAllowed := !pwdUser.IsDbOwner && slices.Contains(allowedRoleTypes, pwdUser.Origin)
+
+	// users can ignore any kind of rotation
+	isIgnoringRotation := slices.Contains(c.Spec.UsersIgnoringSecretRotation, secretUsername)
+
+	if ((c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest) && !isIgnoringRotation {
+		passwordRotationMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
+		if err != nil {
+			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
+		}
+	} else {
+		// username might not match if password rotation has been disabled again
+		usernameFromSecret := string(secret.Data["username"])
+		if secretUsername != usernameFromSecret {
+			// handle edge case when manifest user conflicts with a user from prepared databases
+			if strings.Replace(usernameFromSecret, "-", "_", -1) == strings.Replace(secretUsername, "-", "_", -1) {
+				return "", fmt.Errorf("could not update secret because of user name mismatch: expected: %s, got: %s", secretUsername, usernameFromSecret)
+			}
+			*retentionUsers = append(*retentionUsers, secretUsername)
+			secret.Data["username"] = []byte(secretUsername)
+			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+			secret.Data["nextRotation"] = []byte{}
+			passwordRotationMsg = fmt.Sprintf("secret does not contain the role %s - updating username and resetting password", secretUsername)
+		}
+	}
+
+	return passwordRotationMsg, nil
 }
 
 func (c *Cluster) rotatePasswordInSecret(
