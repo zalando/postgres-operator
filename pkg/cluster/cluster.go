@@ -630,6 +630,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
 		newCheck("new %s's %s (index %d) volume mounts do not match the current one",
 			func(a, b v1.Container) bool { return !compareVolumeMounts(a.VolumeMounts, b.VolumeMounts) }),
+		newCheck("new %s's %s (index %d) command does not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Command, b.Command) }),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {
