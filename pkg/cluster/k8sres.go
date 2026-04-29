@@ -2027,10 +2027,11 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 	annotations := c.getCustomServiceAnnotations(role, spec)
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
-		dnsName := c.dnsName(role)
-
-		// External DNS name annotation is not customizable
-		annotations[constants.ZalandoDNSNameAnnotation] = dnsName
+		// Only set the DNS annotation if not already defined by user in service annotations
+		if _, exists := annotations[constants.ZalandoDNSNameAnnotation]; !exists {
+			dnsName := c.dnsName(role)
+			annotations[constants.ZalandoDNSNameAnnotation] = dnsName
+		}
 	}
 
 	if len(annotations) == 0 {

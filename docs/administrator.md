@@ -896,8 +896,9 @@ its services:
 
 - `external-dns.alpha.kubernetes.io/hostname` with the value defined by the
   operator configs `master_dns_name_format` and `replica_dns_name_format`.
-  This value can't be overwritten. If any changing in its value is needed, it
-  MUST be done changing the DNS format operator config parameters; and
+  This value can be overwritten by specifying the annotation in
+  `serviceAnnotations`, `masterServiceAnnotations`, or `replicaServiceAnnotations`
+  in the cluster manifest; and
 
 There are multiple options to specify service annotations that will be merged
 with each other and override in the following order (where latter take
