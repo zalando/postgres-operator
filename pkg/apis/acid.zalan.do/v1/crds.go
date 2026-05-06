@@ -55,6 +55,7 @@ var OperatorConfigCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition
 	},
 }
 
+var min0 = 0.0
 var min1 = 1.0
 var minLength1 int64 = 1
 var minDisable = -1.0
@@ -898,6 +899,18 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"logical_backup_cronjob_environment_secret": {
 								Type: "string",
+							},
+							"logical_backup_failed_jobs_history_limit": {
+								Type:    "integer",
+								Minimum: &min0,
+							},
+							"logical_backup_successful_jobs_history_limit": {
+								Type:    "integer",
+								Minimum: &min0,
+							},
+							"logical_backup_ttl_seconds_after_finished": {
+								Type:    "integer",
+								Minimum: &min0,
 							},
 						},
 					},
