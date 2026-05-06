@@ -4040,6 +4040,32 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
 			t.Errorf("%s - %s: expected resources %#v, got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
 		}
+
+		expectedSuccessfulJobsHistoryLimit := int32(3)
+		if cluster.OpConfig.LogicalBackup.LogicalBackupSuccessfulJobsHistoryLimit != nil {
+			expectedSuccessfulJobsHistoryLimit = *cluster.OpConfig.LogicalBackup.LogicalBackupSuccessfulJobsHistoryLimit
+		}
+		if *cronJob.Spec.SuccessfulJobsHistoryLimit != expectedSuccessfulJobsHistoryLimit {
+			t.Errorf("%s - %s: expected successfulJobsHistoryLimit %d, got %d", t.Name(), tt.subTest, expectedSuccessfulJobsHistoryLimit, *cronJob.Spec.SuccessfulJobsHistoryLimit)
+		}
+
+		expectedFailedJobsHistoryLimit := int32(3)
+		if cluster.OpConfig.LogicalBackup.LogicalBackupFailedJobsHistoryLimit != nil {
+			expectedFailedJobsHistoryLimit = *cluster.OpConfig.LogicalBackup.LogicalBackupFailedJobsHistoryLimit
+		}
+		if *cronJob.Spec.FailedJobsHistoryLimit != expectedFailedJobsHistoryLimit {
+			t.Errorf("%s - %s: expected failedJobsHistoryLimit %d, got %d", t.Name(), tt.subTest, expectedFailedJobsHistoryLimit, *cronJob.Spec.FailedJobsHistoryLimit)
+		}
+
+		expectedTTL := int32(86400)
+		if cluster.OpConfig.LogicalBackup.LogicalBackupTTLSecondsAfterFinished != nil {
+			expectedTTL = *cluster.OpConfig.LogicalBackup.LogicalBackupTTLSecondsAfterFinished
+		}
+		if cronJob.Spec.JobTemplate.Spec.TTLSecondsAfterFinished == nil {
+			t.Errorf("%s - %s: expected TTLSecondsAfterFinished to be set", t.Name(), tt.subTest)
+		} else if *cronJob.Spec.JobTemplate.Spec.TTLSecondsAfterFinished != expectedTTL {
+			t.Errorf("%s - %s: expected TTLSecondsAfterFinished %d, got %d", t.Name(), tt.subTest, expectedTTL, *cronJob.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
+		}
 	}
 }
 

@@ -2393,7 +2393,13 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 	// configure a batch job
 
 	jobSpec := batchv1.JobSpec{
-		Template: *podTemplate,
+		Template:                *podTemplate,
+		TTLSecondsAfterFinished: c.OpConfig.LogicalBackup.LogicalBackupTTLSecondsAfterFinished,
+	}
+
+	if jobSpec.TTLSecondsAfterFinished == nil {
+		defaultTTL := int32(86400)
+		jobSpec.TTLSecondsAfterFinished = &defaultTTL
 	}
 
 	// configure a cron job
@@ -2407,6 +2413,18 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		schedule = c.OpConfig.LogicalBackupSchedule
 	}
 
+	successfulJobsHistoryLimit := c.OpConfig.LogicalBackup.LogicalBackupSuccessfulJobsHistoryLimit
+	if successfulJobsHistoryLimit == nil {
+		defaultLimit := int32(3)
+		successfulJobsHistoryLimit = &defaultLimit
+	}
+
+	failedJobsHistoryLimit := c.OpConfig.LogicalBackup.LogicalBackupFailedJobsHistoryLimit
+	if failedJobsHistoryLimit == nil {
+		defaultLimit := int32(3)
+		failedJobsHistoryLimit = &defaultLimit
+	}
+
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.getLogicalBackupJobName(),
@@ -2416,9 +2434,11 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          schedule,
-			JobTemplate:       jobTemplateSpec,
-			ConcurrencyPolicy: batchv1.ForbidConcurrent,
+			Schedule:                   schedule,
+			JobTemplate:                jobTemplateSpec,
+			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
+			SuccessfulJobsHistoryLimit: successfulJobsHistoryLimit,
+			FailedJobsHistoryLimit:     failedJobsHistoryLimit,
 		},
 	}
 
