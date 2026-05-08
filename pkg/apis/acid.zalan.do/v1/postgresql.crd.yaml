@@ -3256,6 +3256,12 @@ spec:
                   pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
                   type: string
                 type: array
+              masterPoolerServiceAnnotations:
+                additionalProperties:
+                  type: string
+                description: MasterPoolerServiceAnnotations takes precedence over other
+                  annotations for master pooler service if not empty
+                type: object
               masterServiceAnnotations:
                 additionalProperties:
                   type: string
@@ -3560,6 +3566,12 @@ spec:
               replicaLoadBalancer:
                 description: deprecated
                 type: boolean
+              replicaPoolerServiceAnnotations:
+                additionalProperties:
+                  type: string
+                description: ReplicaPoolerServiceAnnotations takes precedence over other
+                  annotations for replica pooler service if not empty
+                type: object
               replicaServiceAnnotations:
                 additionalProperties:
                   type: string

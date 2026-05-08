@@ -111,8 +111,12 @@ type PostgresSpec struct {
 	// MasterServiceAnnotations takes precedence over ServiceAnnotations for master role if not empty
 	MasterServiceAnnotations map[string]string `json:"masterServiceAnnotations,omitempty"`
 	// ReplicaServiceAnnotations takes precedence over ServiceAnnotations for replica role if not empty
-	ReplicaServiceAnnotations map[string]string  `json:"replicaServiceAnnotations,omitempty"`
-	TLS                       *TLSDescription    `json:"tls,omitempty"`
+	ReplicaServiceAnnotations map[string]string `json:"replicaServiceAnnotations,omitempty"`
+	// MasterPoolerServiceAnnotations takes precedence over other annotations for master pooler service if not empty
+	MasterPoolerServiceAnnotations map[string]string `json:"masterPoolerServiceAnnotations,omitempty"`
+	// ReplicaPoolerServiceAnnotations takes precedence over other annotations for replica pooler service if not empty
+	ReplicaPoolerServiceAnnotations map[string]string `json:"replicaPoolerServiceAnnotations,omitempty"`
+	TLS                             *TLSDescription   `json:"tls,omitempty"`
 	AdditionalVolumes         []AdditionalVolume `json:"additionalVolumes,omitempty"`
 	Streams                   []Stream           `json:"streams,omitempty"`
 	Env                       []v1.EnvVar        `json:"env,omitempty"`
