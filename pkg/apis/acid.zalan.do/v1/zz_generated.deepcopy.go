@@ -188,6 +188,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.PodSysctls != nil {
+		in, out := &in.PodSysctls, &out.PodSysctls
+		*out = make([]corev1.Sysctl, len(*in))
+		copy(*out, *in)
+	}
 	if in.PDBMasterLabelSelector != nil {
 		in, out := &in.PDBMasterLabelSelector, &out.PDBMasterLabelSelector
 		*out = new(bool)

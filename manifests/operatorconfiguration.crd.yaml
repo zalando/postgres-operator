@@ -334,6 +334,18 @@ spec:
                   pod_service_account_role_binding_definition:
                     type: string
                     default: ""
+                  pod_sysctls:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - name
+                        - value
+                      properties:
+                        name:
+                          type: string
+                        value:
+                          type: string
                   pod_terminate_grace_period:
                     type: string
                     default: "5m"
