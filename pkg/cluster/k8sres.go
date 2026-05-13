@@ -313,6 +313,14 @@ func (c *Cluster) generateResourceRequirements(
 	specLimits := acidv1.ResourceDescription{}
 	result := v1.ResourceRequirements{}
 
+	enforceThresholds := true
+	resourcesLimitAnnotationKey := c.OpConfig.IgnoreResourcesLimitsAnnotationKey
+	if resourcesLimitAnnotationKey != "" {
+		if value, exists := c.ObjectMeta.Annotations[resourcesLimitAnnotationKey]; exists && value == "true" {
+			enforceThresholds = false
+		}
+	}
+
 	if resources != nil {
 		specRequests = resources.ResourceRequests
 		specLimits = resources.ResourceLimits
@@ -329,7 +337,7 @@ func (c *Cluster) generateResourceRequirements(
 	}
 
 	// enforce minimum cpu and memory limits for Postgres containers only
-	if containerName == constants.PostgresContainerName {
+	if containerName == constants.PostgresContainerName && enforceThresholds {
 		if err = c.enforceMinResourceLimits(&result); err != nil {
 			return nil, fmt.Errorf("could not enforce minimum resource limits: %v", err)
 		}
@@ -344,7 +352,7 @@ func (c *Cluster) generateResourceRequirements(
 	}
 
 	// enforce maximum cpu and memory requests for Postgres containers only
-	if containerName == constants.PostgresContainerName {
+	if containerName == constants.PostgresContainerName && enforceThresholds {
 		if err = c.enforceMaxResourceRequests(&result); err != nil {
 			return nil, fmt.Errorf("could not enforce maximum resource requests: %v", err)
 		}
@@ -412,7 +420,7 @@ PatroniInitDBParams:
 	}
 
 	if patroni.MaximumLagOnFailover >= 0 {
-		config.Bootstrap.DCS.MaximumLagOnFailover = patroni.MaximumLagOnFailover
+		config.Bootstrap.DCS.MaximumLagOnFailover = float32(patroni.MaximumLagOnFailover)
 	}
 	if patroni.LoopWait != 0 {
 		config.Bootstrap.DCS.LoopWait = patroni.LoopWait
@@ -810,9 +818,6 @@ func (c *Cluster) generatePodTemplate(
 	sidecarContainers []v1.Container,
 	sharePgSocketWithSidecars *bool,
 	tolerationsSpec *[]v1.Toleration,
-	spiloRunAsUser *int64,
-	spiloRunAsGroup *int64,
-	spiloFSGroup *int64,
 	nodeAffinity *v1.Affinity,
 	schedulerName *string,
 	terminateGracePeriod int64,
@@ -831,18 +836,22 @@ func (c *Cluster) generatePodTemplate(
 	terminateGracePeriodSeconds := terminateGracePeriod
 	containers := []v1.Container{*spiloContainer}
 	containers = append(containers, sidecarContainers...)
-	securityContext := v1.PodSecurityContext{}
-
-	if spiloRunAsUser != nil {
-		securityContext.RunAsUser = spiloRunAsUser
+	securityContext := v1.PodSecurityContext{
+		RunAsUser:  c.OpConfig.Resources.SpiloRunAsUser,
+		RunAsGroup: c.OpConfig.Resources.SpiloRunAsGroup,
+		FSGroup:    c.OpConfig.Resources.SpiloFSGroup,
 	}
 
-	if spiloRunAsGroup != nil {
-		securityContext.RunAsGroup = spiloRunAsGroup
+	if c.Spec.SpiloRunAsUser != nil {
+		securityContext.RunAsUser = c.Spec.SpiloRunAsUser
 	}
 
-	if spiloFSGroup != nil {
-		securityContext.FSGroup = spiloFSGroup
+	if c.Spec.SpiloRunAsGroup != nil {
+		securityContext.RunAsGroup = c.Spec.SpiloRunAsGroup
+	}
+
+	if c.Spec.SpiloFSGroup != nil {
+		securityContext.FSGroup = c.Spec.SpiloFSGroup
 	}
 
 	if len(c.OpConfig.PodSysctls) > 0 {
@@ -1348,22 +1357,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
 
-	// determine the User, Group and FSGroup for the spilo pod
-	effectiveRunAsUser := c.OpConfig.Resources.SpiloRunAsUser
-	if spec.SpiloRunAsUser != nil {
-		effectiveRunAsUser = spec.SpiloRunAsUser
-	}
-
-	effectiveRunAsGroup := c.OpConfig.Resources.SpiloRunAsGroup
-	if spec.SpiloRunAsGroup != nil {
-		effectiveRunAsGroup = spec.SpiloRunAsGroup
-	}
-
-	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
-	if spec.SpiloFSGroup != nil {
-		effectiveFSGroup = spec.SpiloFSGroup
-	}
-
 	volumeMounts := generateVolumeMounts(spec.Volume)
 
 	// configure TLS with a custom secret volume
@@ -1481,9 +1474,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		sidecarContainers,
 		c.OpConfig.SharePgSocketWithSidecars,
 		&tolerationSpec,
-		effectiveRunAsUser,
-		effectiveRunAsGroup,
-		effectiveFSGroup,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
 		spec.SchedulerName,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
@@ -1687,7 +1677,7 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 		}
 	}
 
-	if spec.StandbyCluster != nil {
+	if isStandbyCluster(spec) {
 		if newcur == 1 {
 			min = newcur
 			max = newcur
@@ -2043,11 +2033,6 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 	if c.shouldCreateLoadBalancerForService(role, spec) {
 		dnsName := c.dnsName(role)
 
-		// Just set ELB Timeout annotation with default value, if it does not
-		// have a custom value
-		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
-			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
-		}
 		// External DNS name annotation is not customizable
 		annotations[constants.ZalandoDNSNameAnnotation] = dnsName
 	}
@@ -2203,23 +2188,29 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 				Value: description.StandbyPort,
 			})
 		}
-	} else {
-		c.logger.Info("standby cluster streaming from WAL location")
-		if description.S3WalPath != "" {
+		if description.StandbyPrimarySlotName != "" {
 			result = append(result, v1.EnvVar{
-				Name:  "STANDBY_WALE_S3_PREFIX",
-				Value: description.S3WalPath,
+				Name:  "STANDBY_PRIMARY_SLOT_NAME",
+				Value: description.StandbyPrimarySlotName,
 			})
-		} else if description.GSWalPath != "" {
-			result = append(result, v1.EnvVar{
-				Name:  "STANDBY_WALE_GS_PREFIX",
-				Value: description.GSWalPath,
-			})
-		} else {
-			c.logger.Error("no WAL path specified in standby section")
-			return result
 		}
+	}
 
+	// WAL archive can be specified with or without standby_host
+	if description.S3WalPath != "" {
+		c.logger.Info("standby cluster using S3 WAL archive")
+		result = append(result, v1.EnvVar{
+			Name:  "STANDBY_WALE_S3_PREFIX",
+			Value: description.S3WalPath,
+		})
+		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
+		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+	} else if description.GSWalPath != "" {
+		c.logger.Info("standby cluster using GCS WAL archive")
+		result = append(result, v1.EnvVar{
+			Name:  "STANDBY_WALE_GS_PREFIX",
+			Value: description.GSWalPath,
+		})
 		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
@@ -2369,9 +2360,6 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.Container{},
 		util.False(),
 		&tolerationsSpec,
-		nil,
-		nil,
-		nil,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		nil,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),

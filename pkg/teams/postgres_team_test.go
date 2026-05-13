@@ -24,9 +24,9 @@ var (
 					Name: "teamAB",
 				},
 				Spec: acidv1.PostgresTeamSpec{
-					AdditionalSuperuserTeams: map[string][]string{"teamA": []string{"teamB", "team24x7"}, "teamB": []string{"teamA", "teamC", "team24x7"}},
-					AdditionalTeams:          map[string][]string{"teamA": []string{"teamC"}, "teamB": []string{}},
-					AdditionalMembers:        map[string][]string{"team24x7": []string{"optimusprime"}, "teamB": []string{"drno"}},
+					AdditionalSuperuserTeams: map[string]acidv1.SuperUserTeams{"teamA": []string{"teamB", "team24x7"}, "teamB": []string{"teamA", "teamC", "team24x7"}},
+					AdditionalTeams:          map[string]acidv1.Teams{"teamA": []string{"teamC"}, "teamB": []string{}},
+					AdditionalMembers:        map[string]acidv1.Users{"team24x7": []string{"optimusprime"}, "teamB": []string{"drno"}},
 				},
 			}, {
 				TypeMeta: metav1.TypeMeta{
@@ -37,9 +37,9 @@ var (
 					Name: "teamC",
 				},
 				Spec: acidv1.PostgresTeamSpec{
-					AdditionalSuperuserTeams: map[string][]string{"teamC": []string{"team24x7"}},
-					AdditionalTeams:          map[string][]string{"teamA": []string{"teamC"}, "teamC": []string{"teamA", "teamB", "acid"}},
-					AdditionalMembers:        map[string][]string{"acid": []string{"batman"}},
+					AdditionalSuperuserTeams: map[string]acidv1.SuperUserTeams{"teamC": []string{"team24x7"}},
+					AdditionalTeams:          map[string]acidv1.Teams{"teamA": []string{"teamC"}, "teamC": []string{"teamA", "teamB", "acid"}},
+					AdditionalMembers:        map[string]acidv1.Users{"acid": []string{"batman"}},
 				},
 			},
 			{
@@ -51,9 +51,9 @@ var (
 					Name: "teamD",
 				},
 				Spec: acidv1.PostgresTeamSpec{
-					AdditionalSuperuserTeams: map[string][]string{},
-					AdditionalTeams:          map[string][]string{"teamA": []string{"teamD"}, "teamC": []string{"teamD"}, "teamD": []string{"teamA", "teamB", "teamC"}},
-					AdditionalMembers:        map[string][]string{"acid": []string{"batman"}},
+					AdditionalSuperuserTeams: map[string]acidv1.SuperUserTeams{},
+					AdditionalTeams:          map[string]acidv1.Teams{"teamA": []string{"teamD"}, "teamC": []string{"teamD"}, "teamD": []string{"teamA", "teamB", "teamC"}},
+					AdditionalMembers:        map[string]acidv1.Users{"acid": []string{"batman"}},
 				},
 			},
 		},

@@ -347,9 +347,11 @@ func (c *Controller) initController() {
 	logMultiLineConfig(c.logger, c.opConfig.MustMarshal())
 
 	roleDefs := c.getInfrastructureRoleDefinitions()
-	if infraRoles, err := c.getInfrastructureRoles(roleDefs); err != nil {
-		c.logger.Warningf("could not get infrastructure roles: %v", err)
-	} else {
+	infraRoles, err := c.getInfrastructureRoles(roleDefs)
+	if err != nil {
+		c.logger.Warningf("could not get all infrastructure roles: %v", err)
+	}
+	if len(infraRoles) > 0 {
 		c.config.InfrastructureRoles = infraRoles
 	}
 

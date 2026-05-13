@@ -3,18 +3,23 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: ghcr.io/zalando/spilo-17:4.0-p3
+  docker_image: ghcr.io/zalando/spilo-18:4.1-p1
   # enable_crd_registration: true
   # crd_categories:
   # - all
   # enable_lazy_spilo_upgrade: false
+  enable_maintenance_windows: true
   enable_pgversion_env_var: true
   # enable_shm_volume: true
   enable_spilo_wal_path_compat: false
   enable_team_id_clustername_prefix: false
   etcd_host: ""
   # ignore_instance_limits_annotation_key: ""
+  # ignore_resources_limits_annotation_key: ""
   # kubernetes_use_configmaps: false
+  # maintenance_windows:
+  # - "Sat:22:00-23:59"
+  # - "Sun:00:00-01:00"
   max_instances: -1
   min_instances: -1
   resync_period: 30m
@@ -39,8 +44,8 @@ configuration:
     major_version_upgrade_mode: "manual"
     # major_version_upgrade_team_allow_list:
     # - acid
-    minimal_major_version: "13"
-    target_major_version: "17"
+    minimal_major_version: "14"
+    target_major_version: "18"
   kubernetes:
     # additional_pod_capabilities:
     # - "SYS_NICE"
@@ -216,7 +221,7 @@ configuration:
     connection_pooler_default_cpu_request: "500m"
     connection_pooler_default_memory_limit: 100Mi
     connection_pooler_default_memory_request: 100Mi
-    connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-32"
+    connection_pooler_image: "ghcr.io/zalando/postgres-operator/pgbouncer:latest"
     # connection_pooler_max_db_connections: 60
     connection_pooler_mode: "transaction"
     connection_pooler_number_of_instances: 2
