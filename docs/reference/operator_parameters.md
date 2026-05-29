@@ -1075,7 +1075,7 @@ operator being able to provide some reasonable defaults.
 
 * **connection_pooler_image**
   Docker image to use for connection pooler deployment.
-  Default: "registry.opensource.zalan.do/acid/pgbouncer"
+  Default: "ghcr.io/zalando/postgres-operator/pgbouncer:latest"
 
 * **connection_pooler_max_db_connections**
   How many connections the pooler can max hold. This value is divided among the

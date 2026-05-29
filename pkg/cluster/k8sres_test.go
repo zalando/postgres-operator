@@ -2967,6 +2967,7 @@ func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 		DeploymentsGetter: clientSet.AppsV1(),
 		PodsGetter:        clientSet.CoreV1(),
 		ServicesGetter:    clientSet.CoreV1(),
+		SecretsGetter:     clientSet.CoreV1(),
 	}, clientSet
 }
 

@@ -1581,8 +1581,8 @@ func newCronJob(image, schedule string, vars []v1.EnvVar, mounts []v1.VolumeMoun
 
 func TestCompareLogicalBackupJob(t *testing.T) {
 
-	img1 := "registry.opensource.zalan.do/acid/logical-backup:v1.0"
-	img2 := "registry.opensource.zalan.do/acid/logical-backup:v2.0"
+	img1 := "ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0"
+	img2 := "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
 
 	clientSet := fake.NewSimpleClientset()
 	acidClientSet := fakeacidv1.NewSimpleClientset()
