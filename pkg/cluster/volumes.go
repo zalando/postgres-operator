@@ -39,7 +39,7 @@ func (c *Cluster) syncVolumes() error {
 		} else {
 			err = c.syncUnderlyingEBSVolume()
 			if err != nil {
-				c.logger.Errorf("errors occured during EBS volume adjustments: %v", err)
+				c.logger.Errorf("errors occurred during EBS volume adjustments: %v", err)
 			}
 		}
 	}
