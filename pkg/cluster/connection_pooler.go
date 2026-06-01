@@ -187,7 +187,7 @@ func (c *Cluster) generateConnectionPoolerAuthSecret(connectionPooler *Connectio
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          c.connectionPoolerLabels(connectionPooler.Role, true).MatchLabels,
-			Name:            fmt.Sprintf("%s-userlist", connectionPooler.Name),
+			Name:            fmt.Sprintf("%s-u", connectionPooler.Name),
 			Namespace:       connectionPooler.Namespace,
 			Annotations:     c.annotationsSet(nil),
 			OwnerReferences: c.ownerReferences(),
@@ -393,15 +393,15 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 
 	// mount secret volume with userlist.txt for pgBouncer to authenticate users
 	poolerVolumes = append(poolerVolumes, v1.Volume{
-		Name: fmt.Sprintf("%s-userlist-volume", c.connectionPoolerName(role)),
+		Name: fmt.Sprintf("%s-u", c.connectionPoolerName(role)),
 		VolumeSource: v1.VolumeSource{
 			Secret: &v1.SecretVolumeSource{
-				SecretName: fmt.Sprintf("%s-userlist", c.connectionPoolerName(role)),
+				SecretName: fmt.Sprintf("%s-u", c.connectionPoolerName(role)),
 			},
 		},
 	})
 	volumeMounts = append(volumeMounts, v1.VolumeMount{
-		Name:      fmt.Sprintf("%s-userlist-volume", c.connectionPoolerName(role)),
+		Name:      fmt.Sprintf("%s-u", c.connectionPoolerName(role)),
 		MountPath: "/etc/pgbouncer/userlist.txt",
 		SubPath:   "userlist.txt",
 		ReadOnly:  true,
@@ -1063,7 +1063,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 
 	// create extra secret for connection pooler authentication
 	newAuthSecret = c.generateConnectionPoolerAuthSecret(c.ConnectionPooler[role])
-	if authSecret, err = c.KubeClient.Secrets(c.Namespace).Get(context.TODO(), fmt.Sprintf("%s-userlist", c.connectionPoolerName(role)), metav1.GetOptions{}); err == nil {
+	if authSecret, err = c.KubeClient.Secrets(c.Namespace).Get(context.TODO(), fmt.Sprintf("%s-u", c.connectionPoolerName(role)), metav1.GetOptions{}); err == nil {
 		c.ConnectionPooler[role].AuthSecret = authSecret
 		// make sure existing annotations are preserved
 		newAuthSecret.Annotations = c.annotationsSet(authSecret.Annotations)
@@ -1077,7 +1077,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 	}
 
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Warningf("auth secret %s for connection pooler is not found, create it", fmt.Sprintf("%s-userlist", c.connectionPoolerName(role)))
+		c.logger.Warningf("auth secret %s for connection pooler is not found, create it", fmt.Sprintf("%s-u", c.connectionPoolerName(role)))
 		authSecret, err = c.KubeClient.
 			Secrets(newAuthSecret.Namespace).
 			Create(context.TODO(), newAuthSecret, metav1.CreateOptions{})
