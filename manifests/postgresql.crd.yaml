@@ -4056,6 +4056,22 @@ spec:
                       type: string
                   type: object
                 type: array
+              topologySpreadConstraints:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  properties:
+                    maxSkew:
+                      type: integer
+                      format: int32
+                    topologyKey:
+                      type: string
+                    whenUnsatisfiable:
+                      type: string
+                      enum:
+                        - DoNotSchedule
+                        - ScheduleAnyway
               useLoadBalancer:
                 description: |-
                   deprecated load balancer settings maintained for backward compatibility

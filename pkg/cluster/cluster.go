@@ -506,6 +506,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's pod affinity does not match the current one")
 	}
+	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.TopologySpreadConstraints, statefulSet.Spec.Template.Spec.TopologySpreadConstraints) {
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod topologySpreadConstraints does not match the current one")
+	}
 	if len(c.Statefulset.Spec.Template.Spec.Tolerations) != len(statefulSet.Spec.Template.Spec.Tolerations) {
 		needsReplace = true
 		needsRollUpdate = true
@@ -1298,7 +1303,7 @@ func (c *Cluster) Delete() error {
 	// If we are done deleting our various resources we remove the finalizer to let K8S finally delete the Postgres CR
 	if anyErrors {
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "Delete", "some resources could be successfully deleted yet")
-		return fmt.Errorf("some error(s) occured when deleting resources, NOT removing finalizer yet")
+		return fmt.Errorf("some error(s) occurred when deleting resources, NOT removing finalizer yet")
 	}
 	if err := c.removeFinalizer(); err != nil {
 		return fmt.Errorf("done cleaning up, but error when removing finalizer: %v", err)

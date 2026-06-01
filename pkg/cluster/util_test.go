@@ -660,6 +660,7 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 	cluster := New(
 		Config{
 			OpConfig: config.Config{
+				EnableMaintenanceWindows: util.True(),
 				Resources: config.Resources{
 					ClusterLabels:        map[string]string{"application": "spilo"},
 					ClusterNameLabel:     "cluster-name",
@@ -683,12 +684,27 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 		name          string
 		windows       []acidv1.MaintenanceWindow
 		configWindows []string
+		windowsFlag   bool
 		expected      bool
 	}{
 		{
 			name:          "no maintenance windows",
 			windows:       nil,
 			configWindows: nil,
+			windowsFlag:   true,
+			expected:      true,
+		},
+		{
+			name: "maintenance windows diabled",
+			windows: []acidv1.MaintenanceWindow{
+				{
+					Everyday:  true,
+					StartTime: mustParseTime("00:00"),
+					EndTime:   mustParseTime("23:59"),
+				},
+			},
+			configWindows: nil,
+			windowsFlag:   false,
 			expected:      true,
 		},
 		{
@@ -701,6 +717,7 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 				},
 			},
 			configWindows: nil,
+			windowsFlag:   true,
 			expected:      true,
 		},
 		{
@@ -713,6 +730,7 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 				},
 			},
 			configWindows: nil,
+			windowsFlag:   true,
 			expected:      true,
 		},
 		{
@@ -724,24 +742,35 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 					EndTime:   mustParseTime(futureTimeEndFormatted),
 				},
 			},
-			expected: false,
+			windowsFlag: true,
+			expected:    false,
 		},
 		{
 			name:          "global maintenance windows with future interval time",
 			windows:       nil,
 			configWindows: []string{fmt.Sprintf("%s-%s", futureTimeStartFormatted, futureTimeEndFormatted)},
+			windowsFlag:   true,
 			expected:      false,
 		},
 		{
 			name:          "global maintenance windows all day",
 			windows:       nil,
 			configWindows: []string{"00:00-02:00", "02:00-23:59"},
+			windowsFlag:   true,
+			expected:      true,
+		},
+		{
+			name:          "global maintenance windows ignored",
+			windows:       nil,
+			configWindows: []string{"00:00-02:00", "02:00-23:59"},
+			windowsFlag:   false,
 			expected:      true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			cluster.OpConfig.EnableMaintenanceWindows = &tt.windowsFlag
 			cluster.OpConfig.MaintenanceWindows = tt.configWindows
 			cluster.Spec.MaintenanceWindows = tt.windows
 			if cluster.isInMaintenanceWindow(cluster.Spec.MaintenanceWindows) != tt.expected {

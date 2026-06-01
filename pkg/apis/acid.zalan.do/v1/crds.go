@@ -56,6 +56,7 @@ var OperatorConfigCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition
 }
 
 var min1 = 1.0
+var minLength1 int64 = 1
 var minDisable = -1.0
 
 // OperatorConfigCRDResourceValidation to check applied manifest parameters
@@ -103,6 +104,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Description: "deprecated",
 					},
 					"enable_lazy_spilo_upgrade": {
+						Type: "boolean",
+					},
+					"enable_maintenance_windows": {
 						Type: "boolean",
 					},
 					"enable_shm_volume": {
