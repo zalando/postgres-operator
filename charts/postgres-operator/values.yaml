@@ -18,6 +18,9 @@ configTarget: "OperatorConfigurationCRD"
 # JSON logging format
 enableJsonLogging: false
 
+# Command-line options for the operator
+extraArgs: []
+
 # general configuration parameters
 configGeneral:
   # the deployment should create/update the CRDs
