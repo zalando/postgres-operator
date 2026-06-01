@@ -61,6 +61,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountDefinition            string                       `json:"pod_service_account_definition,omitempty"`
 	PodServiceAccountRoleBindingDefinition string                       `json:"pod_service_account_role_binding_definition,omitempty"`
 	PodTerminateGracePeriod                Duration                     `json:"pod_terminate_grace_period,omitempty"`
+	LivenessProbe                          *v1.Probe                    `json:"liveness_probe"`
 	SpiloPrivileged                        bool                         `json:"spilo_privileged,omitempty"`
 	SpiloAllowPrivilegeEscalation          *bool                        `json:"spilo_allow_privilege_escalation,omitempty"`
 	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
@@ -108,7 +109,6 @@ type KubernetesMetaConfiguration struct {
 	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
 	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
 	EnableFinalizers                         *bool               `json:"enable_finalizers,omitempty"`
-	LivenessProbe                            *v1.Probe           `json:"liveness_probe,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources

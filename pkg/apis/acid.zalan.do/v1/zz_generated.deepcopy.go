@@ -820,6 +820,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.LivenessProbe != nil {
+		in, out := &in.LivenessProbe, &out.LivenessProbe
+		*out = new(corev1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Sidecars != nil {
 		in, out := &in.Sidecars, &out.Sidecars
 		*out = make([]Sidecar, len(*in))
@@ -897,11 +902,6 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-	}
-	if in.LivenessProbe != nil {
-		in, out := &in.LivenessProbe, &out.LivenessProbe
-		*out = new(corev1.Probe)
-		(*in).DeepCopyInto(*out)
 	}
 	if in.InitContainersOld != nil {
 		in, out := &in.InitContainersOld, &out.InitContainersOld

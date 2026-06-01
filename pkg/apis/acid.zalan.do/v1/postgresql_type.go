@@ -87,7 +87,6 @@ type PostgresSpec struct {
 	NumberOfInstances int32 `json:"numberOfInstances"`
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=array
-	// +kubebuilde:validation:items:Type=string
 	MaintenanceWindows []MaintenanceWindow `json:"maintenanceWindows,omitempty"`
 	Clone              *CloneDescription   `json:"clone,omitempty"`
 	// Note: usernames specified here as database owners must be declared
@@ -98,6 +97,7 @@ type PostgresSpec struct {
 	NodeAffinity              *v1.NodeAffinity              `json:"nodeAffinity,omitempty"`
 	TopologySpreadConstraints []v1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 	Tolerations               []v1.Toleration               `json:"tolerations,omitempty"`
+	LivenessProbe             *v1.Probe                     `json:"livenessProbe,omitempty"`
 	Sidecars                  []Sidecar                     `json:"sidecars,omitempty"`
 	InitContainers            []v1.Container                `json:"initContainers,omitempty"`
 	PodPriorityClassName      string                        `json:"podPriorityClassName,omitempty"`
@@ -117,7 +117,6 @@ type PostgresSpec struct {
 	AdditionalVolumes         []AdditionalVolume `json:"additionalVolumes,omitempty"`
 	Streams                   []Stream           `json:"streams,omitempty"`
 	Env                       []v1.EnvVar        `json:"env,omitempty"`
-	LivenessProbe             *v1.Probe          `json:"livenessProbe,omitempty"`
 
 	// deprecated
 	InitContainersOld []v1.Container `json:"init_containers,omitempty"`
