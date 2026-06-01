@@ -433,6 +433,11 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.EnableMaintenanceWindows != nil {
+		in, out := &in.EnableMaintenanceWindows, &out.EnableMaintenanceWindows
+		*out = new(bool)
+		**out = **in
+	}
 	if in.MaintenanceWindows != nil {
 		in, out := &in.MaintenanceWindows, &out.MaintenanceWindows
 		*out = make([]MaintenanceWindow, len(*in))
@@ -795,6 +800,13 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		in, out := &in.NodeAffinity, &out.NodeAffinity
 		*out = new(corev1.NodeAffinity)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.TopologySpreadConstraints != nil {
+		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
+		*out = make([]corev1.TopologySpreadConstraint, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations

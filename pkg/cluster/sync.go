@@ -41,6 +41,12 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	defer c.mu.Unlock()
 
 	oldSpec := c.Postgresql
+
+	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
+
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -95,11 +101,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		if nil != err {
 			return err
 		}
-	}
-
-	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
-		// do not apply any major version related changes yet
-		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
 
 	if err = c.syncStatefulSet(); err != nil {
@@ -718,14 +719,26 @@ func (c *Cluster) syncStatefulSet() error {
 	if configPatched, restartPrimaryFirst, restartWait, err = c.syncPatroniConfig(pods, c.Spec.Patroni, requiredPgParameters); err != nil {
 		c.logger.Warningf("Patroni config updated? %v - errors during config sync: %v", configPatched, err)
 		postponeReasons = append(postponeReasons, "errors during Patroni config sync")
-		isSafeToRecreatePods = false
+		// Only mark unsafe if all pods are running. If some pods are not running,
+		// Patroni API errors are expected and should not block pod recreation,
+		// which is the only way to fix non-running pods.
+		if c.allPodsRunning(pods) {
+			isSafeToRecreatePods = false
+		} else {
+			c.logger.Warningf("ignoring Patroni config sync errors because some pods are not running")
+		}
 	}
 
 	// restart Postgres where it is still pending
 	if err = c.restartInstances(pods, restartWait, restartPrimaryFirst); err != nil {
 		c.logger.Errorf("errors while restarting Postgres in pods via Patroni API: %v", err)
 		postponeReasons = append(postponeReasons, "errors while restarting Postgres via Patroni API")
-		isSafeToRecreatePods = false
+		// Same logic: don't let unreachable non-running pods block recreation.
+		if c.allPodsRunning(pods) {
+			isSafeToRecreatePods = false
+		} else {
+			c.logger.Warningf("ignoring Patroni restart errors because some pods are not running")
+		}
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old

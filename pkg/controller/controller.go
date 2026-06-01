@@ -277,7 +277,7 @@ func (c *Controller) initRoleBinding() {
 		}`, c.PodServiceAccount.Name, c.PodServiceAccount.Name, c.PodServiceAccount.Name)
 		c.opConfig.PodServiceAccountRoleBindingDefinition = compactValue(stringValue)
 	}
-	c.logger.Info("Parse role bindings")
+
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 	obj, groupVersionKind, err := decode([]byte(c.opConfig.PodServiceAccountRoleBindingDefinition), nil, nil)

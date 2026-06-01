@@ -77,7 +77,7 @@ spec:
                     "17",
                     "16",
                     "15",
-                    "14",
+                    "14"
                   ]
                 }
             # Exemple of settings to make snapshot view working in the ui when using AWS
