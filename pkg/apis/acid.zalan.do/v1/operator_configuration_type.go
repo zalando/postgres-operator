@@ -266,6 +266,7 @@ type OperatorConfigurationData struct {
 	Workers                       uint32                             `json:"workers,omitempty"`
 	ResyncPeriod                  Duration                           `json:"resync_period,omitempty"`
 	RepairPeriod                  Duration                           `json:"repair_period,omitempty"`
+	EnableMaintenanceWindows      *bool                              `json:"enable_maintenance_windows,omitempty"`
 	MaintenanceWindows            []MaintenanceWindow                `json:"maintenance_windows,omitempty"`
 	SetMemoryRequestToLimit       bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                     *bool                              `json:"enable_shm_volume,omitempty"`
