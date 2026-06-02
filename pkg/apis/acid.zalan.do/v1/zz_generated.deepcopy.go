@@ -163,6 +163,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(bool)
 		**out = **in
 	}
+	if in.LivenessProbe != nil {
+		in, out := &in.LivenessProbe, &out.LivenessProbe
+		*out = new(corev1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.SpiloAllowPrivilegeEscalation != nil {
 		in, out := &in.SpiloAllowPrivilegeEscalation, &out.SpiloAllowPrivilegeEscalation
 		*out = new(bool)
@@ -296,11 +301,6 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		in, out := &in.EnableFinalizers, &out.EnableFinalizers
 		*out = new(bool)
 		**out = **in
-	}
-	if in.LivenessProbe != nil {
-		in, out := &in.LivenessProbe, &out.LivenessProbe
-		*out = new(corev1.Probe)
-		(*in).DeepCopyInto(*out)
 	}
 	return
 }
