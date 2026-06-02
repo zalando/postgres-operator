@@ -31,6 +31,7 @@ type Resources struct {
 	PodLabelWaitTimeout           time.Duration       `name:"pod_label_wait_timeout" default:"10m"`
 	PodDeletionWaitTimeout        time.Duration       `name:"pod_deletion_wait_timeout" default:"10m"`
 	PodTerminateGracePeriod       time.Duration       `name:"pod_terminate_grace_period" default:"5m"`
+	LivenessProbe                 *v1.Probe           `name:"-"`
 	SpiloRunAsUser                *int64              `name:"spilo_runasuser"`
 	SpiloRunAsGroup               *int64              `name:"spilo_runasgroup"`
 	SpiloFSGroup                  *int64              `name:"spilo_fsgroup"`
