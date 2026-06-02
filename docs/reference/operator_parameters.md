@@ -334,6 +334,10 @@ configuration they are grouped under the `kubernetes` key.
   Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination)
   after this timeout. The default is `5m`.
 
+* **liveness_probe**
+  Allows for adding a liveness probe to the Spilo container to detect if it's
+  running properly. Cannot be configured via ConfigMap. Default is empty.
+
 * **custom_pod_annotations**
   This key/value map provides a list of annotations that get attached to each pod
   of a database created by the operator. If the annotation key is also provided
