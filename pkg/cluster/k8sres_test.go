@@ -2967,6 +2967,7 @@ func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 		DeploymentsGetter: clientSet.AppsV1(),
 		PodsGetter:        clientSet.CoreV1(),
 		ServicesGetter:    clientSet.CoreV1(),
+		SecretsGetter:     clientSet.CoreV1(),
 	}, clientSet
 }
 
@@ -4270,4 +4271,57 @@ func TestGenerateCapabilities(t *testing.T) {
 				t.Name(), tt.subTest, tt.capabilities, caps)
 		}
 	}
+}
+
+func TestTopologySpreadConstraints(t *testing.T) {
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	labelSelector := &metav1.LabelSelector{
+		MatchLabels: cluster.labelsSet(true),
+	}
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			NumberOfInstances: 1,
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+			TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "topology.kubernetes.io/zone",
+					WhenUnsatisfiable: v1.DoNotSchedule,
+					LabelSelector:     labelSelector,
+				},
+			},
+		},
+	}
+
+	cluster := New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+	cluster.labelsSet(true)
+
+	s, err := cluster.generateStatefulSet(&pg.Spec)
+	assert.NoError(t, err)
+	assert.Contains(t, s.Spec.Template.Spec.TopologySpreadConstraints, v1.TopologySpreadConstraint{
+		MaxSkew:           int32(1),
+		TopologyKey:       "topology.kubernetes.io/zone",
+		WhenUnsatisfiable: v1.DoNotSchedule,
+		LabelSelector:     labelSelector,
+	},
+	)
 }

@@ -18,6 +18,9 @@ configTarget: "OperatorConfigurationCRD"
 # JSON logging format
 enableJsonLogging: false
 
+# Command-line options for the operator
+extraArgs: []
+
 # general configuration parameters
 configGeneral:
   # the deployment should create/update the CRDs
@@ -228,6 +231,19 @@ configKubernetes:
   # whether the Spilo container should run with additional permissions other than parent.
   # required by cron which needs setuid
   spilo_allow_privilege_escalation: true
+
+  # liveness probe for the spilo pod
+  # liveness_probe:
+  #   httpGet:
+  #     scheme: HTTP
+  #     path: /liveness
+  #     port: 8008
+  #   initialDelaySeconds: 10
+  #   periodSeconds: 10
+  #   timeoutSeconds: 5
+  #   successThreshold: 1
+  #   failureThreshold: 3
+
   # storage resize strategy, available options are: ebs, pvc, off or mixed
   storage_resize_mode: pvc
   # pod toleration assigned to instances of every Postgres cluster
@@ -443,7 +459,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-32"
+  connection_pooler_image: "ghcr.io/zalando/postgres-operator/pgbouncer:latest"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode

@@ -163,6 +163,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(bool)
 		**out = **in
 	}
+	if in.LivenessProbe != nil {
+		in, out := &in.LivenessProbe, &out.LivenessProbe
+		*out = new(corev1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.SpiloAllowPrivilegeEscalation != nil {
 		in, out := &in.SpiloAllowPrivilegeEscalation, &out.SpiloAllowPrivilegeEscalation
 		*out = new(bool)
@@ -801,12 +806,24 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(corev1.NodeAffinity)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.TopologySpreadConstraints != nil {
+		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
+		*out = make([]corev1.TopologySpreadConstraint, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
 		*out = make([]corev1.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.LivenessProbe != nil {
+		in, out := &in.LivenessProbe, &out.LivenessProbe
+		*out = new(corev1.Probe)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Sidecars != nil {
 		in, out := &in.Sidecars, &out.Sidecars
