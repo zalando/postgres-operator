@@ -49,8 +49,8 @@ type PostgresUsersConfiguration struct {
 type MajorVersionUpgradeConfiguration struct {
 	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"manual"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
 	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
-	MinimalMajorVersion              string   `json:"minimal_major_version" default:"13"`
-	TargetMajorVersion               string   `json:"target_major_version" default:"17"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"14"`
+	TargetMajorVersion               string   `json:"target_major_version" default:"18"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
@@ -61,6 +61,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountDefinition            string                       `json:"pod_service_account_definition,omitempty"`
 	PodServiceAccountRoleBindingDefinition string                       `json:"pod_service_account_role_binding_definition,omitempty"`
 	PodTerminateGracePeriod                Duration                     `json:"pod_terminate_grace_period,omitempty"`
+	LivenessProbe                          *v1.Probe                    `json:"liveness_probe"`
 	SpiloPrivileged                        bool                         `json:"spilo_privileged,omitempty"`
 	SpiloAllowPrivilegeEscalation          *bool                        `json:"spilo_allow_privilege_escalation,omitempty"`
 	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
@@ -167,8 +168,8 @@ type AWSGCPConfiguration struct {
 
 // OperatorDebugConfiguration defines options for the debug mode
 type OperatorDebugConfiguration struct {
-	DebugLogging   bool `json:"debug_logging,omitempty"`
-	EnableDBAccess bool `json:"enable_database_access,omitempty"`
+	DebugLogging   *bool `json:"debug_logging,omitempty"`
+	EnableDBAccess *bool `json:"enable_database_access,omitempty"`
 }
 
 // TeamsAPIConfiguration defines the configuration of TeamsAPI
@@ -266,6 +267,8 @@ type OperatorConfigurationData struct {
 	Workers                       uint32                             `json:"workers,omitempty"`
 	ResyncPeriod                  Duration                           `json:"resync_period,omitempty"`
 	RepairPeriod                  Duration                           `json:"repair_period,omitempty"`
+	EnableMaintenanceWindows      *bool                              `json:"enable_maintenance_windows,omitempty"`
+	MaintenanceWindows            []MaintenanceWindow                `json:"maintenance_windows,omitempty"`
 	SetMemoryRequestToLimit       bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                     *bool                              `json:"enable_shm_volume,omitempty"`
 	SidecarImages                 map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
@@ -285,9 +288,10 @@ type OperatorConfigurationData struct {
 	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
 	Patroni                       PatroniConfiguration               `json:"patroni"`
 
-	MinInstances                      int32  `json:"min_instances,omitempty"`
-	MaxInstances                      int32  `json:"max_instances,omitempty"`
-	IgnoreInstanceLimitsAnnotationKey string `json:"ignore_instance_limits_annotation_key,omitempty"`
+	MinInstances                       int32  `json:"min_instances,omitempty"`
+	MaxInstances                       int32  `json:"max_instances,omitempty"`
+	IgnoreInstanceLimitsAnnotationKey  string `json:"ignore_instance_limits_annotation_key,omitempty"`
+	IgnoreResourcesLimitsAnnotationKey string `json:"ignore_resources_limits_annotation_key,omitempty"`
 }
 
 // Duration shortens this frequently used name

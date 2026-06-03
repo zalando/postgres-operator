@@ -26,6 +26,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	informers_core_v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -277,7 +278,7 @@ func (c *Controller) initRoleBinding() {
 		}`, c.PodServiceAccount.Name, c.PodServiceAccount.Name, c.PodServiceAccount.Name)
 		c.opConfig.PodServiceAccountRoleBindingDefinition = compactValue(stringValue)
 	}
-	c.logger.Info("Parse role bindings")
+
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 	obj, groupVersionKind, err := decode([]byte(c.opConfig.PodServiceAccountRoleBindingDefinition), nil, nil)
@@ -347,9 +348,11 @@ func (c *Controller) initController() {
 	logMultiLineConfig(c.logger, c.opConfig.MustMarshal())
 
 	roleDefs := c.getInfrastructureRoleDefinitions()
-	if infraRoles, err := c.getInfrastructureRoles(roleDefs); err != nil {
-		c.logger.Warningf("could not get infrastructure roles: %v", err)
-	} else {
+	infraRoles, err := c.getInfrastructureRoles(roleDefs)
+	if err != nil {
+		c.logger.Warningf("could not get all infrastructure roles: %v", err)
+	}
+	if len(infraRoles) > 0 {
 		c.config.InfrastructureRoles = infraRoles
 	}
 
@@ -399,16 +402,8 @@ func (c *Controller) initSharedInformers() {
 	}
 
 	// Pods
-	podLw := &cache.ListWatch{
-		ListFunc:  c.podListFunc,
-		WatchFunc: c.podWatchFunc,
-	}
-
-	c.podInformer = cache.NewSharedIndexInformer(
-		podLw,
-		&v1.Pod{},
-		constants.QueueResyncPeriodPod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	c.podInformer = informers_core_v1.NewPodInformer(c.KubeClient.Clientset,
+		c.opConfig.WatchedNamespace, constants.QueueResyncPeriodPod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.podAdd,
@@ -417,15 +412,7 @@ func (c *Controller) initSharedInformers() {
 	})
 
 	// Kubernetes Nodes
-	nodeLw := &cache.ListWatch{
-		ListFunc:  c.nodeListFunc,
-		WatchFunc: c.nodeWatchFunc,
-	}
-
-	c.nodesInformer = cache.NewSharedIndexInformer(
-		nodeLw,
-		&v1.Node{},
-		constants.QueueResyncPeriodNode,
+	c.nodesInformer = informers_core_v1.NewNodeInformer(c.KubeClient.Clientset, constants.QueueResyncPeriodNode,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.nodesInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{

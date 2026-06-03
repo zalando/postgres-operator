@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=registry.opensource.zalan.do/library/alpine-3:latest
+ARG BASE_IMAGE=alpine:latest
 FROM golang:1.25-alpine AS builder
 ARG VERSION=latest
 

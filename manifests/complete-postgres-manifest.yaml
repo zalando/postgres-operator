@@ -10,7 +10,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: ghcr.io/zalando/spilo-17:4.0-p2
+  dockerImage: ghcr.io/zalando/spilo-18:4.1-p1
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -48,7 +48,7 @@ spec:
           defaultRoles: true
           defaultUsers: false
   postgresql:
-    version: "17"
+    version: "18"
     parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
@@ -231,6 +231,12 @@ spec:
 #              operator: In
 #              values:
 #                - enabled
+
+# Add topology spread constraint to distribute PostgreSQL pods across all nodes labeled with "topology.kubernetes.io/zone".
+#   topologySpreadConstraint:
+#     - maxSkew: 1
+#       topologyKey: topology.kubernetes.io/zone
+#       whenUnsatisfiable: DoNotSchedule
 
 # Enables change data capture streams for defined database tables
 #  streams:

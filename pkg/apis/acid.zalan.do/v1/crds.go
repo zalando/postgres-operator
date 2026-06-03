@@ -1,22 +1,19 @@
 package v1
 
 import (
+	_ "embed"
 	"fmt"
-
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	"github.com/zalando/postgres-operator/pkg/util"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 )
 
 // CRDResource* define names necesssary for the k8s CRD API
 const (
-	PostgresCRDResourceKind   = "postgresql"
-	PostgresCRDResourcePlural = "postgresqls"
-	PostgresCRDResourceList   = PostgresCRDResourceKind + "List"
-	PostgresCRDResouceName    = PostgresCRDResourcePlural + "." + acidzalando.GroupName
-	PostgresCRDResourceShort  = "pg"
+	PostgresCRDResourceKind = "postgresql"
 
 	OperatorConfigCRDResouceKind    = "OperatorConfiguration"
 	OperatorConfigCRDResourcePlural = "operatorconfigurations"
@@ -24,57 +21,6 @@ const (
 	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
 	OperatorConfigCRDResourceShort  = "opconfig"
 )
-
-// PostgresCRDResourceColumns definition of AdditionalPrinterColumns for postgresql CRD
-var PostgresCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition{
-	{
-		Name:        "Team",
-		Type:        "string",
-		Description: "Team responsible for Postgres cluster",
-		JSONPath:    ".spec.teamId",
-	},
-	{
-		Name:        "Version",
-		Type:        "string",
-		Description: "PostgreSQL version",
-		JSONPath:    ".spec.postgresql.version",
-	},
-	{
-		Name:        "Pods",
-		Type:        "integer",
-		Description: "Number of Pods per Postgres cluster",
-		JSONPath:    ".spec.numberOfInstances",
-	},
-	{
-		Name:        "Volume",
-		Type:        "string",
-		Description: "Size of the bound volume",
-		JSONPath:    ".spec.volume.size",
-	},
-	{
-		Name:        "CPU-Request",
-		Type:        "string",
-		Description: "Requested CPU for Postgres containers",
-		JSONPath:    ".spec.resources.requests.cpu",
-	},
-	{
-		Name:        "Memory-Request",
-		Type:        "string",
-		Description: "Requested memory for Postgres containers",
-		JSONPath:    ".spec.resources.requests.memory",
-	},
-	{
-		Name:     "Age",
-		Type:     "date",
-		JSONPath: ".metadata.creationTimestamp",
-	},
-	{
-		Name:        "Status",
-		Type:        "string",
-		Description: "Current sync status of postgresql resource",
-		JSONPath:    ".status.PostgresClusterStatus",
-	},
-}
 
 // OperatorConfigCRDResourceColumns definition of AdditionalPrinterColumns for OperatorConfiguration CRD
 var OperatorConfigCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition{
@@ -109,1009 +55,9 @@ var OperatorConfigCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition
 	},
 }
 
-var min0 = 0.0
 var min1 = 1.0
+var minLength1 int64 = 1
 var minDisable = -1.0
-
-// PostgresCRDResourceValidation to check applied manifest parameters
-var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
-	OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
-		Type:     "object",
-		Required: []string{"kind", "apiVersion", "spec"},
-		Properties: map[string]apiextv1.JSONSchemaProps{
-			"kind": {
-				Type: "string",
-				Enum: []apiextv1.JSON{
-					{
-						Raw: []byte(`"postgresql"`),
-					},
-				},
-			},
-			"apiVersion": {
-				Type: "string",
-				Enum: []apiextv1.JSON{
-					{
-						Raw: []byte(`"acid.zalan.do/v1"`),
-					},
-				},
-			},
-			"spec": {
-				Type:     "object",
-				Required: []string{"numberOfInstances", "teamId", "postgresql", "volume"},
-				Properties: map[string]apiextv1.JSONSchemaProps{
-					"additionalVolumes": {
-						Type: "array",
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:     "object",
-								Required: []string{"name", "mountPath", "volumeSource"},
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"isSubPathExpr": {
-										Type: "boolean",
-									},
-									"name": {
-										Type: "string",
-									},
-									"mountPath": {
-										Type: "string",
-									},
-									"subPath": {
-										Type: "string",
-									},
-									"targetContainers": {
-										Type:     "array",
-										Nullable: true,
-										Items: &apiextv1.JSONSchemaPropsOrArray{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "string",
-											},
-										},
-									},
-									"volumeSource": {
-										Type:                   "object",
-										XPreserveUnknownFields: util.True(),
-									},
-								},
-							},
-						},
-					},
-					"allowedSourceRanges": {
-						Type:     "array",
-						Nullable: true,
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:    "string",
-								Pattern: "^(\\d|[1-9]\\d|1\\d\\d|2[0-4]\\d|25[0-5])\\.(\\d|[1-9]\\d|1\\d\\d|2[0-4]\\d|25[0-5])\\.(\\d|[1-9]\\d|1\\d\\d|2[0-4]\\d|25[0-5])\\.(\\d|[1-9]\\d|1\\d\\d|2[0-4]\\d|25[0-5])\\/(\\d|[1-2]\\d|3[0-2])$",
-							},
-						},
-					},
-					"clone": {
-						Type:     "object",
-						Required: []string{"cluster"},
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"cluster": {
-								Type: "string",
-							},
-							"s3_endpoint": {
-								Type: "string",
-							},
-							"s3_access_key_id": {
-								Type: "string",
-							},
-							"s3_secret_access_key": {
-								Type: "string",
-							},
-							"s3_force_path_style": {
-								Type: "boolean",
-							},
-							"s3_wal_path": {
-								Type: "string",
-							},
-							"timestamp": {
-								Type:    "string",
-								Pattern: "^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\\.[0-9]+)?(([+-]([01][0-9]|2[0-3]):[0-5][0-9]))$",
-							},
-							"uid": {
-								Type:   "string",
-								Format: "uuid",
-							},
-						},
-					},
-					"connectionPooler": {
-						Type: "object",
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"dockerImage": {
-								Type: "string",
-							},
-							"maxDBConnections": {
-								Type: "integer",
-							},
-							"mode": {
-								Type: "string",
-								Enum: []apiextv1.JSON{
-									{
-										Raw: []byte(`"session"`),
-									},
-									{
-										Raw: []byte(`"transaction"`),
-									},
-								},
-							},
-							"numberOfInstances": {
-								Type:    "integer",
-								Minimum: &min1,
-							},
-							"resources": {
-								Type: "object",
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"limits": {
-										Type: "object",
-										Properties: map[string]apiextv1.JSONSchemaProps{
-											"cpu": {
-												Type:    "string",
-												Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
-											},
-											"memory": {
-												Type:    "string",
-												Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
-											},
-										},
-									},
-									"requests": {
-										Type: "object",
-										Properties: map[string]apiextv1.JSONSchemaProps{
-											"cpu": {
-												Type:    "string",
-												Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
-											},
-											"memory": {
-												Type:    "string",
-												Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
-											},
-										},
-									},
-								},
-							},
-							"schema": {
-								Type: "string",
-							},
-							"user": {
-								Type: "string",
-							},
-						},
-					},
-					"databases": {
-						Type: "object",
-						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "string",
-							},
-						},
-					},
-					"dockerImage": {
-						Type: "string",
-					},
-					"enableConnectionPooler": {
-						Type: "boolean",
-					},
-					"enableReplicaConnectionPooler": {
-						Type: "boolean",
-					},
-					"enableLogicalBackup": {
-						Type: "boolean",
-					},
-					"enableMasterLoadBalancer": {
-						Type: "boolean",
-					},
-					"enableMasterPoolerLoadBalancer": {
-						Type: "boolean",
-					},
-					"enableReplicaLoadBalancer": {
-						Type: "boolean",
-					},
-					"enableReplicaPoolerLoadBalancer": {
-						Type: "boolean",
-					},
-					"enableShmVolume": {
-						Type: "boolean",
-					},
-					"env": {
-						Type:     "array",
-						Nullable: true,
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:                   "object",
-								XPreserveUnknownFields: util.True(),
-							},
-						},
-					},
-					"init_containers": {
-						Type:        "array",
-						Description: "deprecated",
-						Nullable:    true,
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:                   "object",
-								XPreserveUnknownFields: util.True(),
-							},
-						},
-					},
-					"initContainers": {
-						Type:     "array",
-						Nullable: true,
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:                   "object",
-								XPreserveUnknownFields: util.True(),
-							},
-						},
-					},
-					"logicalBackupRetention": {
-						Type: "string",
-					},
-					"logicalBackupSchedule": {
-						Type:    "string",
-						Pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$",
-					},
-					"maintenanceWindows": {
-						Type: "array",
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:    "string",
-								Pattern: "^\\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))\\ *$",
-							},
-						},
-					},
-					"masterServiceAnnotations": {
-						Type: "object",
-						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "string",
-							},
-						},
-					},
-					"nodeAffinity": {
-						Type: "object",
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"preferredDuringSchedulingIgnoredDuringExecution": {
-								Type: "array",
-								Items: &apiextv1.JSONSchemaPropsOrArray{
-									Schema: &apiextv1.JSONSchemaProps{
-										Type:     "object",
-										Required: []string{"preference", "weight"},
-										Properties: map[string]apiextv1.JSONSchemaProps{
-											"preference": {
-												Type: "object",
-												Properties: map[string]apiextv1.JSONSchemaProps{
-													"matchExpressions": {
-														Type: "array",
-														Items: &apiextv1.JSONSchemaPropsOrArray{
-															Schema: &apiextv1.JSONSchemaProps{
-																Type:     "object",
-																Required: []string{"key", "operator"},
-																Properties: map[string]apiextv1.JSONSchemaProps{
-																	"key": {
-																		Type: "string",
-																	},
-																	"operator": {
-																		Type: "string",
-																	},
-																	"values": {
-																		Type: "array",
-																		Items: &apiextv1.JSONSchemaPropsOrArray{
-																			Schema: &apiextv1.JSONSchemaProps{
-																				Type: "string",
-																			},
-																		},
-																	},
-																},
-															},
-														},
-													},
-													"matchFields": {
-														Type: "array",
-														Items: &apiextv1.JSONSchemaPropsOrArray{
-															Schema: &apiextv1.JSONSchemaProps{
-																Type:     "object",
-																Required: []string{"key", "operator"},
-																Properties: map[string]apiextv1.JSONSchemaProps{
-																	"key": {
-																		Type: "string",
-																	},
-																	"operator": {
-																		Type: "string",
-																	},
-																	"values": {
-																		Type: "array",
-																		Items: &apiextv1.JSONSchemaPropsOrArray{
-																			Schema: &apiextv1.JSONSchemaProps{
-																				Type: "string",
-																			},
-																		},
-																	},
-																},
-															},
-														},
-													},
-												},
-											},
-											"weight": {
-												Type:   "integer",
-												Format: "int32",
-											},
-										},
-									},
-								},
-							},
-							"requiredDuringSchedulingIgnoredDuringExecution": {
-								Type:     "object",
-								Required: []string{"nodeSelectorTerms"},
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"nodeSelectorTerms": {
-										Type: "array",
-										Items: &apiextv1.JSONSchemaPropsOrArray{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "object",
-												Properties: map[string]apiextv1.JSONSchemaProps{
-													"matchExpressions": {
-														Type: "array",
-														Items: &apiextv1.JSONSchemaPropsOrArray{
-															Schema: &apiextv1.JSONSchemaProps{
-																Type:     "object",
-																Required: []string{"key", "operator"},
-																Properties: map[string]apiextv1.JSONSchemaProps{
-																	"key": {
-																		Type: "string",
-																	},
-																	"operator": {
-																		Type: "string",
-																	},
-																	"values": {
-																		Type: "array",
-																		Items: &apiextv1.JSONSchemaPropsOrArray{
-																			Schema: &apiextv1.JSONSchemaProps{
-																				Type: "string",
-																			},
-																		},
-																	},
-																},
-															},
-														},
-													},
-													"matchFields": {
-														Type: "array",
-														Items: &apiextv1.JSONSchemaPropsOrArray{
-															Schema: &apiextv1.JSONSchemaProps{
-																Type:     "object",
-																Required: []string{"key", "operator"},
-																Properties: map[string]apiextv1.JSONSchemaProps{
-																	"key": {
-																		Type: "string",
-																	},
-																	"operator": {
-																		Type: "string",
-																	},
-																	"values": {
-																		Type: "array",
-																		Items: &apiextv1.JSONSchemaPropsOrArray{
-																			Schema: &apiextv1.JSONSchemaProps{
-																				Type: "string",
-																			},
-																		},
-																	},
-																},
-															},
-														},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					"numberOfInstances": {
-						Type:    "integer",
-						Minimum: &min0,
-					},
-					"patroni": {
-						Type: "object",
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"failsafe_mode": {
-								Type: "boolean",
-							},
-							"initdb": {
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Schema: &apiextv1.JSONSchemaProps{
-										Type: "string",
-									},
-								},
-							},
-							"loop_wait": {
-								Type: "integer",
-							},
-							"maximum_lag_on_failover": {
-								Type: "integer",
-							},
-							"pg_hba": {
-								Type: "array",
-								Items: &apiextv1.JSONSchemaPropsOrArray{
-									Schema: &apiextv1.JSONSchemaProps{
-										Type: "string",
-									},
-								},
-							},
-							"retry_timeout": {
-								Type: "integer",
-							},
-							"slots": {
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Schema: &apiextv1.JSONSchemaProps{
-										Type: "object",
-										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "string",
-											},
-										},
-									},
-								},
-							},
-							"synchronous_mode": {
-								Type: "boolean",
-							},
-							"synchronous_mode_strict": {
-								Type: "boolean",
-							},
-							"synchronous_node_count": {
-								Type: "integer",
-							},
-							"ttl": {
-								Type: "integer",
-							},
-						},
-					},
-					"podAnnotations": {
-						Type: "object",
-						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "string",
-							},
-						},
-					},
-					"pod_priority_class_name": {
-						Type:        "string",
-						Description: "deprecated",
-					},
-					"podPriorityClassName": {
-						Type: "string",
-					},
-					"postgresql": {
-						Type:     "object",
-						Required: []string{"version"},
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"version": {
-								Type: "string",
-								Enum: []apiextv1.JSON{
-									{
-										Raw: []byte(`"13"`),
-									},
-									{
-										Raw: []byte(`"14"`),
-									},
-									{
-										Raw: []byte(`"15"`),
-									},
-									{
-										Raw: []byte(`"16"`),
-									},
-									{
-										Raw: []byte(`"17"`),
-									},
-								},
-							},
-							"parameters": {
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Schema: &apiextv1.JSONSchemaProps{
-										Type: "string",
-									},
-								},
-							},
-						},
-					},
-					"preparedDatabases": {
-						Type: "object",
-						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"defaultUsers": {
-										Type: "boolean",
-									},
-									"extensions": {
-										Type: "object",
-										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "string",
-											},
-										},
-									},
-									"schemas": {
-										Type: "object",
-										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "object",
-												Properties: map[string]apiextv1.JSONSchemaProps{
-													"defaultUsers": {
-														Type: "boolean",
-													},
-													"defaultRoles": {
-														Type: "boolean",
-													},
-												},
-											},
-										},
-									},
-									"secretNamespace": {
-										Type: "string",
-									},
-								},
-							},
-						},
-					},
-					"replicaLoadBalancer": {
-						Type:        "boolean",
-						Description: "deprecated",
-					},
-					"replicaServiceAnnotations": {
-						Type: "object",
-						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "string",
-							},
-						},
-					},
-					"resources": {
-						Type: "object",
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"limits": {
-								Type: "object",
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"cpu": {
-										Type:    "string",
-										Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
-									},
-									"memory": {
-										Type:    "string",
-										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
-									},
-									"hugepages-2Mi": {
-										Type:    "string",
-										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
-									},
-									"hugepages-1Gi": {
-										Type:    "string",
-										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
-									},
-								},
-							},
-							"requests": {
-								Type: "object",
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"cpu": {
-										Type:    "string",
-										Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
-									},
-									"memory": {
-										Type:    "string",
-										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
-									},
-									"hugepages-2Mi": {
-										Type:    "string",
-										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
-									},
-									"hugepages-1Gi": {
-										Type:    "string",
-										Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
-									},
-								},
-							},
-						},
-					},
-					"schedulerName": {
-						Type: "string",
-					},
-					"serviceAnnotations": {
-						Type: "object",
-						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "string",
-							},
-						},
-					},
-					"sidecars": {
-						Type:     "array",
-						Nullable: true,
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:                   "object",
-								XPreserveUnknownFields: util.True(),
-							},
-						},
-					},
-					"spiloRunAsUser": {
-						Type: "integer",
-					},
-					"spiloRunAsGroup": {
-						Type: "integer",
-					},
-					"spiloFSGroup": {
-						Type: "integer",
-					},
-					"standby": {
-						Type: "object",
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"s3_wal_path": {
-								Type: "string",
-							},
-							"gs_wal_path": {
-								Type: "string",
-							},
-							"standby_host": {
-								Type: "string",
-							},
-							"standby_port": {
-								Type: "string",
-							},
-						},
-						OneOf: []apiextv1.JSONSchemaProps{
-							apiextv1.JSONSchemaProps{Required: []string{"s3_wal_path"}},
-							apiextv1.JSONSchemaProps{Required: []string{"gs_wal_path"}},
-							apiextv1.JSONSchemaProps{Required: []string{"standby_host"}},
-						},
-					},
-					"streams": {
-						Type: "array",
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:     "object",
-								Required: []string{"applicationId", "database", "tables"},
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"applicationId": {
-										Type: "string",
-									},
-									"batchSize": {
-										Type: "integer",
-									},
-									"database": {
-										Type: "string",
-									},
-									"enableRecovery": {
-										Type: "boolean",
-									},
-									"filter": {
-										Type: "object",
-										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "string",
-											},
-										},
-									},
-									"tables": {
-										Type: "object",
-										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type:     "object",
-												Required: []string{"eventType"},
-												Properties: map[string]apiextv1.JSONSchemaProps{
-													"eventType": {
-														Type: "string",
-													},
-													"idColumn": {
-														Type: "string",
-													},
-													"payloadColumn": {
-														Type: "string",
-													},
-													"recoveryEventType": {
-														Type: "string",
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					"teamId": {
-						Type: "string",
-					},
-					"tls": {
-						Type:     "object",
-						Required: []string{"secretName"},
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"secretName": {
-								Type: "string",
-							},
-							"certificateFile": {
-								Type: "string",
-							},
-							"privateKeyFile": {
-								Type: "string",
-							},
-							"caFile": {
-								Type: "string",
-							},
-							"caSecretName": {
-								Type: "string",
-							},
-						},
-					},
-					"tolerations": {
-						Type: "array",
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"key": {
-										Type: "string",
-									},
-									"operator": {
-										Type: "string",
-										Enum: []apiextv1.JSON{
-											{
-												Raw: []byte(`"Equal"`),
-											},
-											{
-												Raw: []byte(`"Exists"`),
-											},
-										},
-									},
-									"value": {
-										Type: "string",
-									},
-									"effect": {
-										Type: "string",
-										Enum: []apiextv1.JSON{
-											{
-												Raw: []byte(`"NoExecute"`),
-											},
-											{
-												Raw: []byte(`"NoSchedule"`),
-											},
-											{
-												Raw: []byte(`"PreferNoSchedule"`),
-											},
-										},
-									},
-									"tolerationSeconds": {
-										Type: "integer",
-									},
-								},
-							},
-						},
-					},
-					"useLoadBalancer": {
-						Type:        "boolean",
-						Description: "deprecated",
-					},
-					"users": {
-						Type: "object",
-						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:     "array",
-								Nullable: true,
-								Items: &apiextv1.JSONSchemaPropsOrArray{
-									Schema: &apiextv1.JSONSchemaProps{
-										Type: "string",
-										Enum: []apiextv1.JSON{
-											{
-												Raw: []byte(`"bypassrls"`),
-											},
-											{
-												Raw: []byte(`"BYPASSRLS"`),
-											},
-											{
-												Raw: []byte(`"nobypassrls"`),
-											},
-											{
-												Raw: []byte(`"NOBYPASSRLS"`),
-											},
-											{
-												Raw: []byte(`"createdb"`),
-											},
-											{
-												Raw: []byte(`"CREATEDB"`),
-											},
-											{
-												Raw: []byte(`"nocreatedb"`),
-											},
-											{
-												Raw: []byte(`"NOCREATEDB"`),
-											},
-											{
-												Raw: []byte(`"createrole"`),
-											},
-											{
-												Raw: []byte(`"CREATEROLE"`),
-											},
-											{
-												Raw: []byte(`"nocreaterole"`),
-											},
-											{
-												Raw: []byte(`"NOCREATEROLE"`),
-											},
-											{
-												Raw: []byte(`"inherit"`),
-											},
-											{
-												Raw: []byte(`"INHERIT"`),
-											},
-											{
-												Raw: []byte(`"noinherit"`),
-											},
-											{
-												Raw: []byte(`"NOINHERIT"`),
-											},
-											{
-												Raw: []byte(`"login"`),
-											},
-											{
-												Raw: []byte(`"LOGIN"`),
-											},
-											{
-												Raw: []byte(`"nologin"`),
-											},
-											{
-												Raw: []byte(`"NOLOGIN"`),
-											},
-											{
-												Raw: []byte(`"replication"`),
-											},
-											{
-												Raw: []byte(`"REPLICATION"`),
-											},
-											{
-												Raw: []byte(`"noreplication"`),
-											},
-											{
-												Raw: []byte(`"NOREPLICATION"`),
-											},
-											{
-												Raw: []byte(`"superuser"`),
-											},
-											{
-												Raw: []byte(`"SUPERUSER"`),
-											},
-											{
-												Raw: []byte(`"nosuperuser"`),
-											},
-											{
-												Raw: []byte(`"NOSUPERUSER"`),
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					"usersIgnoringSecretRotation": {
-						Type:     "array",
-						Nullable: true,
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "string",
-							},
-						},
-					},
-					"usersWithInPlaceSecretRotation": {
-						Type:     "array",
-						Nullable: true,
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "string",
-							},
-						},
-					},
-					"usersWithSecretRotation": {
-						Type:     "array",
-						Nullable: true,
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type: "string",
-							},
-						},
-					},
-					"volume": {
-						Type:     "object",
-						Required: []string{"size"},
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"isSubPathExpr": {
-								Type: "boolean",
-							},
-							"iops": {
-								Type: "integer",
-							},
-							"selector": {
-								Type: "object",
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"matchExpressions": {
-										Type: "array",
-										Items: &apiextv1.JSONSchemaPropsOrArray{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type:     "object",
-												Required: []string{"key", "operator"},
-												Properties: map[string]apiextv1.JSONSchemaProps{
-													"key": {
-														Type: "string",
-													},
-													"operator": {
-														Type: "string",
-														Enum: []apiextv1.JSON{
-															{
-																Raw: []byte(`"DoesNotExist"`),
-															},
-															{
-																Raw: []byte(`"Exists"`),
-															},
-															{
-																Raw: []byte(`"In"`),
-															},
-															{
-																Raw: []byte(`"NotIn"`),
-															},
-														},
-													},
-													"values": {
-														Type: "array",
-														Items: &apiextv1.JSONSchemaPropsOrArray{
-															Schema: &apiextv1.JSONSchemaProps{
-																Type: "string",
-															},
-														},
-													},
-												},
-											},
-										},
-									},
-									"matchLabels": {
-										Type:                   "object",
-										XPreserveUnknownFields: util.True(),
-									},
-								},
-							},
-							"size": {
-								Type:    "string",
-								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
-							},
-							"storageClass": {
-								Type: "string",
-							},
-							"subPath": {
-								Type: "string",
-							},
-							"throughput": {
-								Type: "integer",
-							},
-						},
-					},
-				},
-			},
-			"status": {
-				Type: "object",
-				AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-					Schema: &apiextv1.JSONSchemaProps{
-						Type: "string",
-					},
-				},
-			},
-		},
-	},
-}
 
 // OperatorConfigCRDResourceValidation to check applied manifest parameters
 var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
@@ -1160,6 +106,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enable_lazy_spilo_upgrade": {
 						Type: "boolean",
 					},
+					"enable_maintenance_windows": {
+						Type: "boolean",
+					},
 					"enable_shm_volume": {
 						Type: "boolean",
 					},
@@ -1176,8 +125,20 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"ignore_instance_limits_annotation_key": {
 						Type: "string",
 					},
+					"ignore_resources_limits_annotation_key": {
+						Type: "string",
+					},
 					"kubernetes_use_configmaps": {
 						Type: "boolean",
+					},
+					"maintenance_windows": {
+						Type: "array",
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:    "string",
+								Pattern: "^\\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))\\ *$",
+							},
+						},
 					},
 					"max_instances": {
 						Type:        "integer",
@@ -1408,6 +369,132 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
 										Type: "string",
+									},
+								},
+							},
+							"liveness_probe": {
+								Description: "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+								Type:        "object",
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"exec": {
+										Description: "One and only one of the following should be specified. Exec specifies the action to take.",
+										Type:        "object",
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"command": {
+												Description: "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.",
+												Type:        "array",
+												Items: &apiextv1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1.JSONSchemaProps{
+														Type: "string",
+													},
+												},
+											},
+										},
+									},
+									"failureThreshold": {
+										Description: "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
+										Type:        "integer",
+										Format:      "int32",
+									},
+									"httpGet": {
+										Description: "HTTPGet specifies the http request to perform.",
+										Type:        "object",
+										Required:    []string{"port"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"host": {
+												Description: "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead.",
+												Type:        "string",
+											},
+											"httpHeaders": {
+												Description: "Custom headers to set in the request. HTTP allows repeated headers.",
+												Type:        "array",
+												Items: &apiextv1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1.JSONSchemaProps{
+														Description: "HTTPHeader describes a custom header to be used in HTTP probes",
+														Type:        "object",
+														Required:    []string{"name", "value"},
+														Properties: map[string]apiextv1.JSONSchemaProps{
+															"name": {
+																Description: "The header field name",
+																Type:        "string",
+															},
+															"value": {
+																Description: "The header field value",
+																Type:        "string",
+															},
+														},
+													},
+												},
+											},
+											"path": {
+												Description: "Path to access on the HTTP server.",
+												Type:        "string",
+											},
+											"port": {
+												Description: "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+												AnyOf: []apiextv1.JSONSchemaProps{
+													{
+														Type: "integer",
+													},
+													{
+														Type: "string",
+													},
+												},
+												XIntOrString: true,
+											},
+											"scheme": {
+												Description: "Scheme to use for connecting to the host. Defaults to HTTP.",
+												Type:        "string",
+											},
+										},
+									},
+									"initialDelaySeconds": {
+										Description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+										Type:        "integer",
+										Format:      "int32",
+									},
+									"periodSeconds": {
+										Description: "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
+										Type:        "integer",
+										Format:      "int32",
+									},
+									"successThreshold": {
+										Description: "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.",
+										Type:        "integer",
+										Format:      "int32",
+									},
+									"tcpSocket": {
+										Description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook",
+										Type:        "object",
+										Required:    []string{"port"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"host": {
+												Description: "Optional: Host name to connect to, defaults to the pod IP.",
+												Type:        "string",
+											},
+											"port": {
+												Description:  "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+												XIntOrString: true,
+												AnyOf: []apiextv1.JSONSchemaProps{
+													{
+														Type: "integer",
+													},
+													{
+														Type: "string",
+													},
+												},
+											},
+										},
+									},
+									"terminationGracePeriodSeconds": {
+										Description: "Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
+										Type:        "integer",
+										Format:      "int64",
+									},
+									"timeoutSeconds": {
+										Description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+										Type:        "integer",
+										Format:      "int32",
 									},
 								},
 							},
@@ -2020,16 +1107,20 @@ func buildCRD(name, kind, plural, list, short string,
 	}
 }
 
+//go:embed postgresql.crd.yaml
+var postgresqlCRDYAML []byte
+
 // PostgresCRD returns CustomResourceDefinition built from PostgresCRDResource
-func PostgresCRD(crdCategories []string) *apiextv1.CustomResourceDefinition {
-	return buildCRD(PostgresCRDResouceName,
-		PostgresCRDResourceKind,
-		PostgresCRDResourcePlural,
-		PostgresCRDResourceList,
-		PostgresCRDResourceShort,
-		crdCategories,
-		PostgresCRDResourceColumns,
-		PostgresCRDResourceValidation)
+func PostgresCRD(crdCategories []string) (*apiextv1.CustomResourceDefinition, error) {
+	var crd apiextv1.CustomResourceDefinition
+	err := yaml.Unmarshal(postgresqlCRDYAML, &crd)
+	if err != nil {
+		return nil, err
+	}
+
+	crd.Spec.Names.Categories = crdCategories
+
+	return &crd, nil
 }
 
 // ConfigurationCRD returns CustomResourceDefinition built from OperatorConfigCRDResource

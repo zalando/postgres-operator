@@ -11,7 +11,7 @@ endif
 LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS)
 LDFLAGS ?= -X=main.version=$(VERSION)
 
-IMAGE            ?= registry.opensource.zalan.do/acid/$(BINARY)
+IMAGE            ?= ghcr.io/zalando/$(BINARY)
 VERSION          ?= $(shell git describe --tags --always --dirty)
 TAG              ?= $(VERSION)
 GITHEAD          = $(shell git rev-parse --short HEAD)
@@ -46,7 +46,7 @@ tools:
 	# install pinned version of 'kind'
 	# go install must run outside of a dir with a (module-based) Go project !
 	# otherwise go install updates project's dependencies and/or behaves differently
-	cd "/tmp" && GO111MODULE=on go install sigs.k8s.io/kind@v0.24.0
+	cd "/tmp" && GO111MODULE=on go install sigs.k8s.io/kind@v0.27.0
 
 e2etest: tools copy clean
 	./run.sh main
