@@ -73,11 +73,10 @@ type Resources struct {
 type InfrastructureRole struct {
 	// Name of a secret which describes the role, and optionally name of a
 	// configmap with an extra information
-	SecretName spec.NamespacedName `json:"secretname,omitempty"`
-
-	UserKey     string `json:"userkey,omitempty"`
-	PasswordKey string `json:"passwordkey,omitempty"`
-	RoleKey     string `json:"rolekey,omitempty"`
+	SecretName  spec.NamespacedName `json:"secretname,omitempty"`
+	UserKey     string              `json:"userkey,omitempty"`
+	PasswordKey string              `json:"passwordkey,omitempty"`
+	RoleKey     string              `json:"rolekey,omitempty"`
 
 	DefaultUserValue string `json:"defaultuservalue,omitempty"`
 	DefaultRoleValue string `json:"defaultrolevalue,omitempty"`

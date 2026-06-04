@@ -13,11 +13,17 @@ import (
 )
 
 // +genclient
-// +genclient:onlyVerbs=get
-// +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // OperatorConfiguration defines the specification for the OperatorConfiguration.
+// +k8s:deepcopy-gen=true
+// +kubebuilder:resource:categories=all,shortName=opconfig,scope=Namespaced
+// +kubebuilder:printcolumn:name="Image",type=string,JSONPath=`.configuration.docker_image`,description="Spilo image to be used for Pods"
+// +kubebuilder:printcolumn:name="Cluster-Label",type=string,JSONPath=`.configuration.kubernetes.cluster_name_label`,description="Label for K8s resources created by operator"
+// +kubebuilder:printcolumn:name="Service-Account",type=string,JSONPath=`.configuration.kubernetes.pod_service_account_name`,description="Name of service account to be used"
+// +kubebuilder:printcolumn:name="Min-Instances",type=integer,JSONPath=`.configuration.min_instances`,description="Minimum number of instances per Postgres cluster"
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,description="Age of the OperatorConfiguration resource"
+// +kubebuilder:subresource:status
 type OperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -58,41 +64,46 @@ type KubernetesMetaConfiguration struct {
 	EnableOwnerReferences *bool  `json:"enable_owner_references,omitempty"`
 	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
 	// TODO: change it to the proper json
-	PodServiceAccountDefinition            string                       `json:"pod_service_account_definition,omitempty"`
-	PodServiceAccountRoleBindingDefinition string                       `json:"pod_service_account_role_binding_definition,omitempty"`
-	PodTerminateGracePeriod                Duration                     `json:"pod_terminate_grace_period,omitempty"`
-	LivenessProbe                          *v1.Probe                    `json:"liveness_probe"`
-	SpiloPrivileged                        bool                         `json:"spilo_privileged,omitempty"`
-	SpiloAllowPrivilegeEscalation          *bool                        `json:"spilo_allow_privilege_escalation,omitempty"`
-	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
-	SpiloRunAsGroup                        *int64                       `json:"spilo_runasgroup,omitempty"`
-	SpiloFSGroup                           *int64                       `json:"spilo_fsgroup,omitempty"`
-	AdditionalPodCapabilities              []string                     `json:"additional_pod_capabilities,omitempty"`
-	WatchedNamespace                       string                       `json:"watched_namespace,omitempty"`
-	PDBNameFormat                          config.StringTemplate        `json:"pdb_name_format,omitempty"`
-	PDBMasterLabelSelector                 *bool                        `json:"pdb_master_label_selector,omitempty"`
-	EnablePodDisruptionBudget              *bool                        `json:"enable_pod_disruption_budget,omitempty"`
-	StorageResizeMode                      string                       `json:"storage_resize_mode,omitempty"`
-	EnableInitContainers                   *bool                        `json:"enable_init_containers,omitempty"`
-	EnableSidecars                         *bool                        `json:"enable_sidecars,omitempty"`
-	SharePgSocketWithSidecars              *bool                        `json:"share_pgsocket_with_sidecars,omitempty"`
-	SecretNameTemplate                     config.StringTemplate        `json:"secret_name_template,omitempty"`
-	ClusterDomain                          string                       `json:"cluster_domain,omitempty"`
-	OAuthTokenSecretName                   spec.NamespacedName          `json:"oauth_token_secret_name,omitempty"`
-	InfrastructureRolesSecretName          spec.NamespacedName          `json:"infrastructure_roles_secret_name,omitempty"`
-	InfrastructureRolesDefs                []*config.InfrastructureRole `json:"infrastructure_roles_secrets,omitempty"`
-	PodRoleLabel                           string                       `json:"pod_role_label,omitempty"`
-	ClusterLabels                          map[string]string            `json:"cluster_labels,omitempty"`
-	InheritedLabels                        []string                     `json:"inherited_labels,omitempty"`
-	InheritedAnnotations                   []string                     `json:"inherited_annotations,omitempty"`
-	DownscalerAnnotations                  []string                     `json:"downscaler_annotations,omitempty"`
-	IgnoredAnnotations                     []string                     `json:"ignored_annotations,omitempty"`
-	ClusterNameLabel                       string                       `json:"cluster_name_label,omitempty"`
-	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
-	DeleteAnnotationNameKey                string                       `json:"delete_annotation_name_key,omitempty"`
-	NodeReadinessLabel                     map[string]string            `json:"node_readiness_label,omitempty"`
-	NodeReadinessLabelMerge                string                       `json:"node_readiness_label_merge,omitempty"`
-	CustomPodAnnotations                   map[string]string            `json:"custom_pod_annotations,omitempty"`
+	PodServiceAccountDefinition            string   `json:"pod_service_account_definition,omitempty"`
+	PodServiceAccountRoleBindingDefinition string   `json:"pod_service_account_role_binding_definition,omitempty"`
+	PodTerminateGracePeriod                Duration `json:"pod_terminate_grace_period,omitempty"`
+	// +optional
+	LivenessProbe                 *v1.Probe             `json:"liveness_probe"`
+	SpiloPrivileged               bool                  `json:"spilo_privileged,omitempty"`
+	SpiloAllowPrivilegeEscalation *bool                 `json:"spilo_allow_privilege_escalation,omitempty"`
+	SpiloRunAsUser                *int64                `json:"spilo_runasuser,omitempty"`
+	SpiloRunAsGroup               *int64                `json:"spilo_runasgroup,omitempty"`
+	SpiloFSGroup                  *int64                `json:"spilo_fsgroup,omitempty"`
+	AdditionalPodCapabilities     []string              `json:"additional_pod_capabilities,omitempty"`
+	WatchedNamespace              string                `json:"watched_namespace,omitempty"`
+	PDBNameFormat                 config.StringTemplate `json:"pdb_name_format,omitempty"`
+	PDBMasterLabelSelector        *bool                 `json:"pdb_master_label_selector,omitempty"`
+	EnablePodDisruptionBudget     *bool                 `json:"enable_pod_disruption_budget,omitempty"`
+	// +kubebuilder:validation:Enum=ebs;mixed;pvc;off
+	StorageResizeMode             string                `json:"storage_resize_mode,omitempty"`
+	EnableInitContainers          *bool                 `json:"enable_init_containers,omitempty"`
+	EnableSidecars                *bool                 `json:"enable_sidecars,omitempty"`
+	SharePgSocketWithSidecars     *bool                 `json:"share_pgsocket_with_sidecars,omitempty"`
+	SecretNameTemplate            config.StringTemplate `json:"secret_name_template,omitempty"`
+	ClusterDomain                 string                `json:"cluster_domain,omitempty"`
+	OAuthTokenSecretName          spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`
+	InfrastructureRolesSecretName spec.NamespacedName   `json:"infrastructure_roles_secret_name,omitempty"`
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:validation:Type=array
+	InfrastructureRolesDefs []*config.InfrastructureRole `json:"infrastructure_roles_secrets,omitempty"`
+	PodRoleLabel            string                       `json:"pod_role_label,omitempty"`
+	ClusterLabels           map[string]string            `json:"cluster_labels,omitempty"`
+	InheritedLabels         []string                     `json:"inherited_labels,omitempty"`
+	InheritedAnnotations    []string                     `json:"inherited_annotations,omitempty"`
+	DownscalerAnnotations   []string                     `json:"downscaler_annotations,omitempty"`
+	IgnoredAnnotations      []string                     `json:"ignored_annotations,omitempty"`
+	ClusterNameLabel        string                       `json:"cluster_name_label,omitempty"`
+	DeleteAnnotationDateKey string                       `json:"delete_annotation_date_key,omitempty"`
+	DeleteAnnotationNameKey string                       `json:"delete_annotation_name_key,omitempty"`
+	NodeReadinessLabel      map[string]string            `json:"node_readiness_label,omitempty"`
+	// +kubebuilder:validation:Enum=AND;OR
+	NodeReadinessLabelMerge string            `json:"node_readiness_label_merge,omitempty"`
+	CustomPodAnnotations    map[string]string `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration                            map[string]string   `json:"toleration,omitempty"`
 	PodEnvironmentConfigMap                  spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
@@ -102,25 +113,34 @@ type KubernetesMetaConfiguration struct {
 	EnablePodAntiAffinity                    bool                `json:"enable_pod_antiaffinity,omitempty"`
 	PodAntiAffinityPreferredDuringScheduling bool                `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
 	PodAntiAffinityTopologyKey               string              `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy                      string              `json:"pod_management_policy,omitempty"`
-	PersistentVolumeClaimRetentionPolicy     map[string]string   `json:"persistent_volume_claim_retention_policy,omitempty"`
-	EnableSecretsDeletion                    *bool               `json:"enable_secrets_deletion,omitempty"`
-	EnablePersistentVolumeClaimDeletion      *bool               `json:"enable_persistent_volume_claim_deletion,omitempty"`
-	EnableReadinessProbe                     bool                `json:"enable_readiness_probe,omitempty"`
-	EnableCrossNamespaceSecret               bool                `json:"enable_cross_namespace_secret,omitempty"`
-	EnableFinalizers                         *bool               `json:"enable_finalizers,omitempty"`
+	// +kubebuilder:validation:Enum=ordered_ready;parallel
+	PodManagementPolicy                  string            `json:"pod_management_policy,omitempty"`
+	PersistentVolumeClaimRetentionPolicy map[string]string `json:"persistent_volume_claim_retention_policy,omitempty"`
+	EnableSecretsDeletion                *bool             `json:"enable_secrets_deletion,omitempty"`
+	EnablePersistentVolumeClaimDeletion  *bool             `json:"enable_persistent_volume_claim_deletion,omitempty"`
+	EnableReadinessProbe                 bool              `json:"enable_readiness_probe,omitempty"`
+	EnableCrossNamespaceSecret           bool              `json:"enable_cross_namespace_secret,omitempty"`
+	EnableFinalizers                     *bool             `json:"enable_finalizers,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
 type PostgresPodResourcesDefaults struct {
-	DefaultCPURequest    string `json:"default_cpu_request,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	DefaultCPURequest string `json:"default_cpu_request,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
 	DefaultMemoryRequest string `json:"default_memory_request,omitempty"`
-	DefaultCPULimit      string `json:"default_cpu_limit,omitempty"`
-	DefaultMemoryLimit   string `json:"default_memory_limit,omitempty"`
-	MinCPULimit          string `json:"min_cpu_limit,omitempty"`
-	MinMemoryLimit       string `json:"min_memory_limit,omitempty"`
-	MaxCPURequest        string `json:"max_cpu_request,omitempty"`
-	MaxMemoryRequest     string `json:"max_memory_request,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	DefaultCPULimit string `json:"default_cpu_limit,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	DefaultMemoryLimit string `json:"default_memory_limit,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	MinCPULimit string `json:"min_cpu_limit,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	MinMemoryLimit string `json:"min_memory_limit,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	MaxCPURequest string `json:"max_cpu_request,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	MaxMemoryRequest string `json:"max_memory_request,omitempty"`
 }
 
 // OperatorTimeouts defines the timeout of ResourceCheck, PodWait, ReadyWait
@@ -147,7 +167,8 @@ type LoadBalancerConfiguration struct {
 	MasterLegacyDNSNameFormat       config.StringTemplate `json:"master_legacy_dns_name_format,omitempty"`
 	ReplicaDNSNameFormat            config.StringTemplate `json:"replica_dns_name_format,omitempty"`
 	ReplicaLegacyDNSNameFormat      config.StringTemplate `json:"replica_legacy_dns_name_format,omitempty"`
-	ExternalTrafficPolicy           string                `json:"external_traffic_policy" default:"Cluster"`
+	// +kubebuilder:validation:Enum=Cluster;Local
+	ExternalTrafficPolicy string `json:"external_traffic_policy" default:"Cluster"`
 }
 
 // AWSGCPConfiguration defines the configuration for AWS
@@ -199,31 +220,41 @@ type LoggingRESTAPIConfiguration struct {
 
 // ScalyrConfiguration defines the configuration for ScalyrAPI
 type ScalyrConfiguration struct {
-	ScalyrAPIKey        string `json:"scalyr_api_key,omitempty"`
-	ScalyrImage         string `json:"scalyr_image,omitempty"`
-	ScalyrServerURL     string `json:"scalyr_server_url,omitempty"`
-	ScalyrCPURequest    string `json:"scalyr_cpu_request,omitempty"`
+	ScalyrAPIKey    string `json:"scalyr_api_key,omitempty"`
+	ScalyrImage     string `json:"scalyr_image,omitempty"`
+	ScalyrServerURL string `json:"scalyr_server_url,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	ScalyrCPURequest string `json:"scalyr_cpu_request,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
 	ScalyrMemoryRequest string `json:"scalyr_memory_request,omitempty"`
 	ScalyrCPULimit      string `json:"scalyr_cpu_limit,omitempty"`
-	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	ScalyrMemoryLimit string `json:"scalyr_memory_limit,omitempty"`
 }
 
 // ConnectionPoolerConfiguration defines default configuration for connection pooler
 type ConnectionPoolerConfiguration struct {
-	NumberOfInstances    *int32 `json:"connection_pooler_number_of_instances,omitempty"`
-	Schema               string `json:"connection_pooler_schema,omitempty"`
-	User                 string `json:"connection_pooler_user,omitempty"`
-	Image                string `json:"connection_pooler_image,omitempty"`
-	Mode                 string `json:"connection_pooler_mode,omitempty"`
-	MaxDBConnections     *int32 `json:"connection_pooler_max_db_connections,omitempty"`
-	DefaultCPURequest    string `json:"connection_pooler_default_cpu_request,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	NumberOfInstances *int32 `json:"connection_pooler_number_of_instances,omitempty"`
+	Schema            string `json:"connection_pooler_schema,omitempty"`
+	User              string `json:"connection_pooler_user,omitempty"`
+	Image             string `json:"connection_pooler_image,omitempty"`
+	// +kubebuilder:validation:Enum=session;transaction;statement
+	Mode             string `json:"connection_pooler_mode,omitempty"`
+	MaxDBConnections *int32 `json:"connection_pooler_max_db_connections,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	DefaultCPURequest string `json:"connection_pooler_default_cpu_request,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
 	DefaultMemoryRequest string `json:"connection_pooler_default_memory_request,omitempty"`
-	DefaultCPULimit      string `json:"connection_pooler_default_cpu_limit,omitempty"`
-	DefaultMemoryLimit   string `json:"connection_pooler_default_memory_limit,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	DefaultCPULimit string `json:"connection_pooler_default_cpu_limit,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	DefaultMemoryLimit string `json:"connection_pooler_default_memory_limit,omitempty"`
 }
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
 type OperatorLogicalBackupConfiguration struct {
+	// +kubebuilder:validation:Pattern=`^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$`
 	Schedule                     string `json:"logical_backup_schedule,omitempty"`
 	DockerImage                  string `json:"logical_backup_docker_image,omitempty"`
 	BackupProvider               string `json:"logical_backup_provider,omitempty"`
@@ -241,10 +272,14 @@ type OperatorLogicalBackupConfiguration struct {
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
 	CronjobEnvironmentSecret     string `json:"logical_backup_cronjob_environment_secret,omitempty"`
-	CPURequest                   string `json:"logical_backup_cpu_request,omitempty"`
-	MemoryRequest                string `json:"logical_backup_memory_request,omitempty"`
-	CPULimit                     string `json:"logical_backup_cpu_limit,omitempty"`
-	MemoryLimit                  string `json:"logical_backup_memory_limit,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	CPURequest string `json:"logical_backup_cpu_request,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	MemoryRequest string `json:"logical_backup_memory_request,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`
+	CPULimit string `json:"logical_backup_cpu_limit,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
+	MemoryLimit string `json:"logical_backup_memory_limit,omitempty"`
 }
 
 // PatroniConfiguration defines configuration for Patroni
@@ -254,42 +289,53 @@ type PatroniConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
-	EnableCRDRegistration         *bool                              `json:"enable_crd_registration,omitempty"`
-	EnableCRDValidation           *bool                              `json:"enable_crd_validation,omitempty"`
-	CRDCategories                 []string                           `json:"crd_categories,omitempty"`
-	EnableLazySpiloUpgrade        bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
-	EnablePgVersionEnvVar         bool                               `json:"enable_pgversion_env_var,omitempty"`
-	EnableSpiloWalPathCompat      bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
-	EnableTeamIdClusternamePrefix bool                               `json:"enable_team_id_clustername_prefix,omitempty"`
-	EtcdHost                      string                             `json:"etcd_host,omitempty"`
-	KubernetesUseConfigMaps       bool                               `json:"kubernetes_use_configmaps,omitempty"`
-	DockerImage                   string                             `json:"docker_image,omitempty"`
-	Workers                       uint32                             `json:"workers,omitempty"`
-	ResyncPeriod                  Duration                           `json:"resync_period,omitempty"`
-	RepairPeriod                  Duration                           `json:"repair_period,omitempty"`
-	EnableMaintenanceWindows      *bool                              `json:"enable_maintenance_windows,omitempty"`
-	MaintenanceWindows            []MaintenanceWindow                `json:"maintenance_windows,omitempty"`
-	SetMemoryRequestToLimit       bool                               `json:"set_memory_request_to_limit,omitempty"`
-	ShmVolume                     *bool                              `json:"enable_shm_volume,omitempty"`
-	SidecarImages                 map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
-	SidecarContainers             []v1.Container                     `json:"sidecars,omitempty"`
-	PostgresUsersConfiguration    PostgresUsersConfiguration         `json:"users"`
-	MajorVersionUpgrade           MajorVersionUpgradeConfiguration   `json:"major_version_upgrade"`
-	Kubernetes                    KubernetesMetaConfiguration        `json:"kubernetes"`
-	PostgresPodResources          PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
-	Timeouts                      OperatorTimeouts                   `json:"timeouts"`
-	LoadBalancer                  LoadBalancerConfiguration          `json:"load_balancer"`
-	AWSGCP                        AWSGCPConfiguration                `json:"aws_or_gcp"`
-	OperatorDebug                 OperatorDebugConfiguration         `json:"debug"`
-	TeamsAPI                      TeamsAPIConfiguration              `json:"teams_api"`
-	LoggingRESTAPI                LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
-	Scalyr                        ScalyrConfiguration                `json:"scalyr"`
-	LogicalBackup                 OperatorLogicalBackupConfiguration `json:"logical_backup"`
-	ConnectionPooler              ConnectionPoolerConfiguration      `json:"connection_pooler"`
-	Patroni                       PatroniConfiguration               `json:"patroni"`
+	EnableCRDRegistration         *bool    `json:"enable_crd_registration,omitempty"`
+	EnableCRDValidation           *bool    `json:"enable_crd_validation,omitempty"`
+	CRDCategories                 []string `json:"crd_categories,omitempty"`
+	EnableLazySpiloUpgrade        bool     `json:"enable_lazy_spilo_upgrade,omitempty"`
+	EnablePgVersionEnvVar         bool     `json:"enable_pgversion_env_var,omitempty"`
+	EnableSpiloWalPathCompat      bool     `json:"enable_spilo_wal_path_compat,omitempty"`
+	EnableTeamIdClusternamePrefix bool     `json:"enable_team_id_clustername_prefix,omitempty"`
+	EtcdHost                      string   `json:"etcd_host,omitempty"`
+	KubernetesUseConfigMaps       bool     `json:"kubernetes_use_configmaps,omitempty"`
+	DockerImage                   string   `json:"docker_image,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	Workers                  uint32   `json:"workers,omitempty"`
+	ResyncPeriod             Duration `json:"resync_period,omitempty"`
+	RepairPeriod             Duration `json:"repair_period,omitempty"`
+	EnableMaintenanceWindows *bool    `json:"enable_maintenance_windows,omitempty"`
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:validation:Type=array
+	MaintenanceWindows      []MaintenanceWindow `json:"maintenance_windows,omitempty"`
+	SetMemoryRequestToLimit bool                `json:"set_memory_request_to_limit,omitempty"`
+	ShmVolume               *bool               `json:"enable_shm_volume,omitempty"`
+	SidecarImages           map[string]string   `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
+	// +kubebuilder:validation:XPreserveUnknownFields
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:validation:Schemaless
+	SidecarContainers          []v1.Container                   `json:"sidecars,omitempty"`
+	PostgresUsersConfiguration PostgresUsersConfiguration       `json:"users"`
+	MajorVersionUpgrade        MajorVersionUpgradeConfiguration `json:"major_version_upgrade"`
+	Kubernetes                 KubernetesMetaConfiguration      `json:"kubernetes"`
+	PostgresPodResources       PostgresPodResourcesDefaults     `json:"postgres_pod_resources"`
+	Timeouts                   OperatorTimeouts                 `json:"timeouts"`
+	LoadBalancer               LoadBalancerConfiguration        `json:"load_balancer"`
+	AWSGCP                     AWSGCPConfiguration              `json:"aws_or_gcp"`
+	OperatorDebug              OperatorDebugConfiguration       `json:"debug"`
+	// +optional
+	TeamsAPI       TeamsAPIConfiguration       `json:"teams_api"`
+	LoggingRESTAPI LoggingRESTAPIConfiguration `json:"logging_rest_api"`
+	// +optional
+	Scalyr           ScalyrConfiguration                `json:"scalyr"`
+	LogicalBackup    OperatorLogicalBackupConfiguration `json:"logical_backup"`
+	ConnectionPooler ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	Patroni          PatroniConfiguration               `json:"patroni"`
 
-	MinInstances                       int32  `json:"min_instances,omitempty"`
-	MaxInstances                       int32  `json:"max_instances,omitempty"`
+	// +kubebuilder:validation:Minimum=-1
+	MinInstances int32 `json:"min_instances,omitempty"`
+	// +kubebuilder:validation:Minimum=-1
+	MaxInstances int32 `json:"max_instances,omitempty"`
+
 	IgnoreInstanceLimitsAnnotationKey  string `json:"ignore_instance_limits_annotation_key,omitempty"`
 	IgnoreResourcesLimitsAnnotationKey string `json:"ignore_resources_limits_annotation_key,omitempty"`
 }

@@ -161,6 +161,7 @@ spec:
                     enum:
                     - session
                     - transaction
+                    - statement
                     type: string
                   numberOfInstances:
                     format: int32

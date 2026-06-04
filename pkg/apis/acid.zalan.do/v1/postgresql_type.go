@@ -321,7 +321,7 @@ type ConnectionPooler struct {
 	NumberOfInstances *int32 `json:"numberOfInstances,omitempty"`
 	Schema            string `json:"schema,omitempty"`
 	User              string `json:"user,omitempty"`
-	// +kubebuilder:validation:Enum=session;transaction
+	// +kubebuilder:validation:Enum=session;transaction;statement
 	Mode             string `json:"mode,omitempty"`
 	DockerImage      string `json:"dockerImage,omitempty"`
 	MaxDBConnections *int32 `json:"maxDBConnections,omitempty"`
