@@ -17,6 +17,7 @@ import (
 	"github.com/zalando/postgres-operator/v2/pkg/util"
 	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
 	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/retryutil"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -1418,11 +1419,7 @@ func (c *Cluster) updatePgUser(secretUsername string, degraded bool) {
 func (c *Cluster) syncRoles() (err error) {
 	c.setProcessName("syncing roles")
 
-	var (
-		dbUsers   spec.PgUserMap
-		newUsers  spec.PgUserMap
-		userNames []string
-	)
+	var userNames []string
 
 	err = c.initDbConn()
 	if err != nil {
@@ -1441,7 +1438,6 @@ func (c *Cluster) syncRoles() (err error) {
 
 	// mapping between original role name and with deletion suffix
 	deletedUsers := map[string]string{}
-	newUsers = make(map[string]spec.PgUser)
 
 	// create list of database roles to query
 	for _, u := range c.pgUsers {
@@ -1471,50 +1467,93 @@ func (c *Cluster) syncRoles() (err error) {
 	// search also for system users
 	for _, systemUser := range c.systemUsers {
 		userNames = append(userNames, systemUser.Name)
-		newUsers[systemUser.Name] = systemUser
 	}
 
-	dbUsers, err = c.readPgUsersFromDatabase(userNames)
+	// read the current state of roles and compute the sync requests on every
+	// attempt, since a previous attempt might have partially applied them
+	var lastErr error
+	err = retryutil.Retry(
+		constants.PostgresConnectTimeout,
+		constants.PostgresConnectRetryTimeout,
+		func() (bool, error) {
+			inRecovery, err := c.isInRecovery()
+			if err != nil {
+				lastErr = err // connection problem / startup: transient
+			} else if inRecovery {
+				lastErr = fmt.Errorf("database is in recovery")
+			} else if lastErr = c.executeRolesSync(userNames, deletedUsers); lastErr != nil {
+				// the failure is only transient if the database got demoted meanwhile
+				if inRecovery, rerr := c.isInRecovery(); rerr == nil && !inRecovery {
+					return false, lastErr // permanent error (e.g. rename conflict): fail fast
+				}
+			}
+			if lastErr != nil {
+				c.logger.Warningf("could not sync roles, retrying: %v", lastErr)
+				return false, nil
+			}
+			return true, nil
+		})
+	if err != nil {
+		return fmt.Errorf("error executing sync statements: %v", err)
+	}
+
+	return nil
+}
+
+// executeRolesSync reads the given roles from the database, compares them with
+// the desired roles and executes the resulting sync requests
+func (c *Cluster) executeRolesSync(userNames []string, deletedUsers map[string]string) error {
+	dbUsers, err := c.readPgUsersFromDatabase(userNames)
 	if err != nil {
 		return fmt.Errorf("error getting users from the database: %v", err)
+	}
+
+	newUsers := c.buildNewUsers(dbUsers, deletedUsers)
+	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, newUsers)
+	return c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb)
+}
+
+// buildNewUsers returns the desired roles to send to ProduceSyncRequests, adjusted
+// to the current state of dbUsers. It works on copies of the cluster's users, so
+// that repeated attempts always start from the same desired state. Group roles of
+// rotation users are removed from dbUsers.
+func (c *Cluster) buildNewUsers(dbUsers spec.PgUserMap, deletedUsers map[string]string) spec.PgUserMap {
+	newUsers := make(spec.PgUserMap)
+	for _, systemUser := range c.systemUsers {
+		newUsers[systemUser.Name] = systemUser
+	}
+	for _, pgUser := range c.pgUsers {
+		newUsers[pgUser.Name] = pgUser
 	}
 
 DBUSERS:
 	for _, dbUser := range dbUsers {
 		// copy rolconfig to rotation users
-		for pgUserName, pgUser := range c.pgUsers {
+		for _, pgUser := range c.pgUsers {
 			if pgUser.Rotated && pgUser.MemberOf[0] == dbUser.Name {
-				pgUser.Parameters = dbUser.Parameters
-				c.pgUsers[pgUserName] = pgUser
+				rotationUser := newUsers[pgUser.Name]
+				rotationUser.Parameters = dbUser.Parameters
+				newUsers[pgUser.Name] = rotationUser
 				// remove group role from dbUsers to not count as deleted role
 				delete(dbUsers, dbUser.Name)
 				continue DBUSERS
 			}
 		}
 
-		// update pgUsers where a deleted role was found
+		// update newUsers where a deleted role was found
 		// so that they are skipped in ProduceSyncRequests
 		originalUsername, foundDeletedUser := deletedUsers[dbUser.Name]
 		// check if original user does not exist in dbUsers
 		_, originalUserAlreadyExists := dbUsers[originalUsername]
 		if foundDeletedUser && !originalUserAlreadyExists {
-			recreatedUser := c.pgUsers[originalUsername]
-			recreatedUser.Deleted = true
-			c.pgUsers[originalUsername] = recreatedUser
+			if recreatedUser, exists := newUsers[originalUsername]; exists {
+				recreatedUser.Deleted = true
+				newUsers[originalUsername] = recreatedUser
+			}
 		}
 	}
 
-	// last but not least copy pgUsers to newUsers to send to ProduceSyncRequests
-	for _, pgUser := range c.pgUsers {
-		newUsers[pgUser.Name] = pgUser
-	}
-
-	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, newUsers)
-	if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
-		return fmt.Errorf("error executing sync statements: %v", err)
-	}
-
-	return nil
+	return newUsers
 }
 
 func (c *Cluster) syncDatabases() error {
