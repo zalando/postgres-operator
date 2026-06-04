@@ -893,6 +893,16 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) *compareLog
 		reasons = append(reasons, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q", newPgVersion, curPgVersion))
 	}
 
+	if !reflect.DeepEqual(cur.Labels, new.Labels) {
+		match = false
+		reasons = append(reasons, "new job's labels do not match the current ones")
+	}
+
+	if !reflect.DeepEqual(cur.Spec.JobTemplate.Labels, new.Spec.JobTemplate.Labels) {
+		match = false
+		reasons = append(reasons, "new job's template labels do not match the current ones")
+	}
+
 	needsReplace := false
 	contReasons := make([]string, 0)
 	needsReplace, contReasons = c.compareContainers("cronjob container", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, needsReplace, contReasons)
