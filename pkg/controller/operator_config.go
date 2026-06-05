@@ -294,6 +294,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	if fromCRD.ConnectionPooler.GenerateConfig != nil {
 		result.ConnectionPooler.GenerateConfig = *fromCRD.ConnectionPooler.GenerateConfig
 	}
+	// Command is nil when not configured (keeps the image entrypoint)
 	result.ConnectionPooler.Command = fromCRD.ConnectionPooler.Command
 	result.ConnectionPooler.Args = util.CoalesceStrArr(
 		fromCRD.ConnectionPooler.Args,
