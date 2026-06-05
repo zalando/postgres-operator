@@ -16,7 +16,7 @@ import (
 
 const (
 	pgBouncerConfigFileName        = "pgbouncer.ini"
-	poolerConfigChecksumAnnotation = "postgres-operator.zalando.org/pgbouncer-config-checksum"
+	poolerConfigChecksumAnnotation = "acid.zalan.do/pgbouncer-config-checksum"
 )
 
 // FIPS-friendly pgbouncer.ini. Differs from the stock Zalando image template:
