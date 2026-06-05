@@ -220,6 +220,11 @@ type ConnectionPoolerConfiguration struct {
 	DefaultMemoryRequest string `json:"connection_pooler_default_memory_request,omitempty"`
 	DefaultCPULimit      string `json:"connection_pooler_default_cpu_limit,omitempty"`
 	DefaultMemoryLimit   string `json:"connection_pooler_default_memory_limit,omitempty"`
+	GenerateConfig       *bool    `json:"connection_pooler_generate_config,omitempty"`
+	Command              []string `json:"connection_pooler_command,omitempty"`
+	Args                 []string `json:"connection_pooler_args,omitempty"`
+	AuthType             string   `json:"connection_pooler_auth_type,omitempty"`
+	ConfigPath           string   `json:"connection_pooler_config_path,omitempty"`
 }
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup

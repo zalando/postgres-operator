@@ -291,5 +291,17 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		fromCRD.ConnectionPooler.MaxDBConnections,
 		k8sutil.Int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
 
+	if fromCRD.ConnectionPooler.GenerateConfig != nil {
+		result.ConnectionPooler.GenerateConfig = *fromCRD.ConnectionPooler.GenerateConfig
+	}
+	result.ConnectionPooler.Command = fromCRD.ConnectionPooler.Command
+	result.ConnectionPooler.Args = util.CoalesceStrArr(
+		fromCRD.ConnectionPooler.Args,
+		[]string{"/etc/pgbouncer/pgbouncer.ini"})
+	result.ConnectionPooler.AuthType = util.Coalesce(
+		fromCRD.ConnectionPooler.AuthType, "scram-sha-256")
+	result.ConnectionPooler.ConfigPath = util.Coalesce(
+		fromCRD.ConnectionPooler.ConfigPath, "/etc/pgbouncer/pgbouncer.ini")
+
 	return result
 }
