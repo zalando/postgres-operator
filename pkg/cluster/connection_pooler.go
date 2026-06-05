@@ -471,7 +471,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	// container command/args (e.g. for images like the Chainguard FIPS pgbouncer
 	// whose entrypoint is the bare binary with no config-rendering wrapper).
 	if c.OpConfig.ConnectionPooler.GenerateConfig {
-		configVolumeName := fmt.Sprintf("%s-config", c.connectionPoolerName(role))
+		configVolumeName := c.connectionPoolerConfigMapName(role)
 		poolerVolumes = append(poolerVolumes, v1.Volume{
 			Name: configVolumeName,
 			VolumeSource: v1.VolumeSource{
@@ -511,9 +511,9 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		securityContext.FSGroup = effectiveFSGroup
 	}
 
-	podAnnotations, annErr := c.connectionPoolerPodAnnotations(role)
-	if annErr != nil {
-		return nil, annErr
+	podAnnotations, err := c.connectionPoolerPodAnnotations(role)
+	if err != nil {
+		return nil, err
 	}
 
 	podTemplate := &v1.PodTemplateSpec{

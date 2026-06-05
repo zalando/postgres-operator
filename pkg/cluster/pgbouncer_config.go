@@ -147,6 +147,12 @@ func (c *Cluster) connectionPoolerConfigChecksum(role PostgresRole) (string, err
 	return fmt.Sprintf("%x", sum), nil
 }
 
+// connectionPoolerConfigMapName returns the name of the operator-generated
+// pgbouncer config map for the given role.
+func (c *Cluster) connectionPoolerConfigMapName(role PostgresRole) string {
+	return fmt.Sprintf("%s-config", c.connectionPoolerName(role))
+}
+
 // generateConnectionPoolerConfigMap builds the operator-owned ConfigMap holding
 // the rendered pgbouncer.ini for the given role.
 func (c *Cluster) generateConnectionPoolerConfigMap(role PostgresRole) (*v1.ConfigMap, error) {
@@ -156,7 +162,7 @@ func (c *Cluster) generateConnectionPoolerConfigMap(role PostgresRole) (*v1.Conf
 	}
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-config", c.connectionPoolerName(role)),
+			Name:            c.connectionPoolerConfigMapName(role),
 			Namespace:       c.Namespace,
 			Labels:          c.connectionPoolerLabels(role, true).MatchLabels,
 			Annotations:     c.annotationsSet(nil),
