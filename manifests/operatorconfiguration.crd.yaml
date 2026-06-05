@@ -849,6 +849,23 @@ spec:
                   connection_pooler_default_memory_request:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                  connection_pooler_generate_config:
+                    type: boolean
+                    default: false
+                  connection_pooler_command:
+                    type: array
+                    items:
+                      type: string
+                  connection_pooler_args:
+                    type: array
+                    items:
+                      type: string
+                  connection_pooler_auth_type:
+                    type: string
+                    default: "scram-sha-256"
+                  connection_pooler_config_path:
+                    type: string
+                    default: "/etc/pgbouncer/pgbouncer.ini"
               patroni:
                 type: object
                 properties:
