@@ -229,4 +229,17 @@ func TestSyncConnectionPoolerConfigMap(t *testing.T) {
 	if err := cluster.syncConnectionPoolerConfigMap(Master); err != nil {
 		t.Fatalf("unexpected error on resync: %v", err)
 	}
+
+	// drift -> update branch: change a config input that alters the rendered ini
+	cluster.OpConfig.ConnectionPooler.AuthType = "md5"
+	if err := cluster.syncConnectionPoolerConfigMap(Master); err != nil {
+		t.Fatalf("unexpected error on drift resync: %v", err)
+	}
+	cm, err = client.ConfigMaps("default").Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("config map not found after update: %v", err)
+	}
+	if !strings.Contains(cm.Data["pgbouncer.ini"], "auth_type = md5") {
+		t.Errorf("expected updated config map to contain auth_type = md5, got:\n%s", cm.Data["pgbouncer.ini"])
+	}
 }
