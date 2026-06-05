@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func newGenerateConfigCluster() *Cluster {
@@ -180,5 +182,51 @@ func TestPoolerPodTemplateGeneratedConfigOff(t *testing.T) {
 	}
 	if _, ok := tmpl.Annotations[poolerConfigChecksumAnnotation]; ok {
 		t.Errorf("did not expect checksum annotation when GenerateConfig is off")
+	}
+}
+
+func TestSyncConnectionPoolerConfigMap(t *testing.T) {
+	client, _ := newFakeK8sPoolerTestClient()
+	maxDB := int32(60)
+	instances := int32(2)
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{Name: "acid-test", Namespace: "default"},
+		Spec: acidv1.PostgresSpec{
+			EnableConnectionPooler: boolToPointer(true),
+			ConnectionPooler:       &acidv1.ConnectionPooler{},
+		},
+	}
+	cluster := New(
+		Config{OpConfig: config.Config{
+			ConnectionPooler: config.ConnectionPooler{
+				User: "pooler", Schema: "pooler", Mode: "transaction",
+				MaxDBConnections: &maxDB, NumberOfInstances: &instances,
+				GenerateConfig: true, AuthType: "scram-sha-256",
+				ConfigPath: "/etc/pgbouncer/pgbouncer.ini",
+				Args:       []string{"/etc/pgbouncer/pgbouncer.ini"},
+			},
+		}},
+		client, pg, logger, eventRecorder)
+	cluster.Name = "acid-test"
+	cluster.Namespace = "default"
+	cluster.Spec = pg.Spec
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+		Master: {Name: cluster.connectionPoolerName(Master), Namespace: "default", Role: Master},
+	}
+
+	if err := cluster.syncConnectionPoolerConfigMap(Master); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	name := cluster.connectionPoolerName(Master) + "-config"
+	cm, err := client.ConfigMaps("default").Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("config map not created: %v", err)
+	}
+	if _, ok := cm.Data["pgbouncer.ini"]; !ok {
+		t.Errorf("config map missing pgbouncer.ini")
+	}
+
+	if err := cluster.syncConnectionPoolerConfigMap(Master); err != nil {
+		t.Fatalf("unexpected error on resync: %v", err)
 	}
 }
