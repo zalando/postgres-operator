@@ -153,16 +153,21 @@ type LogicalBackup struct {
 
 // Operator options for connection pooler
 type ConnectionPooler struct {
-	NumberOfInstances                    *int32 `name:"connection_pooler_number_of_instances" default:"2"`
-	Schema                               string `name:"connection_pooler_schema" default:"pooler"`
-	User                                 string `name:"connection_pooler_user" default:"pooler"`
-	Image                                string `name:"connection_pooler_image" default:"ghcr.io/zalando/postgres-operator/pgbouncer:latest"`
-	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
-	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
-	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request"`
-	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request"`
-	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit"`
-	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit"`
+	NumberOfInstances                    *int32   `name:"connection_pooler_number_of_instances" default:"2"`
+	Schema                               string   `name:"connection_pooler_schema" default:"pooler"`
+	User                                 string   `name:"connection_pooler_user" default:"pooler"`
+	Image                                string   `name:"connection_pooler_image" default:"ghcr.io/zalando/postgres-operator/pgbouncer:latest"`
+	Mode                                 string   `name:"connection_pooler_mode" default:"transaction"`
+	MaxDBConnections                     *int32   `name:"connection_pooler_max_db_connections" default:"60"`
+	ConnectionPoolerDefaultCPURequest    string   `name:"connection_pooler_default_cpu_request"`
+	ConnectionPoolerDefaultMemoryRequest string   `name:"connection_pooler_default_memory_request"`
+	ConnectionPoolerDefaultCPULimit      string   `name:"connection_pooler_default_cpu_limit"`
+	ConnectionPoolerDefaultMemoryLimit   string   `name:"connection_pooler_default_memory_limit"`
+	GenerateConfig                       bool     `name:"connection_pooler_generate_config" default:"false"`
+	Command                              []string `name:"connection_pooler_command"`
+	Args                                 []string `name:"connection_pooler_args" default:"/etc/pgbouncer/pgbouncer.ini"`
+	AuthType                             string   `name:"connection_pooler_auth_type" default:"scram-sha-256"`
+	ConfigPath                           string   `name:"connection_pooler_config_path" default:"/etc/pgbouncer/pgbouncer.ini"`
 }
 
 // Config describes operator config

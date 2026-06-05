@@ -335,3 +335,35 @@ func TestNewFromMap(t *testing.T) {
 		})
 	}
 }
+
+func TestConnectionPoolerGenerateConfigDefaults(t *testing.T) {
+	cfg := NewFromMap(map[string]string{})
+
+	if cfg.ConnectionPooler.GenerateConfig {
+		t.Errorf("expected GenerateConfig default false, got true")
+	}
+	if cfg.ConnectionPooler.AuthType != "scram-sha-256" {
+		t.Errorf("expected AuthType scram-sha-256, got %q", cfg.ConnectionPooler.AuthType)
+	}
+	if cfg.ConnectionPooler.ConfigPath != "/etc/pgbouncer/pgbouncer.ini" {
+		t.Errorf("expected ConfigPath /etc/pgbouncer/pgbouncer.ini, got %q", cfg.ConnectionPooler.ConfigPath)
+	}
+	if len(cfg.ConnectionPooler.Args) != 1 || cfg.ConnectionPooler.Args[0] != "/etc/pgbouncer/pgbouncer.ini" {
+		t.Errorf("expected Args [/etc/pgbouncer/pgbouncer.ini], got %#v", cfg.ConnectionPooler.Args)
+	}
+
+	cfg2 := NewFromMap(map[string]string{
+		"connection_pooler_generate_config": "true",
+		"connection_pooler_auth_type":       "md5",
+		"connection_pooler_args":            "/custom/pgbouncer.ini",
+	})
+	if !cfg2.ConnectionPooler.GenerateConfig {
+		t.Errorf("expected GenerateConfig true")
+	}
+	if cfg2.ConnectionPooler.AuthType != "md5" {
+		t.Errorf("expected AuthType md5, got %q", cfg2.ConnectionPooler.AuthType)
+	}
+	if len(cfg2.ConnectionPooler.Args) != 1 || cfg2.ConnectionPooler.Args[0] != "/custom/pgbouncer.ini" {
+		t.Errorf("expected Args [/custom/pgbouncer.ini], got %#v", cfg2.ConnectionPooler.Args)
+	}
+}
