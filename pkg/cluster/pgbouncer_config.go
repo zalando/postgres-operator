@@ -167,3 +167,20 @@ func (c *Cluster) generateConnectionPoolerConfigMap(role PostgresRole) (*v1.Conf
 		},
 	}, nil
 }
+
+// connectionPoolerPodAnnotations returns the pooler pod annotations, adding the
+// config checksum when generated config is enabled so config changes roll pods.
+func (c *Cluster) connectionPoolerPodAnnotations(role PostgresRole) (map[string]string, error) {
+	annotations := c.annotationsSet(c.generatePodAnnotations(&c.Spec))
+	if c.OpConfig.ConnectionPooler.GenerateConfig {
+		checksum, err := c.connectionPoolerConfigChecksum(role)
+		if err != nil {
+			return nil, err
+		}
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[poolerConfigChecksumAnnotation] = checksum
+	}
+	return annotations, nil
+}

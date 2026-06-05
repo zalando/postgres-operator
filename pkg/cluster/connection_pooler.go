@@ -34,6 +34,7 @@ type ConnectionPoolerObjects struct {
 	AuthSecret  *v1.Secret
 	Deployment  *appsv1.Deployment
 	Service     *v1.Service
+	ConfigMap   *v1.ConfigMap
 	Name        string
 	ClusterName string
 	Namespace   string
@@ -466,6 +467,33 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		}
 	}
 
+	// When enabled, mount an operator-generated pgbouncer.ini and override the
+	// container command/args (e.g. for images like the Chainguard FIPS pgbouncer
+	// whose entrypoint is the bare binary with no config-rendering wrapper).
+	if c.OpConfig.ConnectionPooler.GenerateConfig {
+		configVolumeName := fmt.Sprintf("%s-config", c.connectionPoolerName(role))
+		poolerVolumes = append(poolerVolumes, v1.Volume{
+			Name: configVolumeName,
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: configVolumeName,
+					},
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, v1.VolumeMount{
+			Name:      configVolumeName,
+			MountPath: c.OpConfig.ConnectionPooler.ConfigPath,
+			SubPath:   pgBouncerConfigFileName,
+			ReadOnly:  true,
+		})
+		if len(c.OpConfig.ConnectionPooler.Command) > 0 {
+			poolerContainer.Command = c.OpConfig.ConnectionPooler.Command
+		}
+		poolerContainer.Args = c.OpConfig.ConnectionPooler.Args
+	}
+
 	poolerContainer.Env = envVars
 	poolerContainer.VolumeMounts = volumeMounts
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
@@ -483,11 +511,16 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		securityContext.FSGroup = effectiveFSGroup
 	}
 
+	podAnnotations, annErr := c.connectionPoolerPodAnnotations(role)
+	if annErr != nil {
+		return nil, annErr
+	}
+
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      c.connectionPoolerLabels(role, true).MatchLabels,
 			Namespace:   c.Namespace,
-			Annotations: c.annotationsSet(c.generatePodAnnotations(spec)),
+			Annotations: podAnnotations,
 		},
 		Spec: v1.PodSpec{
 			TerminationGracePeriodSeconds: &gracePeriod,
