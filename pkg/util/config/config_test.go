@@ -356,6 +356,8 @@ func TestConnectionPoolerGenerateConfigDefaults(t *testing.T) {
 		"connection_pooler_generate_config": "true",
 		"connection_pooler_auth_type":       "md5",
 		"connection_pooler_args":            "/custom/pgbouncer.ini",
+		"connection_pooler_config_path":     "/custom/pgbouncer.ini",
+		"connection_pooler_command":         "/usr/bin/pgbouncer",
 	})
 	if !cfg2.ConnectionPooler.GenerateConfig {
 		t.Errorf("expected GenerateConfig true")
@@ -365,5 +367,11 @@ func TestConnectionPoolerGenerateConfigDefaults(t *testing.T) {
 	}
 	if len(cfg2.ConnectionPooler.Args) != 1 || cfg2.ConnectionPooler.Args[0] != "/custom/pgbouncer.ini" {
 		t.Errorf("expected Args [/custom/pgbouncer.ini], got %#v", cfg2.ConnectionPooler.Args)
+	}
+	if cfg2.ConnectionPooler.ConfigPath != "/custom/pgbouncer.ini" {
+		t.Errorf("expected ConfigPath /custom/pgbouncer.ini, got %q", cfg2.ConnectionPooler.ConfigPath)
+	}
+	if len(cfg2.ConnectionPooler.Command) != 1 || cfg2.ConnectionPooler.Command[0] != "/usr/bin/pgbouncer" {
+		t.Errorf("expected Command [/usr/bin/pgbouncer], got %#v", cfg2.ConnectionPooler.Command)
 	}
 }
