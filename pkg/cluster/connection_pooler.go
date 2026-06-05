@@ -221,15 +221,23 @@ func (c *Cluster) generateConnectionPoolerAuthSecret(connectionPooler *Connectio
 //
 // RESERVE_SIZE is how many additional connections to allow for a pooler.
 
-func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
+type connectionPoolerSizes struct {
+	maxDBConn     int32
+	defaultSize   int32
+	minSize       int32
+	reserveSize   int32
+	maxClientConn int32
+}
+
+// connectionPoolerSizes computes the pgBouncer pool sizing from the cluster
+// spec and operator config. Shared by getConnectionPoolerEnvVars (stock image,
+// via env vars) and generatePgBouncerIni (generated config).
+func (c *Cluster) connectionPoolerSizes() connectionPoolerSizes {
 	spec := &c.Spec
 	connectionPoolerSpec := spec.ConnectionPooler
 	if connectionPoolerSpec == nil {
 		connectionPoolerSpec = &acidv1.ConnectionPooler{}
 	}
-	effectiveMode := util.Coalesce(
-		connectionPoolerSpec.Mode,
-		c.OpConfig.ConnectionPooler.Mode)
 
 	numberOfInstances := connectionPoolerSpec.NumberOfInstances
 	if numberOfInstances == nil {
@@ -241,17 +249,35 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	effectiveMaxDBConn := util.CoalesceInt32(
 		connectionPoolerSpec.MaxDBConnections,
 		c.OpConfig.ConnectionPooler.MaxDBConnections)
-
 	if effectiveMaxDBConn == nil {
 		effectiveMaxDBConn = k8sutil.Int32ToPointer(
 			constants.ConnectionPoolerMaxDBConnections)
 	}
 
 	maxDBConn := *effectiveMaxDBConn / *numberOfInstances
-
 	defaultSize := maxDBConn / 2
 	minSize := defaultSize / 2
-	reserveSize := minSize
+
+	return connectionPoolerSizes{
+		maxDBConn:     maxDBConn,
+		defaultSize:   defaultSize,
+		minSize:       minSize,
+		reserveSize:   minSize,
+		maxClientConn: constants.ConnectionPoolerMaxClientConnections,
+	}
+}
+
+func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
+	spec := &c.Spec
+	connectionPoolerSpec := spec.ConnectionPooler
+	if connectionPoolerSpec == nil {
+		connectionPoolerSpec = &acidv1.ConnectionPooler{}
+	}
+	effectiveMode := util.Coalesce(
+		connectionPoolerSpec.Mode,
+		c.OpConfig.ConnectionPooler.Mode)
+
+	sizes := c.connectionPoolerSizes()
 
 	return []v1.EnvVar{
 		{
@@ -264,23 +290,23 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 		},
 		{
 			Name:  "CONNECTION_POOLER_DEFAULT_SIZE",
-			Value: fmt.Sprint(defaultSize),
+			Value: fmt.Sprint(sizes.defaultSize),
 		},
 		{
 			Name:  "CONNECTION_POOLER_MIN_SIZE",
-			Value: fmt.Sprint(minSize),
+			Value: fmt.Sprint(sizes.minSize),
 		},
 		{
 			Name:  "CONNECTION_POOLER_RESERVE_SIZE",
-			Value: fmt.Sprint(reserveSize),
+			Value: fmt.Sprint(sizes.reserveSize),
 		},
 		{
 			Name:  "CONNECTION_POOLER_MAX_CLIENT_CONN",
-			Value: fmt.Sprint(constants.ConnectionPoolerMaxClientConnections),
+			Value: fmt.Sprint(sizes.maxClientConn),
 		},
 		{
 			Name:  "CONNECTION_POOLER_MAX_DB_CONN",
-			Value: fmt.Sprint(maxDBConn),
+			Value: fmt.Sprint(sizes.maxDBConn),
 		},
 	}
 }
