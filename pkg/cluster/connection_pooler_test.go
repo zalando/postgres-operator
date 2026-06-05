@@ -1178,4 +1178,7 @@ func TestConnectionPoolerSizes(t *testing.T) {
 	if sizes.reserveSize != 7 {
 		t.Errorf("expected reserveSize 7, got %d", sizes.reserveSize)
 	}
+	if sizes.minSize != 7 {
+		t.Errorf("expected minSize 7, got %d", sizes.minSize)
+	}
 }

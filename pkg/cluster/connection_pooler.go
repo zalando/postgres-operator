@@ -200,27 +200,6 @@ func (c *Cluster) generateConnectionPoolerAuthSecret(connectionPooler *Connectio
 	}
 }
 
-// Generate pool size related environment variables.
-//
-// MAX_DB_CONN would specify the global maximum for connections to a target
-//
-//	database.
-//
-// MAX_CLIENT_CONN is not configurable at the moment, just set it high enough.
-//
-// DEFAULT_SIZE is a pool size per db/user (having in mind the use case when
-//
-//	most of the queries coming through a connection pooler are from the same
-//	user to the same db). In case if we want to spin up more connection pooler
-//	instances, take this into account and maintain the same number of
-//	connections.
-//
-// MIN_SIZE is a pool's minimal size, to prevent situation when sudden workload
-//
-//	have to wait for spinning up a new connections.
-//
-// RESERVE_SIZE is how many additional connections to allow for a pooler.
-
 type connectionPoolerSizes struct {
 	maxDBConn     int32
 	defaultSize   int32
@@ -267,6 +246,26 @@ func (c *Cluster) connectionPoolerSizes() connectionPoolerSizes {
 	}
 }
 
+// Generate pool size related environment variables.
+//
+// MAX_DB_CONN would specify the global maximum for connections to a target
+//
+//	database.
+//
+// MAX_CLIENT_CONN is not configurable at the moment, just set it high enough.
+//
+// DEFAULT_SIZE is a pool size per db/user (having in mind the use case when
+//
+//	most of the queries coming through a connection pooler are from the same
+//	user to the same db). In case if we want to spin up more connection pooler
+//	instances, take this into account and maintain the same number of
+//	connections.
+//
+// MIN_SIZE is a pool's minimal size, to prevent situation when sudden workload
+//
+//	have to wait for spinning up a new connections.
+//
+// RESERVE_SIZE is how many additional connections to allow for a pooler.
 func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	spec := &c.Spec
 	connectionPoolerSpec := spec.ConnectionPooler
