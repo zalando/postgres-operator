@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMain(m *testing.M) {
@@ -41,10 +43,6 @@ func TestGetMapPairsFromString(t *testing.T) {
 
 func int32Ptr(i int32) *int32 {
 	return &i
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }
 
 var validateTests = []struct {
@@ -339,18 +337,10 @@ func TestNewFromMap(t *testing.T) {
 func TestConnectionPoolerGenerateConfigDefaults(t *testing.T) {
 	cfg := NewFromMap(map[string]string{})
 
-	if cfg.ConnectionPooler.GenerateConfig {
-		t.Errorf("expected GenerateConfig default false, got true")
-	}
-	if cfg.ConnectionPooler.AuthType != "scram-sha-256" {
-		t.Errorf("expected AuthType scram-sha-256, got %q", cfg.ConnectionPooler.AuthType)
-	}
-	if cfg.ConnectionPooler.ConfigPath != "/etc/pgbouncer/pgbouncer.ini" {
-		t.Errorf("expected ConfigPath /etc/pgbouncer/pgbouncer.ini, got %q", cfg.ConnectionPooler.ConfigPath)
-	}
-	if len(cfg.ConnectionPooler.Args) != 1 || cfg.ConnectionPooler.Args[0] != "/etc/pgbouncer/pgbouncer.ini" {
-		t.Errorf("expected Args [/etc/pgbouncer/pgbouncer.ini], got %#v", cfg.ConnectionPooler.Args)
-	}
+	assert.Equal(t, false, cfg.ConnectionPooler.GenerateConfig, "expected GenerateConfig default false")
+	assert.Equal(t, "scram-sha-256", cfg.ConnectionPooler.AuthType, "expected AuthType scram-sha-256")
+	assert.Equal(t, "/etc/pgbouncer/pgbouncer.ini", cfg.ConnectionPooler.ConfigPath, "expected ConfigPath /etc/pgbouncer/pgbouncer.ini")
+	assert.Equal(t, []string{"/etc/pgbouncer/pgbouncer.ini"}, cfg.ConnectionPooler.Args, "expected Args [/etc/pgbouncer/pgbouncer.ini]")
 
 	cfg2 := NewFromMap(map[string]string{
 		"connection_pooler_generate_config": "true",
@@ -360,18 +350,10 @@ func TestConnectionPoolerGenerateConfigDefaults(t *testing.T) {
 		"connection_pooler_command":         "/usr/bin/pgbouncer",
 	})
 	if !cfg2.ConnectionPooler.GenerateConfig {
-		t.Errorf("expected GenerateConfig true")
+		assert.Equal(t, true, cfg2.ConnectionPooler.GenerateConfig, "expected GenerateConfig true")
 	}
-	if cfg2.ConnectionPooler.AuthType != "md5" {
-		t.Errorf("expected AuthType md5, got %q", cfg2.ConnectionPooler.AuthType)
-	}
-	if len(cfg2.ConnectionPooler.Args) != 1 || cfg2.ConnectionPooler.Args[0] != "/custom/pgbouncer.ini" {
-		t.Errorf("expected Args [/custom/pgbouncer.ini], got %#v", cfg2.ConnectionPooler.Args)
-	}
-	if cfg2.ConnectionPooler.ConfigPath != "/custom/pgbouncer.ini" {
-		t.Errorf("expected ConfigPath /custom/pgbouncer.ini, got %q", cfg2.ConnectionPooler.ConfigPath)
-	}
-	if len(cfg2.ConnectionPooler.Command) != 1 || cfg2.ConnectionPooler.Command[0] != "/usr/bin/pgbouncer" {
-		t.Errorf("expected Command [/usr/bin/pgbouncer], got %#v", cfg2.ConnectionPooler.Command)
-	}
+	assert.Equal(t, "md5", cfg2.ConnectionPooler.AuthType, "expected AuthType md5")
+	assert.Equal(t, []string{"/custom/pgbouncer.ini"}, cfg2.ConnectionPooler.Args, "expected Args [/custom/pgbouncer.ini]")
+	assert.Equal(t, "/custom/pgbouncer.ini", cfg2.ConnectionPooler.ConfigPath, "expected ConfigPath /custom/pgbouncer.ini")
+	assert.Equal(t, []string{"/usr/bin/pgbouncer"}, cfg2.ConnectionPooler.Command, "expected Command [/usr/bin/pgbouncer]")
 }
