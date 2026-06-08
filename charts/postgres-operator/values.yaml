@@ -471,6 +471,24 @@ configConnectionPooler:
   connection_pooler_default_memory_request: 100Mi
   connection_pooler_default_cpu_limit: "1"
   connection_pooler_default_memory_limit: 100Mi
+  # Override the pooler pod- and container-level securityContext. Useful for hardened
+  # images whose pgbouncer user/UID differs from the operator default (100/101) and which
+  # own /etc/pgbouncer, or to satisfy restricted Pod Security Standards. When unset the
+  # operator keeps its defaults (pod RunAsUser/RunAsGroup 100/101, container
+  # allowPrivilegeEscalation=false).
+  # connection_pooler_pod_security_context:
+  #   runAsUser: 100
+  #   runAsGroup: 101
+  #   runAsNonRoot: true
+  #   fsGroup: 101
+  #   seccompProfile:
+  #     type: RuntimeDefault
+  # connection_pooler_security_context:
+  #   allowPrivilegeEscalation: false
+  #   readOnlyRootFilesystem: true
+  #   capabilities:
+  #     drop:
+  #       - ALL
 
 configPatroni:
   # enable Patroni DCS failsafe_mode feature

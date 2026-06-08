@@ -220,6 +220,11 @@ type ConnectionPoolerConfiguration struct {
 	DefaultMemoryRequest string `json:"connection_pooler_default_memory_request,omitempty"`
 	DefaultCPULimit      string `json:"connection_pooler_default_cpu_limit,omitempty"`
 	DefaultMemoryLimit   string `json:"connection_pooler_default_memory_limit,omitempty"`
+	// PodSecurityContext and SecurityContext allow overriding the pooler pod- and
+	// container-level security contexts (e.g. to match a hardened image's UID/GID or to
+	// satisfy restricted Pod Security Standards). When unset the operator keeps its defaults.
+	PodSecurityContext *v1.PodSecurityContext `json:"connection_pooler_pod_security_context,omitempty"`
+	SecurityContext    *v1.SecurityContext    `json:"connection_pooler_security_context,omitempty"`
 }
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup

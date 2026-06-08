@@ -1052,6 +1052,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"connection_pooler_user": {
 								Type: "string",
 							},
+							"connection_pooler_pod_security_context": {
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
+							"connection_pooler_security_context": {
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
+							},
 						},
 					},
 				},

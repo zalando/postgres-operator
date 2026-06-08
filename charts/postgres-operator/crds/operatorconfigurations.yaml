@@ -851,6 +851,12 @@ spec:
                   connection_pooler_default_memory_request:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                  connection_pooler_pod_security_context:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  connection_pooler_security_context:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
               patroni:
                 type: object
                 properties:
