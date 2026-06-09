@@ -96,10 +96,7 @@ psql -U postgres -h localhost -p 6432
 
 ## Password encryption
 
-Passwords are encrypted with `md5` hash generation by default. However, it is
-possible to use the more recent `scram-sha-256` method by changing the
-`password_encryption` parameter in the Postgres config. You can define it
-directly from the cluster manifest:
+Passwords are encrypted using the `scram-sha-256` hashing method by default. Other methods can be configured by changing the `password_encryption` parameter in the cluster manifest:
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
