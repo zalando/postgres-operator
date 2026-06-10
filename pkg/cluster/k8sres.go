@@ -2069,18 +2069,19 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 
 func (c *Cluster) generateMigrationService() *v1.Service {
 	serviceSpec := v1.ServiceSpec{
-		Ports: []v1.ServicePort{{Name: "postgresql", Port: pgPort, TargetPort: intstr.IntOrString{IntVal: pgPort}}},
-		Type:  v1.ServiceTypeLoadBalancer,
+		Ports:    []v1.ServicePort{{Name: "postgresql", Port: pgPort, TargetPort: intstr.IntOrString{IntVal: pgPort}}},
+		Selector: c.roleLabelsSet(false, Master),
+		Type:     v1.ServiceTypeLoadBalancer,
 	}
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s2", c.Name),
 			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(true, Master),
 			Annotations: map[string]string{
-				"service.beta.kubernetes.io/aws-load-balancer-internal": "true",
-				"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+				"service.beta.kubernetes.io/aws-load-balancer-type":                              "nlb",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                          "true",
+				"service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
 			},
 			OwnerReferences: c.ownerReferences(),
 		},
