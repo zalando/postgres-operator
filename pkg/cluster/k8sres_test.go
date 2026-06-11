@@ -4064,7 +4064,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -4089,7 +4089,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("50Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("300m"), Memory: k8sutil.StringToPointer("300Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -4112,7 +4112,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("50m"), Memory: k8sutil.StringToPointer("100Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("250m"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -4135,7 +4135,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("200Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("200Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -4157,7 +4157,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
-			expectedLabel:      map[string]string{"labelKey": "labelValue", "cluster-name": clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", "labelKey": "labelValue", "cluster-name": clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -4179,7 +4179,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: map[string]string{"annotationKey": "annotationValue"},
 		},
 	}
