@@ -81,7 +81,7 @@ func (c *Controller) GetStatus() *spec.ControllerStatus {
 
 	queueSizes := make(map[int]int, c.opConfig.Workers)
 	for workerID, queue := range c.clusterEventQueues {
-		queueSizes[workerID] = len(queue.ListKeys())
+		queueSizes[workerID] = len((*queue).ListKeys())
 	}
 
 	return &spec.ControllerStatus{
@@ -186,8 +186,8 @@ func (c *Controller) ListQueue(workerID uint32) (*spec.QueueDump, error) {
 
 	q := c.clusterEventQueues[workerID]
 	return &spec.QueueDump{
-		Keys: q.ListKeys(),
-		List: q.List(),
+		Keys: (*q).ListKeys(),
+		List: (*q).List(),
 	}, nil
 }
 
@@ -196,7 +196,7 @@ func (c *Controller) GetWorkersCnt() uint32 {
 	return c.opConfig.Workers
 }
 
-//WorkerStatus provides status of the worker
+// WorkerStatus provides status of the worker
 func (c *Controller) WorkerStatus(workerID uint32) (*cluster.WorkerStatus, error) {
 	obj, ok := c.curWorkerCluster.Load(workerID)
 	if !ok || obj == nil {

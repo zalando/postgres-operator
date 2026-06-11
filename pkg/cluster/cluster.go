@@ -92,7 +92,7 @@ type Cluster struct {
 	mu               sync.Mutex
 	userSyncStrategy spec.UserSyncer
 	deleteOptions    metav1.DeleteOptions
-	podEventsQueue   *cache.FIFO
+	podEventsQueue   *cache.Heap
 	replicationSlots map[string]interface{}
 
 	teamsAPIClient      teams.Interface
@@ -125,14 +125,14 @@ type compareLogicalBackupJobResult struct {
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
-	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
+	podEventsQueue := cache.NewHeap(func(obj interface{}) (string, error) {
 		e, ok := obj.(PodEvent)
 		if !ok {
 			return "", fmt.Errorf("could not cast to PodEvent")
 		}
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
-	})
+	}, nil)
 	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
 	if !ok {
 		passwordEncryption = "scram-sha-256"
@@ -1381,7 +1381,7 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 		case <-stopCh:
 			return
 		default:
-			if _, err := c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent)); err != nil {
+			if _, err := c.podEventsQueue.Pop(); err != nil {
 				c.logger.Errorf("error when processing pod event queue %v", err)
 			}
 		}

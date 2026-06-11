@@ -100,7 +100,7 @@ pooler:
 	cd pooler; docker build --rm -t "$(POOLER_TAG)" --build-arg VERSION="${VERSION}" --build-arg BASE_IMAGE="${BASE_IMAGE}" .
 
 indocker-race:
-	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.25.3 bash -c "make linux"
+	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.26.4 bash -c "make linux"
 
 mocks:
 	GO111MODULE=on go generate ./...

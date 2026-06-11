@@ -371,11 +371,11 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 
 	go func() {
 		<-stopCh
-		c.clusterEventQueues[idx].Close()
+		(*c.clusterEventQueues[idx]).Close()
 	}()
 
 	for {
-		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}, bool) error { return nil }))
+		obj, err := (*c.clusterEventQueues[idx]).Pop()
 		if err != nil {
 			if err == cache.ErrFIFOClosed {
 				return
@@ -523,7 +523,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	}
 
 	lg := c.logger.WithField("worker", workerID).WithField("cluster-name", clusterName)
-	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
+	if err := (*c.clusterEventQueues[workerID]).Add(clusterEvent); err != nil {
 		lg.Errorf("error while queueing cluster event: %v", clusterEvent)
 	}
 	lg.Infof("%s event has been queued", eventType)
@@ -533,7 +533,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	}
 	// A delete event discards all prior requests for that cluster.
 	for _, evType := range []EventType{EventAdd, EventSync, EventUpdate, EventRepair} {
-		obj, exists, err := c.clusterEventQueues[workerID].GetByKey(queueClusterKey(evType, uid))
+		obj, exists, err := (*c.clusterEventQueues[workerID]).GetByKey(queueClusterKey(evType, uid))
 		if err != nil {
 			lg.Warningf("could not get event from the queue: %v", err)
 			continue
@@ -543,7 +543,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 			continue
 		}
 
-		err = c.clusterEventQueues[workerID].Delete(obj)
+		err = (*c.clusterEventQueues[workerID]).Delete(obj)
 		if err != nil {
 			lg.Warningf("could not delete event from the queue: %v", err)
 		} else {
