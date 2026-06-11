@@ -767,16 +767,16 @@ func TestServiceAnnotations(t *testing.T) {
 			},
 		},
 		{
-			about:                      "Master with cluster annotations do not override external-dns annotations",
+			about:                      "Master with user-defined external-dns annotation is preserved",
 			role:                       "master",
 			enableMasterLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:  false,
 			operatorAnnotations:        make(map[string]string),
 			serviceAnnotations: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
+				"external-dns.alpha.kubernetes.io/hostname": "custom.user-defined.example.com",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg.test.db.example.com,test-stg.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname": "custom.user-defined.example.com",
 			},
 		},
 		{
@@ -916,16 +916,16 @@ func TestServiceAnnotations(t *testing.T) {
 			},
 		},
 		{
-			about:                       "Replica with cluster annotations do not override external-dns annotations",
+			about:                       "Replica with user-defined external-dns annotation is preserved",
 			role:                        "replica",
 			enableReplicaLoadBalancerOC: true,
 			enableTeamIdClusterPrefix:   false,
 			operatorAnnotations:         make(map[string]string),
 			serviceAnnotations: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname": "wrong.external-dns-name.example.com",
+				"external-dns.alpha.kubernetes.io/hostname": "custom.user-defined-repl.example.com",
 			},
 			expect: map[string]string{
-				"external-dns.alpha.kubernetes.io/hostname": "acid-test-stg-repl.test.db.example.com,test-stg-repl.acid.db.example.com",
+				"external-dns.alpha.kubernetes.io/hostname": "custom.user-defined-repl.example.com",
 			},
 		},
 		{
