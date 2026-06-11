@@ -2047,12 +2047,10 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
 
-	if c.shouldCreateLoadBalancerForService(role, spec) {
-		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
-	}
-
 	if ok, port := c.shouldCreateNodePortForService(role, spec); ok {
 		c.configureNodePortService(&serviceSpec, port)
+	} else if c.shouldCreateLoadBalancerForService(role, spec) {
+		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
 	service := &v1.Service{
@@ -2096,10 +2094,7 @@ func (c *Cluster) configureNodePortService(serviceSpec *v1.ServiceSpec, port int
 func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
 	annotations := c.getCustomServiceAnnotations(role, spec)
 
-	// we do not want the load balancer specific annotations on a NodePort service
-	nodePort, _ := c.shouldCreateNodePortForService(role, spec)
-
-	if c.shouldCreateLoadBalancerForService(role, spec) && !nodePort {
+	if c.shouldCreateLoadBalancerForService(role, spec) {
 		dnsName := c.dnsName(role)
 
 		// External DNS name annotation is not customizable

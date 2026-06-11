@@ -333,7 +333,6 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 				newService.Spec.ClusterIP = oldService.Spec.ClusterIP
 			}
 		}
-		}
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("could not update service %q: %v", serviceName, err)

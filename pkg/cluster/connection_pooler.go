@@ -566,12 +566,10 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 		},
 	}
 
-	if c.shouldCreateLoadBalancerForPoolerService(poolerRole, spec) {
-		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
-	}
-
 	if ok, port := c.shouldCreateNodePortForPoolerService(poolerRole, spec); ok {
 		c.configureNodePortService(&serviceSpec, port)
+	} else if c.shouldCreateLoadBalancerForPoolerService(poolerRole, spec) {
+		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
 	service := &v1.Service{
@@ -598,10 +596,7 @@ func (c *Cluster) generatePoolerServiceAnnotations(role PostgresRole, spec *acid
 	var dnsString string
 	annotations := c.getCustomServiceAnnotations(role, spec)
 
-	// we do not want the load balancer specific annotations on a NodePort service
-	nodePort, _ := c.shouldCreateNodePortForPoolerService(role, spec)
-
-	if c.shouldCreateLoadBalancerForPoolerService(role, spec) && !nodePort {
+	if c.shouldCreateLoadBalancerForPoolerService(role, spec) {
 		// -repl suffix will be added by replicaDNSName
 		clusterNameWithPoolerSuffix := c.connectionPoolerName(Master)
 		if role == Master {
