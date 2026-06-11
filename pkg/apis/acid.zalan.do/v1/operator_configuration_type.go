@@ -61,6 +61,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountDefinition            string                       `json:"pod_service_account_definition,omitempty"`
 	PodServiceAccountRoleBindingDefinition string                       `json:"pod_service_account_role_binding_definition,omitempty"`
 	PodTerminateGracePeriod                Duration                     `json:"pod_terminate_grace_period,omitempty"`
+	LivenessProbe                          *v1.Probe                    `json:"liveness_probe"`
 	SpiloPrivileged                        bool                         `json:"spilo_privileged,omitempty"`
 	SpiloAllowPrivilegeEscalation          *bool                        `json:"spilo_allow_privilege_escalation,omitempty"`
 	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
@@ -167,8 +168,8 @@ type AWSGCPConfiguration struct {
 
 // OperatorDebugConfiguration defines options for the debug mode
 type OperatorDebugConfiguration struct {
-	DebugLogging   bool `json:"debug_logging,omitempty"`
-	EnableDBAccess bool `json:"enable_database_access,omitempty"`
+	DebugLogging   *bool `json:"debug_logging,omitempty"`
+	EnableDBAccess *bool `json:"enable_database_access,omitempty"`
 }
 
 // TeamsAPIConfiguration defines the configuration of TeamsAPI

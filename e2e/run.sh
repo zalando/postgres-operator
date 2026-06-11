@@ -26,17 +26,33 @@ echo "Kubeconfig path: ${kubeconfig_path}"
 
 function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
-  image_name="ghcr.io/zalando/postgres-operator:${operator_tag}"
-  if [[ -z $(docker images -q "${image_name}") ]]
-  then
-    if ! docker pull "${image_name}"
-    then
-      echo "Failed to pull operator image: ${image_name}"
-      exit 1
+  components=("postgres-operator" "pooler")
+  image_urls=("ghcr.io/zalando/postgres-operator:${operator_tag}" "ghcr.io/zalando/postgres-operator/pgbouncer:${operator_tag}")
+
+  for i in "${!components[@]}"; do
+    component="${components[$i]}"
+    image="${image_urls[$i]}"
+
+    if [[ -z $(docker images -q "$image") ]]; then
+      echo "Pulling $component image: $image"
+      if ! docker pull "$image"; then
+        echo "Failed to pull $component image: $image"
+        exit 1
+      fi
+    else
+      echo "$component image already exists: $image"
     fi
-  fi
-  operator_image="${image_name}"
-  echo "Using operator image: ${operator_image}"
+
+    # Set variables for later use
+    if [[ "$component" == "postgres-operator" ]]; then
+      operator_image="$image"
+    elif [[ "$component" == "pooler" ]]; then
+      pooler_image="$image"
+    fi
+  done
+
+  echo "Using operator image: $operator_image"
+  echo "Using pooler image: $pooler_image"
 }
 
 function start_kind(){
@@ -55,10 +71,11 @@ function start_kind(){
   kind load docker-image "${spilo_image}" --name ${cluster_name}
 }
 
-function load_operator_image() {
-  echo "Loading operator image"
+function load_operator_images() {
+  echo "Loading operator images"
   export KUBECONFIG="${kubeconfig_path}"
   kind load docker-image "${operator_image}" --name ${cluster_name}
+  kind load docker-image "${pooler_image}" --name ${cluster_name}
 }
 
 function set_kind_api_server_ip(){
@@ -85,7 +102,8 @@ function run_tests(){
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
   --mount type=bind,source="$(readlink -f scripts)",target=/scripts \
-  -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}" ${E2E_TEST_CASE-} $@
+  -e OPERATOR_IMAGE="${operator_image}" -e POOLER_IMAGE="${pooler_image}" \
+  "${e2e_test_runner_image}" ${E2E_TEST_CASE-} $@
 }
 
 function cleanup(){
@@ -100,7 +118,7 @@ function main(){
   [[ -z ${NOCLEANUP-} ]] && trap "cleanup" QUIT TERM EXIT
   pull_images
   [[ ! -f ${kubeconfig_path} ]] && start_kind
-  load_operator_image
+  load_operator_images
   set_kind_api_server_ip
   generate_certificate
 
