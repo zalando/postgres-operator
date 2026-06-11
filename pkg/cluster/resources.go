@@ -332,9 +332,7 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 			if newServiceType == v1.ServiceTypeClusterIP {
 				newService.Spec.ClusterIP = oldService.Spec.ClusterIP
 			}
-		} else if newServiceType == v1.ServiceTypeClusterIP && newServiceType != oldServiceType {
-			newService.ResourceVersion = oldService.ResourceVersion
-			newService.Spec.ClusterIP = oldService.Spec.ClusterIP
+		}
 		}
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
 		if err != nil {
