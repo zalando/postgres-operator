@@ -15,7 +15,7 @@ pipeline:
     vm_config:
       type: linux
       size: extra_large
-      image: cdp-runtime
+      image: cdp-runtime/go
     cache:
       paths:
         - /go/pkg/mod        # pkg cache for Go modules
