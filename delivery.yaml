@@ -14,7 +14,7 @@ pipeline:
     type: script
     vm_config:
       type: linux
-      size: large
+      size: extra_large
       image: cdp-runtime/go-1.25
     cache:
       paths:
