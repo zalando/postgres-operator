@@ -596,7 +596,9 @@ func (c *Cluster) generatePoolerServiceAnnotations(role PostgresRole, spec *acid
 	var dnsString string
 	annotations := c.getCustomServiceAnnotations(role, spec)
 
-	if c.shouldCreateLoadBalancerForPoolerService(role, spec) {
+	nodePort, _ := c.shouldCreateNodePortForPoolerService(role, spec)
+
+	if !nodePort && c.shouldCreateLoadBalancerForPoolerService(role, spec) {
 		// -repl suffix will be added by replicaDNSName
 		clusterNameWithPoolerSuffix := c.connectionPoolerName(Master)
 		if role == Master {
