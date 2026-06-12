@@ -2067,6 +2067,29 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	return service
 }
 
+func (c *Cluster) generateMigrationService() *v1.Service {
+	serviceSpec := v1.ServiceSpec{
+		Ports: []v1.ServicePort{{Name: "postgresql", Port: pgPort, TargetPort: intstr.IntOrString{IntVal: pgPort}}},
+		Type:  v1.ServiceTypeLoadBalancer,
+	}
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s2", c.Name),
+			Namespace: c.Namespace,
+			Labels:    c.roleLabelsSet(true, Master),
+			Annotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-internal": "true",
+				"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+			},
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: serviceSpec,
+	}
+
+	return service
+}
+
 func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourceRanges []string) {
 	// spec.AllowedSourceRanges evaluates to the empty slice of zero length
 	// when omitted or set to 'null'/empty sequence in the PG manifest

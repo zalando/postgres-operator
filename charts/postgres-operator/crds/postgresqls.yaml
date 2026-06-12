@@ -3727,15 +3727,6 @@ spec:
                       type: string
                   type: object
                 type: object
-              replicaLoadBalancer:
-                description: deprecated
-                type: boolean
-              replicaNodePort:
-                format: int32
-                type: integer
-              replicaPoolerNodePort:
-                format: int32
-                type: integer
               replicaServiceAnnotations:
                 additionalProperties:
                   type: string
@@ -4408,9 +4399,7 @@ spec:
                   type: object
                 type: array
               useLoadBalancer:
-                description: |-
-                  deprecated load balancer settings maintained for backward compatibility
-                  see "Load balancers" operator docs
+                description: deprecated load balancer settings re-purposed for K8s migration
                 type: boolean
               users:
                 additionalProperties:
