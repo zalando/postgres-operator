@@ -575,7 +575,7 @@ func (c *Cluster) oldReplicaDNSName(clusterName string) string {
 }
 
 func (c *Cluster) migrationDNSName() string {
-	return c.masterDNSName(c.Name + "-migration")
+	return c.masterDNSName(c.Name + "-migr")
 }
 
 func (c *Cluster) credentialSecretName(username string) string {

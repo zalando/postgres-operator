@@ -2084,7 +2084,7 @@ func (c *Cluster) generateMigrationService() *v1.Service {
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-migration", c.Name),
+			Name:      fmt.Sprintf("%s-migr", c.Name),
 			Namespace: c.Namespace,
 			Annotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-type":                              "nlb",
