@@ -1,6 +1,6 @@
 module github.com/zalando/postgres-operator
 
-go 1.26.4
+go 1.26.3
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
