@@ -103,7 +103,7 @@ indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.26.4 bash -c "make linux"
 
 mocks:
-	GO111MODULE=on go generate ./...
+	go generate ./...
 
 fmt:
 	@gofmt -l -w -s $(DIRS)
@@ -113,7 +113,7 @@ vet:
 	@staticcheck $(PKG)
 
 test: mocks $(GENERATED) $(GENERATED_CRDS)
-	GO111MODULE=on go test ./...
+	go test ./...
 
 codegen: $(GENERATED)
 
