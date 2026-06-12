@@ -324,9 +324,14 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 		// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
 		oldServiceType := oldService.Spec.Type
 		newServiceType := newService.Spec.Type
-		if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
+		if newServiceType != oldServiceType && oldServiceType == v1.ServiceTypeLoadBalancer {
+			// Kubernetes rejects updates that change type away from LoadBalancer while
+			// loadBalancerSourceRanges is still set; clear it before updating
+			newService.Spec.LoadBalancerSourceRanges = nil
 			newService.ResourceVersion = oldService.ResourceVersion
-			newService.Spec.ClusterIP = oldService.Spec.ClusterIP
+			if newServiceType == v1.ServiceTypeClusterIP {
+				newService.Spec.ClusterIP = oldService.Spec.ClusterIP
+			}
 		}
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
 		if err != nil {
