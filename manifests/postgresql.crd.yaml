@@ -3728,6 +3728,12 @@ spec:
                       type: string
                   type: object
                 type: object
+              replicaNodePort:
+                format: int32
+                type: integer
+              replicaPoolerNodePort:
+                format: int32
+                type: integer
               replicaServiceAnnotations:
                 additionalProperties:
                   type: string
