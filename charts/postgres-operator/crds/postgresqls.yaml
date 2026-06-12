@@ -273,34 +273,26 @@ spec:
                   vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
                   in that case the var evaluates to nil and the value is taken from the operator config
                 type: boolean
+              enableMasterNodePort:
+                description: |-
+                  vars to enable and configure nodeport services
+                  set ports to 0 or nil to let kubernetes decide which port to use
+                  overrides loadbalancer configuration
+                type: boolean
               enableMasterPoolerLoadBalancer:
+                type: boolean
+              enableMasterPoolerNodePort:
                 type: boolean
               enableReplicaConnectionPooler:
                 type: boolean
               enableReplicaLoadBalancer:
                 type: boolean
-              enableReplicaPoolerLoadBalancer:
-                type: boolean
-              enableMasterNodePort:
-                type: boolean
-              masterNodePort:
-                type: integer
-                minimum: 0
-              enableMasterPoolerNodePort:
-                type: boolean
-              masterPoolerNodePort:
-                type: integer
-                minimum: 0
               enableReplicaNodePort:
                 type: boolean
-              replicaNodePort:
-                type: integer
-                minimum: 0
+              enableReplicaPoolerLoadBalancer:
+                type: boolean
               enableReplicaPoolerNodePort:
                 type: boolean
-              replicaPoolerNodePort:
-                type: integer
-                minimum: 0
               enableShmVolume:
                 type: boolean
               env:
@@ -3428,6 +3420,12 @@ spec:
                   pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
                   type: string
                 type: array
+              masterNodePort:
+                format: int32
+                type: integer
+              masterPoolerNodePort:
+                format: int32
+                type: integer
               masterServiceAnnotations:
                 additionalProperties:
                   type: string
@@ -3732,6 +3730,12 @@ spec:
               replicaLoadBalancer:
                 description: deprecated
                 type: boolean
+              replicaNodePort:
+                format: int32
+                type: integer
+              replicaPoolerNodePort:
+                format: int32
+                type: integer
               replicaServiceAnnotations:
                 additionalProperties:
                   type: string
