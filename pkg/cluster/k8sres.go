@@ -2072,12 +2072,13 @@ func (c *Cluster) generateMigrationService() *v1.Service {
 		ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy),
 		Ports:                 []v1.ServicePort{{Name: "postgresql", Port: pgPort, TargetPort: intstr.IntOrString{IntVal: pgPort}}},
 		Selector:              c.roleLabelsSet(false, Master),
-		Type:                  v1.ServiceTypeLoadBalancer,
+		Type:                  v1.ServiceTypeExternalName,
+		ExternalName:          c.migrationDNSName(),
 	}
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s2", c.Name),
+			Name:      fmt.Sprintf("%s-migration", c.Name),
 			Namespace: c.Namespace,
 			Annotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-type":                              "nlb",
