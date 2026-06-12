@@ -2101,7 +2101,7 @@ func (c *Cluster) generateMigrationService() *v1.Service {
 }
 
 func (c *Cluster) getVpcIPv4CIDR() string {
-	cm, err := c.KubeClient.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "deployment-config", metav1.GetOptions{})
+	cm, err := c.KubeClient.ConfigMaps("kube-system").Get(context.TODO(), "deployment-config", metav1.GetOptions{})
 	if err != nil {
 		c.logger.Warnf("could not get deployment-config ConfigMap from kube-system: %v", err)
 		return ""
