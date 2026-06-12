@@ -2076,6 +2076,12 @@ func (c *Cluster) generateMigrationService() *v1.Service {
 		ExternalName:          c.migrationDNSName(),
 	}
 
+	// Apply VPC CIDR as LoadBalancerSourceRanges
+	vpcCIDR := c.getVpcIPv4CIDR()
+	if vpcCIDR != "" {
+		serviceSpec.LoadBalancerSourceRanges = []string{vpcCIDR}
+	}
+
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-migration", c.Name),
@@ -2092,6 +2098,22 @@ func (c *Cluster) generateMigrationService() *v1.Service {
 	}
 
 	return service
+}
+
+func (c *Cluster) getVpcIPv4CIDR() string {
+	cm, err := c.KubeClient.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "deployment-config", metav1.GetOptions{})
+	if err != nil {
+		c.logger.Warnf("could not get deployment-config ConfigMap from kube-system: %v", err)
+		return ""
+	}
+
+	vpcCIDR, ok := cm.Data["cluster-vpc-ipv4-cidr"]
+	if !ok {
+		c.logger.Warn("cluster-vpc-ipv4-cidr not found in deployment-config ConfigMap")
+		return ""
+	}
+
+	return vpcCIDR
 }
 
 func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourceRanges []string) {
