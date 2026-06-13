@@ -597,7 +597,9 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 		},
 	}
 
-	if c.shouldCreateLoadBalancerForPoolerService(poolerRole, spec) {
+	if ok, port := c.shouldCreateNodePortForPoolerService(poolerRole, spec); ok {
+		c.configureNodePortService(&serviceSpec, port)
+	} else if c.shouldCreateLoadBalancerForPoolerService(poolerRole, spec) {
 		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
@@ -625,7 +627,9 @@ func (c *Cluster) generatePoolerServiceAnnotations(role PostgresRole, spec *acid
 	var dnsString string
 	annotations := c.getCustomServiceAnnotations(role, spec)
 
-	if c.shouldCreateLoadBalancerForPoolerService(role, spec) {
+	nodePort, _ := c.shouldCreateNodePortForPoolerService(role, spec)
+
+	if !nodePort && c.shouldCreateLoadBalancerForPoolerService(role, spec) {
 		// -repl suffix will be added by replicaDNSName
 		clusterNameWithPoolerSuffix := c.connectionPoolerName(Master)
 		if role == Master {
@@ -661,6 +665,37 @@ func (c *Cluster) shouldCreateLoadBalancerForPoolerService(role PostgresRole, sp
 		}
 		return c.OpConfig.EnableMasterPoolerLoadBalancer
 
+	default:
+		panic(fmt.Sprintf("Unknown role %v", role))
+	}
+}
+
+func (c *Cluster) shouldCreateNodePortForPoolerService(role PostgresRole, spec *acidv1.PostgresSpec) (bool, int32) {
+	switch role {
+	case Replica:
+		// if the value is explicitly set in a Postgresql manifest, follow this setting
+		if spec.EnableReplicaPoolerNodePort != nil {
+			port := int32(0)
+			if spec.ReplicaPoolerNodePort != nil {
+				port = *spec.ReplicaPoolerNodePort
+			}
+
+			return *spec.EnableReplicaPoolerNodePort, port
+		}
+
+		// otherwise, follow the operator configuration
+		return c.OpConfig.EnableReplicaPoolerNodePort, 0
+	case Master:
+		if spec.EnableMasterPoolerNodePort != nil {
+			port := int32(0)
+			if spec.MasterPoolerNodePort != nil {
+				port = *spec.MasterPoolerNodePort
+			}
+
+			return *spec.EnableMasterPoolerNodePort, port
+		}
+
+		return c.OpConfig.EnableMasterPoolerNodePort, 0
 	default:
 		panic(fmt.Sprintf("Unknown role %v", role))
 	}
