@@ -887,6 +887,15 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"logical_backup_cronjob_environment_secret": {
 								Type: "string",
 							},
+							"logical_backup_successful_jobs_history_limit": {
+								Type: "integer",
+							},
+							"logical_backup_failed_jobs_history_limit": {
+								Type: "integer",
+							},
+							"logical_backup_ttl_seconds_after_finished": {
+								Type: "integer",
+							},
 						},
 					},
 					"debug": {
