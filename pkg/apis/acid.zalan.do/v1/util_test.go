@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"regexp"
 	"testing"
 	"time"
 
@@ -808,5 +809,49 @@ func TestPostgresqlClone(t *testing.T) {
 				t.Errorf("TestPostgresqlClone expected: \n%#v\n, got \n%#v", cp, clone)
 			}
 		})
+	}
+}
+
+func TestAllowedSourceRangesPattern(t *testing.T) {
+	// pattern used in CRD validation for allowedSourceRanges
+	pattern := `^((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\/(\d|[1-2]\d|3[0-2])|(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))\/(12[0-8]|1[01][0-9]|[1-9]?[0-9]))$`
+	re := regexp.MustCompile(pattern)
+
+	valid := []string{
+		// IPv4
+		"192.168.1.0/24",
+		"0.0.0.0/0",
+		"127.0.0.1/32",
+		"10.0.0.0/8",
+		"185.85.220.0/22",
+		// IPv6
+		"fd01::/48",
+		"::1/128",
+		"::/0",
+		"2001:db8::/32",
+		"fe80::1/64",
+		"2001:0db8:85a3:0000:0000:8a2e:0370:7334/128",
+	}
+
+	invalid := []string{
+		"999.999.999.999/24",
+		"192.168.1.0/33",
+		"192.168.1.0",
+		"not-an-ip",
+		"fd01::/129",
+		"::gggg/64",
+		"",
+	}
+
+	for _, cidr := range valid {
+		if !re.MatchString(cidr) {
+			t.Errorf("expected %q to match allowedSourceRanges pattern", cidr)
+		}
+	}
+
+	for _, cidr := range invalid {
+		if re.MatchString(cidr) {
+			t.Errorf("expected %q NOT to match allowedSourceRanges pattern", cidr)
+		}
 	}
 }
