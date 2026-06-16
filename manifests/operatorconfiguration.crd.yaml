@@ -521,11 +521,21 @@ spec:
                     type: string
                   enable_master_load_balancer:
                     type: boolean
+                  enable_master_node_port:
+                    description: kept in LoadBalancerConfiguration because all the
+                      other parameters apply here too
+                    type: boolean
                   enable_master_pooler_load_balancer:
+                    type: boolean
+                  enable_master_pooler_node_port:
                     type: boolean
                   enable_replica_load_balancer:
                     type: boolean
+                  enable_replica_node_port:
+                    type: boolean
                   enable_replica_pooler_load_balancer:
+                    type: boolean
+                  enable_replica_pooler_node_port:
                     type: boolean
                   external_traffic_policy:
                     enum:

@@ -174,7 +174,8 @@ type LoadBalancerConfiguration struct {
 	MasterLegacyDNSNameFormat  config.StringTemplate `json:"master_legacy_dns_name_format,omitempty"`
 	ReplicaDNSNameFormat       config.StringTemplate `json:"replica_dns_name_format,omitempty"`
 	ReplicaLegacyDNSNameFormat config.StringTemplate `json:"replica_legacy_dns_name_format,omitempty"`
-	ExternalTrafficPolicy      string                `json:"external_traffic_policy" default:"Cluster"`
+	// +kubebuilder:validation:Enum=Cluster;Local
+	ExternalTrafficPolicy string `json:"external_traffic_policy" default:"Cluster"`
 }
 
 // AWSGCPConfiguration defines the configuration for AWS
