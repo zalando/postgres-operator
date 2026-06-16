@@ -745,6 +745,45 @@ func (c *Cluster) syncStatefulSet() error {
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if len(podsToRecreate) > 0 {
 		if isSafeToRecreatePods {
+			// Ensure we have enough "accounted for" pods before starting a rolling update
+			// A pod is considered "accounted for" if it is either running OR marked for recreation
+			numReplicas := 1
+			if c.Statefulset.Spec.Replicas != nil {
+				numReplicas = int(*c.Statefulset.Spec.Replicas)
+			} else {
+				c.logger.Warningf("replicas number in statefulset spec is nil")
+			}
+
+			accountedPods := 0
+			var unaccountedPods []string
+
+			podsToRecreateMap := make(map[string]struct{}, len(podsToRecreate))
+			for _, p := range podsToRecreate {
+				podsToRecreateMap[p.Name] = struct{}{}
+			}
+
+			for i := range pods {
+				isRunning := !podIsNotRunning(&pods[i])
+				_, inRecreateList := podsToRecreateMap[pods[i].Name]
+
+				if isRunning || inRecreateList {
+					accountedPods++
+				} else {
+					unaccountedPods = append(unaccountedPods, pods[i].Name)
+				}
+			}
+
+			if accountedPods < numReplicas {
+				reason := fmt.Sprintf("only %d/%d pods are healthy or scheduled for recreation", accountedPods, numReplicas)
+				if len(unaccountedPods) > 0 {
+					reason += fmt.Sprintf(", unaccounted/not running pods: %s", strings.Join(unaccountedPods, ", "))
+				} else {
+					reason += fmt.Sprintf(", %d pod(s) are completely missing", numReplicas-accountedPods)
+				}
+				c.logger.Warningf("postpone pod recreation until next sync because %s", reason)
+				return fmt.Errorf("pod recreation cannot be started: %s", reason)
+			}
+
 			c.logger.Info("performing rolling update")
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
 			if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
