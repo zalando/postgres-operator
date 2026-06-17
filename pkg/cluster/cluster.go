@@ -135,7 +135,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	})
 	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
 	if !ok {
-		passwordEncryption = "md5"
+		passwordEncryption = "scram-sha-256"
 	}
 
 	cluster := &Cluster{
@@ -859,6 +859,14 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		return false, "new service's ExternalTrafficPolicy does not match the current one"
 	}
 
+	if len(old.Spec.Ports) > 0 && len(new.Spec.Ports) > 0 {
+		// we need to check whether the new port is not zero (=user-defined)
+		// and only overwrite if it is
+		if new.Spec.Ports[0].NodePort != 0 && old.Spec.Ports[0].NodePort != new.Spec.Ports[0].NodePort {
+			return false, "new service's NodePort does not match the current one"
+		}
+	}
+
 	return true, ""
 }
 
@@ -891,6 +899,16 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) *compareLog
 	if newPgVersion != curPgVersion {
 		match = false
 		reasons = append(reasons, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q", newPgVersion, curPgVersion))
+	}
+
+	if !reflect.DeepEqual(cur.Labels, new.Labels) {
+		match = false
+		reasons = append(reasons, "new job's labels do not match the current ones")
+	}
+
+	if !reflect.DeepEqual(cur.Spec.JobTemplate.Labels, new.Spec.JobTemplate.Labels) {
+		match = false
+		reasons = append(reasons, "new job's template labels do not match the current ones")
 	}
 
 	needsReplace := false

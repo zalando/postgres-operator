@@ -137,17 +137,24 @@ type OperatorTimeouts struct {
 
 // LoadBalancerConfiguration defines the LB configuration
 type LoadBalancerConfiguration struct {
-	DbHostedZone                    string                `json:"db_hosted_zone,omitempty"`
-	EnableMasterLoadBalancer        bool                  `json:"enable_master_load_balancer,omitempty"`
-	EnableMasterPoolerLoadBalancer  bool                  `json:"enable_master_pooler_load_balancer,omitempty"`
-	EnableReplicaLoadBalancer       bool                  `json:"enable_replica_load_balancer,omitempty"`
-	EnableReplicaPoolerLoadBalancer bool                  `json:"enable_replica_pooler_load_balancer,omitempty"`
-	CustomServiceAnnotations        map[string]string     `json:"custom_service_annotations,omitempty"`
-	MasterDNSNameFormat             config.StringTemplate `json:"master_dns_name_format,omitempty"`
-	MasterLegacyDNSNameFormat       config.StringTemplate `json:"master_legacy_dns_name_format,omitempty"`
-	ReplicaDNSNameFormat            config.StringTemplate `json:"replica_dns_name_format,omitempty"`
-	ReplicaLegacyDNSNameFormat      config.StringTemplate `json:"replica_legacy_dns_name_format,omitempty"`
-	ExternalTrafficPolicy           string                `json:"external_traffic_policy" default:"Cluster"`
+	DbHostedZone                    string `json:"db_hosted_zone,omitempty"`
+	EnableMasterLoadBalancer        bool   `json:"enable_master_load_balancer,omitempty"`
+	EnableMasterPoolerLoadBalancer  bool   `json:"enable_master_pooler_load_balancer,omitempty"`
+	EnableReplicaLoadBalancer       bool   `json:"enable_replica_load_balancer,omitempty"`
+	EnableReplicaPoolerLoadBalancer bool   `json:"enable_replica_pooler_load_balancer,omitempty"`
+
+	// kept in LoadBalancerConfiguration because all the other parameters apply here too
+	EnableMasterNodePort        bool `json:"enable_master_node_port,omitempty"`
+	EnableMasterPoolerNodePort  bool `json:"enable_master_pooler_node_port,omitempty"`
+	EnableReplicaNodePort       bool `json:"enable_replica_node_port,omitempty"`
+	EnableReplicaPoolerNodePort bool `json:"enable_replica_pooler_node_port,omitempty"`
+
+	CustomServiceAnnotations   map[string]string     `json:"custom_service_annotations,omitempty"`
+	MasterDNSNameFormat        config.StringTemplate `json:"master_dns_name_format,omitempty"`
+	MasterLegacyDNSNameFormat  config.StringTemplate `json:"master_legacy_dns_name_format,omitempty"`
+	ReplicaDNSNameFormat       config.StringTemplate `json:"replica_dns_name_format,omitempty"`
+	ReplicaLegacyDNSNameFormat config.StringTemplate `json:"replica_legacy_dns_name_format,omitempty"`
+	ExternalTrafficPolicy      string                `json:"external_traffic_policy" default:"Cluster"`
 }
 
 // AWSGCPConfiguration defines the configuration for AWS
@@ -168,8 +175,8 @@ type AWSGCPConfiguration struct {
 
 // OperatorDebugConfiguration defines options for the debug mode
 type OperatorDebugConfiguration struct {
-	DebugLogging   bool `json:"debug_logging,omitempty"`
-	EnableDBAccess bool `json:"enable_database_access,omitempty"`
+	DebugLogging   *bool `json:"debug_logging,omitempty"`
+	EnableDBAccess *bool `json:"enable_database_access,omitempty"`
 }
 
 // TeamsAPIConfiguration defines the configuration of TeamsAPI

@@ -1769,6 +1769,16 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			}
 			c.logger.Info("the logical backup job is synced")
 		}
+		if !reflect.DeepEqual(job.Labels, desiredJob.Labels) {
+			patchData, err := metaLabelsPatch(desiredJob.Labels)
+			if err != nil {
+				return fmt.Errorf("could not form patch for the logical backup job %q labels: %v", jobName, err)
+			}
+			_, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch labels of the logical backup job %q: %v", jobName, err)
+			}
+		}
 		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredJob.Annotations)
 			if err != nil {

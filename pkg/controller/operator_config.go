@@ -171,6 +171,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableMasterPoolerLoadBalancer = fromCRD.LoadBalancer.EnableMasterPoolerLoadBalancer
 	result.EnableReplicaLoadBalancer = fromCRD.LoadBalancer.EnableReplicaLoadBalancer
 	result.EnableReplicaPoolerLoadBalancer = fromCRD.LoadBalancer.EnableReplicaPoolerLoadBalancer
+	result.EnableMasterNodePort = fromCRD.LoadBalancer.EnableMasterNodePort
+	result.EnableMasterPoolerNodePort = fromCRD.LoadBalancer.EnableMasterPoolerNodePort
+	result.EnableReplicaNodePort = fromCRD.LoadBalancer.EnableReplicaNodePort
+	result.EnableReplicaPoolerNodePort = fromCRD.LoadBalancer.EnableReplicaPoolerNodePort
 	result.CustomServiceAnnotations = fromCRD.LoadBalancer.CustomServiceAnnotations
 	result.MasterDNSNameFormat = fromCRD.LoadBalancer.MasterDNSNameFormat
 	result.MasterLegacyDNSNameFormat = fromCRD.LoadBalancer.MasterLegacyDNSNameFormat
@@ -218,8 +222,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupTTLSecondsAfterFinished = fromCRD.LogicalBackup.TTLSecondsAfterFinished
 
 	// debug config
-	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
-	result.EnableDBAccess = fromCRD.OperatorDebug.EnableDBAccess
+	result.DebugLogging = *util.CoalesceBool(fromCRD.OperatorDebug.DebugLogging, util.True())
+	result.EnableDBAccess = *util.CoalesceBool(fromCRD.OperatorDebug.EnableDBAccess, util.True())
 
 	// Teams API config
 	result.EnableTeamsAPI = fromCRD.TeamsAPI.EnableTeamsAPI
