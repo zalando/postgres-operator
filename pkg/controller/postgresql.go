@@ -375,7 +375,12 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	for {
-		obj, err := (*c.clusterEventQueues[idx]).Pop(cache.PopProcessFunc(func(interface{}, bool) error { return nil }))
+		obj, err := (*c.clusterEventQueues[idx]).Pop(cache.PopProcessFunc(func(obj interface{}, isInitialList bool) error {
+			if err := (*c.clusterEventQueues[idx]).Delete(obj); err != nil {
+				c.logger.Errorf("failed to delete key from store: %v", err)
+			}
+			return nil
+		}))
 		if err != nil {
 			if err == cache.ErrFIFOClosed {
 				return

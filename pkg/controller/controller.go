@@ -367,11 +367,8 @@ func (c *Controller) initController() {
 			}
 			return queueClusterKey(e.EventType, e.UID), nil
 		}
-		newStore := cache.NewStore(keyFn)
-		newQueue := cache.NewFIFO(keyFn)
-
-		c.clusterEventStores[i] = newStore
-		c.clusterEventQueues[i] = newQueue
+		c.clusterEventStores[i] = cache.NewStore(keyFn)
+		c.clusterEventQueues[i] = cache.NewFIFO(keyFn)
 	}
 
 	c.apiserver = apiserver.New(c, c.opConfig.APIPort, c.logger.Logger)
