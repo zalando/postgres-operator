@@ -375,7 +375,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	for {
-		obj, err := (*c.clusterEventQueues[idx]).Pop()
+		obj, err := (*c.clusterEventQueues[idx]).Pop(cache.PopProcessFunc(func(interface{}, bool) error { return nil }))
 		if err != nil {
 			if err == cache.ErrFIFOClosed {
 				return
@@ -533,9 +533,9 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	}
 	// A delete event discards all prior requests for that cluster.
 	for _, evType := range []EventType{EventAdd, EventSync, EventUpdate, EventRepair} {
-		obj, exists, err := (*c.clusterEventQueues[workerID]).GetByKey(queueClusterKey(evType, uid))
+		obj, exists, err := c.clusterEventStores[workerID].GetByKey(queueClusterKey(evType, uid))
 		if err != nil {
-			lg.Warningf("could not get event from the queue: %v", err)
+			lg.Warningf("could not get event from the lookup store: %v", err)
 			continue
 		}
 
@@ -548,6 +548,12 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 			lg.Warningf("could not delete event from the queue: %v", err)
 		} else {
 			lg.Debugf("event %s has been discarded for the cluster", evType)
+		}
+		err = c.clusterEventStores[workerID].Delete(obj)
+		if err != nil {
+			lg.Warningf("could not delete event from the lookup store: %v", err)
+		} else {
+			lg.Debugf("event %s has been deleted from the lookup store", evType)
 		}
 	}
 }
