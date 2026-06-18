@@ -9,7 +9,8 @@ COPY  . /go/src/github.com/zalando/postgres-operator
 WORKDIR /go/src/github.com/zalando/postgres-operator
 
 RUN go clean -cache -modcache
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o build/postgres-operator -v -ldflags "-X=main.version=${VERSION}" cmd/main.go
+RUN go mod vendor \
+    && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o build/postgres-operator -v -ldflags "-X=main.version=${VERSION}" cmd/main.go
 
 ARG BASE_IMAGE
 FROM --platform=$TARGETPLATFORM ${BASE_IMAGE}
