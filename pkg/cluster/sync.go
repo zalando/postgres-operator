@@ -754,34 +754,10 @@ func (c *Cluster) syncStatefulSet() error {
 				c.logger.Warningf("replicas number in statefulset spec is nil")
 			}
 
-			accountedPods := 0
-			var unaccountedPods []string
-
-			podsToRecreateMap := make(map[string]struct{}, len(podsToRecreate))
-			for _, p := range podsToRecreate {
-				podsToRecreateMap[p.Name] = struct{}{}
-			}
-
-			for i := range pods {
-				isRunning := !podIsNotRunning(&pods[i])
-				_, inRecreateList := podsToRecreateMap[pods[i].Name]
-
-				if isRunning || inRecreateList {
-					accountedPods++
-				} else {
-					unaccountedPods = append(unaccountedPods, pods[i].Name)
-				}
-			}
-
-			if accountedPods < numReplicas {
-				reason := fmt.Sprintf("only %d/%d pods are healthy or scheduled for recreation", accountedPods, numReplicas)
-				if len(unaccountedPods) > 0 {
-					reason += fmt.Sprintf(", unaccounted/not running pods: %s", strings.Join(unaccountedPods, ", "))
-				} else {
-					reason += fmt.Sprintf(", %d pod(s) are completely missing", numReplicas-accountedPods)
-				}
-				c.logger.Warningf("postpone pod recreation until next sync because %s", reason)
-				return fmt.Errorf("pod recreation cannot be started: %s", reason)
+			res := checkClusterStableForRollout(pods, podsToRecreate, numReplicas)
+			if !res.isEnough {
+				c.logger.Warningf("postpone pod recreation until next sync because %s", res.reason)
+				return fmt.Errorf("pod recreation cannot be started: %s", res.reason)
 			}
 
 			c.logger.Info("performing rolling update")
@@ -1851,4 +1827,57 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	}
 
 	return nil
+}
+
+// podsAccountingResult holds the result of checking whether there are enough
+// "accounted for" pods to safely start a rolling update
+type podsAccountingResult struct {
+	accountedPods   int
+	unaccountedPods []string
+	numReplicas     int
+	isEnough        bool
+	reason          string
+}
+
+// checkClusterStableForRollout verifies we have enough "accounted for" pods before
+// starting a rolling update. A pod is "accounted for" if it is either running
+// OR explicitly scheduled for recreation
+func checkClusterStableForRollout(pods []v1.Pod, podsToRecreate []v1.Pod, numReplicas int) podsAccountingResult {
+	result := podsAccountingResult{
+		numReplicas:     numReplicas,
+		unaccountedPods: []string{},
+	}
+
+	podsToRecreateMap := make(map[string]struct{}, len(podsToRecreate))
+	for _, p := range podsToRecreate {
+		podsToRecreateMap[p.Name] = struct{}{}
+	}
+
+	for i := range pods {
+		isRunning := !podIsNotRunning(&pods[i])
+		_, inRecreateList := podsToRecreateMap[pods[i].Name]
+
+		if isRunning || inRecreateList {
+			result.accountedPods++
+		} else {
+			result.unaccountedPods = append(result.unaccountedPods, pods[i].Name)
+		}
+	}
+
+	result.isEnough = result.accountedPods >= numReplicas
+
+	if !result.isEnough {
+		if len(result.unaccountedPods) > 0 {
+			result.reason = fmt.Sprintf(
+				"only %d/%d pods are healthy or scheduled for recreation, unaccounted/not running pods: %s",
+				result.accountedPods, numReplicas, strings.Join(result.unaccountedPods, ", "),
+			)
+		} else {
+			result.reason = fmt.Sprintf(
+				"only %d/%d pods are healthy or scheduled for recreation, %d pod(s) are completely missing",
+				result.accountedPods, numReplicas, numReplicas-result.accountedPods,
+			)
+		}
+	}
+	return result
 }
