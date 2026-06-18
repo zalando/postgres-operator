@@ -468,7 +468,7 @@ func (c *Cluster) syncMigrationService() error {
 	)
 	c.setProcessName("syncing migration service")
 
-	serviceName := fmt.Sprintf("%s%d", c.Name, 2)
+	serviceName := fmt.Sprintf("%s%s", c.Name, constants.MigrationServiceSuffix)
 
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), serviceName, metav1.GetOptions{}); err == nil {
 		c.MigrationService = svc
@@ -492,10 +492,10 @@ func (c *Cluster) syncMigrationService() error {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("could not create missing migration service: %v", err)
 		}
-		c.logger.Infof("migration service %q already exists", util.NameFromMeta(svc.ObjectMeta))
 		if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), serviceName, metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing migration service: %v", err)
 		}
+		c.logger.Infof("migration service %q already exists", util.NameFromMeta(svc.ObjectMeta))
 	}
 	c.MigrationService = svc
 	return nil

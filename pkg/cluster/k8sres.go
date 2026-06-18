@@ -2072,8 +2072,7 @@ func (c *Cluster) generateMigrationService() *v1.Service {
 		ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy),
 		Ports:                 []v1.ServicePort{{Name: "postgresql", Port: pgPort, TargetPort: intstr.IntOrString{IntVal: pgPort}}},
 		Selector:              c.roleLabelsSet(false, Master),
-		Type:                  v1.ServiceTypeExternalName,
-		ExternalName:          c.migrationDNSName(),
+		Type:                  v1.ServiceTypeLoadBalancer,
 	}
 
 	// Apply VPC CIDR as LoadBalancerSourceRanges
@@ -2084,7 +2083,7 @@ func (c *Cluster) generateMigrationService() *v1.Service {
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-migr", c.Name),
+			Name:      fmt.Sprintf("%s%s", c.Name, constants.MigrationServiceSuffix),
 			Namespace: c.Namespace,
 			Annotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-type":                              "nlb",
