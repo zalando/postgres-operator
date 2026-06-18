@@ -814,19 +814,6 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
-            required:
-            - aws_or_gcp
-            - connection_pooler
-            - debug
-            - kubernetes
-            - load_balancer
-            - logging_rest_api
-            - logical_backup
-            - major_version_upgrade
-            - patroni
-            - postgres_pod_resources
-            - timeouts
-            - users
             type: object
           kind:
             description: |-

@@ -321,23 +321,35 @@ type OperatorConfigurationData struct {
 	// +kubebuilder:validation:XPreserveUnknownFields
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:validation:Schemaless
-	SidecarContainers          []v1.Container                   `json:"sidecars,omitempty"`
-	PostgresUsersConfiguration PostgresUsersConfiguration       `json:"users"`
-	MajorVersionUpgrade        MajorVersionUpgradeConfiguration `json:"major_version_upgrade"`
-	Kubernetes                 KubernetesMetaConfiguration      `json:"kubernetes"`
-	PostgresPodResources       PostgresPodResourcesDefaults     `json:"postgres_pod_resources"`
-	Timeouts                   OperatorTimeouts                 `json:"timeouts"`
-	LoadBalancer               LoadBalancerConfiguration        `json:"load_balancer"`
-	AWSGCP                     AWSGCPConfiguration              `json:"aws_or_gcp"`
-	OperatorDebug              OperatorDebugConfiguration       `json:"debug"`
+	SidecarContainers []v1.Container `json:"sidecars,omitempty"`
 	// +optional
-	TeamsAPI       TeamsAPIConfiguration       `json:"teams_api"`
+	PostgresUsersConfiguration PostgresUsersConfiguration `json:"users"`
+	// +optional
+	MajorVersionUpgrade MajorVersionUpgradeConfiguration `json:"major_version_upgrade"`
+	// +optional
+	Kubernetes KubernetesMetaConfiguration `json:"kubernetes"`
+	// +optional
+	PostgresPodResources PostgresPodResourcesDefaults `json:"postgres_pod_resources"`
+	// +optional
+	Timeouts OperatorTimeouts `json:"timeouts"`
+	// +optional
+	LoadBalancer LoadBalancerConfiguration `json:"load_balancer"`
+	// +optional
+	AWSGCP AWSGCPConfiguration `json:"aws_or_gcp"`
+	// +optional
+	OperatorDebug OperatorDebugConfiguration `json:"debug"`
+	// +optional
+	TeamsAPI TeamsAPIConfiguration `json:"teams_api"`
+	// +optional
 	LoggingRESTAPI LoggingRESTAPIConfiguration `json:"logging_rest_api"`
 	// +optional
-	Scalyr           ScalyrConfiguration                `json:"scalyr"`
-	LogicalBackup    OperatorLogicalBackupConfiguration `json:"logical_backup"`
-	ConnectionPooler ConnectionPoolerConfiguration      `json:"connection_pooler"`
-	Patroni          PatroniConfiguration               `json:"patroni"`
+	Scalyr ScalyrConfiguration `json:"scalyr"`
+	// +optional
+	LogicalBackup OperatorLogicalBackupConfiguration `json:"logical_backup"`
+	// +optional
+	ConnectionPooler ConnectionPoolerConfiguration `json:"connection_pooler"`
+	// +optional
+	Patroni PatroniConfiguration `json:"patroni"`
 
 	// +kubebuilder:validation:Minimum=-1
 	MinInstances int32 `json:"min_instances,omitempty"`
