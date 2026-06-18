@@ -108,7 +108,6 @@ spec:
                     enum:
                     - session
                     - transaction
-                    - statement
                     type: string
                   connection_pooler_number_of_instances:
                     format: int32

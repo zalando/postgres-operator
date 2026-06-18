@@ -53,10 +53,11 @@ type PostgresUsersConfiguration struct {
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
 type MajorVersionUpgradeConfiguration struct {
-	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"manual"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
+	// +kubebuilder:validation:Enum=off;manual;full
+	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode,omitempty"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
 	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
-	MinimalMajorVersion              string   `json:"minimal_major_version" default:"14"`
-	TargetMajorVersion               string   `json:"target_major_version" default:"18"`
+	MinimalMajorVersion              string   `json:"minimal_major_version,omitempty"`
+	TargetMajorVersion               string   `json:"target_major_version,omitempty"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
@@ -175,7 +176,7 @@ type LoadBalancerConfiguration struct {
 	ReplicaDNSNameFormat       config.StringTemplate `json:"replica_dns_name_format,omitempty"`
 	ReplicaLegacyDNSNameFormat config.StringTemplate `json:"replica_legacy_dns_name_format,omitempty"`
 	// +kubebuilder:validation:Enum=Cluster;Local
-	ExternalTrafficPolicy string `json:"external_traffic_policy" default:"Cluster"`
+	ExternalTrafficPolicy string `json:"external_traffic_policy,omitempty"`
 }
 
 // AWSGCPConfiguration defines the configuration for AWS
@@ -190,8 +191,8 @@ type AWSGCPConfiguration struct {
 	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
 	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
 	AdditionalSecretMountPath    string `json:"additional_secret_mount_path,omitempty"`
-	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration" default:"false"`
-	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size" default:"1000"`
+	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration,omitempty"`
+	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size,omitempty"`
 }
 
 // OperatorDebugConfiguration defines options for the debug mode
@@ -246,7 +247,7 @@ type ConnectionPoolerConfiguration struct {
 	Schema            string `json:"connection_pooler_schema,omitempty"`
 	User              string `json:"connection_pooler_user,omitempty"`
 	Image             string `json:"connection_pooler_image,omitempty"`
-	// +kubebuilder:validation:Enum=session;transaction;statement
+	// +kubebuilder:validation:Enum=session;transaction
 	Mode             string `json:"connection_pooler_mode,omitempty"`
 	MaxDBConnections *int32 `json:"connection_pooler_max_db_connections,omitempty"`
 	// +kubebuilder:validation:Pattern=`^(\d+m|\d+(\.\d{1,3})?)$`

@@ -80,9 +80,6 @@ spec:
                     type: string
                   wal_s3_bucket:
                     type: string
-                required:
-                - enable_ebs_gp3_migration
-                - enable_ebs_gp3_migration_max_size
                 type: object
               connection_pooler:
                 description: ConnectionPoolerConfiguration defines default configuration
@@ -109,7 +106,6 @@ spec:
                     enum:
                     - session
                     - transaction
-                    - statement
                     type: string
                   connection_pooler_number_of_instances:
                     format: int32
@@ -554,8 +550,6 @@ spec:
                   replica_legacy_dns_name_format:
                     description: StringTemplate is a convenience alias
                     type: string
-                required:
-                - external_traffic_policy
                 type: object
               logging_rest_api:
                 description: LoggingRESTAPIConfiguration defines Logging API conf
@@ -626,6 +620,10 @@ spec:
                   major version upgrades of Postgres.
                 properties:
                   major_version_upgrade_mode:
+                    enum:
+                    - "off"
+                    - manual
+                    - full
                     type: string
                   major_version_upgrade_team_allow_list:
                     items:
@@ -635,10 +633,6 @@ spec:
                     type: string
                   target_major_version:
                     type: string
-                required:
-                - major_version_upgrade_mode
-                - minimal_major_version
-                - target_major_version
                 type: object
               max_instances:
                 format: int32
