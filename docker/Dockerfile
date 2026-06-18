@@ -6,7 +6,6 @@ COPY  . /go/src/github.com/zalando/postgres-operator
 WORKDIR /go/src/github.com/zalando/postgres-operator
 
 RUN go clean -cache -modcache
-RUN go mod download
 RUN CGO_ENABLED=0 go build -o build/postgres-operator -v -ldflags "-X=main.version=${VERSION}" cmd/main.go
 
 FROM ${BASE_IMAGE}
