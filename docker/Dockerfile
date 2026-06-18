@@ -1,12 +1,13 @@
-ARG BASE_IMAGE=alpine:latest
-FROM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 ARG VERSION=latest
+ARG TARGETOS
+ARG TARGETARCH
 
 COPY  . /go/src/github.com/zalando/postgres-operator
 WORKDIR /go/src/github.com/zalando/postgres-operator
 
 RUN go clean -cache -modcache
-RUN CGO_ENABLED=0 go build -o build/postgres-operator -v -ldflags "-X=main.version=${VERSION}" cmd/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o build/postgres-operator -v -ldflags "-X=main.version=${VERSION}" cmd/main.go
 
 FROM ${BASE_IMAGE}
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
@@ -16,6 +17,7 @@ LABEL org.opencontainers.image.source="https://github.com/zalando/postgres-opera
 RUN apk -U upgrade --no-cache \
     && apk add --no-cache curl ca-certificates
 
+FROM --platform=$TARGETPLATFORM alpine:latest
 COPY --from=builder /go/src/github.com/zalando/postgres-operator/build/* /
 
 RUN addgroup -g 1000 pgo
