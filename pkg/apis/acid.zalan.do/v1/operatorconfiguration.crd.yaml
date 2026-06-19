@@ -62,6 +62,7 @@ spec:
                   additional_secret_mount_path:
                     type: string
                   aws_region:
+                    default: eu-central-1
                     type: string
                   enable_ebs_gp3_migration:
                     type: boolean
@@ -98,22 +99,27 @@ spec:
                     pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                     type: string
                   connection_pooler_image:
+                    default: ghcr.io/zalando/postgres-operator/pgbouncer:latest
                     type: string
                   connection_pooler_max_db_connections:
                     format: int32
                     type: integer
                   connection_pooler_mode:
+                    default: transaction
                     enum:
                     - session
                     - transaction
                     type: string
                   connection_pooler_number_of_instances:
+                    default: 2
                     format: int32
                     minimum: 1
                     type: integer
                   connection_pooler_schema:
+                    default: pooler
                     type: string
                   connection_pooler_user:
+                    default: pooler
                     type: string
                 type: object
               crd_categories:
@@ -125,11 +131,14 @@ spec:
                   mode
                 properties:
                   debug_logging:
+                    default: true
                     type: boolean
                   enable_database_access:
+                    default: true
                     type: boolean
                 type: object
               docker_image:
+                default: ghcr.io/zalando/spilo-18:4.1-p1
                 type: string
               enable_crd_registration:
                 type: boolean
@@ -138,16 +147,20 @@ spec:
               enable_lazy_spilo_upgrade:
                 type: boolean
               enable_maintenance_windows:
+                default: true
                 type: boolean
               enable_pgversion_env_var:
+                default: true
                 type: boolean
               enable_shm_volume:
+                default: true
                 type: boolean
               enable_spilo_wal_path_compat:
                 type: boolean
               enable_team_id_clustername_prefix:
                 type: boolean
               etcd_host:
+                default: ""
                 type: string
               ignore_instance_limits_annotation_key:
                 type: string
@@ -162,12 +175,16 @@ spec:
                       type: string
                     type: array
                   cluster_domain:
+                    default: cluster.local
                     type: string
                   cluster_labels:
                     additionalProperties:
                       type: string
+                    default:
+                      application: spilo
                     type: object
                   cluster_name_label:
+                    default: cluster-name
                     type: string
                   custom_pod_annotations:
                     additionalProperties:
@@ -186,20 +203,25 @@ spec:
                   enable_finalizers:
                     type: boolean
                   enable_init_containers:
+                    default: true
                     type: boolean
                   enable_owner_references:
                     type: boolean
                   enable_persistent_volume_claim_deletion:
+                    default: true
                     type: boolean
                   enable_pod_antiaffinity:
                     type: boolean
                   enable_pod_disruption_budget:
+                    default: true
                     type: boolean
                   enable_readiness_probe:
                     type: boolean
                   enable_secrets_deletion:
+                    default: true
                     type: boolean
                   enable_sidecars:
+                    default: true
                     type: boolean
                   ignored_annotations:
                     items:
@@ -388,6 +410,7 @@ spec:
                         type: integer
                     type: object
                   master_pod_move_timeout:
+                    default: 20m
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
@@ -401,6 +424,7 @@ spec:
                     - OR
                     type: string
                   oauth_token_secret_name:
+                    default: postgres-operator
                     description: |-
                       NamespacedName comprises a resource name, with a mandatory namespace,
                       rendered as "<namespace>/<name>".  Being a type captures intent and
@@ -420,8 +444,10 @@ spec:
                     - name
                     type: object
                   pdb_master_label_selector:
+                    default: true
                     type: boolean
                   pdb_name_format:
+                    default: postgres-{cluster}-pdb
                     description: StringTemplate is a convenience alias
                     type: string
                   persistent_volume_claim_retention_policy:
@@ -431,6 +457,7 @@ spec:
                   pod_antiaffinity_preferred_during_scheduling:
                     type: boolean
                   pod_antiaffinity_topology_key:
+                    default: kubernetes.io/hostname
                     type: string
                   pod_environment_configmap:
                     description: |-
@@ -454,6 +481,7 @@ spec:
                   pod_environment_secret:
                     type: string
                   pod_management_policy:
+                    default: ordered_ready
                     enum:
                     - ordered_ready
                     - parallel
@@ -461,23 +489,28 @@ spec:
                   pod_priority_class_name:
                     type: string
                   pod_role_label:
+                    default: spilo-role
                     type: string
                   pod_service_account_definition:
                     type: string
                   pod_service_account_name:
+                    default: postgres-pod
                     type: string
                   pod_service_account_role_binding_definition:
                     type: string
                   pod_terminate_grace_period:
+                    default: 5m
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
                   secret_name_template:
+                    default: '{username}.{cluster}.credentials.{tprkind}.{tprgroup}'
                     description: StringTemplate is a convenience alias
                     type: string
                   share_pgsocket_with_sidecars:
                     type: boolean
                   spilo_allow_privilege_escalation:
+                    default: true
                     type: boolean
                   spilo_fsgroup:
                     format: int64
@@ -491,6 +524,7 @@ spec:
                     format: int64
                     type: integer
                   storage_resize_mode:
+                    default: pvc
                     enum:
                     - ebs
                     - mixed
@@ -505,6 +539,7 @@ spec:
                     type: string
                 type: object
               kubernetes_use_configmaps:
+                default: true
                 type: boolean
               load_balancer:
                 description: LoadBalancerConfiguration defines the LB configuration
@@ -534,20 +569,25 @@ spec:
                   enable_replica_pooler_node_port:
                     type: boolean
                   external_traffic_policy:
+                    default: Cluster
                     enum:
                     - Cluster
                     - Local
                     type: string
                   master_dns_name_format:
+                    default: '{cluster}.{namespace}.{hostedzone}'
                     description: StringTemplate is a convenience alias
                     type: string
                   master_legacy_dns_name_format:
+                    default: '{cluster}.{team}.{hostedzone}'
                     description: StringTemplate is a convenience alias
                     type: string
                   replica_dns_name_format:
+                    default: '{cluster}-repl.{namespace}.{hostedzone}'
                     description: StringTemplate is a convenience alias
                     type: string
                   replica_legacy_dns_name_format:
+                    default: '{cluster}-repl.{team}.{hostedzone}'
                     description: StringTemplate is a convenience alias
                     type: string
                 type: object
@@ -555,10 +595,13 @@ spec:
                 description: LoggingRESTAPIConfiguration defines Logging API conf
                 properties:
                   api_port:
+                    default: 8080
                     type: integer
                   cluster_history_entries:
+                    default: 1000
                     type: integer
                   ring_log_lines:
+                    default: 100
                     type: integer
                 type: object
               logical_backup:
@@ -580,13 +623,17 @@ spec:
                   logical_backup_cronjob_environment_secret:
                     type: string
                   logical_backup_docker_image:
+                    default: ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1
                     type: string
                   logical_backup_failed_jobs_history_limit:
+                    default: 3
                     format: int32
+                    minimum: 0
                     type: integer
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
+                    default: logical-backup-
                     type: string
                   logical_backup_memory_limit:
                     pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
@@ -595,6 +642,11 @@ spec:
                     pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                     type: string
                   logical_backup_provider:
+                    default: s3
+                    enum:
+                    - az
+                    - gcs
+                    - s3
                     type: string
                   logical_backup_s3_access_key_id:
                     type: string
@@ -613,13 +665,18 @@ spec:
                   logical_backup_s3_sse:
                     type: string
                   logical_backup_schedule:
+                    default: 30 00 * * *
                     pattern: ^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$
                     type: string
                   logical_backup_successful_jobs_history_limit:
+                    default: 3
                     format: int32
+                    minimum: 0
                     type: integer
                   logical_backup_ttl_seconds_after_finished:
+                    default: 86400
                     format: int32
+                    minimum: 0
                     type: integer
                 type: object
               maintenance_windows:
@@ -629,6 +686,7 @@ spec:
                   major version upgrades of Postgres.
                 properties:
                   major_version_upgrade_mode:
+                    default: manual
                     enum:
                     - "off"
                     - manual
@@ -639,15 +697,19 @@ spec:
                       type: string
                     type: array
                   minimal_major_version:
+                    default: "14"
                     type: string
                   target_major_version:
+                    default: "18"
                     type: string
                 type: object
               max_instances:
+                default: -1
                 format: int32
                 minimum: -1
                 type: integer
               min_instances:
+                default: -1
                 format: int32
                 minimum: -1
                 type: integer
@@ -687,10 +749,12 @@ spec:
                     type: string
                 type: object
               repair_period:
+                default: 5m
                 description: Duration shortens this frequently used name
                 format: int64
                 type: integer
               resync_period:
+                default: 30m
                 description: Duration shortens this frequently used name
                 format: int64
                 type: integer
@@ -700,19 +764,25 @@ spec:
                   scalyr_api_key:
                     type: string
                   scalyr_cpu_limit:
+                    default: "1"
+                    pattern: ^(\d+m|\d+(\.\d{1,3})?)$
                     type: string
                   scalyr_cpu_request:
+                    default: 100m
                     pattern: ^(\d+m|\d+(\.\d{1,3})?)$
                     type: string
                   scalyr_image:
                     type: string
                   scalyr_memory_limit:
+                    default: 500Mi
                     pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                     type: string
                   scalyr_memory_request:
+                    default: 50Mi
                     pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                     type: string
                   scalyr_server_url:
+                    default: https://upload.eu.scalyr.com
                     type: string
                 type: object
               set_memory_request_to_limit:
@@ -728,8 +798,10 @@ spec:
                 description: TeamsAPIConfiguration defines the configuration of TeamsAPI
                 properties:
                   enable_admin_role_for_users:
+                    default: true
                     type: boolean
                   enable_postgres_team_crd:
+                    default: true
                     type: boolean
                   enable_postgres_team_crd_superusers:
                     type: boolean
@@ -740,26 +812,35 @@ spec:
                   enable_teams_api:
                     type: boolean
                   pam_configuration:
+                    default: https://info.example.com/oauth2/tokeninfo?access_token=
+                      uid realm=/employees
                     type: string
                   pam_role_name:
+                    default: zalandos
                     type: string
                   postgres_superuser_teams:
                     items:
                       type: string
                     type: array
                   protected_role_names:
+                    default: '["admin", "cron_admin"]'
                     items:
                       type: string
                     type: array
                   role_deletion_suffix:
+                    default: _deleted
                     type: string
                   team_admin_role:
+                    default: admin
                     type: string
                   team_api_role_configuration:
                     additionalProperties:
                       type: string
+                    default:
+                      log_statement: all
                     type: object
                   teams_api_url:
+                    default: https://teams.example.com/api/
                     type: string
                 type: object
               timeouts:
@@ -767,34 +848,42 @@ spec:
                   PodWait, ReadyWait
                 properties:
                   patroni_api_check_interval:
+                    default: 1s
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
                   patroni_api_check_timeout:
+                    default: 5s
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
                   pod_deletion_wait_timeout:
+                    default: 10m
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
                   pod_label_wait_timeout:
+                    default: 10m
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
                   ready_wait_interval:
+                    default: 4s
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
                   ready_wait_timeout:
+                    default: 30s
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
                   resource_check_interval:
+                    default: 3s
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
                   resource_check_timeout:
+                    default: 10m
                     description: Duration shortens this frequently used name
                     format: int64
                     type: integer
@@ -810,17 +899,22 @@ spec:
                   enable_password_rotation:
                     type: boolean
                   password_rotation_interval:
+                    default: 90
                     format: int32
                     type: integer
                   password_rotation_user_retention:
+                    default: 120
                     format: int32
                     type: integer
                   replication_username:
+                    default: standby
                     type: string
                   super_username:
+                    default: postgres
                     type: string
                 type: object
               workers:
+                default: 8
                 format: int32
                 minimum: 1
                 type: integer
