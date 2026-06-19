@@ -612,6 +612,18 @@ spec:
                   logical_backup_schedule:
                     pattern: ^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$
                     type: string
+                  logical_backup_failed_jobs_history_limit:
+                    type: integer
+                    minimum: 0
+                    default: 3
+                  logical_backup_successful_jobs_history_limit:
+                    type: integer
+                    minimum: 0
+                    default: 3
+                  logical_backup_ttl_seconds_after_finished:
+                    type: integer
+                    minimum: 0
+                    default: 86400
                 type: object
               maintenance_windows:
                 type: array
