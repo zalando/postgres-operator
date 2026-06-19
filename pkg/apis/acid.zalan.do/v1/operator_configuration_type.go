@@ -108,7 +108,6 @@ type KubernetesMetaConfiguration struct {
 	// +kubebuilder:default=postgres-operator
 	OAuthTokenSecretName          spec.NamespacedName `json:"oauth_token_secret_name,omitempty"`
 	InfrastructureRolesSecretName spec.NamespacedName `json:"infrastructure_roles_secret_name,omitempty"`
-	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=array
 	InfrastructureRolesDefs []*config.InfrastructureRole `json:"infrastructure_roles_secrets,omitempty"`
 	// +kubebuilder:default=spilo-role
@@ -378,7 +377,9 @@ type PatroniConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
-	EnableCRDRegistration  *bool    `json:"enable_crd_registration,omitempty"`
+	// +kubebuilder:default=true
+	EnableCRDRegistration *bool `json:"enable_crd_registration,omitempty"`
+	// +kubebuilder:default=true
 	EnableCRDValidation    *bool    `json:"enable_crd_validation,omitempty"`
 	CRDCategories          []string `json:"crd_categories,omitempty"`
 	EnableLazySpiloUpgrade bool     `json:"enable_lazy_spilo_upgrade,omitempty"`

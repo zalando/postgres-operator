@@ -140,8 +140,10 @@ spec:
                 default: ghcr.io/zalando/spilo-18:4.1-p1
                 type: string
               enable_crd_registration:
+                default: true
                 type: boolean
               enable_crd_validation:
+                default: true
                 type: boolean
               enable_lazy_spilo_upgrade:
                 type: boolean
@@ -246,6 +248,37 @@ spec:
                     - name
                     type: object
                   infrastructure_roles_secrets:
+                    items:
+                      properties:
+                        defaultrolevalue:
+                          type: string
+                        defaultuservalue:
+                          type: string
+                        details:
+                          description: This field point out the detailed yaml definition
+                            of the role, if exists
+                          type: string
+                        passwordkey:
+                          type: string
+                        rolekey:
+                          type: string
+                        secretname:
+                          description: |-
+                            Name of a secret which describes the role, and optionally name of a
+                            configmap with an extra information
+                          properties:
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        template:
+                          type: boolean
+                        userkey:
+                          type: string
+                      type: object
                     type: array
                   inherited_annotations:
                     items:
