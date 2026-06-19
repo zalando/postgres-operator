@@ -1390,7 +1390,11 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 			return
 		default:
 			_, err := c.podEventsQueue.Pop(cache.PopProcessFunc(func(obj interface{}, isInInitialList bool) error {
-				event := obj.(PodEvent)
+				event, ok := obj.(PodEvent)
+				if !ok {
+					c.logger.Errorf("could not cast to pod event")
+					return nil // skip event to keep processing
+				}
 				c.processPodEvent(event, isInInitialList)
 				if err := c.podEventsStore.Delete(obj); err != nil {
 					c.logger.Errorf("failed to delete key from store: %v", err)

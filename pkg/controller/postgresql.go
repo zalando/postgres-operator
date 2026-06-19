@@ -182,7 +182,7 @@ func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedNam
 	return cl, nil
 }
 
-func (c *Controller) processEvent(event ClusterEvent) {
+func (c *Controller) processEvent(event ClusterEvent, isInInitialList bool) {
 	var clusterName spec.NamespacedName
 	var clHistory ringlog.RingLogger
 	var err error
@@ -375,8 +375,14 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	for {
-		obj, err := (*c.clusterEventQueues[idx]).Pop(cache.PopProcessFunc(func(obj interface{}, isInitialList bool) error {
-			if err := (*c.clusterEventQueues[idx]).Delete(obj); err != nil {
+		_, err := (*c.clusterEventQueues[idx]).Pop(cache.PopProcessFunc(func(obj interface{}, isInitialList bool) error {
+			event, ok := obj.(ClusterEvent)
+			if !ok {
+				c.logger.Errorf("could not cast to cluster event")
+				return nil // skip event to keep processing
+			}
+			c.processEvent(event, isInitialList)
+			if err := c.clusterEventStores[idx].Delete(obj); err != nil {
 				c.logger.Errorf("failed to delete key from store: %v", err)
 			}
 			return nil
@@ -388,12 +394,6 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 			c.logger.Errorf("error when processing cluster events queue: %v", err)
 			continue
 		}
-		event, ok := obj.(ClusterEvent)
-		if !ok {
-			c.logger.Errorf("could not cast to ClusterEvent")
-		}
-
-		c.processEvent(event)
 	}
 }
 
