@@ -79,11 +79,6 @@ Those are top-level keys, containing both leaf keys and groups.
   Instruct the operator to create/update the CRDs. If disabled the operator will rely on the CRDs being managed separately.
   The default is `true`.
 
-* **enable_crd_validation**
-  *deprecated*: toggles if the operator will create or update CRDs with
-  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
-  The default is `true`. `false` will be ignored, since `apiextensions.io/v1` requires a structural schema definition.
-
 * **crd_categories**
   The operator will register CRDs in the `all` category by default so that they will be returned by a `kubectl get all` call. You are free to change categories or leave them empty.
 

@@ -31,7 +31,6 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// general config
 	result.EnableCRDRegistration = util.CoalesceBool(fromCRD.EnableCRDRegistration, util.True())
-	result.EnableCRDValidation = util.CoalesceBool(fromCRD.EnableCRDValidation, util.True())
 	result.CRDCategories = util.CoalesceStrArr(fromCRD.CRDCategories, []string{"all"})
 	result.EnableLazySpiloUpgrade = fromCRD.EnableLazySpiloUpgrade
 	result.EnablePgVersionEnvVar = fromCRD.EnablePgVersionEnvVar

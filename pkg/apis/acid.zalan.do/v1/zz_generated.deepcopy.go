@@ -428,11 +428,6 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 		*out = new(bool)
 		**out = **in
 	}
-	if in.EnableCRDValidation != nil {
-		in, out := &in.EnableCRDValidation, &out.EnableCRDValidation
-		*out = new(bool)
-		**out = **in
-	}
 	if in.CRDCategories != nil {
 		in, out := &in.CRDCategories, &out.CRDCategories
 		*out = make([]string, len(*in))

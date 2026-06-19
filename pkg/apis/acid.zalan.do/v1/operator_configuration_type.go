@@ -378,9 +378,7 @@ type PatroniConfiguration struct {
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
 	// +kubebuilder:default=true
-	EnableCRDRegistration *bool `json:"enable_crd_registration,omitempty"`
-	// +kubebuilder:default=true
-	EnableCRDValidation    *bool    `json:"enable_crd_validation,omitempty"`
+	EnableCRDRegistration  *bool    `json:"enable_crd_registration,omitempty"`
 	CRDCategories          []string `json:"crd_categories,omitempty"`
 	EnableLazySpiloUpgrade bool     `json:"enable_lazy_spilo_upgrade,omitempty"`
 	// +kubebuilder:default=true

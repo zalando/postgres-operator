@@ -143,9 +143,6 @@ spec:
               enable_crd_registration:
                 default: true
                 type: boolean
-              enable_crd_validation:
-                default: true
-                type: boolean
               enable_lazy_spilo_upgrade:
                 type: boolean
               enable_maintenance_windows:
