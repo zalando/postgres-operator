@@ -70,8 +70,8 @@ $(GENERATED_CRDS): $(GENERATED)
 	@rm manifests/acid.zalan.do_operatorconfigurations.yaml
 	@mv manifests/acid.zalan.do_postgresqls.yaml manifests/postgresql.crd.yaml
 	@# hack to use lowercase kind and listKind
-	@sed -i '' -e 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml
-	@sed -i '' -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
+	@sed -i -e 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml
+	@sed -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
 	@hack/adjust_postgresql_crd.sh
 	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
 	@cp manifests/postgresql.crd.yaml pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
