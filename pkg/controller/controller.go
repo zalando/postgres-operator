@@ -357,13 +357,14 @@ func (c *Controller) initController() {
 		c.config.InfrastructureRoles = infraRoles
 	}
 
+	c.clusterEventStores = make([]cache.Store, c.opConfig.Workers)
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
 	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
 		keyFn := func(obj interface{}) (string, error) {
 			e, ok := obj.(ClusterEvent)
 			if !ok {
-				return "", fmt.Errorf("could not cast to ClusterEvent")
+				return "", fmt.Errorf("could not cast to cluster event")
 			}
 			return queueClusterKey(e.EventType, e.UID), nil
 		}

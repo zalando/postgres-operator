@@ -383,7 +383,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 			}
 			c.processEvent(event, isInitialList)
 			if err := c.clusterEventStores[idx].Delete(obj); err != nil {
-				c.logger.Errorf("failed to delete key from store: %v", err)
+				c.logger.Errorf("failed to delete key from lookup store: %v", err)
 			}
 			return nil
 		}))
@@ -528,6 +528,9 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	}
 
 	lg := c.logger.WithField("worker", workerID).WithField("cluster-name", clusterName)
+	if err := c.clusterEventStores[workerID].Add(clusterEvent); err != nil {
+		lg.Errorf("error while storing cluster event for lookup: %v", clusterEvent)
+	}
 	if err := (*c.clusterEventQueues[workerID]).Add(clusterEvent); err != nil {
 		lg.Errorf("error while queueing cluster event: %v", clusterEvent)
 	}

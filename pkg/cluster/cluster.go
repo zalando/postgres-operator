@@ -129,7 +129,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	keyFn := func(obj interface{}) (string, error) {
 		e, ok := obj.(PodEvent)
 		if !ok {
-			return "", fmt.Errorf("could not cast to PodEvent")
+			return "", fmt.Errorf("could not cast to pod event")
 		}
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
@@ -1397,7 +1397,7 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 				}
 				c.processPodEvent(event, isInInitialList)
 				if err := c.podEventsStore.Delete(obj); err != nil {
-					c.logger.Errorf("failed to delete key from store: %v", err)
+					c.logger.Errorf("failed to delete key from lookup store: %v", err)
 				}
 				return nil
 			}))
