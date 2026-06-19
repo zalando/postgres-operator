@@ -924,6 +924,21 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) *compareLog
 		reasons = append(reasons, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(contReasons, `', '`)))
 	}
 
+	if !reflect.DeepEqual(cur.Spec.SuccessfulJobsHistoryLimit, new.Spec.SuccessfulJobsHistoryLimit) {
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's successfulJobsHistoryLimit %v does not match the current one %v", new.Spec.SuccessfulJobsHistoryLimit, cur.Spec.SuccessfulJobsHistoryLimit))
+	}
+
+	if !reflect.DeepEqual(cur.Spec.FailedJobsHistoryLimit, new.Spec.FailedJobsHistoryLimit) {
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's failedJobsHistoryLimit %v does not match the current one %v", new.Spec.FailedJobsHistoryLimit, cur.Spec.FailedJobsHistoryLimit))
+	}
+
+	if !reflect.DeepEqual(cur.Spec.JobTemplate.Spec.TTLSecondsAfterFinished, new.Spec.JobTemplate.Spec.TTLSecondsAfterFinished) {
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's TTLSecondsAfterFinished %v does not match the current one %v", new.Spec.JobTemplate.Spec.TTLSecondsAfterFinished, cur.Spec.JobTemplate.Spec.TTLSecondsAfterFinished))
+	}
+
 	return &compareLogicalBackupJobResult{match: match, reasons: reasons, deletedPodAnnotations: deletedPodAnnotations}
 }
 
