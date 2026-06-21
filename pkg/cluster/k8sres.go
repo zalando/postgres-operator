@@ -862,6 +862,10 @@ func (c *Cluster) generatePodTemplate(
 		securityContext.FSGroup = c.Spec.SpiloFSGroup
 	}
 
+	if len(c.OpConfig.PodSysctls) > 0 {
+		securityContext.Sysctls = c.OpConfig.PodSysctls
+	}
+
 	podSpec := v1.PodSpec{
 		ServiceAccountName:            podServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,

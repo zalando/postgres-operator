@@ -93,6 +93,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.SpiloRunAsGroup = fromCRD.Kubernetes.SpiloRunAsGroup
 	result.SpiloFSGroup = fromCRD.Kubernetes.SpiloFSGroup
 	result.AdditionalPodCapabilities = fromCRD.Kubernetes.AdditionalPodCapabilities
+	result.PodSysctls = fromCRD.Kubernetes.PodSysctls
 	result.ClusterDomain = util.Coalesce(fromCRD.Kubernetes.ClusterDomain, "cluster.local")
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat

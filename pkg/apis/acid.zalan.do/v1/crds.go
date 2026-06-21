@@ -594,6 +594,23 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pod_service_account_role_binding_definition": {
 								Type: "string",
 							},
+							"pod_sysctls": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type:     "object",
+										Required: []string{"name", "value"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"name": {
+												Type: "string",
+											},
+											"value": {
+												Type: "string",
+											},
+										},
+									},
+								},
+							},
 							"pod_terminate_grace_period": {
 								Type: "string",
 							},

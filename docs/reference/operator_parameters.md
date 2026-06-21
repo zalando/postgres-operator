@@ -548,6 +548,18 @@ configuration they are grouped under the `kubernetes` key.
   PodSecruityPolicy allows the capabilities listed here. Otherwise, the
   container will not start. The default is empty.
 
+* **pod_sysctls**
+  list of sysctls applied to the pod-level `securityContext.sysctls` of every
+  Postgres pod (and any sidecar/init containers sharing the pod). Each entry is
+  `{name, value}`. Useful when a cluster-wide mutating admission webhook
+  (e.g. an internal platform policy) injects sysctls into the pod template;
+  declaring the same list here lets the operator-generated template match the
+  webhook-mutated cluster state, so the statefulset comparator does not flag a
+  spurious diff and trigger a rolling update on every sync. The list is applied
+  verbatim, so the order and values must match what the webhook expects. The
+  default is empty (no sysctls). Only available in the OperatorConfiguration
+  CRD configuration mode.
+
 * **master_pod_move_timeout**
   The period of time to wait for the success of migration of master pods from
   an unschedulable node. The migration includes Patroni switchovers to

@@ -1514,6 +1514,64 @@ func TestNodeAffinity(t *testing.T) {
 	assert.Equal(t, s.Spec.Template.Spec.Affinity.NodeAffinity, nodeAff, "cluster template has correct node affinity")
 }
 
+func TestPodSysctls(t *testing.T) {
+	spec := acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: &acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+		},
+		Volume: acidv1.Volume{Size: "1G"},
+	}
+
+	t.Run("sysctls applied to pod securityContext when configured", func(t *testing.T) {
+		sysctls := []v1.Sysctl{
+			{Name: "net.ipv4.tcp_keepalive_time", Value: "600"},
+			{Name: "net.ipv4.tcp_keepalive_intvl", Value: "20"},
+			{Name: "net.ipv4.tcp_keepalive_probes", Value: "3"},
+		}
+		cluster := New(
+			Config{
+				OpConfig: config.Config{
+					PodManagementPolicy: "ordered_ready",
+					ProtectedRoles:      []string{"admin"},
+					Auth: config.Auth{
+						SuperUsername:       superUserName,
+						ReplicationUsername: replicationUserName,
+					},
+					Resources: config.Resources{
+						PodSysctls: sysctls,
+					},
+				},
+			}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+		s, err := cluster.generateStatefulSet(&spec)
+		assert.NoError(t, err)
+		assert.NotNil(t, s.Spec.Template.Spec.SecurityContext, "pod SecurityContext should not be nil")
+		assert.Equal(t, sysctls, s.Spec.Template.Spec.SecurityContext.Sysctls,
+			"pod securityContext.sysctls should match operator configuration")
+	})
+
+	t.Run("sysctls omitted when not configured", func(t *testing.T) {
+		cluster := New(
+			Config{
+				OpConfig: config.Config{
+					PodManagementPolicy: "ordered_ready",
+					ProtectedRoles:      []string{"admin"},
+					Auth: config.Auth{
+						SuperUsername:       superUserName,
+						ReplicationUsername: replicationUserName,
+					},
+				},
+			}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+		s, err := cluster.generateStatefulSet(&spec)
+		assert.NoError(t, err)
+		assert.Nil(t, s.Spec.Template.Spec.SecurityContext.Sysctls,
+			"pod securityContext.sysctls should be nil when pod_sysctls is empty")
+	})
+}
+
 func TestPodAffinity(t *testing.T) {
 	clusterName := "acid-test-cluster"
 	namespace := "default"
