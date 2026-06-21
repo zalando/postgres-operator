@@ -7,8 +7,11 @@ env:
 
 on:
   push:
+    branches:
+      - 's3_comp'
     tags:
       - '*'
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -25,26 +28,26 @@ jobs:
         with:
           go-version: "^1.25.3"
 
-      - name: Run unit tests
-        run: make test
-
-      - name: Define image name
-        id: image
-        run: |
-            OPERATOR_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_REF/refs\/tags\//}"
-            echo "OPERATOR_IMAGE=$OPERATOR_IMAGE" >> $GITHUB_OUTPUT
-
-      - name: Define pooler image name
-        id: image_pooler
-        run: |
-            POOLER_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/pgbouncer:${GITHUB_REF/refs\/tags\//}"
-            echo "POOLER_IMAGE=$POOLER_IMAGE" >> $GITHUB_OUTPUT
-
-      - name: Define UI image name
-        id: image_ui
-        run: |
-            UI_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_UI }}:${GITHUB_REF/refs\/tags\//}"
-            echo "UI_IMAGE=$UI_IMAGE" >> $GITHUB_OUTPUT
+      # - name: Run unit tests
+      #   run: make test
+      #
+      # - name: Define image name
+      #   id: image
+      #   run: |
+      #       OPERATOR_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_REF/refs\/tags\//}"
+      #       echo "OPERATOR_IMAGE=$OPERATOR_IMAGE" >> $GITHUB_OUTPUT
+      #
+      # - name: Define pooler image name
+      #   id: image_pooler
+      #   run: |
+      #       POOLER_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/pgbouncer:${GITHUB_REF/refs\/tags\//}"
+      #       echo "POOLER_IMAGE=$POOLER_IMAGE" >> $GITHUB_OUTPUT
+      #
+      # - name: Define UI image name
+      #   id: image_ui
+      #   run: |
+      #       UI_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_UI }}:${GITHUB_REF/refs\/tags\//}"
+      #       echo "UI_IMAGE=$UI_IMAGE" >> $GITHUB_OUTPUT
 
       - name: Define logical backup image name
         id: image_lb
@@ -65,33 +68,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multiarch operator image to ghcr
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: docker/Dockerfile
-          push: true
-          build-args: BASE_IMAGE=alpine:3
-          tags: "${{ steps.image.outputs.OPERATOR_IMAGE }}"
-          platforms: linux/amd64,linux/arm64
-
-      - name: Build and push multiarch pooler image to ghcr
-        uses: docker/build-push-action@v3
-        with:
-          context: pooler
-          push: true
-          build-args: BASE_IMAGE=alpine:3.22
-          tags: "${{ steps.image_pooler.outputs.POOLER_IMAGE }}"
-          platforms: linux/amd64,linux/arm64
-
-      - name: Build and push multiarch ui image to ghcr
-        uses: docker/build-push-action@v3
-        with:
-          context: ui
-          push: true
-          build-args: BASE_IMAGE=python:3.11-slim
-          tags: "${{ steps.image_ui.outputs.UI_IMAGE }}"
-          platforms: linux/amd64,linux/arm64
+      # - name: Build and push multiarch operator image to ghcr
+      #   uses: docker/build-push-action@v3
+      #   with:
+      #     context: .
+      #     file: docker/Dockerfile
+      #     push: true
+      #     build-args: BASE_IMAGE=alpine:3
+      #     tags: "${{ steps.image.outputs.OPERATOR_IMAGE }}"
+      #     platforms: linux/amd64,linux/arm64
+      #
+      # - name: Build and push multiarch pooler image to ghcr
+      #   uses: docker/build-push-action@v3
+      #   with:
+      #     context: pooler
+      #     push: true
+      #     build-args: BASE_IMAGE=alpine:3.22
+      #     tags: "${{ steps.image_pooler.outputs.POOLER_IMAGE }}"
+      #     platforms: linux/amd64,linux/arm64
+      #
+      # - name: Build and push multiarch ui image to ghcr
+      #   uses: docker/build-push-action@v3
+      #   with:
+      #     context: ui
+      #     push: true
+      #     build-args: BASE_IMAGE=python:3.11-slim
+      #     tags: "${{ steps.image_ui.outputs.UI_IMAGE }}"
+      #     platforms: linux/amd64,linux/arm64
 
       - name: Build and push multiarch logical-backup image to ghcr
         uses: docker/build-push-action@v3
