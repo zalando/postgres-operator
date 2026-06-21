@@ -7,6 +7,7 @@ data:
   # additional_pod_capabilities: "SYS_NICE"
   # additional_secret_mount: "some-secret-name"
   # additional_secret_mount_path: "/some/dir"
+  # api_address: ""
   api_port: "8080"
   aws_region: eu-central-1
   cluster_domain: cluster.local
