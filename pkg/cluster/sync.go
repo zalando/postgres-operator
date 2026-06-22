@@ -76,7 +76,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
-	//TODO: mind the secrets of the deleted/new users
+	// TODO: mind the secrets of the deleted/new users
 	if err = c.syncSecrets(); err != nil {
 		err = fmt.Errorf("could not sync secrets: %v", err)
 		return err
@@ -869,7 +869,6 @@ func (c *Cluster) restartInstance(pod *v1.Pod, restartWait uint32) error {
 // AnnotationsToPropagate get the annotations to update if required
 // based on the annotations in postgres CRD
 func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[string]string {
-
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
@@ -1140,7 +1139,8 @@ func (c *Cluster) updateSecret(
 	secretUsername string,
 	generatedSecret *v1.Secret,
 	retentionUsers *[]string,
-	currentTime time.Time) (*v1.Secret, error) {
+	currentTime time.Time,
+) (*v1.Secret, error) {
 	var (
 		secret          *v1.Secret
 		err             error
@@ -1296,7 +1296,8 @@ func (c *Cluster) rotatePasswordInSecret(
 	secretUsername string,
 	roleOrigin spec.RoleOrigin,
 	currentTime time.Time,
-	retentionUsers *[]string) (string, error) {
+	retentionUsers *[]string,
+) (string, error) {
 	var (
 		err                 error
 		nextRotationDate    time.Time
@@ -1521,7 +1522,7 @@ func (c *Cluster) syncDatabases() error {
 	preparedDatabases := make([]string, 0)
 
 	if err := c.initDbConn(); err != nil {
-		return fmt.Errorf("could not init database connection")
+		return fmt.Errorf("could not init database connection: %v", err)
 	}
 	defer func() {
 		if err := c.closeDbConn(); err != nil {
@@ -1605,7 +1606,7 @@ func (c *Cluster) syncPreparedDatabases() error {
 	errors := make([]string, 0)
 
 	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
-		if err := c.initDbConnWithName(preparedDbName); err != nil {
+		if err := c.initDbConnWithNameContext(c.ctx, preparedDbName); err != nil {
 			errors = append(errors, fmt.Sprintf("could not init connection to database %s: %v", preparedDbName, err))
 			continue
 		}
@@ -1749,7 +1750,8 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			}
 			if len(cmp.deletedPodAnnotations) != 0 {
 				templateMetadataReq := map[string]map[string]map[string]map[string]map[string]map[string]map[string]*string{
-					"spec": {"jobTemplate": {"spec": {"template": {"metadata": {"annotations": {}}}}}}}
+					"spec": {"jobTemplate": {"spec": {"template": {"metadata": {"annotations": {}}}}}},
+				}
 				for _, anno := range cmp.deletedPodAnnotations {
 					templateMetadataReq["spec"]["jobTemplate"]["spec"]["template"]["metadata"]["annotations"][anno] = nil
 				}

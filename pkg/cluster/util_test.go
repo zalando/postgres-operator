@@ -294,7 +294,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 		return nil, err
 	}
 
-	cluster := New(
+	cluster := New(context.Background(),
 		Config{
 			OpConfig: config.Config{
 				PatroniAPICheckInterval: time.Duration(1),
@@ -658,6 +658,7 @@ func Test_trimCronjobName(t *testing.T) {
 
 func TestIsInMaintenanceWindow(t *testing.T) {
 	cluster := New(
+		context.Background(),
 		Config{
 			OpConfig: config.Config{
 				EnableMaintenanceWindows: util.True(),
@@ -670,7 +671,8 @@ func TestIsInMaintenanceWindow(t *testing.T) {
 					DefaultMemoryLimit:   "300Mi",
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder,
+	)
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
 
