@@ -103,7 +103,11 @@ func (c *Controller) createPostgresCRD() error {
 }
 
 func (c *Controller) createConfigurationCRD() error {
-	return c.createOperatorCRD(acidv1.ConfigurationCRD(c.opConfig.CRDCategories))
+	crd, err := acidv1.OperatorConfigurationCRD(c.opConfig.CRDCategories)
+	if err != nil {
+		return fmt.Errorf("could not create OperatorConfiguration CRD object: %v", err)
+	}
+	return c.createOperatorCRD(crd)
 }
 
 func readDecodedRole(s string) (*spec.PgUser, error) {
