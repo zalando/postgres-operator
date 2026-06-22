@@ -467,9 +467,11 @@ type OperatorConfigurationData struct {
 
 	// +kubebuilder:validation:Minimum=-1
 	// +kubebuilder:default=-1
+	// -1 = disabled
 	MinInstances int32 `json:"min_instances,omitempty"`
 	// +kubebuilder:validation:Minimum=-1
 	// +kubebuilder:default=-1
+	// -1 = disabled
 	MaxInstances int32 `json:"max_instances,omitempty"`
 
 	IgnoreInstanceLimitsAnnotationKey  string `json:"ignore_instance_limits_annotation_key,omitempty"`

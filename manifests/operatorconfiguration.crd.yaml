@@ -729,11 +729,13 @@ spec:
                 type: object
               max_instances:
                 default: -1
+                description: -1 = disabled
                 format: int32
                 minimum: -1
                 type: integer
               min_instances:
                 default: -1
+                description: -1 = disabled
                 format: int32
                 minimum: -1
                 type: integer
