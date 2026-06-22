@@ -67,15 +67,15 @@ $(GENERATED): go.mod $(CRD_SOURCES)
 
 $(GENERATED_CRDS): $(GENERATED)
 	go tool controller-gen crd:crdVersions=v1,allowDangerousTypes=true paths=./pkg/apis/acid.zalan.do/... output:crd:dir=manifests
-	# only generate postgresteam.crd.yaml and postgresql.crd.yaml for now
-	@rm manifests/acid.zalan.do_operatorconfigurations.yaml
 	@mv manifests/acid.zalan.do_postgresqls.yaml manifests/postgresql.crd.yaml
 	@# hack to use lowercase kind and listKind
 	@sed -i -e 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml
 	@sed -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
 	@hack/adjust_postgresql_crd.sh
+	@mv manifests/acid.zalan.do_operatorconfigurations.yaml manifests/operatorconfiguration.crd.yaml
 	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
 	@cp manifests/postgresql.crd.yaml pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
+	@cp manifests/operatorconfiguration.crd.yaml pkg/apis/acid.zalan.do/v1/operatorconfiguration.crd.yaml
 
 local: ${SOURCES} $(GENERATED_CRDS)
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)

@@ -32,18 +32,26 @@ import (
 
 // fakeOperatorConfigurations implements OperatorConfigurationInterface
 type fakeOperatorConfigurations struct {
-	*gentype.FakeClient[*v1.OperatorConfiguration]
+	*gentype.FakeClientWithList[*v1.OperatorConfiguration, *v1.OperatorConfigurationList]
 	Fake *FakeAcidV1
 }
 
 func newFakeOperatorConfigurations(fake *FakeAcidV1, namespace string) acidzalandov1.OperatorConfigurationInterface {
 	return &fakeOperatorConfigurations{
-		gentype.NewFakeClient[*v1.OperatorConfiguration](
+		gentype.NewFakeClientWithList[*v1.OperatorConfiguration, *v1.OperatorConfigurationList](
 			fake.Fake,
 			namespace,
 			v1.SchemeGroupVersion.WithResource("operatorconfigurations"),
 			v1.SchemeGroupVersion.WithKind("OperatorConfiguration"),
 			func() *v1.OperatorConfiguration { return &v1.OperatorConfiguration{} },
+			func() *v1.OperatorConfigurationList { return &v1.OperatorConfigurationList{} },
+			func(dst, src *v1.OperatorConfigurationList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.OperatorConfigurationList) []*v1.OperatorConfiguration {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1.OperatorConfigurationList, items []*v1.OperatorConfiguration) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
 		),
 		fake,
 	}
