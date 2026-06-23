@@ -92,6 +92,7 @@ type Cluster struct {
 	mu               sync.Mutex
 	userSyncStrategy spec.UserSyncer
 	deleteOptions    metav1.DeleteOptions
+	podEventsStore   cache.Store
 	podEventsQueue   *cache.FIFO
 	replicationSlots map[string]interface{}
 
@@ -125,14 +126,17 @@ type compareLogicalBackupJobResult struct {
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
-	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
+	keyFn := func(obj interface{}) (string, error) {
 		e, ok := obj.(PodEvent)
 		if !ok {
-			return "", fmt.Errorf("could not cast to PodEvent")
+			return "", fmt.Errorf("could not cast to pod event")
 		}
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
-	})
+	}
+	podEventsStore := cache.NewStore(keyFn)
+	podEventsQueue := cache.NewFIFO(keyFn)
+
 	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
 	if !ok {
 		passwordEncryption = "scram-sha-256"
@@ -159,6 +163,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			AdditionalOwnerRoles: cfg.OpConfig.AdditionalOwnerRoles,
 		},
 		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
+		podEventsStore:      podEventsStore,
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
 		currentMajorVersion: 0,
@@ -1356,6 +1361,9 @@ func (c *Cluster) NeedsRepair() (bool, acidv1.PostgresStatus) {
 
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
 func (c *Cluster) ReceivePodEvent(event PodEvent) {
+	if err := c.podEventsStore.Add(event); err != nil {
+		c.logger.Errorf("error when receiving pod event for lookup: %v", err)
+	}
 	if err := c.podEventsQueue.Add(event); err != nil {
 		c.logger.Errorf("error when receiving pod events: %v", err)
 	}
@@ -1396,7 +1404,19 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 		case <-stopCh:
 			return
 		default:
-			if _, err := c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent)); err != nil {
+			_, err := c.podEventsQueue.Pop(cache.PopProcessFunc(func(obj interface{}, isInInitialList bool) error {
+				event, ok := obj.(PodEvent)
+				if !ok {
+					c.logger.Errorf("could not cast to pod event")
+					return nil // skip event to keep processing
+				}
+				c.processPodEvent(event, isInInitialList)
+				if err := c.podEventsStore.Delete(obj); err != nil {
+					c.logger.Errorf("failed to delete key from lookup store: %v", err)
+				}
+				return nil
+			}))
+			if err != nil {
 				c.logger.Errorf("error when processing pod event queue %v", err)
 			}
 		}

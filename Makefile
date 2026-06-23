@@ -2,6 +2,7 @@
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
+GOARCH ?= amd64
 CGO_ENABLED ?= 0
 ifeq ($(RACE),1)
 	BUILD_FLAGS += -race -a
@@ -83,10 +84,10 @@ wasm: ${SOURCES} $(GENERATED_CRDS)
 	GOOS=wasip1 GOARCH=wasm CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY}.wasm ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 linux: ${SOURCES} $(GENERATED_CRDS)
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
+	GOOS=linux GOARCH=${GOARCH} CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 macos: ${SOURCES} $(GENERATED_CRDS)
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
+	GOOS=darwin GOARCH=${GOARCH} CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 docker: $(GENERATED_CRDS) ${DOCKERDIR}/${DOCKERFILE}
 	echo `(env)`
@@ -100,10 +101,10 @@ pooler:
 	cd pooler; docker build --rm -t "$(POOLER_TAG)" --build-arg VERSION="${VERSION}" --build-arg BASE_IMAGE="${BASE_IMAGE}" .
 
 indocker-race:
-	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.25.3 bash -c "make linux"
+	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.26.4 bash -c "make linux"
 
 mocks:
-	GO111MODULE=on go generate ./...
+	go generate ./...
 
 fmt:
 	@gofmt -l -w -s $(DIRS)
@@ -113,7 +114,7 @@ vet:
 	@staticcheck $(PKG)
 
 test: mocks $(GENERATED) $(GENERATED_CRDS)
-	GO111MODULE=on go test ./...
+	go test ./...
 
 codegen: $(GENERATED)
 
