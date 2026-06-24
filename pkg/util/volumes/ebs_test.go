@@ -89,7 +89,7 @@ func TestVolumeBelongsToProvider(t *testing.T) {
 			name: "AWS EBS volume handle",
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string {
+					Annotations: map[string]string{
 						"pv.kubernetes.io/provisioned-by": "kubernetes.io/aws-ebs",
 					},
 				},
@@ -125,21 +125,21 @@ func TestVolumeBelongsToProvider(t *testing.T) {
 
 func TestTagVolumes(t *testing.T) {
 	tests := []struct {
-		name     string
-		volumes  []string
-		tags     map[string]string
+		name    string
+		volumes []string
+		tags    map[string]string
 		// We're testing the interface, not the actual tagging
 		// since that requires a mock EC2 client
 	}{
 		{
-			name: "Single volume with single tag",
+			name:    "Single volume with single tag",
 			volumes: []string{"vol-123456"},
 			tags: map[string]string{
 				"application": "my-app",
 			},
 		},
 		{
-			name: "Multiple volumes with multiple tags",
+			name:    "Multiple volumes with multiple tags",
 			volumes: []string{"vol-123456", "vol-789012"},
 			tags: map[string]string{
 				"application": "my-app",
