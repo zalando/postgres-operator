@@ -68,6 +68,10 @@ spec:
                   enable_ebs_gp3_migration_max_size:
                     format: int64
                     type: integer
+                  ebs_volume_tags_from_annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
                   gcp_credentials:
                     type: string
                   kube_iam_role:
