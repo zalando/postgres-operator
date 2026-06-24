@@ -36,6 +36,7 @@ data:
   # delete_annotation_name_key: delete-clustername
   docker_image: ghcr.io/zalando/spilo-18:4.1-p1
   # downscaler_annotations: "deployment-time,downscaler/*"
+  # ebs_volume_tags_from_annotations: "application:myorg.io/application,team:myorg.io/team"
   enable_admin_role_for_users: "true"
   enable_crd_registration: "true"
   enable_cross_namespace_secret: "false"
