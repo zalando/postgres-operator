@@ -169,6 +169,9 @@ configuration:
     aws_region: eu-central-1
     enable_ebs_gp3_migration: false
     # enable_ebs_gp3_migration_max_size: 1000
+    # ebs_volume_tags_from_annotations:
+    #   application: zalando.org/owning-application
+    #   team: zalando.org/team
     # gcp_credentials: ""
     # kube_iam_role: ""
     # log_s3_bucket: ""

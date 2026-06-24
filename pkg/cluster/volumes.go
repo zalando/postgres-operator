@@ -37,6 +37,9 @@ func (c *Cluster) syncVolumes() error {
 		if err != nil {
 			c.logger.Errorf("populating EBS meta data failed, skipping potential adjustments: %v", err)
 		} else {
+			if err = c.tagEBSVolumes(); err != nil {
+				c.logger.Warningf("tagging EBS volumes failed: %v", err)
+			}
 			err = c.syncUnderlyingEBSVolume()
 			if err != nil {
 				c.logger.Errorf("errors occurred during EBS volume adjustments: %v", err)
@@ -56,6 +59,11 @@ func (c *Cluster) syncVolumes() error {
 		// TODO: handle the case of the cluster that is downsized and enlarged again
 		// (there will be a volume from the old pod for which we can't act before the
 		//  the statefulset modification is concluded)
+		if err = c.populateVolumeMetaData(); err != nil {
+			c.logger.Warningf("populating EBS meta data failed, skipping EBS volume tagging: %v", err)
+		} else if err = c.tagEBSVolumes(); err != nil {
+			c.logger.Warningf("tagging EBS volumes failed: %v", err)
+		}
 		if err = c.syncEbsVolumes(); err != nil {
 			err = fmt.Errorf("could not sync persistent volumes: %v", err)
 			return err
@@ -496,4 +504,81 @@ func (c *Cluster) executeEBSMigration() error {
 	}
 
 	return nil
+}
+
+// tagEBSVolumes tags EBS volumes based on the configured annotation-to-tag mappings
+// Only tags volumes that don't already have the desired tags
+func (c *Cluster) tagEBSVolumes() error {
+	if c.VolumeResizer == nil {
+		return fmt.Errorf("no volume resizer set for EBS volume tagging")
+	}
+
+	if len(c.OpConfig.EBSVolumeTagsFromAnnotations) == 0 {
+		c.logger.Debugf("no annotation-to-tag mappings configured, skipping EBS volume tagging")
+		return nil
+	}
+
+	if len(c.EBSVolumes) == 0 {
+		c.logger.Debugf("no EBS volumes found for tagging")
+		return nil
+	}
+
+	desiredTags := make(map[string]string)
+	for tagName, annotationKey := range c.OpConfig.EBSVolumeTagsFromAnnotations {
+		annotationValue, ok := c.ObjectMeta.Annotations[annotationKey]
+		if !ok || annotationValue == "" {
+			c.logger.Debugf("annotation %q not found or empty, skipping tag %q", annotationKey, tagName)
+			continue
+		}
+		desiredTags[tagName] = annotationValue
+	}
+
+	if len(desiredTags) == 0 {
+		c.logger.Debugf("no tags to apply from configured annotations")
+		return nil
+	}
+
+	// Filter volumes that need tagging
+	volumesToTag := make([]string, 0, len(c.EBSVolumes))
+	for volumeID, volumeProps := range c.EBSVolumes {
+		if c.tagsNeedUpdate(volumeProps.Tags, desiredTags) {
+			volumesToTag = append(volumesToTag, volumeID)
+		}
+	}
+
+	if len(volumesToTag) == 0 {
+		c.logger.Debugf("all EBS volumes already have the desired tags")
+		return nil
+	}
+
+	if !c.VolumeResizer.IsConnectedToProvider() {
+		err := c.VolumeResizer.ConnectToProvider()
+		if err != nil {
+			return fmt.Errorf("could not connect to volume provider for tagging: %v", err)
+		}
+		defer func() {
+			if err := c.VolumeResizer.DisconnectFromProvider(); err != nil {
+				c.logger.Errorf("disconnecting from volume provider failed: %v", err)
+			}
+		}()
+	}
+
+	err := c.VolumeResizer.TagVolumes(volumesToTag, desiredTags)
+	if err != nil {
+		return fmt.Errorf("could not tag EBS volumes: %v", err)
+	}
+
+	c.logger.Infof("successfully tagged %d EBS volumes with tags: %v", len(volumesToTag), desiredTags)
+	return nil
+}
+
+// tagsNeedUpdate checks if the desired tags differ from existing tags
+func (c *Cluster) tagsNeedUpdate(existingTags, desiredTags map[string]string) bool {
+	for key, desiredValue := range desiredTags {
+		existingValue, exists := existingTags[key]
+		if !exists || existingValue != desiredValue {
+			return true
+		}
+	}
+	return false
 }

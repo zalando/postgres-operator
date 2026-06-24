@@ -201,6 +201,7 @@ type Config struct {
 	AdditionalSecretMountPath                string            `name:"additional_secret_mount_path"`
 	EnableEBSGp3Migration                    bool              `name:"enable_ebs_gp3_migration" default:"false"`
 	EnableEBSGp3MigrationMaxSize             int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
+	EBSVolumeTagsFromAnnotations              map[string]string `name:"ebs_volume_tags_from_annotations" default:""`
 	DebugLogging                             bool              `name:"debug_logging" default:"true"`
 	EnableDBAccess                           bool              `name:"enable_database_access" default:"true"`
 	EnableTeamsAPI                           bool              `name:"enable_teams_api" default:"true"`
