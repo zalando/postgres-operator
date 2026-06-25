@@ -2624,13 +2624,13 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3, Patroni: acidv1.Patroni{SynchronousModeStrict: true, SynchronousNodeCount: 1}}},
 				logger,
 				eventRecorder),
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
 				hasName("postgres-myapp-database-pdb"),
-				hasMinAvailable(1),
+				hasMinAvailable(2),
 				testLabelsAndSelectors(true),
 			},
 		},
