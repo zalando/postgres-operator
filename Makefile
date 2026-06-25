@@ -2,6 +2,7 @@
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
+GOARCH ?= amd64
 CGO_ENABLED ?= 0
 ifeq ($(RACE),1)
 	BUILD_FLAGS += -race -a
@@ -66,15 +67,15 @@ $(GENERATED): go.mod $(CRD_SOURCES)
 
 $(GENERATED_CRDS): $(GENERATED)
 	go tool controller-gen crd:crdVersions=v1,allowDangerousTypes=true paths=./pkg/apis/acid.zalan.do/... output:crd:dir=manifests
-	# only generate postgresteam.crd.yaml and postgresql.crd.yaml for now
-	@rm manifests/acid.zalan.do_operatorconfigurations.yaml
 	@mv manifests/acid.zalan.do_postgresqls.yaml manifests/postgresql.crd.yaml
 	@# hack to use lowercase kind and listKind
 	@sed -i -e 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml
 	@sed -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
 	@hack/adjust_postgresql_crd.sh
+	@mv manifests/acid.zalan.do_operatorconfigurations.yaml manifests/operatorconfiguration.crd.yaml
 	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
 	@cp manifests/postgresql.crd.yaml pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
+	@cp manifests/operatorconfiguration.crd.yaml pkg/apis/acid.zalan.do/v1/operatorconfiguration.crd.yaml
 
 local: ${SOURCES} $(GENERATED_CRDS)
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)
@@ -83,10 +84,10 @@ wasm: ${SOURCES} $(GENERATED_CRDS)
 	GOOS=wasip1 GOARCH=wasm CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY}.wasm ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 linux: ${SOURCES} $(GENERATED_CRDS)
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
+	GOOS=linux GOARCH=${GOARCH} CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 macos: ${SOURCES} $(GENERATED_CRDS)
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
+	GOOS=darwin GOARCH=${GOARCH} CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $(SOURCES)
 
 docker: $(GENERATED_CRDS) ${DOCKERDIR}/${DOCKERFILE}
 	echo `(env)`
@@ -100,10 +101,10 @@ pooler:
 	cd pooler; docker build --rm -t "$(POOLER_TAG)" --build-arg VERSION="${VERSION}" --build-arg BASE_IMAGE="${BASE_IMAGE}" .
 
 indocker-race:
-	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.25.3 bash -c "make linux"
+	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.26.4 bash -c "make linux"
 
 mocks:
-	GO111MODULE=on go generate ./...
+	go generate ./...
 
 fmt:
 	@gofmt -l -w -s $(DIRS)
@@ -113,7 +114,7 @@ vet:
 	@staticcheck $(PKG)
 
 test: mocks $(GENERATED) $(GENERATED_CRDS)
-	GO111MODULE=on go test ./...
+	go test ./...
 
 codegen: $(GENERATED)
 

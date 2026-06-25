@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/filesystems"
@@ -91,18 +91,18 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 		var modifyType *string
 
 		if targetValue.Iops != nil && *targetValue.Iops >= int64(3000) {
-			if volume.Iops != *targetValue.Iops {
+			if volume.Iops != int64(*targetValue.Iops) {
 				modifyIops = targetValue.Iops
 			}
 		}
 
 		if targetValue.Throughput != nil && *targetValue.Throughput >= int64(125) {
-			if volume.Throughput != *targetValue.Throughput {
+			if volume.Throughput != int64(*targetValue.Throughput) {
 				modifyThroughput = targetValue.Throughput
 			}
 		}
 
-		if targetSize > volume.Size {
+		if targetSize > int64(volume.Size) {
 			modifySize = &targetSize
 		}
 

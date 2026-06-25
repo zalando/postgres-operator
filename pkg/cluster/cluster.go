@@ -92,6 +92,7 @@ type Cluster struct {
 	mu               sync.Mutex
 	userSyncStrategy spec.UserSyncer
 	deleteOptions    metav1.DeleteOptions
+	podEventsStore   cache.Store
 	podEventsQueue   *cache.FIFO
 	replicationSlots map[string]interface{}
 
@@ -125,14 +126,17 @@ type compareLogicalBackupJobResult struct {
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
-	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
+	keyFn := func(obj interface{}) (string, error) {
 		e, ok := obj.(PodEvent)
 		if !ok {
-			return "", fmt.Errorf("could not cast to PodEvent")
+			return "", fmt.Errorf("could not cast to pod event")
 		}
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
-	})
+	}
+	podEventsStore := cache.NewStore(keyFn)
+	podEventsQueue := cache.NewFIFO(keyFn)
+
 	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
 	if !ok {
 		passwordEncryption = "scram-sha-256"
@@ -159,6 +163,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			AdditionalOwnerRoles: cfg.OpConfig.AdditionalOwnerRoles,
 		},
 		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
+		podEventsStore:      podEventsStore,
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
 		currentMajorVersion: 0,
@@ -859,6 +864,14 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 		return false, "new service's ExternalTrafficPolicy does not match the current one"
 	}
 
+	if len(old.Spec.Ports) > 0 && len(new.Spec.Ports) > 0 {
+		// we need to check whether the new port is not zero (=user-defined)
+		// and only overwrite if it is
+		if new.Spec.Ports[0].NodePort != 0 && old.Spec.Ports[0].NodePort != new.Spec.Ports[0].NodePort {
+			return false, "new service's NodePort does not match the current one"
+		}
+	}
+
 	return true, ""
 }
 
@@ -893,12 +906,37 @@ func (c *Cluster) compareLogicalBackupJob(cur, new *batchv1.CronJob) *compareLog
 		reasons = append(reasons, fmt.Sprintf("new job's env PG_VERSION %q does not match the current one %q", newPgVersion, curPgVersion))
 	}
 
+	if !reflect.DeepEqual(cur.Labels, new.Labels) {
+		match = false
+		reasons = append(reasons, "new job's labels do not match the current ones")
+	}
+
+	if !reflect.DeepEqual(cur.Spec.JobTemplate.Labels, new.Spec.JobTemplate.Labels) {
+		match = false
+		reasons = append(reasons, "new job's template labels do not match the current ones")
+	}
+
 	needsReplace := false
 	contReasons := make([]string, 0)
 	needsReplace, contReasons = c.compareContainers("cronjob container", cur.Spec.JobTemplate.Spec.Template.Spec.Containers, new.Spec.JobTemplate.Spec.Template.Spec.Containers, needsReplace, contReasons)
 	if needsReplace {
 		match = false
 		reasons = append(reasons, fmt.Sprintf("logical backup container specs do not match: %v", strings.Join(contReasons, `', '`)))
+	}
+
+	if !reflect.DeepEqual(cur.Spec.SuccessfulJobsHistoryLimit, new.Spec.SuccessfulJobsHistoryLimit) {
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's successfulJobsHistoryLimit %v does not match the current one %v", new.Spec.SuccessfulJobsHistoryLimit, cur.Spec.SuccessfulJobsHistoryLimit))
+	}
+
+	if !reflect.DeepEqual(cur.Spec.FailedJobsHistoryLimit, new.Spec.FailedJobsHistoryLimit) {
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's failedJobsHistoryLimit %v does not match the current one %v", new.Spec.FailedJobsHistoryLimit, cur.Spec.FailedJobsHistoryLimit))
+	}
+
+	if !reflect.DeepEqual(cur.Spec.JobTemplate.Spec.TTLSecondsAfterFinished, new.Spec.JobTemplate.Spec.TTLSecondsAfterFinished) {
+		match = false
+		reasons = append(reasons, fmt.Sprintf("new job's TTLSecondsAfterFinished %v does not match the current one %v", new.Spec.JobTemplate.Spec.TTLSecondsAfterFinished, cur.Spec.JobTemplate.Spec.TTLSecondsAfterFinished))
 	}
 
 	return &compareLogicalBackupJobResult{match: match, reasons: reasons, deletedPodAnnotations: deletedPodAnnotations}
@@ -1323,6 +1361,9 @@ func (c *Cluster) NeedsRepair() (bool, acidv1.PostgresStatus) {
 
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
 func (c *Cluster) ReceivePodEvent(event PodEvent) {
+	if err := c.podEventsStore.Add(event); err != nil {
+		c.logger.Errorf("error when receiving pod event for lookup: %v", err)
+	}
 	if err := c.podEventsQueue.Add(event); err != nil {
 		c.logger.Errorf("error when receiving pod events: %v", err)
 	}
@@ -1363,7 +1404,19 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 		case <-stopCh:
 			return
 		default:
-			if _, err := c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent)); err != nil {
+			_, err := c.podEventsQueue.Pop(cache.PopProcessFunc(func(obj interface{}, isInInitialList bool) error {
+				event, ok := obj.(PodEvent)
+				if !ok {
+					c.logger.Errorf("could not cast to pod event")
+					return nil // skip event to keep processing
+				}
+				c.processPodEvent(event, isInInitialList)
+				if err := c.podEventsStore.Delete(obj); err != nil {
+					c.logger.Errorf("failed to delete key from lookup store: %v", err)
+				}
+				return nil
+			}))
+			if err != nil {
 				c.logger.Errorf("error when processing pod event queue %v", err)
 			}
 		}

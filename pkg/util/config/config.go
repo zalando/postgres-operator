@@ -19,7 +19,6 @@ type CRD struct {
 	ResyncPeriod          time.Duration `name:"resync_period" default:"30m"`
 	RepairPeriod          time.Duration `name:"repair_period" default:"5m"`
 	EnableCRDRegistration *bool         `name:"enable_crd_registration" default:"true"`
-	EnableCRDValidation   *bool         `name:"enable_crd_validation" default:"true"`
 	CRDCategories         []string      `name:"crd_categories" default:"all"`
 }
 
@@ -149,6 +148,9 @@ type LogicalBackup struct {
 	LogicalBackupMemoryRequest                string `name:"logical_backup_memory_request"`
 	LogicalBackupCPULimit                     string `name:"logical_backup_cpu_limit"`
 	LogicalBackupMemoryLimit                  string `name:"logical_backup_memory_limit"`
+	LogicalBackupSuccessfulJobsHistoryLimit   *int32 `name:"logical_backup_successful_jobs_history_limit" default:"3"`
+	LogicalBackupFailedJobsHistoryLimit       *int32 `name:"logical_backup_failed_jobs_history_limit" default:"3"`
+	LogicalBackupTTLSecondsAfterFinished      *int32 `name:"logical_backup_ttl_seconds_after_finished" default:"86400"`
 }
 
 // Operator options for connection pooler
@@ -219,6 +221,10 @@ type Config struct {
 	EnableMasterPoolerLoadBalancer           bool              `name:"enable_master_pooler_load_balancer" default:"false"`
 	EnableReplicaLoadBalancer                bool              `name:"enable_replica_load_balancer" default:"false"`
 	EnableReplicaPoolerLoadBalancer          bool              `name:"enable_replica_pooler_load_balancer" default:"false"`
+	EnableMasterNodePort                     bool              `name:"enable_master_node_port" default:"false"`
+	EnableMasterPoolerNodePort               bool              `name:"enable_master_pooler_node_port" default:"false"`
+	EnableReplicaNodePort                    bool              `name:"enable_replica_node_port" default:"false"`
+	EnableReplicaPoolerNodePort              bool              `name:"enable_replica_pooler_node_port" default:"false"`
 	CustomServiceAnnotations                 map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                     map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                    bool              `name:"enable_pod_antiaffinity" default:"false"`

@@ -2971,32 +2971,32 @@ func newLBFakeClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 	}, clientSet
 }
 
-func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPolicy, clusterName string) []v1.ServiceSpec {
+func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPolicy, clusterName string, nodePort int32) []v1.ServiceSpec {
 	return []v1.ServiceSpec{
 		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}, NodePort: nodePort}},
 			Type:                     serviceType,
 		},
 		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}, NodePort: nodePort}},
 			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler"},
 			Type:                     serviceType,
 		},
 		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}, NodePort: nodePort}},
 			Selector:                 map[string]string{"spilo-role": "replica", "application": "spilo", "cluster-name": clusterName},
 			Type:                     serviceType,
 		},
 		{
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
-			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			Ports:                    []v1.ServicePort{{Name: clusterName + "-pooler-repl", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}, NodePort: nodePort}},
 			Selector:                 map[string]string{"connection-pooler": clusterName + "-pooler-repl"},
 			Type:                     serviceType,
 		},
@@ -3064,7 +3064,7 @@ func TestEnableLoadBalancers(t *testing.T) {
 					},
 				},
 			},
-			expectedServices: getServices(v1.ServiceTypeClusterIP, nil, "", clusterName),
+			expectedServices: getServices(v1.ServiceTypeClusterIP, nil, "", clusterName, 0),
 		},
 		{
 			subTest: "LBs enabled in manifest, disabled in config",
@@ -3111,11 +3111,200 @@ func TestEnableLoadBalancers(t *testing.T) {
 					},
 				},
 			},
-			expectedServices: getServices(v1.ServiceTypeLoadBalancer, sourceRanges, extTrafficPolicy, clusterName),
+			expectedServices: getServices(v1.ServiceTypeLoadBalancer, sourceRanges, extTrafficPolicy, clusterName, 0),
 		},
 	}
 
 	for _, tt := range tests {
+		var cluster = New(
+			Config{
+				OpConfig: tt.config,
+			}, client, tt.pgSpec, logger, eventRecorder)
+
+		cluster.Name = clusterName
+		cluster.Namespace = namespace
+		cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
+		generatedServices := make([]v1.ServiceSpec, 0)
+		for _, role := range roles {
+			cluster.syncService(role)
+			cluster.ConnectionPooler[role] = &ConnectionPoolerObjects{
+				Name:        cluster.connectionPoolerName(role),
+				ClusterName: cluster.Name,
+				Namespace:   cluster.Namespace,
+				Role:        role,
+			}
+			cluster.syncConnectionPoolerWorker(&tt.pgSpec, &tt.pgSpec, role)
+			generatedServices = append(generatedServices, cluster.Services[role].Spec)
+			generatedServices = append(generatedServices, cluster.ConnectionPooler[role].Service.Spec)
+		}
+		if !reflect.DeepEqual(tt.expectedServices, generatedServices) {
+			t.Errorf("%s %s: expected %#v but got %#v", t.Name(), tt.subTest, tt.expectedServices, generatedServices)
+		}
+	}
+}
+
+func TestEnableNodePorts(t *testing.T) {
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	clusterNameLabel := "cluster-name"
+	roleLabel := "spilo-role"
+	roles := []PostgresRole{Master, Replica}
+	extTrafficPolicy := "Cluster"
+	port := int32(1337)
+
+	tests := []struct {
+		subTest          string
+		config           config.Config
+		pgSpec           acidv1.Postgresql
+		expectedServices []v1.ServiceSpec
+	}{
+		{
+			subTest: "NodePorts enabled in config, disabled in manifest",
+			config: config.Config{
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
+				},
+				EnableMasterNodePort:        true,
+				EnableMasterPoolerNodePort:  true,
+				EnableReplicaNodePort:       true,
+				EnableReplicaPoolerNodePort: true,
+				ExternalTrafficPolicy:       extTrafficPolicy,
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: clusterNameLabel,
+					PodRoleLabel:     roleLabel,
+				},
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					EnableConnectionPooler:        util.True(),
+					EnableReplicaConnectionPooler: util.True(),
+					EnableMasterNodePort:          util.False(),
+					EnableMasterPoolerNodePort:    util.False(),
+					EnableReplicaNodePort:         util.False(),
+					EnableReplicaPoolerNodePort:   util.False(),
+					NumberOfInstances:             1,
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedServices: getServices(v1.ServiceTypeClusterIP, nil, "", clusterName, 0),
+		},
+		{
+			subTest: "NodePorts configured in manifest, disabled in config",
+			config: config.Config{
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
+				},
+				EnableMasterNodePort:        false,
+				EnableMasterPoolerNodePort:  false,
+				EnableReplicaNodePort:       false,
+				EnableReplicaPoolerNodePort: false,
+				ExternalTrafficPolicy:       extTrafficPolicy,
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: clusterNameLabel,
+					PodRoleLabel:     roleLabel,
+				},
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					EnableConnectionPooler:        util.True(),
+					EnableReplicaConnectionPooler: util.True(),
+					EnableMasterNodePort:          util.True(),
+					EnableMasterPoolerNodePort:    util.True(),
+					EnableReplicaNodePort:         util.True(),
+					EnableReplicaPoolerNodePort:   util.True(),
+					NumberOfInstances:             1,
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedServices: getServices(v1.ServiceTypeNodePort, nil, extTrafficPolicy, clusterName, 0),
+		},
+		{
+			subTest: "NodePorts configured in manifest, disabled in config, custom port specified",
+			config: config.Config{
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
+				},
+				EnableMasterNodePort:        false,
+				EnableMasterPoolerNodePort:  false,
+				EnableReplicaNodePort:       false,
+				EnableReplicaPoolerNodePort: false,
+				ExternalTrafficPolicy:       extTrafficPolicy,
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: clusterNameLabel,
+					PodRoleLabel:     roleLabel,
+				},
+			},
+			pgSpec: acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: acidv1.PostgresSpec{
+					EnableConnectionPooler:        util.True(),
+					EnableReplicaConnectionPooler: util.True(),
+					EnableMasterNodePort:          util.True(),
+					MasterNodePort:                &port,
+					EnableMasterPoolerNodePort:    util.True(),
+					MasterPoolerNodePort:          &port,
+					EnableReplicaNodePort:         util.True(),
+					ReplicaNodePort:               &port,
+					EnableReplicaPoolerNodePort:   util.True(),
+					ReplicaPoolerNodePort:         &port,
+					NumberOfInstances:             1,
+					Resources: &acidv1.Resources{
+						ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+						ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+					},
+					TeamID: "acid",
+					Volume: acidv1.Volume{
+						Size: "1G",
+					},
+				},
+			},
+			expectedServices: getServices(v1.ServiceTypeNodePort, nil, extTrafficPolicy, clusterName, port),
+		},
+	}
+
+	for _, tt := range tests {
+		client, _ := newLBFakeClient()
+
 		var cluster = New(
 			Config{
 				OpConfig: tt.config,
@@ -3875,7 +4064,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -3900,7 +4089,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("10m"), Memory: k8sutil.StringToPointer("50Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("300m"), Memory: k8sutil.StringToPointer("300Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -3923,7 +4112,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("50m"), Memory: k8sutil.StringToPointer("100Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("250m"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -3946,7 +4135,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("200Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("200Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -3968,7 +4157,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
-			expectedLabel:      map[string]string{"labelKey": "labelValue", "cluster-name": clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", "labelKey": "labelValue", "cluster-name": clusterName, "team": teamId},
 			expectedAnnotation: nil,
 		},
 		{
@@ -3990,7 +4179,7 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("100m"), Memory: k8sutil.StringToPointer("100Mi")},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("500Mi")},
 			},
-			expectedLabel:      map[string]string{configResources.ClusterNameLabel: clusterName, "team": teamId},
+			expectedLabel:      map[string]string{"application": "spilo-logical-backup", configResources.ClusterNameLabel: clusterName, "team": teamId},
 			expectedAnnotation: map[string]string{"annotationKey": "annotationValue"},
 		},
 	}
@@ -4039,6 +4228,32 @@ func TestGenerateLogicalBackupJob(t *testing.T) {
 		assert.NoError(t, err)
 		if !reflect.DeepEqual(tt.expectedResources, clusterResources) {
 			t.Errorf("%s - %s: expected resources %#v, got %#v", t.Name(), tt.subTest, tt.expectedResources, clusterResources)
+		}
+
+		expectedSuccessfulJobsHistoryLimit := int32(3)
+		if cluster.OpConfig.LogicalBackup.LogicalBackupSuccessfulJobsHistoryLimit != nil {
+			expectedSuccessfulJobsHistoryLimit = *cluster.OpConfig.LogicalBackup.LogicalBackupSuccessfulJobsHistoryLimit
+		}
+		if *cronJob.Spec.SuccessfulJobsHistoryLimit != expectedSuccessfulJobsHistoryLimit {
+			t.Errorf("%s - %s: expected successfulJobsHistoryLimit %d, got %d", t.Name(), tt.subTest, expectedSuccessfulJobsHistoryLimit, *cronJob.Spec.SuccessfulJobsHistoryLimit)
+		}
+
+		expectedFailedJobsHistoryLimit := int32(3)
+		if cluster.OpConfig.LogicalBackup.LogicalBackupFailedJobsHistoryLimit != nil {
+			expectedFailedJobsHistoryLimit = *cluster.OpConfig.LogicalBackup.LogicalBackupFailedJobsHistoryLimit
+		}
+		if *cronJob.Spec.FailedJobsHistoryLimit != expectedFailedJobsHistoryLimit {
+			t.Errorf("%s - %s: expected failedJobsHistoryLimit %d, got %d", t.Name(), tt.subTest, expectedFailedJobsHistoryLimit, *cronJob.Spec.FailedJobsHistoryLimit)
+		}
+
+		expectedTTL := int32(86400)
+		if cluster.OpConfig.LogicalBackup.LogicalBackupTTLSecondsAfterFinished != nil {
+			expectedTTL = *cluster.OpConfig.LogicalBackup.LogicalBackupTTLSecondsAfterFinished
+		}
+		if cronJob.Spec.JobTemplate.Spec.TTLSecondsAfterFinished == nil {
+			t.Errorf("%s - %s: expected TTLSecondsAfterFinished to be set", t.Name(), tt.subTest)
+		} else if *cronJob.Spec.JobTemplate.Spec.TTLSecondsAfterFinished != expectedTTL {
+			t.Errorf("%s - %s: expected TTLSecondsAfterFinished %d, got %d", t.Name(), tt.subTest, expectedTTL, *cronJob.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
 		}
 	}
 }
