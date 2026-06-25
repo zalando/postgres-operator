@@ -24,6 +24,7 @@ import (
 // +kubebuilder:printcolumn:name="Min-Instances",type=integer,JSONPath=`.configuration.min_instances`,description="Minimum number of instances per Postgres cluster"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,description="Age of the OperatorConfiguration resource"
 // +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels=app.kubernetes.io/name=postgres-operator
 type OperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
