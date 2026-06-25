@@ -95,6 +95,7 @@ func TestCreate(t *testing.T) {
 
 	client := k8sutil.KubernetesClient{
 		DeploymentsGetter:            clientSet.AppsV1(),
+		ConfigMapsGetter:             clientSet.CoreV1(),
 		CronJobsGetter:               clientSet.BatchV1(),
 		EndpointsGetter:              clientSet.CoreV1(),
 		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
