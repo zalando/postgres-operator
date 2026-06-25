@@ -73,6 +73,7 @@ $(GENERATED_CRDS): $(GENERATED)
 	@sed -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
 	@hack/adjust_postgresql_crd.sh
 	@mv manifests/acid.zalan.do_operatorconfigurations.yaml manifests/operatorconfiguration.crd.yaml
+	@hack/adjust_operatorconfiguration_crd.sh
 	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
 	@cp manifests/postgresql.crd.yaml pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
 	@cp manifests/operatorconfiguration.crd.yaml pkg/apis/acid.zalan.do/v1/operatorconfiguration.crd.yaml
