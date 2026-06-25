@@ -31,7 +31,6 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// general config
 	result.EnableCRDRegistration = util.CoalesceBool(fromCRD.EnableCRDRegistration, util.True())
-	result.EnableCRDValidation = util.CoalesceBool(fromCRD.EnableCRDValidation, util.True())
 	result.CRDCategories = util.CoalesceStrArr(fromCRD.CRDCategories, []string{"all"})
 	result.EnableLazySpiloUpgrade = fromCRD.EnableLazySpiloUpgrade
 	result.EnablePgVersionEnvVar = fromCRD.EnablePgVersionEnvVar
@@ -217,6 +216,9 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupMemoryRequest = fromCRD.LogicalBackup.MemoryRequest
 	result.LogicalBackupCPULimit = fromCRD.LogicalBackup.CPULimit
 	result.LogicalBackupMemoryLimit = fromCRD.LogicalBackup.MemoryLimit
+	result.LogicalBackupSuccessfulJobsHistoryLimit = util.CoalesceInt32(fromCRD.LogicalBackup.SuccessfulJobsHistoryLimit, k8sutil.Int32ToPointer(3))
+	result.LogicalBackupFailedJobsHistoryLimit = util.CoalesceInt32(fromCRD.LogicalBackup.FailedJobsHistoryLimit, k8sutil.Int32ToPointer(3))
+	result.LogicalBackupTTLSecondsAfterFinished = fromCRD.LogicalBackup.TTLSecondsAfterFinished
 
 	// debug config
 	result.DebugLogging = *util.CoalesceBool(fromCRD.OperatorDebug.DebugLogging, util.True())

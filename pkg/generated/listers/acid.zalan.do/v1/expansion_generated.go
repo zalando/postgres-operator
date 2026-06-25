@@ -24,6 +24,14 @@ SOFTWARE.
 
 package v1
 
+// OperatorConfigurationListerExpansion allows custom methods to be added to
+// OperatorConfigurationLister.
+type OperatorConfigurationListerExpansion interface{}
+
+// OperatorConfigurationNamespaceListerExpansion allows custom methods to be added to
+// OperatorConfigurationNamespaceLister.
+type OperatorConfigurationNamespaceListerExpansion interface{}
+
 // PostgresTeamListerExpansion allows custom methods to be added to
 // PostgresTeamLister.
 type PostgresTeamListerExpansion interface{}
