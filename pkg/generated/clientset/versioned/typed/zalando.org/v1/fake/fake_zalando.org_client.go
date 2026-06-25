@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -35,7 +35,7 @@ type FakeZalandoV1 struct {
 }
 
 func (c *FakeZalandoV1) FabricEventStreams(namespace string) v1.FabricEventStreamInterface {
-	return &FakeFabricEventStreams{c, namespace}
+	return newFakeFabricEventStreams(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

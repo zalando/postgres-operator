@@ -31,7 +31,6 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// general config
 	result.EnableCRDRegistration = util.CoalesceBool(fromCRD.EnableCRDRegistration, util.True())
-	result.EnableCRDValidation = util.CoalesceBool(fromCRD.EnableCRDValidation, util.True())
 	result.CRDCategories = util.CoalesceStrArr(fromCRD.CRDCategories, []string{"all"})
 	result.EnableLazySpiloUpgrade = fromCRD.EnableLazySpiloUpgrade
 	result.EnablePgVersionEnvVar = fromCRD.EnablePgVersionEnvVar
@@ -39,17 +38,29 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableTeamIdClusternamePrefix = fromCRD.EnableTeamIdClusternamePrefix
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
-	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "ghcr.io/zalando/spilo-17:4.0-p2")
+	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "ghcr.io/zalando/spilo-18:4.1-p1")
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
 	result.IgnoreInstanceLimitsAnnotationKey = fromCRD.IgnoreInstanceLimitsAnnotationKey
+	result.IgnoreResourcesLimitsAnnotationKey = fromCRD.IgnoreResourcesLimitsAnnotationKey
 	result.ResyncPeriod = util.CoalesceDuration(time.Duration(fromCRD.ResyncPeriod), "30m")
 	result.RepairPeriod = util.CoalesceDuration(time.Duration(fromCRD.RepairPeriod), "5m")
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 	result.ShmVolume = util.CoalesceBool(fromCRD.ShmVolume, util.True())
 	result.SidecarImages = fromCRD.SidecarImages
 	result.SidecarContainers = fromCRD.SidecarContainers
+	result.EnableMaintenanceWindows = util.CoalesceBool(fromCRD.EnableMaintenanceWindows, util.True())
+	if len(fromCRD.MaintenanceWindows) > 0 {
+		result.MaintenanceWindows = make([]string, 0, len(fromCRD.MaintenanceWindows))
+		for _, window := range fromCRD.MaintenanceWindows {
+			w, err := window.MarshalJSON()
+			if err != nil {
+				panic(fmt.Errorf("could not marshal configured maintenance window: %v", err))
+			}
+			result.MaintenanceWindows = append(result.MaintenanceWindows, string(w))
+		}
+	}
 
 	// user config
 	result.SuperUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.SuperUsername, "postgres")
@@ -62,8 +73,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// major version upgrade config
 	result.MajorVersionUpgradeMode = util.Coalesce(fromCRD.MajorVersionUpgrade.MajorVersionUpgradeMode, "manual")
 	result.MajorVersionUpgradeTeamAllowList = fromCRD.MajorVersionUpgrade.MajorVersionUpgradeTeamAllowList
-	result.MinimalMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.MinimalMajorVersion, "13")
-	result.TargetMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.TargetMajorVersion, "17")
+	result.MinimalMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.MinimalMajorVersion, "14")
+	result.TargetMajorVersion = util.Coalesce(fromCRD.MajorVersionUpgrade.TargetMajorVersion, "18")
 
 	// kubernetes config
 	result.EnableOwnerReferences = util.CoalesceBool(fromCRD.Kubernetes.EnableOwnerReferences, util.False())
@@ -74,6 +85,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodEnvironmentConfigMap = fromCRD.Kubernetes.PodEnvironmentConfigMap
 	result.PodEnvironmentSecret = fromCRD.Kubernetes.PodEnvironmentSecret
 	result.PodTerminateGracePeriod = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod), "5m")
+	result.LivenessProbe = fromCRD.Kubernetes.LivenessProbe
 	result.SpiloPrivileged = fromCRD.Kubernetes.SpiloPrivileged
 	result.SpiloAllowPrivilegeEscalation = util.CoalesceBool(fromCRD.Kubernetes.SpiloAllowPrivilegeEscalation, util.True())
 	result.SpiloRunAsUser = fromCRD.Kubernetes.SpiloRunAsUser
@@ -158,6 +170,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableMasterPoolerLoadBalancer = fromCRD.LoadBalancer.EnableMasterPoolerLoadBalancer
 	result.EnableReplicaLoadBalancer = fromCRD.LoadBalancer.EnableReplicaLoadBalancer
 	result.EnableReplicaPoolerLoadBalancer = fromCRD.LoadBalancer.EnableReplicaPoolerLoadBalancer
+	result.EnableMasterNodePort = fromCRD.LoadBalancer.EnableMasterNodePort
+	result.EnableMasterPoolerNodePort = fromCRD.LoadBalancer.EnableMasterPoolerNodePort
+	result.EnableReplicaNodePort = fromCRD.LoadBalancer.EnableReplicaNodePort
+	result.EnableReplicaPoolerNodePort = fromCRD.LoadBalancer.EnableReplicaPoolerNodePort
 	result.CustomServiceAnnotations = fromCRD.LoadBalancer.CustomServiceAnnotations
 	result.MasterDNSNameFormat = fromCRD.LoadBalancer.MasterDNSNameFormat
 	result.MasterLegacyDNSNameFormat = fromCRD.LoadBalancer.MasterLegacyDNSNameFormat
@@ -180,7 +196,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupAzureStorageAccountName = fromCRD.LogicalBackup.AzureStorageAccountName
 	result.LogicalBackupAzureStorageAccountKey = fromCRD.LogicalBackup.AzureStorageAccountKey
@@ -200,10 +216,13 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupMemoryRequest = fromCRD.LogicalBackup.MemoryRequest
 	result.LogicalBackupCPULimit = fromCRD.LogicalBackup.CPULimit
 	result.LogicalBackupMemoryLimit = fromCRD.LogicalBackup.MemoryLimit
+	result.LogicalBackupSuccessfulJobsHistoryLimit = util.CoalesceInt32(fromCRD.LogicalBackup.SuccessfulJobsHistoryLimit, k8sutil.Int32ToPointer(3))
+	result.LogicalBackupFailedJobsHistoryLimit = util.CoalesceInt32(fromCRD.LogicalBackup.FailedJobsHistoryLimit, k8sutil.Int32ToPointer(3))
+	result.LogicalBackupTTLSecondsAfterFinished = fromCRD.LogicalBackup.TTLSecondsAfterFinished
 
 	// debug config
-	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
-	result.EnableDBAccess = fromCRD.OperatorDebug.EnableDBAccess
+	result.DebugLogging = *util.CoalesceBool(fromCRD.OperatorDebug.DebugLogging, util.True())
+	result.EnableDBAccess = *util.CoalesceBool(fromCRD.OperatorDebug.EnableDBAccess, util.True())
 
 	// Teams API config
 	result.EnableTeamsAPI = fromCRD.TeamsAPI.EnableTeamsAPI
@@ -263,7 +282,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	result.ConnectionPooler.Image = util.Coalesce(
 		fromCRD.ConnectionPooler.Image,
-		"registry.opensource.zalan.do/acid/pgbouncer")
+		"ghcr.io/zalando/postgres-operator/pgbouncer:latest")
 
 	result.ConnectionPooler.Mode = util.Coalesce(
 		fromCRD.ConnectionPooler.Mode,

@@ -12,9 +12,9 @@ from kubernetes import client
 from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-17-e2e:0.3"
-SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-17-e2e:0.4"
-SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-17:4.0-p2"
+SPILO_CURRENT = "ghcr.io/zalando/spilo-e2e:dev-18.3"
+SPILO_LAZY = "ghcr.io/zalando/spilo-e2e:dev-18.4"
+SPILO_FULL_IMAGE = "ghcr.io/zalando/spilo-18:4.1-p1"
 
 def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
@@ -116,6 +116,7 @@ class EndToEndTestCase(unittest.TestCase):
             configmap["data"]["workers"] = "1"
             configmap["data"]["docker_image"] = SPILO_CURRENT
             configmap["data"]["major_version_upgrade_mode"] = "full"
+            configmap["data"]["connection_pooler_image"] = os.environ['POOLER_IMAGE']
 
         with open("manifests/configmap.yaml", 'w') as f:
             yaml.dump(configmap, f, Dumper=yaml.Dumper)
@@ -151,6 +152,7 @@ class EndToEndTestCase(unittest.TestCase):
             'default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image))  # shows up after tests finish
 
+        # load minimal Postgres manifest and wait for cluster to be up and running
         result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         print('stdout: {}, stderr: {}'.format(result.stdout, result.stderr))
         try:
@@ -559,7 +561,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             pg_patch_config["spec"]["patroni"]["slots"][slot_to_change]["database"] = "bar"
             del pg_patch_config["spec"]["patroni"]["slots"][slot_to_remove]
-            
+
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_delete_slot_patch)
 
@@ -576,7 +578,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", get_slot_query%("database", slot_to_change))[0], "bar",
                 "The replication slot cannot be updated", 10, 5)
-            
+
             # make sure slot from Patroni didn't get deleted
             self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", get_slot_query%("slot_name", patroni_slot))), 1,
                 "The replication slot from Patroni gets deleted", 10, 5)
@@ -697,7 +699,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_running_pods(master_pooler_label), 2, "No pooler pods found")
         self.eventuallyEqual(lambda: k8s.count_running_pods(replica_pooler_label), 2, "No pooler replica pods found")
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label), 2, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label), 1, "Pooler secret not created")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label), 3, "Not all pooler secrets found")
 
         # TLS still enabled so check existing env variables and volume mounts
         self.eventuallyEqual(lambda: k8s.count_pods_with_env_variable("CONNECTION_POOLER_CLIENT_TLS_CRT", pooler_label), 4, "TLS env variable CONNECTION_POOLER_CLIENT_TLS_CRT missing in pooler pods")
@@ -723,14 +725,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         master_annotations = {
             "external-dns.alpha.kubernetes.io/hostname": "acid-minimal-cluster-pooler.default.db.example.com",
-            "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
         }
         self.eventuallyTrue(lambda: k8s.check_service_annotations(
             master_pooler_label+","+pooler_label, master_annotations), "Wrong annotations")
 
         replica_annotations = {
             "external-dns.alpha.kubernetes.io/hostname": "acid-minimal-cluster-pooler-repl.default.db.example.com",
-            "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
         }
         self.eventuallyTrue(lambda: k8s.check_service_annotations(
             replica_pooler_label+","+pooler_label, replica_annotations), "Wrong annotations")
@@ -757,7 +757,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              1, "No pooler service found")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
-                             1, "Secret not created")
+                             2, "Not all pooler secrets created")
 
         # Turn off only replica connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -785,7 +785,7 @@ class EndToEndTestCase(unittest.TestCase):
                              'ClusterIP',
                              "Expected LoadBalancer service type for master, found {}")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
-                             1, "Secret not created")
+                             2, "Not all pooler secrets created")
 
         # scale up connection pooler deployment
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -820,8 +820,8 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler pods not scaled down")
         self.eventuallyEqual(lambda: k8s.count_services_with_label(pooler_label),
                              0, "Pooler service not removed")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
-                             4, "Secrets not deleted")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label(pooler_label),
+                             0, "Not all pooler secrets deleted")
 
         # Verify that all the databases have pooler schema installed.
         # Do this via psql, since otherwise we need to deal with
@@ -932,7 +932,7 @@ class EndToEndTestCase(unittest.TestCase):
                     },
                 }
             }
-            
+
             old_sts_creation_timestamp = sts.metadata.creation_timestamp
             k8s.api.apps_v1.patch_namespaced_stateful_set(sts.metadata.name, sts.metadata.namespace, annotation_patch)
             old_svc_creation_timestamp = svc.metadata.creation_timestamp
@@ -1003,7 +1003,8 @@ class EndToEndTestCase(unittest.TestCase):
                             "Origin": 2,
                             "IsDbOwner": False,
                             "Deleted": False,
-                            "Rotated": False
+                            "Rotated": False,
+                            "Degraded": False,
                         })
                         return True
                 except:
@@ -1210,25 +1211,25 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.create_with_kubectl("manifests/minimal-postgres-lowest-version-manifest.yaml")
         self.eventuallyEqual(lambda: k8s.count_running_pods(labels=cluster_label), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(check_version, 13, "Version is not correct")
+        self.eventuallyEqual(check_version, 14, "Version is not correct")
 
         master_nodes, _ = k8s.get_cluster_nodes(cluster_labels=cluster_label)
         # should upgrade immediately
-        pg_patch_version_14 = {
+        pg_patch_version_higher_version = {
             "spec": {
                 "postgresql": {
-                    "version": "14"
+                    "version": "15"
                 }
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_14)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_higher_version)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 14, "Version should be upgraded from 13 to 14")
+        self.eventuallyEqual(check_version, 15, "Version should be upgraded from 14 to 15")
 
         # check if annotation for last upgrade's success is set
         annotations = get_annotations()
@@ -1237,10 +1238,10 @@ class EndToEndTestCase(unittest.TestCase):
         # should not upgrade because current time is not in maintenanceWindow
         current_time = datetime.now()
         maintenance_window_future = f"{(current_time+timedelta(minutes=60)).strftime('%H:%M')}-{(current_time+timedelta(minutes=120)).strftime('%H:%M')}"
-        pg_patch_version_15_outside_mw = {
+        pg_patch_version_higher_version_outside_mw = {
             "spec": {
                 "postgresql": {
-                    "version": "15"
+                    "version": "16"
                 },
                 "maintenanceWindows": [
                     maintenance_window_future
@@ -1248,23 +1249,23 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15_outside_mw)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_higher_version_outside_mw)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # no pod replacement outside of the maintenance window
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 14, "Version should not be upgraded")
+        self.eventuallyEqual(check_version, 15, "Version should not be upgraded")
 
         second_annotations = get_annotations()
         self.assertIsNone(second_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure should not be set")
 
         # change maintenanceWindows to current
         maintenance_window_current = f"{(current_time-timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=30)).strftime('%H:%M')}"
-        pg_patch_version_15_in_mw = {
+        pg_patch_version_higher_version_in_mw = {
             "spec": {
                 "postgresql": {
-                    "version": "15"
+                    "version": "16"
                 },
                 "maintenanceWindows": [
                     maintenance_window_current
@@ -1273,13 +1274,13 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15_in_mw)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_higher_version_in_mw)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 15, "Version should be upgraded from 14 to 15")
+        self.eventuallyEqual(check_version, 16, "Version should be upgraded from 15 to 16")
 
         # check if annotation for last upgrade's success is updated after second upgrade
         third_annotations = get_annotations()
@@ -1287,7 +1288,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertNotEqual(annotations.get("last-major-upgrade-success"), third_annotations.get("last-major-upgrade-success"), "Annotation for last upgrade's success is not updated")
 
         # test upgrade with failed upgrade annotation
-        pg_patch_version_17 = {
+        pg_patch_version_highest_version = {
             "metadata": {
                 "annotations": {
                     "last-major-upgrade-failure": "2024-01-02T15:04:05Z"
@@ -1295,28 +1296,28 @@ class EndToEndTestCase(unittest.TestCase):
             },
             "spec": {
                 "postgresql": {
-                    "version": "17"
+                    "version": "18"
                 },
             },
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_17)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_highest_version)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-        self.eventuallyEqual(check_version, 15, "Version should not be upgraded because annotation for last upgrade's failure is set")
+        self.eventuallyEqual(check_version, 16, "Version should not be upgraded because annotation for last upgrade's failure is set")
 
-        # change the version back to 15 and should remove failure annotation
+        # change the version back to 16 and should remove failure annotation
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_15_in_mw)
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_higher_version_in_mw)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
-        self.eventuallyEqual(check_version, 15, "Version should not be upgraded from 15")
+        self.eventuallyEqual(check_version, 16, "Version should not be upgraded from 16")
         fourth_annotations = get_annotations()
         self.assertIsNone(fourth_annotations.get("last-major-upgrade-failure"), "Annotation for last upgrade's failure is not removed")
 
@@ -1369,7 +1370,7 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_scaled_policy_retain)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
- 
+
         # decrease the number of instances
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default', 'postgresqls', 'acid-minimal-cluster', pg_patch_scale_down_instances)
@@ -1646,7 +1647,6 @@ class EndToEndTestCase(unittest.TestCase):
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(master_nodes)
 
-
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_overwrite_pooler_deployment(self):
         pooler_name = 'acid-minimal-cluster-pooler'
@@ -1799,7 +1799,7 @@ class EndToEndTestCase(unittest.TestCase):
             },
         }
         k8s.api.core_v1.patch_namespaced_secret(
-            name="foo-user.acid-minimal-cluster.credentials.postgresql.acid.zalan.do", 
+            name="foo-user.acid-minimal-cluster.credentials.postgresql.acid.zalan.do",
             namespace="default",
             body=secret_fake_rotation)
 
@@ -1816,7 +1816,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_password_rotation": "true",
                 "inherited_annotations": "environment",
                 "password_rotation_interval": "30",
-                "password_rotation_user_retention": "30",  # should be set to 60 
+                "password_rotation_user_retention": "30",  # should be set to 60
             },
         }
         k8s.update_config(enable_password_rotation)
@@ -1885,7 +1885,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertTrue("environment" in db_user_secret.metadata.annotations, "Added annotation was not propagated to secret")
 
         # disable password rotation for all other users (foo_user)
-        # and pick smaller intervals to see if the third fake rotation user is dropped 
+        # and pick smaller intervals to see if the third fake rotation user is dropped
         enable_password_rotation = {
             "data": {
                 "enable_password_rotation": "false",
@@ -2386,6 +2386,90 @@ class EndToEndTestCase(unittest.TestCase):
         self.assert_distributed_pods(master_nodes)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_topology_spread_constraints(self):
+        '''
+            Enable topologySpreadConstraints for pods
+        '''
+        k8s = self.k8s
+        cluster_labels = "application=spilo,cluster-name=acid-minimal-cluster"
+
+        # Verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+
+        # patch the pvc retention policy to enable delete when scale down
+        patch_scaled_policy_delete = {
+            "data": {
+                "persistent_volume_claim_retention_policy": "when_deleted:retain,when_scaled:delete"
+            }
+        }
+        k8s.update_config(patch_scaled_policy_delete)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        master_nodes, replica_nodes = k8s.get_cluster_nodes()
+        self.assertNotEqual(master_nodes, [])
+        self.assertNotEqual(replica_nodes, [])
+
+        # Patch label to nodes for topologySpreadConstraints
+        patch_node_label = {
+            "metadata": {
+                "labels": {
+                    "topology.kubernetes.io/zone": "zalando"
+                }
+            }
+        }
+        k8s.api.core_v1.patch_node(master_nodes[0], patch_node_label)
+        k8s.api.core_v1.patch_node(replica_nodes[0], patch_node_label)
+
+        # Patch topologySpreadConstraint and scale-out postgresql pods to postgresqls manifest.
+        patch_topologySpreadConstraint_config = {
+            "spec": {
+                "numberOfInstances": 6,
+                "topologySpreadConstraint": [
+                    {
+                        "maxskew": 1,
+                        "topologyKey": "topology.kubernetes.io/zone",
+                        "whenUnsatisfiable": "DoNotSchedule"
+                    }
+                ]
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default",
+            "postgresqls", "acid-minimal-cluster",
+            patch_topologySpreadConstraint_config)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_labels), 6, "Postgresql StatefulSet are scale to 6")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 6, "All pods are running")
+
+        worker_node_1 = 0
+        worker_node_2 = 0
+        pods = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_labels)
+        for pod in pods.items:
+            if pod.spec.node_name == 'postgres-operator-e2e-tests-worker':
+                worker_node_1 += 1
+            elif pod.spec.node_name == 'postgres-operator-e2e-tests-worker2':
+                worker_node_2 += 1
+
+        self.assertEqual(worker_node_1, worker_node_2)
+        self.assertEqual(worker_node_1, 3)
+        self.assertEqual(worker_node_2, 3)
+
+        # Reset configurations
+        patch_topologySpreadConstraint_config = {
+            "spec": {
+                "numberOfInstances": 2,
+                "topologySpreadConstraint": []
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default",
+            "postgresqls", "acid-minimal-cluster",
+            patch_topologySpreadConstraint_config)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_labels), 2, "Postgresql StatefulSet are scale to 2")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "All pods are running")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_cluster_deletion(self):
         '''
            Test deletion with configured protection
@@ -2460,7 +2544,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.count_deployments_with_label(cluster_label), 0, "Deployments not deleted")
             self.eventuallyEqual(lambda: k8s.count_pdbs_with_label(cluster_label), 0, "Pod disruption budget not deleted")
             self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 8, "Secrets were deleted although disabled in config")
-            self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 3, "PVCs were deleted although disabled in config")
+            self.eventuallyEqual(lambda: k8s.count_pvcs_with_label(cluster_label), 2, "PVCs were deleted although disabled in config")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -2502,7 +2586,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         # if nodes are different we can quit here
         if master_nodes[0] not in replica_nodes:
-            return True             
+            return True
 
         # enable pod anti affintiy in config map which should trigger movement of replica
         patch_enable_antiaffinity = {
@@ -2526,7 +2610,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.update_config(patch_disable_antiaffinity, "disable antiaffinity")
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-            
+
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_labels)
             k8s.wait_for_running_pods(cluster_labels, 2)
 
@@ -2537,7 +2621,7 @@ class EndToEndTestCase(unittest.TestCase):
             # if nodes are different we can quit here
             for target_node in target_nodes:
                 if (target_node not in master_nodes or target_node not in replica_nodes) and master_nodes[0] in replica_nodes:
-                    print('Pods run on the same node') 
+                    print('Pods run on the same node')
                     return False
 
         except timeout_decorator.TimeoutError:

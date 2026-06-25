@@ -10,7 +10,7 @@ hence set it up first. For local tests we recommend to use one of the following
 solutions:
 
 * [minikube](https://github.com/kubernetes/minikube/releases), which creates a
-  single-node K8s cluster inside a VM (requires KVM or VirtualBox),
+  K8s cluster inside a container or VM (requires Docker, KVM, Hyper-V, HyperKit, VirtualBox, or similar),
 * [kind](https://kind.sigs.k8s.io/) and [k3d](https://k3d.io), which allows creating multi-nodes K8s
   clusters running on Docker (requires Docker)
 
@@ -20,7 +20,7 @@ This quickstart assumes that you have started minikube or created a local kind
 cluster. Note that you can also use built-in K8s support in the Docker Desktop
 for Mac to follow the steps of this tutorial. You would have to replace
 `minikube start` and `minikube delete` with your launch actions for the Docker
-built-in K8s support.
+Desktop built-in K8s support.
 
 ## Configuration Options
 

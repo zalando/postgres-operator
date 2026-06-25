@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,15 +25,16 @@ SOFTWARE.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	apiszalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
 	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/zalando/postgres-operator/pkg/generated/listers/zalando.org/v1"
+	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/generated/listers/zalando.org/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -42,7 +43,7 @@ import (
 // FabricEventStreams.
 type FabricEventStreamInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.FabricEventStreamLister
+	Lister() zalandoorgv1.FabricEventStreamLister
 }
 
 type fabricEventStreamInformer struct {
@@ -55,42 +56,67 @@ type fabricEventStreamInformer struct {
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFabricEventStreamInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredFabricEventStreamInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewFabricEventStreamInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredFabricEventStreamInformer constructs a new informer for FabricEventStream type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredFabricEventStreamInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+	return NewFabricEventStreamInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewFabricEventStreamInformerWithOptions constructs a new informer for FabricEventStream type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFabricEventStreamInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "zalando.org", Version: "v1", Resource: "fabriceventstreams"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ZalandoV1().FabricEventStreams(namespace).List(context.TODO(), options)
+				return client.ZalandoV1().FabricEventStreams(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ZalandoV1().FabricEventStreams(namespace).Watch(context.TODO(), options)
+				return client.ZalandoV1().FabricEventStreams(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.ZalandoV1().FabricEventStreams(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.ZalandoV1().FabricEventStreams(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiszalandoorgv1.FabricEventStream{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&zalandoorgv1.FabricEventStream{},
-		resyncPeriod,
-		indexers,
 	)
 }
 
 func (f *fabricEventStreamInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredFabricEventStreamInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFabricEventStreamInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *fabricEventStreamInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&zalandoorgv1.FabricEventStream{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiszalandoorgv1.FabricEventStream{}, f.defaultInformer)
 }
 
-func (f *fabricEventStreamInformer) Lister() v1.FabricEventStreamLister {
-	return v1.NewFabricEventStreamLister(f.Informer().GetIndexer())
+func (f *fabricEventStreamInformer) Lister() zalandoorgv1.FabricEventStreamLister {
+	return zalandoorgv1.NewFabricEventStreamLister(f.Informer().GetIndexer())
 }

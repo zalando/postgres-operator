@@ -85,6 +85,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   requires a custom Spilo image. Note the FSGroup of a Pod cannot be changed
   without recreating a new Pod. Optional.
 
+* **livenessProbe**
+  Allows for adding a liveness probe to the Spilo container to detect if it's
+  running properly.
+
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_master_load_balancer` parameter) to define whether to enable the load
@@ -109,16 +113,61 @@ These parameters are grouped directly under  the `spec` key in the manifest.
 
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter
-  defines the comma-separated range of IP networks (in CIDR-notation). The
-  corresponding load balancer is accessible only to the networks defined by
-  this parameter. Optional, when empty the load balancer service becomes
-  inaccessible from outside of the Kubernetes cluster.
+  defines the comma-separated range of IP networks (in CIDR-notation). Both
+  IPv4 (e.g. `192.168.1.0/24`) and IPv6 (e.g. `fd01::/48`) CIDR ranges are
+  supported. The corresponding load balancer is accessible only to the networks
+  defined by this parameter. Optional, when empty the load balancer service
+  becomes inaccessible from outside of the Kubernetes cluster.
+
+* **enableMasterNodePort**
+  boolean flag to override the operator defaults (set by the
+  `enable_master_node_port` parameter) to define whether to enable the node
+  port pointing to the Postgres primary. Optional. Overrides `enableMasterLoadBalancer`.
+
+* **enableMasterPoolerNodePort**
+  boolean flag to override the operator defaults (set by the
+  `enable_master_pooler_node_port` parameter) to define whether to enable
+  the node port for master pooler pods pointing to the Postgres primary.
+  Optional. Overrides `enableMasterPoolerLoadBalancer`.
+
+* **enableReplicaNodePort**
+  boolean flag to override the operator defaults (set by the
+  `enable_replica_node_port` parameter) to define whether to enable the node
+  port pointing to the Postgres standby instances. Optional. Overrides `enableReplicaLoadBalancer`.
+
+* **enableReplicaPoolerNodePort**
+  boolean flag to override the operator defaults (set by the
+  `enable_replica_pooler_node_port` parameter) to define whether to enable
+  the node port for replica pooler pods pointing to the Postgres standby
+  instances. Optional. Overrides `enableReplicaPoolerLoadBalancer`.
+
+* **masterNodePort**
+  integer flag to specify a port number for the node port to the Postgres primary.
+  Only used when `enableMasterNodePort` or `enable_master_node_port` are enabled.
+  Optional. Kubernetes will provide a port number for you if not specified.
+
+* **masterPoolerNodePort**
+  integer flag to specify a port number for the node port for the master pooler pods pointing to the Postgres primary.
+  Only used when `enableMasterPoolerNodePort` or `enable_master_pooler_node_port` are enabled.
+  Optional. Kubernetes will provide a port number for you if not specified.
+
+* **replicaNodePort**
+  integer flag to specify a port number for the node port pointing to the Postgres standby instances.
+  Only used when `enableReplicaNodePort` or `enable_replica_node_port` are enabled.
+  Optional. Kubernetes will provide a port number for you if not specified.
+
+* **replicaPoolerNodePort**
+  integer flag to specify a port number for the node port for the replica pooler pods pointing to the Postgres standby instances
+  Only used when `enableReplicaPoolerNodePort` or `enable_replica_pooler_node_port` are enabled.
+  Optional. Kubernetes will provide a port number for you if not specified.
 
 * **maintenanceWindows**
   a list which defines specific time frames when certain maintenance operations
-  such as automatic major upgrades or master pod migration. Accepted formats
-  are "01:00-06:00" for daily maintenance windows or "Sat:00:00-04:00" for specific
-  days, with all times in UTC.
+  such as automatic major upgrades or master pod migration are allowed to happen.
+  Accepted formats are "01:00-06:00" for daily maintenance windows or
+  "Sat:00:00-04:00" for specific days, with all times in UTC. Note, when the
+  global config option `enable_maintenance_windows` is false, the specified
+  windows will be ignored.
 
 * **users**
   a map of usernames to user flags for the users that should be created in the
@@ -457,21 +506,30 @@ under the `clone` top-level key and do not affect the already running cluster.
 
 On startup, an existing `standby` top-level key creates a standby Postgres
 cluster streaming from a remote location - either from a S3 or GCS WAL
-archive or a remote primary. Only one of options is allowed and required
-if the `standby` key is present.
+archive, a remote primary, or a combination of both. At least one of
+`s3_wal_path`, `gs_wal_path`, or `standby_host` must be specified.
+Note that `s3_wal_path` and `gs_wal_path` are mutually exclusive.
 
 * **s3_wal_path**
   the url to S3 bucket containing the WAL archive of the remote primary.
+  Can be combined with `standby_host` for additional redundancy.
 
 * **gs_wal_path**
   the url to GS bucket containing the WAL archive of the remote primary.
+  Can be combined with `standby_host` for additional redundancy.
 
 * **standby_host**
   hostname or IP address of the primary to stream from.
+  Can be specified alone or combined with either `s3_wal_path` or `gs_wal_path`.
 
 * **standby_port**
   TCP port on which the primary is listening for connections. Patroni will
   use `"5432"` if not set.
+
+* **standby_primary_slot_name**
+  name of the replication slot to use on the primary server when streaming
+  from a remote primary. See the Patroni documentation
+  [here](https://patroni.readthedocs.io/en/latest/standby_cluster.html) for more details. Optional.
 
 ## Volume properties
 
@@ -638,7 +696,7 @@ the global configuration before adding the `tls` section'.
 ## Change data capture streams
 
 This sections enables change data capture (CDC) streams via Postgres' 
-[logical decoding](https://www.postgresql.org/docs/17/logicaldecoding.html)
+[logical decoding](https://www.postgresql.org/docs/18/logicaldecoding.html)
 feature and `pgoutput` plugin. While the Postgres operator takes responsibility
 for providing the setup to publish change events, it relies on external tools
 to consume them. At Zalando, we are using a workflow based on
@@ -671,7 +729,7 @@ can have the following properties:
   The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
   The application is responsible for putting events into a (JSON/B or VARCHAR)
   payload column of the outbox table in the structure of the specified target
-  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/17/logical-replication-publication.html)
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/18/logical-replication-publication.html)
   in Postgres for all tables specified for one `database` and `applicationId`.
   The CDC operator will consume from it shortly after transactions are
   committed to the outbox table. The `idColumn` will be used in telemetry for
