@@ -453,13 +453,6 @@ spec:
                   type: object
                 type: array
               envFrom:
-                description: |-
-                  List of sources to populate environment variables in the container.
-                  The keys defined within a source may consist of any printable ASCII characters except '='.
-                  When a key exists in multiple
-                  sources, the value associated with the last source will take precedence.
-                  Values defined by an Env with a duplicate key will take precedence.
-                  Cannot be updated.
                 items:
                   description: EnvFromSource represents the source of a set of ConfigMaps
                     or Secrets
@@ -505,7 +498,6 @@ spec:
                       x-kubernetes-map-type: atomic
                   type: object
                 type: array
-                x-kubernetes-list-type: atomic
               init_containers:
                 description: deprecated
                 items:
