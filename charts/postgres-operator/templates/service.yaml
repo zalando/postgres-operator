@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
   name: {{ template "postgres-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: ClusterIP
   ports:

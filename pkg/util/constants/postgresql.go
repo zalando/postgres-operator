@@ -8,9 +8,14 @@ const (
 	PostgresDataMount = "/home/postgres/pgdata"
 	PostgresDataPath  = PostgresDataMount + "/pgroot"
 
+	PatroniPGParametersParameterName = "parameters"
+
 	PostgresConnectRetryTimeout = 2 * time.Minute
 	PostgresConnectTimeout      = 15 * time.Second
 
 	ShmVolumeName = "dshm"
 	ShmVolumePath = "/dev/shm"
+
+	RunVolumeName = "postgresql-run"
+	RunVolumePath = "/var/run/postgresql"
 )

@@ -3,15 +3,16 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ template "postgres-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
     helm.sh/chart: {{ template "postgres-operator.chart" . }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
-  {{- if .Values.podPriorityClassName }}
-  pod_priority_class_name: {{ .Values.podPriorityClassName }}
-  {{- end }}
+{{- if or .Values.podPriorityClassName.create .Values.podPriorityClassName.name }}
+  pod_priority_class_name: {{ include "postgres-pod.priorityClassName" . }}
+{{- end }}
   pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
 {{- include "flattenValuesForConfigMap" .Values.configGeneral | indent 2 }}
 {{- include "flattenValuesForConfigMap" .Values.configUsers | indent 2 }}
@@ -25,4 +26,5 @@ data:
 {{- include "flattenValuesForConfigMap" .Values.configLoggingRestApi | indent 2 }}
 {{- include "flattenValuesForConfigMap" .Values.configTeamsApi | indent 2 }}
 {{- include "flattenValuesForConfigMap" .Values.configConnectionPooler | indent 2 }}
+{{- include "flattenValuesForConfigMap" .Values.configPatroni | indent 2 }}
 {{- end }}

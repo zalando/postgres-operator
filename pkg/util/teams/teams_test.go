@@ -13,60 +13,63 @@ import (
 var (
 	logger = logrus.New().WithField("pkg", "teamsapi")
 	token  = "ec45b1cfbe7100c6315d183a3eb6cec0M2U1LWJkMzEtZDgzNzNmZGQyNGM3IiwiYXV0aF90aW1lIjoxNDkzNzMwNzQ1LCJpc3MiOiJodHRwcz"
+	input  = `{
+	"dn": "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
+	"id": "acid",
+	"id_name": "acid",
+	"team_id": "111222",
+	"type": "official",
+	"name": "Acid team name",
+	"mail": [
+	"email1@example.com",
+	"email2@example.com"
+	],
+	"alias": [
+	"acid"
+	],
+	"member": [
+	  "member1",
+	  "member2",
+	  "member3"
+	],
+	"infrastructure-accounts": [
+	{
+	  "id": "1234512345",
+	  "name": "acid",
+	  "provider": "aws",
+	  "type": "aws",
+	  "description": "",
+	  "owner": "acid",
+	  "owner_dn": "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
+	  "disabled": false
+	},
+	{
+	  "id": "5432154321",
+	  "name": "db",
+	  "provider": "aws",
+	  "type": "aws",
+	  "description": "",
+	  "owner": "acid",
+	  "owner_dn": "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
+	  "disabled": false
+	}
+	],
+	"cost_center": "00099999",
+	"delivery_lead": "member4",
+	"parent_team_id": "111221"
+	}`
 )
-
 var teamsAPItc = []struct {
 	in     string
 	inCode int
+	inTeam string
 	out    *Team
 	err    error
 }{
-	{`{
-"dn": "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
-"id": "acid",
-"id_name": "acid",
-"team_id": "111222",
-"type": "official",
-"name": "Acid team name",
-"mail": [
-"email1@example.com",
-"email2@example.com"
-],
-"alias": [
-"acid"
-],
-"member": [
-  "member1",
-  "member2",
-  "member3"
-],
-"infrastructure-accounts": [
-{
-  "id": "1234512345",
-  "name": "acid",
-  "provider": "aws",
-  "type": "aws",
-  "description": "",
-  "owner": "acid",
-  "owner_dn": "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
-  "disabled": false
-},
-{
-  "id": "5432154321",
-  "name": "db",
-  "provider": "aws",
-  "type": "aws",
-  "description": "",
-  "owner": "acid",
-  "owner_dn": "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
-  "disabled": false
-}
-],
-"cost_center": "00099999",
-"delivery_lead": "member4",
-"parent_team_id": "111221"
-}`,
+	{
+		input,
 		200,
+		"acid",
 		&Team{
 			Dn:           "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
 			ID:           "acid",
@@ -104,26 +107,37 @@ var teamsAPItc = []struct {
 		nil}, {
 		`{"error": "Access Token not valid"}`,
 		401,
+		"acid",
 		nil,
 		fmt.Errorf(`team API query failed with status code 401 and message: '"Access Token not valid"'`),
 	},
 	{
 		`{"status": "I'm a teapot'"}`,
 		418,
+		"acid",
 		nil,
 		fmt.Errorf(`team API query failed with status code 418`),
 	},
 	{
 		`{"status": "I'm a teapot`,
 		418,
+		"acid",
 		nil,
 		fmt.Errorf(`team API query failed with status code 418 and malformed response: unexpected EOF`),
 	},
 	{
 		`{"status": "I'm a teapot`,
 		200,
+		"acid",
 		nil,
 		fmt.Errorf(`could not parse team API response: unexpected EOF`),
+	},
+	{
+		input,
+		404,
+		"banana",
+		nil,
+		fmt.Errorf(`team API query failed with status code 404`),
 	},
 }
 
@@ -156,7 +170,7 @@ func TestInfo(t *testing.T) {
 			defer ts.Close()
 			api := NewTeamsAPI(ts.URL, logger)
 
-			actual, err := api.TeamInfo("acid", token)
+			actual, statusCode, err := api.TeamInfo(tc.inTeam, token)
 			if err != nil && err.Error() != tc.err.Error() {
 				t.Errorf("expected error: %v, got: %v", tc.err, err)
 				return
@@ -164,6 +178,10 @@ func TestInfo(t *testing.T) {
 
 			if !reflect.DeepEqual(actual, tc.out) {
 				t.Errorf("expected %#v, got: %#v", tc.out, actual)
+			}
+
+			if statusCode != tc.inCode {
+				t.Errorf("expected %d, got: %d", tc.inCode, statusCode)
 			}
 		}()
 	}
@@ -202,7 +220,7 @@ func TestHttpClientClose(t *testing.T) {
 	api := NewTeamsAPI(ts.URL, logger)
 	api.httpClient = &mockHTTPClient{}
 
-	_, err := api.TeamInfo("acid", token)
+	_, _, err := api.TeamInfo("acid", token)
 	expError := fmt.Errorf("error when closing response: close error")
 	if err.Error() != expError.Error() {
 		t.Errorf("expected error: %v, got: %v", expError, err)
@@ -212,7 +230,7 @@ func TestHttpClientClose(t *testing.T) {
 func TestRequest(t *testing.T) {
 	for _, tc := range requestsURLtc {
 		api := NewTeamsAPI(tc.url, logger)
-		resp, err := api.TeamInfo("acid", token)
+		resp, _, err := api.TeamInfo("acid", token)
 		if resp != nil {
 			t.Errorf("response expected to be nil")
 			continue

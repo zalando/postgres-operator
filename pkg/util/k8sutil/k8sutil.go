@@ -3,30 +3,28 @@ package k8sutil
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	b64 "encoding/base64"
 	"encoding/json"
 
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
-
 	apiacidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	acidv1client "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
+	zalandoclient "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	zalandov1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/zalando.org/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	apiextv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -34,6 +32,14 @@ import (
 
 func Int32ToPointer(value int32) *int32 {
 	return &value
+}
+
+func UInt32ToPointer(value uint32) *uint32 {
+	return &value
+}
+
+func StringToPointer(str string) *string {
+	return &str
 }
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -52,15 +58,25 @@ type KubernetesClient struct {
 	appsv1.StatefulSetsGetter
 	appsv1.DeploymentsGetter
 	rbacv1.RoleBindingsGetter
-	policyv1beta1.PodDisruptionBudgetsGetter
-	apiextv1.CustomResourceDefinitionsGetter
-	clientbatchv1beta1.CronJobsGetter
+	batchv1.CronJobsGetter
+	policyv1.PodDisruptionBudgetsGetter
+	apiextv1client.CustomResourceDefinitionsGetter
 	acidv1.OperatorConfigurationsGetter
 	acidv1.PostgresTeamsGetter
 	acidv1.PostgresqlsGetter
+	zalandov1.FabricEventStreamsGetter
 
-	RESTClient      rest.Interface
-	AcidV1ClientSet *acidv1client.Clientset
+	RESTClient         rest.Interface
+	Clientset          *kubernetes.Clientset
+	AcidV1ClientSet    *zalandoclient.Clientset
+	Zalandov1ClientSet *zalandoclient.Clientset
+}
+
+type mockCustomResourceDefinition struct {
+	apiextv1client.CustomResourceDefinitionInterface
+}
+
+type MockCustomResourceDefinitionsGetter struct {
 }
 
 type mockSecret struct {
@@ -133,6 +149,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 		return kubeClient, fmt.Errorf("could not get clientset: %v", err)
 	}
 
+	kubeClient.Clientset = client
 	kubeClient.PodsGetter = client.CoreV1()
 	kubeClient.ServicesGetter = client.CoreV1()
 	kubeClient.EndpointsGetter = client.CoreV1()
@@ -145,10 +162,10 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.NamespacesGetter = client.CoreV1()
 	kubeClient.StatefulSetsGetter = client.AppsV1()
 	kubeClient.DeploymentsGetter = client.AppsV1()
-	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
+	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1()
-	kubeClient.CronJobsGetter = client.BatchV1beta1()
+	kubeClient.CronJobsGetter = client.BatchV1()
 	kubeClient.EventsGetter = client.CoreV1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
@@ -158,127 +175,74 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 
 	kubeClient.CustomResourceDefinitionsGetter = apiextClient.ApiextensionsV1()
 
-	kubeClient.AcidV1ClientSet = acidv1client.NewForConfigOrDie(cfg)
+	kubeClient.AcidV1ClientSet = zalandoclient.NewForConfigOrDie(cfg)
 	if err != nil {
 		return kubeClient, fmt.Errorf("could not create acid.zalan.do clientset: %v", err)
+	}
+	kubeClient.Zalandov1ClientSet = zalandoclient.NewForConfigOrDie(cfg)
+	if err != nil {
+		return kubeClient, fmt.Errorf("could not create zalando.org clientset: %v", err)
 	}
 
 	kubeClient.OperatorConfigurationsGetter = kubeClient.AcidV1ClientSet.AcidV1()
 	kubeClient.PostgresTeamsGetter = kubeClient.AcidV1ClientSet.AcidV1()
 	kubeClient.PostgresqlsGetter = kubeClient.AcidV1ClientSet.AcidV1()
+	kubeClient.FabricEventStreamsGetter = kubeClient.Zalandov1ClientSet.ZalandoV1()
 
 	return kubeClient, nil
 }
 
 // SetPostgresCRDStatus of Postgres cluster
-func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string) (*apiacidv1.Postgresql, error) {
-	var pg *apiacidv1.Postgresql
-	var pgStatus apiacidv1.PostgresStatus
-	pgStatus.PostgresClusterStatus = status
-
-	patch, err := json.Marshal(struct {
-		PgStatus interface{} `json:"status"`
-	}{&pgStatus})
-
-	if err != nil {
-		return pg, fmt.Errorf("could not marshal status: %v", err)
-	}
-
-	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
-	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
-	// we should take advantage of it.
-	pg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
-		context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, pg *apiacidv1.Postgresql) (*apiacidv1.Postgresql, error) {
+	pg, err := client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).UpdateStatus(context.TODO(), pg, metav1.UpdateOptions{})
 	if err != nil {
 		return pg, fmt.Errorf("could not update status: %v", err)
 	}
 
-	// update the spec, maintaining the new resourceVersion.
 	return pg, nil
 }
 
-// SameService compares the Services
-func SameService(cur, new *v1.Service) (match bool, reason string) {
-	//TODO: improve comparison
-	if cur.Spec.Type != new.Spec.Type {
-		return false, fmt.Sprintf("new service's type %q does not match the current one %q",
-			new.Spec.Type, cur.Spec.Type)
-	}
+// SetFinalizer of Postgres cluster
+func (client *KubernetesClient) SetFinalizer(clusterName spec.NamespacedName, pg *apiacidv1.Postgresql, finalizers []string) (*apiacidv1.Postgresql, error) {
+	var (
+		updatedPg *apiacidv1.Postgresql
+		patch     []byte
+		err       error
+	)
+	pg.ObjectMeta.Finalizers = finalizers
 
-	oldSourceRanges := cur.Spec.LoadBalancerSourceRanges
-	newSourceRanges := new.Spec.LoadBalancerSourceRanges
-
-	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
-	if (len(oldSourceRanges) != 0) || (len(newSourceRanges) != 0) {
-		if !reflect.DeepEqual(oldSourceRanges, newSourceRanges) {
-			return false, "new service's LoadBalancerSourceRange does not match the current one"
+	if len(finalizers) > 0 {
+		patch, err = json.Marshal(struct {
+			PgMetadata interface{} `json:"metadata"`
+		}{&pg.ObjectMeta})
+		if err != nil {
+			return pg, fmt.Errorf("could not marshal ObjectMeta: %v", err)
 		}
+
+		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
+			context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	} else {
+		// in case finalizers are empty and update is needed to remove
+		updatedPg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Update(
+			context.TODO(), pg, metav1.UpdateOptions{})
+	}
+	if err != nil {
+		return updatedPg, fmt.Errorf("could not set finalizer: %v", err)
 	}
 
-	match = true
-
-	reasonPrefix := "new service's annotations does not match the current one:"
-	for ann := range cur.Annotations {
-		if _, ok := new.Annotations[ann]; !ok {
-			match = false
-			if len(reason) == 0 {
-				reason = reasonPrefix
-			}
-			reason += fmt.Sprintf(" Removed '%s'.", ann)
-		}
-	}
-
-	for ann := range new.Annotations {
-		v, ok := cur.Annotations[ann]
-		if !ok {
-			if len(reason) == 0 {
-				reason = reasonPrefix
-			}
-			reason += fmt.Sprintf(" Added '%s' with value '%s'.", ann, new.Annotations[ann])
-			match = false
-		} else if v != new.Annotations[ann] {
-			if len(reason) == 0 {
-				reason = reasonPrefix
-			}
-			reason += fmt.Sprintf(" '%s' changed from '%s' to '%s'.", ann, v, new.Annotations[ann])
-			match = false
-		}
-	}
-
-	return match, reason
+	return updatedPg, nil
 }
 
-// SamePDB compares the PodDisruptionBudgets
-func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason string) {
-	//TODO: improve comparison
-	match = reflect.DeepEqual(new.Spec, cur.Spec)
-	if !match {
-		reason = "new PDB spec does not match the current one"
-	}
-
-	return
+func (c *mockCustomResourceDefinition) Get(ctx context.Context, name string, options metav1.GetOptions) (*apiextv1.CustomResourceDefinition, error) {
+	return &apiextv1.CustomResourceDefinition{}, nil
 }
 
-func getJobImage(cronJob *batchv1beta1.CronJob) string {
-	return cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+func (c *mockCustomResourceDefinition) Create(ctx context.Context, crd *apiextv1.CustomResourceDefinition, options metav1.CreateOptions) (*apiextv1.CustomResourceDefinition, error) {
+	return &apiextv1.CustomResourceDefinition{}, nil
 }
 
-// SameLogicalBackupJob compares Specs of logical backup cron jobs
-func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
-
-	if cur.Spec.Schedule != new.Spec.Schedule {
-		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
-			new.Spec.Schedule, cur.Spec.Schedule)
-	}
-
-	newImage := getJobImage(new)
-	curImage := getJobImage(cur)
-	if newImage != curImage {
-		return false, fmt.Sprintf("new job's image %q does not match the current one %q",
-			newImage, curImage)
-	}
-
-	return true, ""
+func (mock *MockCustomResourceDefinitionsGetter) CustomResourceDefinitions() apiextv1client.CustomResourceDefinitionInterface {
+	return &mockCustomResourceDefinition{}
 }
 
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
@@ -394,7 +358,7 @@ func (mock *mockDeployment) Get(ctx context.Context, name string, opts metav1.Ge
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
-						v1.Container{
+						{
 							Image: "pooler:1.0",
 						},
 					},
@@ -485,6 +449,8 @@ func NewMockKubernetesClient() KubernetesClient {
 		ConfigMapsGetter:  &MockConfigMapsGetter{},
 		DeploymentsGetter: &MockDeploymentGetter{},
 		ServicesGetter:    &MockServiceGetter{},
+
+		CustomResourceDefinitionsGetter: &MockCustomResourceDefinitionsGetter{},
 	}
 }
 

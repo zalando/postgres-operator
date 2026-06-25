@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -15,8 +14,39 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// NamespacedName describes the namespace/name pairs used in Kubernetes names.
-type NamespacedName types.NamespacedName
+// NamespacedName comprises a resource name, with a mandatory namespace,
+// rendered as "<namespace>/<name>".  Being a type captures intent and
+// helps make sure that UIDs, namespaced names and non-namespaced names
+// do not get conflated in code.  For most use cases, namespace and name
+// will already have been format validated at the API entry point, so we
+// don't do that here.  Where that's not the case (e.g. in testing),
+// consider using NamespacedNameOrDie() in testing.go in this package.
+//
+// from: https://github.com/kubernetes/apimachinery/blob/master/pkg/types/namespacedname.go
+type NamespacedName struct {
+	Namespace string `json:"namespace,omitempty"`
+	Name      string `json:"name"`
+}
+
+const (
+	Separator = '/'
+)
+
+// String returns the general purpose string representation
+func (n NamespacedName) String() string {
+	return n.Namespace + string(Separator) + n.Name
+}
+
+// MarshalLog emits a struct containing required key/value pair
+func (n NamespacedName) MarshalLog() interface{} {
+	return struct {
+		Name      string `json:"name"`
+		Namespace string `json:"namespace,omitempty"`
+	}{
+		Name:      n.Name,
+		Namespace: n.Namespace,
+	}
+}
 
 const fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
@@ -32,7 +62,8 @@ const (
 	RoleOriginTeamsAPI
 	RoleOriginSystem
 	RoleOriginBootstrap
-	RoleConnectionPooler
+	RoleOriginConnectionPooler
+	RoleOriginStream
 )
 
 type syncUserOperation int
@@ -49,12 +80,16 @@ const (
 type PgUser struct {
 	Origin     RoleOrigin        `yaml:"-"`
 	Name       string            `yaml:"-"`
+	Namespace  string            `yaml:"-"`
 	Password   string            `yaml:"-"`
 	Flags      []string          `yaml:"user_flags"`
 	MemberOf   []string          `yaml:"inrole"`
 	Parameters map[string]string `yaml:"db_parameters"`
 	AdminRole  string            `yaml:"admin_role"`
+	IsDbOwner  bool              `yaml:"is_db_owner"`
 	Deleted    bool              `yaml:"deleted"`
+	Rotated    bool              `yaml:"rotated"`
+	Degraded   bool              `yaml:"degraded"`
 }
 
 func (user *PgUser) Valid() bool {
@@ -116,16 +151,16 @@ type ControllerConfig struct {
 	CRDReadyWaitTimeout  time.Duration
 	ConfigMapName        NamespacedName
 	Namespace            string
+	IgnoredAnnotations   []string
 
 	EnableJsonLogging bool
+
+	KubeQPS   int
+	KubeBurst int
 }
 
 // cached value for the GetOperatorNamespace
 var operatorNamespace string
-
-func (n NamespacedName) String() string {
-	return types.NamespacedName(n).String()
-}
 
 // MarshalJSON defines marshaling rule for the namespaced name type.
 func (n NamespacedName) MarshalJSON() ([]byte, error) {
@@ -191,7 +226,7 @@ func (r RoleOrigin) String() string {
 		return "system role"
 	case RoleOriginBootstrap:
 		return "bootstrapped role"
-	case RoleConnectionPooler:
+	case RoleOriginConnectionPooler:
 		return "connection pooler role"
 	default:
 		panic(fmt.Sprintf("bogus role origin value %d", r))
@@ -205,7 +240,7 @@ func GetOperatorNamespace() string {
 		if namespaceFromEnvironment := os.Getenv("OPERATOR_NAMESPACE"); namespaceFromEnvironment != "" {
 			return namespaceFromEnvironment
 		}
-		operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
+		operatorNamespaceBytes, err := os.ReadFile(fileWithNamespace)
 		if err != nil {
 			log.Fatalf("Unable to detect operator namespace from within its pod due to: %v", err)
 		}

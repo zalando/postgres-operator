@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,12 +25,14 @@ SOFTWARE.
 package v1
 
 import (
-	"context"
+	context "context"
 
 	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rest "k8s.io/client-go/rest"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // OperatorConfigurationsGetter has a method to return a OperatorConfigurationInterface.
@@ -41,33 +43,32 @@ type OperatorConfigurationsGetter interface {
 
 // OperatorConfigurationInterface has methods to work with OperatorConfiguration resources.
 type OperatorConfigurationInterface interface {
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*acidzalandov1.OperatorConfiguration, error)
+	Create(ctx context.Context, operatorConfiguration *acidzalandov1.OperatorConfiguration, opts metav1.CreateOptions) (*acidzalandov1.OperatorConfiguration, error)
+	Update(ctx context.Context, operatorConfiguration *acidzalandov1.OperatorConfiguration, opts metav1.UpdateOptions) (*acidzalandov1.OperatorConfiguration, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*acidzalandov1.OperatorConfiguration, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*acidzalandov1.OperatorConfigurationList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *acidzalandov1.OperatorConfiguration, err error)
 	OperatorConfigurationExpansion
 }
 
 // operatorConfigurations implements OperatorConfigurationInterface
 type operatorConfigurations struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*acidzalandov1.OperatorConfiguration, *acidzalandov1.OperatorConfigurationList]
 }
 
 // newOperatorConfigurations returns a OperatorConfigurations
 func newOperatorConfigurations(c *AcidV1Client, namespace string) *operatorConfigurations {
 	return &operatorConfigurations{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*acidzalandov1.OperatorConfiguration, *acidzalandov1.OperatorConfigurationList](
+			"operatorconfigurations",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *acidzalandov1.OperatorConfiguration { return &acidzalandov1.OperatorConfiguration{} },
+			func() *acidzalandov1.OperatorConfigurationList { return &acidzalandov1.OperatorConfigurationList{} },
+		),
 	}
-}
-
-// Get takes name of the operatorConfiguration, and returns the corresponding operatorConfiguration object, and an error if there is any.
-func (c *operatorConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *acidzalandov1.OperatorConfiguration, err error) {
-	result = &acidzalandov1.OperatorConfiguration{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("operatorconfigurations").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
 }

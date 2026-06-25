@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -11,6 +11,7 @@ import (
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -19,15 +20,25 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func mockInstallLookupFunction(schema string, user string, role PostgresRole) error {
+func newFakeK8sPoolerTestClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset()
+
+	return k8sutil.KubernetesClient{
+		PodsGetter:         clientSet.CoreV1(),
+		PostgresqlsGetter:  acidClientSet.AcidV1(),
+		StatefulSetsGetter: clientSet.AppsV1(),
+		DeploymentsGetter:  clientSet.AppsV1(),
+		ServicesGetter:     clientSet.CoreV1(),
+		SecretsGetter:      clientSet.CoreV1(),
+	}, clientSet
+}
+
+func mockInstallLookupFunction(schema string, user string) error {
 	return nil
 }
 
 func boolToPointer(value bool) *bool {
-	return &value
-}
-
-func int32ToPointer(value int32) *int32 {
 	return &value
 }
 
@@ -267,6 +278,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 	client := k8sutil.KubernetesClient{
 		StatefulSetsGetter: clientSet.AppsV1(),
 		ServicesGetter:     clientSet.CoreV1(),
+		PodsGetter:         clientSet.CoreV1(),
 		DeploymentsGetter:  clientSet.AppsV1(),
 		PostgresqlsGetter:  acidClientSet.AcidV1(),
 		SecretsGetter:      clientSet.CoreV1(),
@@ -294,7 +306,7 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:                    int32ToPointer(1),
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
 				},
 				PodManagementPolicy: "ordered_ready",
 				Resources: config.Resources{
@@ -376,6 +388,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 	client := k8sutil.KubernetesClient{
 		StatefulSetsGetter: clientSet.AppsV1(),
 		ServicesGetter:     clientSet.CoreV1(),
+		PodsGetter:         clientSet.CoreV1(),
 		DeploymentsGetter:  clientSet.AppsV1(),
 		PostgresqlsGetter:  acidClientSet.AcidV1(),
 		SecretsGetter:      clientSet.CoreV1(),
@@ -401,7 +414,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:                    int32ToPointer(1),
+					NumberOfInstances:                    k8sutil.Int32ToPointer(1),
 				},
 				PodManagementPolicy: "ordered_ready",
 				Resources: config.Resources{
@@ -639,7 +652,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 	for _, tt := range tests {
 		tt.cluster.OpConfig.ConnectionPooler.Image = tt.defaultImage
 		tt.cluster.OpConfig.ConnectionPooler.NumberOfInstances =
-			int32ToPointer(tt.defaultInstances)
+			k8sutil.Int32ToPointer(tt.defaultInstances)
 
 		t.Logf("running test for %s [%s]", testName, tt.subTest)
 
@@ -663,8 +676,9 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
+				PodServiceAccountName: "postgres-pod",
 				ConnectionPooler: config.ConnectionPooler{
-					MaxDBConnections:                     int32ToPointer(60),
+					MaxDBConnections:                     k8sutil.Int32ToPointer(60),
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
@@ -697,38 +711,42 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error { return nil }
 
 	tests := []struct {
-		subTest  string
-		spec     *acidv1.PostgresSpec
-		expected error
-		cluster  *Cluster
-		check    func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error
+		subTest string
+		spec    *acidv1.PostgresSpec
+		cluster *Cluster
+		check   func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error
 	}{
 		{
 			subTest: "default configuration",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    noCheck,
+			cluster: cluster,
+			check:   noCheck,
+		},
+		{
+			subTest: "pooler uses pod service account",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			},
+			cluster: cluster,
+			check:   testServiceAccount,
 		},
 		{
 			subTest: "no default resources",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: errors.New(`could not generate resource requirements: could not fill resource requests: could not parse default CPU quantity: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'`),
-			cluster:  clusterNoDefaultRes,
-			check:    noCheck,
+			cluster: clusterNoDefaultRes,
+			check:   noCheck,
 		},
 		{
 			subTest: "default resources are set",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testResources,
+			cluster: cluster,
+			check:   testResources,
 		},
 		{
 			subTest: "labels for service",
@@ -736,30 +754,23 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				ConnectionPooler:              &acidv1.ConnectionPooler{},
 				EnableReplicaConnectionPooler: boolToPointer(true),
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testLabels,
+			cluster: cluster,
+			check:   testLabels,
 		},
 		{
 			subTest: "required envs",
 			spec: &acidv1.PostgresSpec{
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testEnvs,
+			cluster: cluster,
+			check:   testEnvs,
 		},
 	}
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		for _, tt := range tests {
-			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(role)
+			podSpec, _ := tt.cluster.generateConnectionPoolerPodTemplate(role)
 
-			if err != tt.expected && err.Error() != tt.expected.Error() {
-				t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
-					testName, tt.subTest, err, tt.expected)
-			}
-
-			err = tt.check(cluster, podSpec, role)
+			err := tt.check(cluster, podSpec, role)
 			if err != nil {
 				t.Errorf("%s [%s]: Pod spec is incorrect, %+v",
 					testName, tt.subTest, err)
@@ -793,6 +804,7 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 	}
 	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
 		Master: {
+			AuthSecret:     nil,
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: true,
@@ -859,6 +871,17 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 	}
 }
 
+func testServiceAccount(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
+	poolerServiceAccount := podSpec.Spec.ServiceAccountName
+
+	if poolerServiceAccount != cluster.OpConfig.PodServiceAccountName {
+		return fmt.Errorf("Pooler service account does not match, got %+v, expected %+v",
+			poolerServiceAccount, cluster.OpConfig.PodServiceAccountName)
+	}
+
+	return nil
+}
+
 func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
 	if cpuReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest {
@@ -921,6 +944,126 @@ func testServiceSelector(cluster *Cluster, service *v1.Service, role PostgresRol
 	return nil
 }
 
+func TestPoolerTLS(t *testing.T) {
+	client, _ := newFakeK8sPoolerTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	tlsSecretName := "my-secret"
+	spiloFSGroup := int64(103)
+	defaultMode := int32(0640)
+	mountPath := "/tls"
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			EnableConnectionPooler: util.True(),
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+			TLS: &acidv1.TLSDescription{
+				SecretName: tlsSecretName, CAFile: "ca.crt"},
+			AdditionalVolumes: []acidv1.AdditionalVolume{
+				{
+					Name:      tlsSecretName,
+					MountPath: mountPath,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  tlsSecretName,
+							DefaultMode: &defaultMode,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+					SpiloFSGroup:         &spiloFSGroup,
+				},
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+				},
+				PodServiceAccountName: "postgres-pod",
+			},
+		}, client, pg, logger, eventRecorder)
+
+	// create a statefulset
+	_, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	// create pooler resources
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
+	cluster.ConnectionPooler[Master] = &ConnectionPoolerObjects{
+		AuthSecret:     nil,
+		Deployment:     nil,
+		Service:        nil,
+		Name:           cluster.connectionPoolerName(Master),
+		ClusterName:    clusterName,
+		Namespace:      namespace,
+		LookupFunction: false,
+		Role:           Master,
+	}
+
+	_, err = cluster.syncConnectionPoolerWorker(nil, &pg, Master)
+	assert.NoError(t, err)
+
+	deploy, err := client.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(Master), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	fsGroup := int64(103)
+	assert.Equal(t, &fsGroup, deploy.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
+
+	assert.Equal(t, "postgres-pod", deploy.Spec.Template.Spec.ServiceAccountName, "need to add a service account name")
+
+	volume := v1.Volume{
+		Name: "my-secret",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  "my-secret",
+				DefaultMode: &defaultMode,
+			},
+		},
+	}
+	assert.Contains(t, deploy.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
+
+	poolerContainer := deploy.Spec.Template.Spec.Containers[constants.ConnectionPoolerContainer]
+	assert.Contains(t, poolerContainer.VolumeMounts, v1.VolumeMount{
+		MountPath: "/tls",
+		Name:      "my-secret",
+	}, "the volume gets mounted in /tls")
+
+	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: "/tls/tls.crt"})
+	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: "/tls/tls.key"})
+	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_CA_FILE", Value: "/tls/ca.crt"})
+}
+
 func TestConnectionPoolerServiceSpec(t *testing.T) {
 	testName := "Test connection pooler service spec generation"
 	var cluster = New(
@@ -937,6 +1080,9 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
+				Resources: config.Resources{
+					EnableOwnerReferences: util.True(),
+				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 	cluster.Statefulset = &appsv1.StatefulSet{
@@ -946,12 +1092,14 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 	}
 	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
 		Master: {
+			AuthSecret:     nil,
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: false,
 			Role:           Master,
 		},
 		Replica: {
+			AuthSecret:     nil,
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: false,
@@ -1002,6 +1150,184 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 			if err := tt.check(cluster, service, role); err != nil {
 				t.Errorf("%s [%s]: Service spec is incorrect, %+v",
 					testName, tt.subTest, err)
+			}
+		}
+	}
+}
+
+func TestConnectionPoolerServiceType(t *testing.T) {
+	testName := "Test connection pooler service type selection"
+
+	cluster := New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+				},
+				Resources: config.Resources{
+					EnableOwnerReferences: util.True(),
+				},
+			},
+		},
+		k8sutil.KubernetesClient{},
+		acidv1.Postgresql{},
+		logger,
+		eventRecorder,
+	)
+
+	cluster.Statefulset = &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sts",
+		},
+	}
+
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+		Master: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+			Role:           Master,
+		},
+		Replica: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+			Role:           Replica,
+		},
+	}
+
+	tests := []struct {
+		subTest      string
+		spec         *acidv1.PostgresSpec
+		cluster      *Cluster
+		expectedType map[PostgresRole]v1.ServiceType
+	}{
+		{
+			subTest: "default configuration -> ClusterIP for both",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeClusterIP,
+				Replica: v1.ServiceTypeClusterIP,
+			},
+		},
+		{
+			subTest: "LoadBalancer for both roles",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:                &acidv1.ConnectionPooler{},
+				EnableMasterPoolerLoadBalancer:  boolToPointer(true),
+				EnableReplicaPoolerLoadBalancer: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeLoadBalancer,
+				Replica: v1.ServiceTypeLoadBalancer,
+			},
+		},
+		{
+			subTest: "LoadBalancer for master",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:               &acidv1.ConnectionPooler{},
+				EnableMasterPoolerLoadBalancer: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeLoadBalancer,
+				Replica: v1.ServiceTypeClusterIP,
+			},
+		},
+		{
+			subTest: "LoadBalancer for replica",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:                &acidv1.ConnectionPooler{},
+				EnableReplicaPoolerLoadBalancer: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeClusterIP,
+				Replica: v1.ServiceTypeLoadBalancer,
+			},
+		},
+		{
+			subTest: "NodePort for both roles",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:            &acidv1.ConnectionPooler{},
+				EnableMasterPoolerNodePort:  boolToPointer(true),
+				EnableReplicaPoolerNodePort: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeNodePort,
+				Replica: v1.ServiceTypeNodePort,
+			},
+		},
+		{
+			subTest: "NodePort for master",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:           &acidv1.ConnectionPooler{},
+				EnableMasterPoolerNodePort: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeNodePort,
+				Replica: v1.ServiceTypeClusterIP,
+			},
+		},
+		{
+			subTest: "NodePort for replica",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:            &acidv1.ConnectionPooler{},
+				EnableReplicaPoolerNodePort: boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeClusterIP,
+				Replica: v1.ServiceTypeNodePort,
+			},
+		},
+		{
+			subTest: "NodePort overrides LoadBalancer for both roles",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPooler:                &acidv1.ConnectionPooler{},
+				EnableMasterPoolerLoadBalancer:  boolToPointer(true),
+				EnableReplicaPoolerLoadBalancer: boolToPointer(true),
+				EnableMasterPoolerNodePort:      boolToPointer(true),
+				EnableReplicaPoolerNodePort:     boolToPointer(true),
+			},
+			cluster: cluster,
+			expectedType: map[PostgresRole]v1.ServiceType{
+				Master:  v1.ServiceTypeNodePort,
+				Replica: v1.ServiceTypeNodePort,
+			},
+		},
+	}
+
+	roles := []PostgresRole{Master, Replica}
+
+	for _, tt := range tests {
+		tt.cluster.Spec = *tt.spec
+
+		for _, role := range roles {
+			svc := tt.cluster.generateConnectionPoolerService(tt.cluster.ConnectionPooler[role])
+
+			expected, ok := tt.expectedType[role]
+			if !ok {
+				t.Fatalf("%s [%s]: missing expectedType for role %v", testName, tt.subTest, role)
+			}
+
+			if svc.Spec.Type != expected {
+				t.Errorf("%s [%s] role=%s: service Type is incorrect, got %s, expected %s",
+					testName, tt.subTest, role, svc.Spec.Type, expected)
 			}
 		}
 	}

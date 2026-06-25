@@ -45,7 +45,7 @@ type httpClient interface {
 
 // Interface to the TeamsAPIClient
 type Interface interface {
-	TeamInfo(teamID, token string) (tm *Team, err error)
+	TeamInfo(teamID, token string) (tm *Team, statusCode int, err error)
 }
 
 // API describes teams API
@@ -67,7 +67,7 @@ func NewTeamsAPI(url string, log *logrus.Entry) *API {
 }
 
 // TeamInfo returns information about a given team using its ID and a token to authenticate to the API service.
-func (t *API) TeamInfo(teamID, token string) (tm *Team, err error) {
+func (t *API) TeamInfo(teamID, token string) (tm *Team, statusCode int, err error) {
 	var (
 		req  *http.Request
 		resp *http.Response
@@ -77,37 +77,38 @@ func (t *API) TeamInfo(teamID, token string) (tm *Team, err error) {
 	t.logger.Debugf("request url: %s", url)
 	req, err = http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusBadRequest, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+token)
 	if resp, err = t.httpClient.Do(req); err != nil {
-		return nil, err
+		return nil, http.StatusUnauthorized, err
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
 			err = fmt.Errorf("error when closing response: %v", closeErr)
 		}
 	}()
-	if resp.StatusCode != 200 {
+	statusCode = resp.StatusCode
+	if statusCode != http.StatusOK {
 		var raw map[string]json.RawMessage
 		d := json.NewDecoder(resp.Body)
 		err = d.Decode(&raw)
 		if err != nil {
-			return nil, fmt.Errorf("team API query failed with status code %d and malformed response: %v", resp.StatusCode, err)
+			return nil, statusCode, fmt.Errorf("team API query failed with status code %d and malformed response: %v", statusCode, err)
 		}
 
 		if errMessage, ok := raw["error"]; ok {
-			return nil, fmt.Errorf("team API query failed with status code %d and message: '%v'", resp.StatusCode, string(errMessage))
+			return nil, statusCode, fmt.Errorf("team API query failed with status code %d and message: '%v'", statusCode, string(errMessage))
 		}
-		return nil, fmt.Errorf("team API query failed with status code %d", resp.StatusCode)
+		return nil, statusCode, fmt.Errorf("team API query failed with status code %d", statusCode)
 	}
 
 	tm = &Team{}
 	d := json.NewDecoder(resp.Body)
 	if err = d.Decode(tm); err != nil {
-		return nil, fmt.Errorf("could not parse team API response: %v", err)
+		return nil, statusCode, fmt.Errorf("could not parse team API response: %v", err)
 	}
 
-	return tm, nil
+	return tm, statusCode, nil
 }

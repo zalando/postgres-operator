@@ -1,4 +1,4 @@
-apiVersion: "networking.k8s.io/v1beta1"
+apiVersion: "networking.k8s.io/v1"
 kind: "Ingress"
 metadata:
   name: "postgres-operator-ui"
@@ -6,10 +6,15 @@ metadata:
   labels:
     application: "postgres-operator-ui"
 spec:
+  # ingressClassName: "ingress-nginx"
   rules:
     - host: "ui.example.org"
       http:
         paths:
-          - backend:
-              serviceName: "postgres-operator-ui"
-              servicePort: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: "postgres-operator-ui"
+                port:
+                  number: 80

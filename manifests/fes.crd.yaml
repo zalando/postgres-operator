@@ -1,0 +1,23 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fabriceventstreams.zalando.org
+spec:
+  group: zalando.org
+  names:
+    kind: FabricEventStream
+    listKind: FabricEventStreamList
+    plural: fabriceventstreams
+    singular: fabriceventstream
+    shortNames:
+    - fes
+    categories:
+    - all
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object

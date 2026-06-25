@@ -1,6 +1,6 @@
 package v1
 
-// 	ClusterStatusUnknown etc : status of a Postgres cluster known to the operator
+// ClusterStatusUnknown etc : status of a Postgres cluster known to the operator
 const (
 	ClusterStatusUnknown      = ""
 	ClusterStatusCreating     = "Creating"

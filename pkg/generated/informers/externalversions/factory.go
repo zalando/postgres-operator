@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@ SOFTWARE.
 package externalversions
 
 import (
+	context "context"
 	reflect "reflect"
 	sync "sync"
 	time "time"
@@ -32,9 +33,11 @@ import (
 	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	acidzalando "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do"
 	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	zalandoorg "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/zalando.org"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -48,11 +51,18 @@ type sharedInformerFactory struct {
 	lock             sync.Mutex
 	defaultResync    time.Duration
 	customResync     map[reflect.Type]time.Duration
+	transform        cache.TransformFunc
+	informerName     *cache.InformerName
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[reflect.Type]bool
+	// wg tracks how many goroutines were started.
+	wg sync.WaitGroup
+	// shuttingDown is true when Shutdown has been called. It may still be running
+	// because it needs to wait for goroutines.
+	shuttingDown bool
 }
 
 // WithCustomResyncConfig sets a custom resync period for the specified informer types.
@@ -81,6 +91,29 @@ func WithNamespace(namespace string) SharedInformerOption {
 	}
 }
 
+// WithTransform sets a transform on all informers.
+func WithTransform(transform cache.TransformFunc) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.transform = transform
+		return factory
+	}
+}
+
+// WithInformerName sets the InformerName for informer identity used in metrics.
+// The InformerName must be created via cache.NewInformerName() at startup,
+// which validates global uniqueness. Each informer type will register its
+// GVR under this name.
+func WithInformerName(informerName *cache.InformerName) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.informerName = informerName
+		return factory
+	}
+}
+
+func (f *sharedInformerFactory) InformerName() *cache.InformerName {
+	return f.informerName
+}
+
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
 func NewSharedInformerFactory(client versioned.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return NewSharedInformerFactoryWithOptions(client, defaultResync)
@@ -89,6 +122,7 @@ func NewSharedInformerFactory(client versioned.Interface, defaultResync time.Dur
 // NewFilteredSharedInformerFactory constructs a new instance of sharedInformerFactory.
 // Listers obtained via this SharedInformerFactory will be subject to the same filters
 // as specified here.
+//
 // Deprecated: Please use NewSharedInformerFactoryWithOptions instead
 func NewFilteredSharedInformerFactory(client versioned.Interface, defaultResync time.Duration, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerFactory {
 	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions))
@@ -113,21 +147,44 @@ func NewSharedInformerFactoryWithOptions(client versioned.Interface, defaultResy
 	return factory
 }
 
-// Start initializes all requested informers.
 func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
+	f.StartWithContext(wait.ContextForChannel(stopCh))
+}
+
+func (f *sharedInformerFactory) StartWithContext(ctx context.Context) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	if f.shuttingDown {
+		return
+	}
+
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			go informer.Run(stopCh)
+			f.wg.Go(func() {
+				informer.RunWithContext(ctx)
+			})
 			f.startedInformers[informerType] = true
 		}
 	}
 }
 
-// WaitForCacheSync waits for all started informers' cache were synced.
+func (f *sharedInformerFactory) Shutdown() {
+	f.lock.Lock()
+	f.shuttingDown = true
+	f.lock.Unlock()
+
+	// Will return immediately if there is nothing to wait for.
+	f.wg.Wait()
+	f.informerName.Release()
+}
+
 func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
+	result := f.WaitForCacheSyncWithContext(wait.ContextForChannel(stopCh))
+	return result.Synced
+}
+
+func (f *sharedInformerFactory) WaitForCacheSyncWithContext(ctx context.Context) cache.SyncResult {
 	informers := func() map[reflect.Type]cache.SharedIndexInformer {
 		f.lock.Lock()
 		defer f.lock.Unlock()
@@ -141,14 +198,35 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
 		return informers
 	}()
 
-	res := map[reflect.Type]bool{}
-	for informType, informer := range informers {
-		res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
+	// Wait for informers to sync, without polling.
+	cacheSyncs := make([]cache.DoneChecker, 0, len(informers))
+	for _, informer := range informers {
+		cacheSyncs = append(cacheSyncs, informer.HasSyncedChecker())
 	}
+	cache.WaitFor(ctx, "" /* no logging */, cacheSyncs...)
+
+	res := cache.SyncResult{
+		Synced: make(map[reflect.Type]bool, len(informers)),
+	}
+	failed := false
+	for informType, informer := range informers {
+		hasSynced := informer.HasSynced()
+		if !hasSynced {
+			failed = true
+		}
+		res.Synced[informType] = hasSynced
+	}
+	if failed {
+		// context.Cause is more informative than ctx.Err().
+		// This must be non-nil, otherwise WaitFor wouldn't have stopped
+		// prematurely.
+		res.Err = context.Cause(ctx)
+	}
+
 	return res
 }
 
-// InternalInformerFor returns the SharedIndexInformer for obj using an internal
+// InformerFor returns the SharedIndexInformer for obj using an internal
 // client.
 func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer {
 	f.lock.Lock()
@@ -166,6 +244,9 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 	}
 
 	informer = newFunc(f.client, resyncPeriod)
+	if f.transform != nil {
+		informer.SetTransform(f.transform)
+	}
 	f.informers[informerType] = informer
 
 	return informer
@@ -173,14 +254,92 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 
 // SharedInformerFactory provides shared informers for resources in all known
 // API group versions.
+//
+// It is typically used like this:
+//
+//	ctx, cancel := context.WithCancel(context.Background())
+//	defer cancel()
+//	factory := NewSharedInformerFactory(client, resyncPeriod)
+//	defer factory.WaitForStop()    // Returns immediately if nothing was started.
+//	genericInformer := factory.ForResource(resource)
+//	typedInformer := factory.SomeAPIGroup().V1().SomeType()
+//	handle, err := typeInformer.Informer().AddEventHandler(...)
+//	if err != nil {
+//	    return fmt.Errorf("register event handler: %v", err)
+//	}
+//	defer typeInformer.Informer().RemoveEventHandler(handle) // Avoids leaking goroutines.
+//	factory.StartWithContext(ctx)                            // Start processing these informers.
+//	synced := factory.WaitForCacheSyncWithContext(ctx)
+//	if err := synced.AsError(); err != nil {
+//	    return err
+//	}
+//	for v := range synced {
+//	    // Only if desired log some information similar to this.
+//	    fmt.Fprintf(os.Stdout, "cache synced: %s", v)
+//	}
+//
+//	// Also make sure that all of the initial cache events have been delivered.
+//	if !WaitFor(ctx, "event handler sync", handle.HasSyncedChecker()) {
+//	    // Must have failed because of context.
+//	    return fmt.Errorf("sync event handler: %w", context.Cause(ctx))
+//	}
+//
+//	// Creating informers can also be created after Start, but then
+//	// Start must be called again:
+//	anotherGenericInformer := factory.ForResource(resource)
+//	factory.StartWithContext(ctx)
 type SharedInformerFactory interface {
 	internalinterfaces.SharedInformerFactory
-	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
+
+	// Start initializes all requested informers. They are handled in goroutines
+	// which run until the stop channel gets closed.
+	// Warning: Start does not block. When run in a go-routine, it will race with a later WaitForCacheSync.
+	//
+	// Contextual logging: StartWithContext should be used instead of Start in code which supports contextual logging.
+	Start(stopCh <-chan struct{})
+
+	// StartWithContext initializes all requested informers. They are handled in goroutines
+	// which run until the context gets canceled.
+	// Warning: StartWithContext does not block. When run in a go-routine, it will race with a later WaitForCacheSync.
+	StartWithContext(ctx context.Context)
+
+	// Shutdown marks a factory as shutting down. At that point no new
+	// informers can be started anymore and Start will return without
+	// doing anything.
+	//
+	// In addition, Shutdown blocks until all goroutines have terminated. For that
+	// to happen, the close channel(s) that they were started with must be closed,
+	// either before Shutdown gets called or while it is waiting.
+	//
+	// Shutdown may be called multiple times, even concurrently. All such calls will
+	// block until all goroutines have terminated.
+	Shutdown()
+
+	// WaitForCacheSync blocks until all started informers' caches were synced
+	// or the stop channel gets closed.
+	//
+	// Contextual logging: WaitForCacheSync should be used instead of WaitForCacheSync in code which supports contextual logging. It also returns a more useful result.
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
+	// WaitForCacheSyncWithContext blocks until all started informers' caches were synced
+	// or the context gets canceled.
+	WaitForCacheSyncWithContext(ctx context.Context) cache.SyncResult
+
+	// ForResource gives generic access to a shared informer of the matching type.
+	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
+
+	// InformerFor returns the SharedIndexInformer for obj using an internal
+	// client.
+	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
+
 	Acid() acidzalando.Interface
+	Zalando() zalandoorg.Interface
 }
 
 func (f *sharedInformerFactory) Acid() acidzalando.Interface {
 	return acidzalando.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Zalando() zalandoorg.Interface {
+	return zalandoorg.New(f, f.namespace, f.tweakListOptions)
 }

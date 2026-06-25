@@ -2,14 +2,12 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -18,7 +16,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func (c *Controller) makeClusterConfig() cluster.Config {
@@ -53,28 +51,28 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 	return c.clusterWorkers[clusterName]
 }
 
-func (c *Controller) createOperatorCRD(crd *apiextv1.CustomResourceDefinition) error {
-	if _, err := c.KubeClient.CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
-		if k8sutil.ResourceAlreadyExists(err) {
-			c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
-
-			patch, err := json.Marshal(crd)
-			if err != nil {
-				return fmt.Errorf("could not marshal new customResourceDefintion: %v", err)
-			}
-			if _, err := c.KubeClient.CustomResourceDefinitions().Patch(
-				context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
-				return fmt.Errorf("could not update customResourceDefinition: %v", err)
-			}
-		} else {
-			c.logger.Errorf("could not create customResourceDefinition %q: %v", crd.Name, err)
+func (c *Controller) createOperatorCRD(desiredCrd *apiextv1.CustomResourceDefinition) error {
+	crd, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), desiredCrd.Name, metav1.GetOptions{})
+	if k8sutil.ResourceNotFound(err) {
+		if _, err := c.KubeClient.CustomResourceDefinitions().Create(context.TODO(), desiredCrd, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("could not create customResourceDefinition %q: %v", desiredCrd.Name, err)
 		}
-	} else {
-		c.logger.Infof("customResourceDefinition %q has been registered", crd.Name)
 	}
+	if err != nil {
+		c.logger.Errorf("could not get customResourceDefinition %q: %v", desiredCrd.Name, err)
+	}
+	if crd != nil {
+		c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
+		crd.Spec = desiredCrd.Spec
+		_, err := c.KubeClient.CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("could not update customResourceDefinition %q: %v", crd.Name, err)
+		}
+	}
+	c.logger.Infof("customResourceDefinition %q is registered", crd.Name)
 
-	return wait.Poll(c.config.CRDReadyWaitInterval, c.config.CRDReadyWaitTimeout, func() (bool, error) {
-		c, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+	return wait.PollUntilContextTimeout(context.TODO(), c.config.CRDReadyWaitInterval, c.config.CRDReadyWaitTimeout, false, func(ctx context.Context) (bool, error) {
+		c, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), desiredCrd.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -96,12 +94,20 @@ func (c *Controller) createOperatorCRD(crd *apiextv1.CustomResourceDefinition) e
 	})
 }
 
-func (c *Controller) createPostgresCRD(enableValidation *bool) error {
-	return c.createOperatorCRD(acidv1.PostgresCRD(enableValidation))
+func (c *Controller) createPostgresCRD() error {
+	crd, err := acidv1.PostgresCRD(c.opConfig.CRDCategories)
+	if err != nil {
+		return fmt.Errorf("could not create Postgres CRD object: %v", err)
+	}
+	return c.createOperatorCRD(crd)
 }
 
-func (c *Controller) createConfigurationCRD(enableValidation *bool) error {
-	return c.createOperatorCRD(acidv1.ConfigurationCRD(enableValidation))
+func (c *Controller) createConfigurationCRD() error {
+	crd, err := acidv1.OperatorConfigurationCRD(c.opConfig.CRDCategories)
+	if err != nil {
+		return fmt.Errorf("could not create OperatorConfiguration CRD object: %v", err)
+	}
+	return c.createOperatorCRD(crd)
 }
 
 func readDecodedRole(s string) (*spec.PgUser, error) {
@@ -195,13 +201,12 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 
 func (c *Controller) getInfrastructureRoles(
 	rolesSecrets []*config.InfrastructureRole) (
-	map[string]spec.PgUser, []error) {
+	map[string]spec.PgUser, error) {
 
-	var errors []error
-	var noRolesProvided = true
-
+	errors := make([]string, 0)
+	noRolesProvided := true
 	roles := []spec.PgUser{}
-	uniqRoles := map[string]spec.PgUser{}
+	uniqRoles := make(map[string]spec.PgUser)
 
 	// To be compatible with the legacy implementation we need to return nil if
 	// the provided secret name is empty. The equivalent situation in the
@@ -214,37 +219,39 @@ func (c *Controller) getInfrastructureRoles(
 	}
 
 	if noRolesProvided {
-		return nil, nil
+		return uniqRoles, nil
 	}
 
 	for _, secret := range rolesSecrets {
 		infraRoles, err := c.getInfrastructureRole(secret)
 
 		if err != nil || infraRoles == nil {
-			c.logger.Debugf("Cannot get infrastructure role: %+v", *secret)
+			c.logger.Debugf("cannot get infrastructure role: %+v", *secret)
 
 			if err != nil {
-				errors = append(errors, err)
+				errors = append(errors, fmt.Sprintf("%v", err))
 			}
 
 			continue
 		}
 
-		for _, r := range infraRoles {
-			roles = append(roles, r)
-		}
+		roles = append(roles, infraRoles...)
 	}
 
 	for _, r := range roles {
 		if _, exists := uniqRoles[r.Name]; exists {
-			msg := "Conflicting infrastructure roles: roles[%s] = (%q, %q)"
+			msg := "conflicting infrastructure roles: roles[%s] = (%q, %q)"
 			c.logger.Debugf(msg, r.Name, uniqRoles[r.Name], r)
 		}
 
 		uniqRoles[r.Name] = r
 	}
 
-	return uniqRoles, errors
+	if len(errors) > 0 {
+		return uniqRoles, fmt.Errorf("%s", strings.Join(errors, `', '`))
+	}
+
+	return uniqRoles, nil
 }
 
 // Generate list of users representing one infrastructure role based on its
@@ -407,6 +414,7 @@ func (c *Controller) postgresTeamAdd(obj interface{}) {
 	pgTeam, ok := obj.(*acidv1.PostgresTeam)
 	if !ok {
 		c.logger.Errorf("could not cast to PostgresTeam spec")
+		return
 	}
 	c.logger.Debugf("PostgreTeam %q added. Reloading postgres team CRDs and overwriting cached map", pgTeam.Name)
 	c.loadPostgresTeams()
@@ -416,6 +424,7 @@ func (c *Controller) postgresTeamUpdate(prev, obj interface{}) {
 	pgTeam, ok := obj.(*acidv1.PostgresTeam)
 	if !ok {
 		c.logger.Errorf("could not cast to PostgresTeam spec")
+		return
 	}
 	c.logger.Debugf("PostgreTeam %q updated. Reloading postgres team CRDs and overwriting cached map", pgTeam.Name)
 	c.loadPostgresTeams()

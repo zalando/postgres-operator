@@ -4,23 +4,23 @@ app
     .container
 
       .navbar-header
-        a.navbar-brand(href='/')
+        a.navbar-brand(href='./')
           | PostgreSQL Operator UI
 
       #navbar.navbar-collapse.collapse
         ul.nav.navbar-nav
 
           li(class='{ active: ["EDIT", "LIST", "LOGS", "STATUS"].includes(activenav) }')
-            a(href='/#/list') PostgreSQL clusters
+            a(href='./#/list') PostgreSQL clusters
 
           li(class='{ active: "BACKUPS" === activenav }')
-            a(href='/#/backups') Backups
+            a(href='./#/backups') Backups
 
           li(class='{ active: "OPERATOR" === activenav }')
-            a(href='/#/operator') Status
+            a(href='./#/operator') Status
 
           li(class='{ active: "NEW" === activenav }')
-            a(href='/#/new') New cluster
+            a(href='./#/new') New cluster
 
           li(if='{ config }')
             a(href='{ config.docs_link }' target='_blank') Documentation
@@ -55,7 +55,7 @@ app
       |
       | or
       |
-      a(href="/") start over
+      a(href="./") start over
       | .
 
     div(if='{ config }')
@@ -152,12 +152,12 @@ app
 
     ;(
       jQuery
-      .get('/config')
+      .get('./config')
       .done(config => {
         this.config = config
         ;(
           jQuery
-          .get('/teams')
+          .get('./teams')
           .done(teams => {
             this.teams = teams.sort()
             this.team = this.teams[0]

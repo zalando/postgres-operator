@@ -73,7 +73,7 @@ class StaticClusterDiscoverer:
                 cluster = Cluster(generate_cluster_id(DEFAULT_CLUSTERS), DEFAULT_CLUSTERS)
             else:
                 logger.info("in cluster configuration failed")
-                config = kubernetes.client.configuration
+                config = kubernetes.client.Configuration()
                 cluster = Cluster(
                     generate_cluster_id(config.host),
                     config.host,

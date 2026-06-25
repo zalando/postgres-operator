@@ -2,6 +2,7 @@ package constants
 
 // Connection pooler specific constants
 const (
+	ConnectionPoolerResourceSuffix       = "pooler"
 	ConnectionPoolerUserName             = "pooler"
 	ConnectionPoolerSchemaName           = "pooler"
 	ConnectionPoolerDefaultType          = "pgbouncer"

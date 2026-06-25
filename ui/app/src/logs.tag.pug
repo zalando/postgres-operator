@@ -5,15 +5,15 @@ logs
       ol.breadcrumb
 
         li.breadcrumb-item
-          a(href='/#/list')
+          a(href='./#/list')
             | PostgreSQL clusters
 
         li.breadcrumb-item
-          a(href='/#/status/{ cluster_path }')
+          a(href='./#/status/{ cluster_path }')
             | { qname }
 
         li.breadcrumb-item
-          a(href='/#/logs/{ cluster_path }')
+          a(href='./#/logs/{ cluster_path }')
             | Logs
 
   .sk-spinner-pulse(if='{ logs === undefined }')
@@ -26,7 +26,7 @@ logs
       |
       | or
       |
-      a(href="/") start over
+      a(href="./") start over
       | .
 
   .container-fluid(if='{ logs }')
@@ -72,7 +72,7 @@ logs
         )
         ;(
           jQuery
-          .get(`/operator/clusters/${cluster_path}/logs`)
+          .get(`./operator/clusters/${cluster_path}/logs`)
           .done(logs => this.logs = logs.reverse())
           .fail(() => this.logs = null)
           .always(() => this.update())

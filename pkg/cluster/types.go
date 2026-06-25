@@ -6,7 +6,7 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -14,11 +14,15 @@ import (
 type PostgresRole string
 
 const (
-	// Master role
-	Master PostgresRole = "master"
-
-	// Replica role
+	// spilo roles
+	Master  PostgresRole = "master"
 	Replica PostgresRole = "replica"
+	Patroni PostgresRole = "config"
+
+	// roles returned by Patroni cluster endpoint
+	Leader        PostgresRole = "leader"
+	StandbyLeader PostgresRole = "standby_leader"
+	SyncStandby   PostgresRole = "sync_standby"
 )
 
 // PodEventType represents the type of a pod-related event
@@ -54,14 +58,16 @@ type WorkerStatus struct {
 
 // ClusterStatus describes status of the cluster
 type ClusterStatus struct {
-	Team                string
-	Cluster             string
-	MasterService       *v1.Service
-	ReplicaService      *v1.Service
-	MasterEndpoint      *v1.Endpoints
-	ReplicaEndpoint     *v1.Endpoints
-	StatefulSet         *appsv1.StatefulSet
-	PodDisruptionBudget *policybeta1.PodDisruptionBudget
+	Team                          string
+	Cluster                       string
+	Namespace                     string
+	MasterService                 *v1.Service
+	ReplicaService                *v1.Service
+	MasterEndpoint                *v1.Endpoints
+	ReplicaEndpoint               *v1.Endpoints
+	StatefulSet                   *appsv1.StatefulSet
+	PrimaryPodDisruptionBudget    *policyv1.PodDisruptionBudget
+	CriticalOpPodDisruptionBudget *policyv1.PodDisruptionBudget
 
 	CurrentProcess Process
 	Worker         uint32
@@ -72,7 +78,7 @@ type ClusterStatus struct {
 
 type TemplateParams map[string]interface{}
 
-type InstallFunction func(schema string, user string, role PostgresRole) error
+type InstallFunction func(schema string, user string) error
 
 type SyncReason []string
 

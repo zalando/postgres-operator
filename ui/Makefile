@@ -1,6 +1,7 @@
 .PHONY: clean test appjs docker push mock
 
-IMAGE            ?= registry.opensource.zalan.do/acid/postgres-operator-ui
+IMAGE            ?= postgres-operator-ui
+BASE_IMAGE       ?= python:3.11-slim
 VERSION          ?= $(shell git describe --tags --always --dirty)
 TAG              ?= $(VERSION)
 GITHEAD          = $(shell git rev-parse --short HEAD)
@@ -21,8 +22,8 @@ test:
 	tox
 
 appjs:
-	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:10.1.0-alpine npm install
-	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:10.1.0-alpine npm run build
+	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:lts-alpine npm install --cache /workdir/.npm
+	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:lts-alpine npm run build --cache /workdir/.npm
 
 docker: appjs
 	echo `(env)`
@@ -30,10 +31,7 @@ docker: appjs
 	echo "Version ${VERSION}"
 	echo "CDP tag ${CDP_TAG}"
 	echo "git describe $(shell git describe --tags --always --dirty)"
-	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)" -f Dockerfile .
-
-push:
-	docker push "$(IMAGE):$(TAG)$(CDP_TAG)"
+	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)" -f Dockerfile --build-arg BASE_IMAGE="${BASE_IMAGE}" .
 
 mock:
 	docker run -it -p 8081:8081 "$(IMAGE):$(TAG)" --mock

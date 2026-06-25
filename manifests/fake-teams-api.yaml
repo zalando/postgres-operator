@@ -4,6 +4,9 @@ metadata:
   name: fake-teams-api
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      name: fake-teams-api
   template:
     metadata:
       labels:
@@ -37,8 +40,6 @@ metadata:
   name: postgresql-operator
   namespace: default
 type: Opaque
-data:
-apiVersion: v1
 data:
   read-only-token-secret: dGVzdHRva2Vu
   read-only-token-type: QmVhcmVy

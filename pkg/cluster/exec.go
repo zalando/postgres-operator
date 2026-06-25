@@ -15,7 +15,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 )
 
-//ExecCommand executes arbitrary command inside the pod
+// ExecCommand executes arbitrary command inside the pod
 func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (string, error) {
 	c.setProcessName("executing command %q", strings.Join(command, " "))
 
@@ -59,7 +59,7 @@ func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (
 		return "", fmt.Errorf("failed to init executor: %v", err)
 	}
 
-	err = exec.Stream(remotecommand.StreamOptions{
+	err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
 		Stdout: &execOut,
 		Stderr: &execErr,
 		Tty:    false,
