@@ -297,5 +297,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		fromCRD.ConnectionPooler.MaxDBConnections,
 		k8sutil.Int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
 
+	// Security contexts are nil unless explicitly configured; the cluster package falls back
+	// to the historical pooler defaults when they are not set.
+	result.ConnectionPooler.PodSecurityContext = fromCRD.ConnectionPooler.PodSecurityContext
+	result.ConnectionPooler.SecurityContext = fromCRD.ConnectionPooler.SecurityContext
+
 	return result
 }

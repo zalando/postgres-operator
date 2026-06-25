@@ -1098,3 +1098,48 @@ operator being able to provide some reasonable defaults.
   **connection_pooler_default_cpu_limit**
   **connection_pooler_default_memory_limit**
   Default resource configuration for connection pooler deployment.
+
+* **connection_pooler_pod_security_context**
+  Pod-level `securityContext` applied to the connection pooler deployment. The
+  value is a standard Kubernetes
+  [PodSecurityContext](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#podsecuritycontext-v1-core)
+  object. Only fields you set are overridden; unset fields keep the operator
+  defaults (`runAsUser: 100`, `runAsGroup: 101`, and the cluster's `fsGroup`).
+  Settable **only** via the `OperatorConfiguration` CRD (not the ConfigMap).
+  Defaults to not set.
+
+* **connection_pooler_security_context**
+  Container-level `securityContext` applied to the pgbouncer container. The
+  value is a standard Kubernetes
+  [SecurityContext](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#securitycontext-v1-core)
+  object. Only fields you set are overridden; when `allowPrivilegeEscalation`
+  is unset it defaults to `false`. Settable **only** via the
+  `OperatorConfiguration` CRD (not the ConfigMap). Defaults to not set.
+
+These two parameters are useful when running a hardened pooler image whose
+pgbouncer user/UID differs from the operator default (100/101), or to satisfy
+restricted [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/).
+Because they are object-valued they cannot be expressed in the flat operator
+ConfigMap; configure them through the `OperatorConfiguration` CRD:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-default-configuration
+configuration:
+  connection_pooler:
+    connection_pooler_pod_security_context:
+      runAsUser: 100
+      runAsGroup: 101
+      runAsNonRoot: true
+      fsGroup: 101
+      seccompProfile:
+        type: RuntimeDefault
+    connection_pooler_security_context:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+```
