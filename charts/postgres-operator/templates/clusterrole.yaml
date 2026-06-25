@@ -242,14 +242,14 @@ rules:
   verbs:
   - get
   - create
-{{- if toString .Values.configKubernetes.spilo_privileged | eq "true" }}
+{{- if or (toString .Values.configKubernetes.spilo_privileged | eq "true") (.Values.rbac.operatorRunWithPsp) }}
 # to run privileged pods
 - apiGroups:
   - extensions
   resources:
   - podsecuritypolicies
   resourceNames:
-  - privileged
+  - {{ .Values.rbac.operatorPrivilegedPodSecurityPolicy }}
   verbs:
   - use
 {{- end }}
