@@ -75,7 +75,10 @@ $(GENERATED_CRDS): $(GENERATED)
 	@mv manifests/acid.zalan.do_operatorconfigurations.yaml manifests/operatorconfiguration.crd.yaml
 	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
 	@cp manifests/postgresql.crd.yaml pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
+	@cp manifests/postgresql.crd.yaml charts/postgres-operator/crds/postgresqls.yaml
 	@cp manifests/operatorconfiguration.crd.yaml pkg/apis/acid.zalan.do/v1/operatorconfiguration.crd.yaml
+	@cp manifests/operatorconfiguration.crd.yaml charts/postgres-operator/crds/operatorconfigurations.yaml
+	@cp manifests/postgresteam.crd.yaml charts/postgres-operator/crds/postgresteams.yaml
 
 local: ${SOURCES} $(GENERATED_CRDS)
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)
