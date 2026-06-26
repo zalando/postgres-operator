@@ -130,6 +130,7 @@ type PostgresSpec struct {
 	AdditionalVolumes         []AdditionalVolume `json:"additionalVolumes,omitempty"`
 	Streams                   []Stream           `json:"streams,omitempty"`
 	Env                       []v1.EnvVar        `json:"env,omitempty"`
+	EnvFrom                   []v1.EnvFromSource `json:"envFrom,omitempty"`
 
 	// deprecated
 	InitContainersOld []v1.Container `json:"init_containers,omitempty"`
