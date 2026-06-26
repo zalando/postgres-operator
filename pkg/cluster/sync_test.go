@@ -1053,3 +1053,193 @@ func TestUpdateSecretNameConflict(t *testing.T) {
 	expectedError := fmt.Sprintf("syncing secret %s failed: error while checking for password rotation: could not update secret because of user name mismatch", "default/prepared-owner-user.acid-test-cluster.credentials")
 	assert.Contains(t, err.Error(), expectedError)
 }
+
+func Test_checkClusterStableForRollout(t *testing.T) {
+	createRunningPod := func(name string) v1.Pod {
+		return v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+				},
+			},
+		}
+	}
+
+	createFailingPod := func(name, reason string) v1.Pod {
+		return v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: reason}}},
+				},
+			},
+		}
+	}
+
+	createTerminatedPod := func(name string, exitCode int32) v1.Pod {
+		return v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: exitCode}}},
+				},
+			},
+		}
+	}
+
+	createPendingPod := func(name string) v1.Pod {
+		return v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status:     v1.PodStatus{Phase: v1.PodPending},
+		}
+	}
+
+	createUnreportedPod := func(name string) v1.Pod {
+		return v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status:     v1.PodStatus{}, // no status reported yet
+		}
+	}
+
+	tests := []struct {
+		name           string
+		numReplicas    int
+		allPods        []v1.Pod
+		podsToRecreate []v1.Pod
+		expectedResult podsAccountingResult
+	}{
+		{
+			name:        "All pods running",
+			numReplicas: 3,
+			allPods:     []v1.Pod{createRunningPod("pod-0"), createRunningPod("pod-1"), createRunningPod("pod-2")},
+			expectedResult: podsAccountingResult{
+				accountedPods:   3,
+				unaccountedPods: []string{},
+				numReplicas:     3,
+				isEnough:        true,
+				reason:          "",
+			},
+		},
+		{
+			name:           "One pod failing, but in recreate list",
+			numReplicas:    3,
+			allPods:        []v1.Pod{createRunningPod("pod-0"), createRunningPod("pod-1"), createFailingPod("pod-2", "CrashLoop")},
+			podsToRecreate: []v1.Pod{createFailingPod("pod-2", "CrashLoop")},
+			expectedResult: podsAccountingResult{
+				accountedPods:   3,
+				unaccountedPods: []string{},
+				numReplicas:     3,
+				isEnough:        true,
+				reason:          "",
+			},
+		},
+		{
+			name:           "One pod failing, not in recreate list",
+			numReplicas:    3,
+			allPods:        []v1.Pod{createRunningPod("pod-0"), createRunningPod("pod-1"), createFailingPod("pod-2", "ImagePullBackOff")},
+			podsToRecreate: []v1.Pod{},
+			expectedResult: podsAccountingResult{
+				accountedPods:   2,
+				unaccountedPods: []string{"pod-2"},
+				numReplicas:     3,
+				isEnough:        false,
+				reason:          "only 2/3 pods are healthy or scheduled for recreation, unaccounted/not running pods: pod-2",
+			},
+		},
+		{
+			name:        "One pod missing from API",
+			numReplicas: 3,
+			allPods:     []v1.Pod{createRunningPod("pod-0"), createRunningPod("pod-1")},
+			expectedResult: podsAccountingResult{
+				accountedPods:   2,
+				unaccountedPods: []string{},
+				numReplicas:     3,
+				isEnough:        false,
+				reason:          "only 2/3 pods are healthy or scheduled for recreation, 1 pod(s) are completely missing",
+			},
+		},
+		{
+			name:        "Minimal cluster: numReplicas=1",
+			numReplicas: 1,
+			allPods:     []v1.Pod{createRunningPod("master")},
+			expectedResult: podsAccountingResult{
+				accountedPods:   1,
+				unaccountedPods: []string{},
+				numReplicas:     1,
+				isEnough:        true,
+				reason:          "",
+			},
+		},
+		{
+			name:        "Edge case: numReplicas=0",
+			numReplicas: 0,
+			allPods:     []v1.Pod{},
+			expectedResult: podsAccountingResult{
+				accountedPods:   0,
+				unaccountedPods: []string{},
+				numReplicas:     0,
+				isEnough:        true,
+				reason:          "",
+			},
+		},
+		{
+			name:        "Pod with empty status counts as accounted",
+			numReplicas: 1,
+			allPods:     []v1.Pod{createUnreportedPod("pod-0")},
+			expectedResult: podsAccountingResult{
+				accountedPods:   1,
+				unaccountedPods: []string{},
+				numReplicas:     1,
+				isEnough:        true,
+				reason:          "",
+			},
+		},
+		{
+			name:        "Multiple unaccounted pods",
+			numReplicas: 3,
+			allPods:     []v1.Pod{createRunningPod("pod-0"), createFailingPod("pod-1", "CrashLoop"), createPendingPod("pod-2")},
+			expectedResult: podsAccountingResult{
+				accountedPods:   1,
+				unaccountedPods: []string{"pod-1", "pod-2"},
+				numReplicas:     3,
+				isEnough:        false,
+				reason:          "only 1/3 pods are healthy or scheduled for recreation, unaccounted/not running pods: pod-1, pod-2",
+			},
+		},
+		{
+			name:        "Scale-down in progress: more pods than numReplicas",
+			numReplicas: 2,
+			allPods:     []v1.Pod{createRunningPod("pod-0"), createRunningPod("pod-1"), createRunningPod("pod-2")},
+			expectedResult: podsAccountingResult{
+				accountedPods:   3,
+				unaccountedPods: []string{},
+				numReplicas:     2,
+				isEnough:        true,
+				reason:          "",
+			},
+		},
+		{
+			name:        "Terminated pod is not running",
+			numReplicas: 2,
+			allPods:     []v1.Pod{createRunningPod("pod-0"), createTerminatedPod("pod-1", 137)},
+			expectedResult: podsAccountingResult{
+				accountedPods:   1,
+				unaccountedPods: []string{"pod-1"},
+				numReplicas:     2,
+				isEnough:        false,
+				reason:          "only 1/2 pods are healthy or scheduled for recreation, unaccounted/not running pods: pod-1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := checkClusterStableForRollout(tt.allPods, tt.podsToRecreate, tt.numReplicas)
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
