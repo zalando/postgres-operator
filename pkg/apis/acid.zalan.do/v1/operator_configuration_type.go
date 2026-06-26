@@ -284,7 +284,7 @@ type TeamsAPIConfiguration struct {
 	PamRoleName string `json:"pam_role_name,omitempty"`
 	// +kubebuilder:default="https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"
 	PamConfiguration string `json:"pam_configuration,omitempty"`
-	// +kubebuilder:default="[\"admin\", \"cron_admin\"]"
+	// +kubebuilder:default={"admin", "cron_admin"}
 	ProtectedRoles         []string `json:"protected_role_names,omitempty"`
 	PostgresSuperuserTeams []string `json:"postgres_superuser_teams,omitempty"`
 	// +kubebuilder:default=true
@@ -426,10 +426,10 @@ type OperatorConfigurationData struct {
 	RepairPeriod Duration `json:"repair_period,omitempty"`
 	// +kubebuilder:default=true
 	EnableMaintenanceWindows *bool `json:"enable_maintenance_windows,omitempty"`
-	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=array
-	MaintenanceWindows      []MaintenanceWindow `json:"maintenance_windows,omitempty"`
-	SetMemoryRequestToLimit bool                `json:"set_memory_request_to_limit,omitempty"`
+	// +kubebuilder:validation:items:Pattern=`^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$`
+	MaintenanceWindows      []string `json:"maintenance_windows,omitempty"`
+	SetMemoryRequestToLimit bool     `json:"set_memory_request_to_limit,omitempty"`
 	// +kubebuilder:default=true
 	ShmVolume     *bool             `json:"enable_shm_volume,omitempty"`
 	SidecarImages map[string]string `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
