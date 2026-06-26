@@ -66,6 +66,10 @@ spec:
                   aws_region:
                     default: eu-central-1
                     type: string
+                  ebs_volume_tags_from_annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
                   enable_ebs_gp3_migration:
                     type: boolean
                   enable_ebs_gp3_migration_max_size:
