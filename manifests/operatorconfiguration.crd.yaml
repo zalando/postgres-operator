@@ -706,11 +706,11 @@ spec:
                     type: integer
                 type: object
               maintenance_windows:
+                items:
+                  pattern: ^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\
+                    *$
+                  type: string
                 type: array
-                x-kubernetes-validations:
-                - message: Invalid maintenance window format
-                  rule: self.all(x, x.matches(r'^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\
-                    *$'))
               major_version_upgrade:
                 description: MajorVersionUpgradeConfiguration defines how to execute
                   major version upgrades of Postgres.

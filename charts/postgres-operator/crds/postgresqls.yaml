@@ -3656,11 +3656,10 @@ spec:
                 pattern: ^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$
                 type: string
               maintenanceWindows:
+                items:
+                  pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
+                  type: string
                 type: array
-                x-kubernetes-validations:
-                - message: Invalid maintenance window format
-                  rule: self.all(x, x.matches(r'^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\
-                    *$'))
               masterNodePort:
                 format: int32
                 type: integer
