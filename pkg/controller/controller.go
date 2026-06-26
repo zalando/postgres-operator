@@ -65,6 +65,7 @@ type Controller struct {
 	nodesInformer        cache.SharedIndexInformer
 	podCh                chan cluster.PodEvent
 
+	clusterEventStores    []cache.Store // [workerID]Store
 	clusterEventQueues    []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime   int64
 	lastClusterRepairTime int64
@@ -356,17 +357,19 @@ func (c *Controller) initController() {
 		c.config.InfrastructureRoles = infraRoles
 	}
 
+	c.clusterEventStores = make([]cache.Store, c.opConfig.Workers)
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
 	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
-		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
+		keyFn := func(obj interface{}) (string, error) {
 			e, ok := obj.(ClusterEvent)
 			if !ok {
-				return "", fmt.Errorf("could not cast to ClusterEvent")
+				return "", fmt.Errorf("could not cast to cluster event")
 			}
-
 			return queueClusterKey(e.EventType, e.UID), nil
-		})
+		}
+		c.clusterEventStores[i] = cache.NewStore(keyFn)
+		c.clusterEventQueues[i] = cache.NewFIFO(keyFn)
 	}
 
 	c.apiserver = apiserver.New(c, c.opConfig.APIPort, c.logger.Logger)

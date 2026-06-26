@@ -19,7 +19,6 @@ type CRD struct {
 	ResyncPeriod          time.Duration `name:"resync_period" default:"30m"`
 	RepairPeriod          time.Duration `name:"repair_period" default:"5m"`
 	EnableCRDRegistration *bool         `name:"enable_crd_registration" default:"true"`
-	EnableCRDValidation   *bool         `name:"enable_crd_validation" default:"true"`
 	CRDCategories         []string      `name:"crd_categories" default:"all"`
 }
 
@@ -149,6 +148,9 @@ type LogicalBackup struct {
 	LogicalBackupMemoryRequest                string `name:"logical_backup_memory_request"`
 	LogicalBackupCPULimit                     string `name:"logical_backup_cpu_limit"`
 	LogicalBackupMemoryLimit                  string `name:"logical_backup_memory_limit"`
+	LogicalBackupSuccessfulJobsHistoryLimit   *int32 `name:"logical_backup_successful_jobs_history_limit" default:"3"`
+	LogicalBackupFailedJobsHistoryLimit       *int32 `name:"logical_backup_failed_jobs_history_limit" default:"3"`
+	LogicalBackupTTLSecondsAfterFinished      *int32 `name:"logical_backup_ttl_seconds_after_finished" default:"86400"`
 }
 
 // Operator options for connection pooler

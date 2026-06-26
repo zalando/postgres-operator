@@ -1567,12 +1567,21 @@ func TestCompareServices(t *testing.T) {
 	}
 }
 
+var (
+	defaultSuccessfulJobsHistoryLimit = int32(3)
+	defaultFailedJobsHistoryLimit     = int32(3)
+	defaultTTLSecondsAfterFinished    = int32(86400)
+)
+
 func newCronJob(image, schedule string, vars []v1.EnvVar, mounts []v1.VolumeMount) *batchv1.CronJob {
 	cron := &batchv1.CronJob{
 		Spec: batchv1.CronJobSpec{
-			Schedule: schedule,
+			Schedule:                   schedule,
+			SuccessfulJobsHistoryLimit: &defaultSuccessfulJobsHistoryLimit,
+			FailedJobsHistoryLimit:     &defaultFailedJobsHistoryLimit,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
+					TTLSecondsAfterFinished: &defaultTTLSecondsAfterFinished,
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{

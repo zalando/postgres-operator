@@ -16,7 +16,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func (c *Controller) makeClusterConfig() cluster.Config {
@@ -103,7 +103,11 @@ func (c *Controller) createPostgresCRD() error {
 }
 
 func (c *Controller) createConfigurationCRD() error {
-	return c.createOperatorCRD(acidv1.ConfigurationCRD(c.opConfig.CRDCategories))
+	crd, err := acidv1.OperatorConfigurationCRD(c.opConfig.CRDCategories)
+	if err != nil {
+		return fmt.Errorf("could not create OperatorConfiguration CRD object: %v", err)
+	}
+	return c.createOperatorCRD(crd)
 }
 
 func readDecodedRole(s string) (*spec.PgUser, error) {

@@ -171,7 +171,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required minimum %s and will be increased",
 				cpuLimit.String(), constants.PostgresContainerName, minCPULimit)
 			c.logger.Warningf("%s", msg)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+			c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
 			resources.Limits[v1.ResourceCPU], _ = resource.ParseQuantity(minCPULimit)
 		}
 	}
@@ -188,7 +188,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 			msg = fmt.Sprintf("defined memory limit %s for %q container is below required minimum %s and will be increased",
 				memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit)
 			c.logger.Warningf("%s", msg)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+			c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
 			resources.Limits[v1.ResourceMemory], _ = resource.ParseQuantity(minMemoryLimit)
 		}
 	}
@@ -1469,7 +1469,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	sidecarContainers, conflicts := mergeContainers(clusterSpecificSidecars, c.Config.OpConfig.SidecarContainers, globalSidecarContainersByDockerImage, scalyrSidecars)
-	for containerName := range conflicts {
+	for _, containerName := range conflicts {
 		c.logger.Warningf("a sidecar is specified twice. Ignoring sidecar %q in favor of %q with high a precedence",
 			containerName, containerName)
 	}
@@ -2500,7 +2500,13 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 	// configure a batch job
 
 	jobSpec := batchv1.JobSpec{
-		Template: *podTemplate,
+		Template:                *podTemplate,
+		TTLSecondsAfterFinished: c.OpConfig.LogicalBackup.LogicalBackupTTLSecondsAfterFinished,
+	}
+
+	if jobSpec.TTLSecondsAfterFinished == nil {
+		defaultTTL := int32(86400)
+		jobSpec.TTLSecondsAfterFinished = &defaultTTL
 	}
 
 	// configure a cron job
@@ -2518,6 +2524,18 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		schedule = c.OpConfig.LogicalBackupSchedule
 	}
 
+	successfulJobsHistoryLimit := c.OpConfig.LogicalBackup.LogicalBackupSuccessfulJobsHistoryLimit
+	if successfulJobsHistoryLimit == nil {
+		defaultLimit := int32(3)
+		successfulJobsHistoryLimit = &defaultLimit
+	}
+
+	failedJobsHistoryLimit := c.OpConfig.LogicalBackup.LogicalBackupFailedJobsHistoryLimit
+	if failedJobsHistoryLimit == nil {
+		defaultLimit := int32(3)
+		failedJobsHistoryLimit = &defaultLimit
+	}
+
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.getLogicalBackupJobName(),
@@ -2527,9 +2545,11 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          schedule,
-			JobTemplate:       jobTemplateSpec,
-			ConcurrencyPolicy: batchv1.ForbidConcurrent,
+			Schedule:                   schedule,
+			JobTemplate:                jobTemplateSpec,
+			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
+			SuccessfulJobsHistoryLimit: successfulJobsHistoryLimit,
+			FailedJobsHistoryLimit:     failedJobsHistoryLimit,
 		},
 	}
 
