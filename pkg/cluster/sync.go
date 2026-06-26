@@ -360,6 +360,11 @@ func (c *Cluster) syncServices() error {
 		if err := c.syncService(role); err != nil {
 			return fmt.Errorf("could not sync %s service: %v", role, err)
 		}
+		if c.Spec.UseLoadBalancer != nil && *c.Spec.UseLoadBalancer {
+			if err := c.syncMigrationService(); err != nil {
+				return fmt.Errorf("could not sync migration service: %v", err)
+			}
+		}
 	}
 
 	return nil
@@ -375,7 +380,7 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		updatedSvc, err := c.updateService(role, svc, desiredSvc)
+		updatedSvc, err := c.updateService(string(role), svc, desiredSvc)
 		if err != nil {
 			return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
@@ -453,6 +458,46 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 		}
 	}
 	c.Endpoints[role] = ep
+	return nil
+}
+
+func (c *Cluster) syncMigrationService() error {
+	var (
+		svc *v1.Service
+		err error
+	)
+	c.setProcessName("syncing migration service")
+
+	serviceName := fmt.Sprintf("%s%s", c.Name, constants.MigrationServiceSuffix)
+
+	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), serviceName, metav1.GetOptions{}); err == nil {
+		c.MigrationService = svc
+		desiredSvc := c.generateMigrationService()
+		updatedSvc, err := c.updateService("migration", svc, desiredSvc)
+		if err != nil {
+			return fmt.Errorf("could not update migration service to match desired state: %v", err)
+		}
+		c.MigrationService = updatedSvc
+		return nil
+	}
+	if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get migration service: %v", err)
+	}
+	// no existing migration service, create new one
+	c.logger.Infof("could not find the cluster's migration service")
+
+	if svc, err = c.createMigrationService(); err == nil {
+		c.logger.Infof("created missing migration service %q", util.NameFromMeta(svc.ObjectMeta))
+	} else {
+		if !k8sutil.ResourceAlreadyExists(err) {
+			return fmt.Errorf("could not create missing migration service: %v", err)
+		}
+		if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), serviceName, metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not fetch existing migration service: %v", err)
+		}
+		c.logger.Infof("migration service %q already exists", util.NameFromMeta(svc.ObjectMeta))
+	}
+	c.MigrationService = svc
 	return nil
 }
 

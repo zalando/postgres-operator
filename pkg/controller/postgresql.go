@@ -213,22 +213,10 @@ func (c *Controller) processEvent(event ClusterEvent, isInInitialList bool) {
 		}
 		lg.Debugf("observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
 		event.EventType = EventSync
-	}
-
-	if event.EventType == EventAdd || event.EventType == EventUpdate || event.EventType == EventSync {
-		// handle deprecated parameters by possibly assigning their values to the new ones.
-		if event.OldSpec != nil {
-			c.mergeDeprecatedPostgreSQLSpecParameters(&event.OldSpec.Spec)
-		}
-		if event.NewSpec != nil {
-			c.warnOnDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
-			c.mergeDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
-		}
-
+	} else if event.EventType != EventDelete {
 		if err = c.submitRBACCredentials(event); err != nil {
 			c.logger.Warnf("pods and/or Patroni may misfunction due to the lack of permissions: %v", err)
 		}
-
 	}
 
 	switch event.EventType {
@@ -395,45 +383,6 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 			continue
 		}
 	}
-}
-
-func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.PostgresSpec) {
-	deprecate := func(deprecated, replacement string) {
-		c.logger.Warningf("parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
-	}
-
-	if spec.UseLoadBalancer != nil {
-		deprecate("useLoadBalancer", "enableMasterLoadBalancer")
-	}
-	if spec.ReplicaLoadBalancer != nil {
-		deprecate("replicaLoadBalancer", "enableReplicaLoadBalancer")
-	}
-
-	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
-		(spec.EnableReplicaLoadBalancer != nil || spec.EnableMasterLoadBalancer != nil) {
-		c.logger.Warnf("both old and new load balancer parameters are present in the manifest, ignoring old ones")
-	}
-}
-
-// mergeDeprecatedPostgreSQLSpecParameters modifies the spec passed to the cluster by setting current parameter
-// values from the obsolete ones. Note: while the spec that is modified is a copy made in queueClusterEvent, it is
-// still a shallow copy, so be extra careful not to modify values pointer fields point to, but copy them instead.
-func (c *Controller) mergeDeprecatedPostgreSQLSpecParameters(spec *acidv1.PostgresSpec) *acidv1.PostgresSpec {
-	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
-		(spec.EnableReplicaLoadBalancer == nil && spec.EnableMasterLoadBalancer == nil) {
-		if spec.UseLoadBalancer != nil {
-			spec.EnableMasterLoadBalancer = new(bool)
-			*spec.EnableMasterLoadBalancer = *spec.UseLoadBalancer
-		}
-		if spec.ReplicaLoadBalancer != nil {
-			spec.EnableReplicaLoadBalancer = new(bool)
-			*spec.EnableReplicaLoadBalancer = *spec.ReplicaLoadBalancer
-		}
-	}
-	spec.ReplicaLoadBalancer = nil
-	spec.UseLoadBalancer = nil
-
-	return spec
 }
 
 func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.Postgresql, eventType EventType) {
