@@ -27,20 +27,11 @@ git clone https://github.com/zalando/postgres-operator.git
 
 ## Building the operator
 
-We use [Go Modules](https://github.com/golang/go/wiki/Modules) for handling
-dependencies. When using Go below v1.13 you need to explicitly enable Go modules
-by setting the `GO111MODULE` environment variable to `on`. The make targets do
-this for you, so simply run
+We use [Go Modules](https://github.com/golang/go/wiki/Modules) for handling dependencies.
+Run `go mod vendor && go mod tidy` to install them.
 
-```bash
-make
-```
-
-Build the operator with the `make docker` command. You may define the TAG
-variable to assign an explicit tag to your Docker image and the IMAGE to set
-the image name. By default, the tag is computed with
-`git describe --tags --always --dirty` and the image is
-`ghcr.io/zalando/postgres-operator`
+Build the operator with the `make docker` command. You may define the TAG variable to assign an explicit tag to your Docker image and the IMAGE to set the image name. By default, the tag is computed with
+`git describe --tags --always --dirty` and the image is `ghcr.io/zalando/postgres-operator`. On macos search and replace `sed -i` commands with `sed -i ''` for the make commands to work.
 
 ```bash
 export TAG=$(git describe --tags --always --dirty)
@@ -296,8 +287,7 @@ Please run flake8 [before submitting a PR](http://flake8.pycqa.org/en/latest/use
 In the case you want to add functionality to the operator that shall be
 controlled via the operator configuration there are a few places that need to
 be updated. As explained [here](reference/operator_parameters.md), it's possible
-to configure the operator either with a ConfigMap or CRD, but currently we aim
-to synchronize parameters everywhere.
+to configure the operator either with a ConfigMap or CRD.
 
 When choosing a parameter name for a new option in a Postgres cluster manifest,
 keep in mind the naming conventions there. We use `camelCase` for manifest
@@ -320,32 +310,28 @@ manifest files:
 
 Postgres manifest parameters are defined in the [api package](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/postgresql_type.go).
 The operator behavior has to be implemented at least in [k8sres.go](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/k8sres.go).
-Validation of CRD parameters is controlled in [crds.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/crds.go).
 Please, reflect your changes in tests, for example in:
 
 * [config_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config_test.go)
 * [k8sres_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/k8sres_test.go)
 * [util_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/util_test.go)
 
-### Updating manifest files
+### Generating the CRDs
 
-For the CRD-based configuration, please update the following files:
-
-* the default [OperatorConfiguration](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
-* the CRD's [validation](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml)
-* the CRD's validation in the [Helm chart](https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator/crds/operatorconfigurations.yaml)
-
-Add new options also to the Helm chart's [values file](https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator/values.yaml) file.
-It follows the OperatorConfiguration CRD layout. Nested values will be flattened for the ConfigMap.
-Last but no least, update the [ConfigMap](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml) manifest example as well.
+The CRDs can be automatically generated from the go structs. Use the correct kubebuilder annotations for defining the validation, constraints or default values etc.. Run `make` to update the CRDs which are stored in three locations:
+- In the Go api package
+- The example manifests folder
+- The helm chart folder
 
 ### Updating documentation
 
-Finally, add a section for each new configuration option and/or cluster manifest
+Config changes need to be reflected in the Helm chart's [values file](https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator/values.yaml), too. It follows the OperatorConfiguration CRD layout. Nested values will be flattened for the ConfigMap.
+
+Add a section for each new configuration option and/or cluster manifest
 parameter in the reference documents:
 
 * [config reference](reference/operator_parameters.md)
 * [manifest reference](reference/cluster_manifest.md)
 
-It also helps users to explain new features with examples in the
-[administrator docs](administrator.md).
+It can also help other K8s admins to explain new features with examples in the
+[administrator docs](administrator.md) and also update the [OperatorConfiguration CRD](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml) and [ConfigMap](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml) manifest examples.
