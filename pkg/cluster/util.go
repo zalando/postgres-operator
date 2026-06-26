@@ -627,9 +627,12 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 	if !c.patroniUsesKubernetes() {
 		return false
 	}
+	if c.OpConfig.KubernetesUseConfigMaps == nil {
+		return true
+	}
 
 	// otherwise, follow the operator configuration
-	return c.OpConfig.KubernetesUseConfigMaps
+	return *c.OpConfig.KubernetesUseConfigMaps
 }
 
 // Earlier arguments take priority

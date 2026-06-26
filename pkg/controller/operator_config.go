@@ -37,7 +37,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableSpiloWalPathCompat = fromCRD.EnableSpiloWalPathCompat
 	result.EnableTeamIdClusternamePrefix = fromCRD.EnableTeamIdClusternamePrefix
 	result.EtcdHost = fromCRD.EtcdHost
-	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
+	result.KubernetesUseConfigMaps = util.CoalesceBool(fromCRD.KubernetesUseConfigMaps, util.True())
 	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "ghcr.io/zalando/spilo-18:4.1-p1")
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
