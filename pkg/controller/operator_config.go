@@ -51,16 +51,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.SidecarImages = fromCRD.SidecarImages
 	result.SidecarContainers = fromCRD.SidecarContainers
 	result.EnableMaintenanceWindows = util.CoalesceBool(fromCRD.EnableMaintenanceWindows, util.True())
-	if len(fromCRD.MaintenanceWindows) > 0 {
-		result.MaintenanceWindows = make([]string, 0, len(fromCRD.MaintenanceWindows))
-		for _, window := range fromCRD.MaintenanceWindows {
-			w, err := window.MarshalJSON()
-			if err != nil {
-				panic(fmt.Errorf("could not marshal configured maintenance window: %v", err))
-			}
-			result.MaintenanceWindows = append(result.MaintenanceWindows, string(w))
-		}
-	}
+	result.MaintenanceWindows = fromCRD.MaintenanceWindows
 
 	// user config
 	result.SuperUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.SuperUsername, "postgres")
