@@ -855,7 +855,9 @@ spec:
                       type: string
                     type: array
                   protected_role_names:
-                    default: '["admin", "cron_admin"]'
+                    default:
+                    - admin
+                    - cron_admin
                     items:
                       type: string
                     type: array

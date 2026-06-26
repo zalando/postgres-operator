@@ -284,7 +284,7 @@ type TeamsAPIConfiguration struct {
 	PamRoleName string `json:"pam_role_name,omitempty"`
 	// +kubebuilder:default="https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"
 	PamConfiguration string `json:"pam_configuration,omitempty"`
-	// +kubebuilder:default="[\"admin\", \"cron_admin\"]"
+	// +kubebuilder:default={"admin", "cron_admin"}
 	ProtectedRoles         []string `json:"protected_role_names,omitempty"`
 	PostgresSuperuserTeams []string `json:"postgres_superuser_teams,omitempty"`
 	// +kubebuilder:default=true
