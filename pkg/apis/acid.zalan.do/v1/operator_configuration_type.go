@@ -428,6 +428,7 @@ type OperatorConfigurationData struct {
 	EnableMaintenanceWindows *bool `json:"enable_maintenance_windows,omitempty"`
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=array
+	// +kubebuilder:validation:XValidation:rule="self.all(x, x.matches(r'^\\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))-((2[0-3]|[01]?\\d):([0-5]?\\d)|(2[0-3]|[01]?\\d):([0-5]?\\d))\\ *$'))",message="Invalid maintenance window format"
 	MaintenanceWindows      []MaintenanceWindow `json:"maintenance_windows,omitempty"`
 	SetMemoryRequestToLimit bool                `json:"set_memory_request_to_limit,omitempty"`
 	// +kubebuilder:default=true
