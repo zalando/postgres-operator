@@ -138,7 +138,8 @@ func TestCreate(t *testing.T) {
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
-				PodManagementPolicy: "ordered_ready",
+				PodManagementPolicy:     "ordered_ready",
+				PodTerminateGracePeriod: &metav1.Duration{Duration: 600 * time.Second},
 				Resources: config.Resources{
 					ClusterLabels:         map[string]string{"application": "spilo"},
 					ClusterNameLabel:      "cluster-name",

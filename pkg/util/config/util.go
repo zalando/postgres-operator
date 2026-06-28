@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type decoder interface {
@@ -158,6 +161,15 @@ func processField(value string, field reflect.Value) error {
 			mp.SetMapIndex(k, v)
 		}
 		field.Set(mp)
+	case reflect.Struct:
+		if typ.Name() == "Duration" {
+			var d time.Duration
+			d, err := time.ParseDuration(value)
+			if err != nil {
+				return err
+			}
+			field.Set(reflect.ValueOf(metav1.Duration{Duration: d}))
+		}
 	}
 
 	return nil
