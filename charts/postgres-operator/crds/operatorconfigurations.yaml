@@ -1,9 +1,12 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: operatorconfigurations.acid.zalan.do
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
   labels:
     app.kubernetes.io/name: postgres-operator
+  name: operatorconfigurations.acid.zalan.do
 spec:
   group: acid.zalan.do
   names:
@@ -444,8 +447,7 @@ spec:
                     default: 20m
                     description: timeout for successful migration of master pods from
                       unschedulable node
-                    format: int64
-                    type: integer
+                    type: string
                   node_readiness_label:
                     additionalProperties:
                       type: string
@@ -518,8 +520,7 @@ spec:
                     default: 5m
                     description: Postgres pods are terminated forcefully after this
                       timeout
-                    format: int64
-                    type: integer
+                    type: string
                   secret_name_template:
                     default: '{username}.{cluster}.credentials.{tprkind}.{tprgroup}'
                     description: |-
@@ -703,6 +704,10 @@ spec:
                     type: integer
                 type: object
               maintenance_windows:
+                items:
+                  pattern: ^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\
+                    *$
+                  type: string
                 type: array
               major_version_upgrade:
                 description: MajorVersionUpgradeConfiguration defines how to execute
@@ -776,13 +781,11 @@ spec:
               repair_period:
                 default: 5m
                 description: period between consecutive repair requests
-                format: int64
-                type: integer
+                type: string
               resync_period:
                 default: 30m
                 description: period between consecutive sync requests
-                format: int64
-                type: integer
+                type: string
               scalyr:
                 description: ScalyrConfiguration defines the configuration for ScalyrAPI
                 properties:
@@ -848,7 +851,9 @@ spec:
                       type: string
                     type: array
                   protected_role_names:
-                    default: '["admin", "cron_admin"]'
+                    default:
+                    - admin
+                    - cron_admin
                     items:
                       type: string
                     type: array
@@ -876,48 +881,40 @@ spec:
                     default: 1s
                     description: interval between consecutive attempts of operator
                       calling the Patroni API
-                    format: int64
-                    type: integer
+                    type: string
                   patroni_api_check_timeout:
                     default: 5s
                     description: timeout when waiting for successful response from
                       Patroni API
-                    format: int64
-                    type: integer
+                    type: string
                   pod_deletion_wait_timeout:
                     default: 10m
                     description: timeout when waiting for the Postgres pods to be
                       deleted
-                    format: int64
-                    type: integer
+                    type: string
                   pod_label_wait_timeout:
                     default: 10m
                     description: timeout when waiting for pod role and cluster labels
-                    format: int64
-                    type: integer
+                    type: string
                   ready_wait_interval:
                     default: 4s
                     description: interval between consecutive attempts waiting for
                       postgresql CRD to be created
-                    format: int64
-                    type: integer
+                    type: string
                   ready_wait_timeout:
                     default: 30s
                     description: timeout for the complete postgres CRD creation
-                    format: int64
-                    type: integer
+                    type: string
                   resource_check_interval:
                     default: 3s
                     description: interval to wait between consecutive attempts to
                       check for some K8s resources
-                    format: int64
-                    type: integer
+                    type: string
                   resource_check_timeout:
                     default: 10m
                     description: timeout when waiting for the presence of a certain
                       K8s resource
-                    format: int64
-                    type: integer
+                    type: string
                 type: object
               users:
                 description: PostgresUsersConfiguration defines the system users of

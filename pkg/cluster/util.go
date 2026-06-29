@@ -342,7 +342,7 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 }
 
 func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{}, role *PostgresRole) (*v1.Pod, error) {
-	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
+	timeout := time.After(c.OpConfig.PodLabelWaitTimeout.Duration)
 	for {
 		select {
 		case podEvent := <-podEvents:
@@ -364,7 +364,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{},
 }
 
 func (c *Cluster) waitForPodDeletion(podEvents chan PodEvent) error {
-	timeout := time.After(c.OpConfig.PodDeletionWaitTimeout)
+	timeout := time.After(c.OpConfig.PodDeletionWaitTimeout.Duration)
 	for {
 		select {
 		case podEvent := <-podEvents:
@@ -378,7 +378,7 @@ func (c *Cluster) waitForPodDeletion(podEvents chan PodEvent) error {
 }
 
 func (c *Cluster) waitStatefulsetReady() error {
-	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	return retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			listOptions := metav1.ListOptions{
 				LabelSelector: c.labelsSet(false).String(),
@@ -428,7 +428,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 		c.logger.Debug("Waiting for any replica pod to become ready")
 	}
 
-	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			masterCount := 0
 			if !anyReplica {
