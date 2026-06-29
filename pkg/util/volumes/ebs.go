@@ -215,14 +215,14 @@ func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSiz
 
 // TagVolumes tags the given EBS volumes with the provided tags.
 func (r *EBSVolumeResizer) TagVolumes(volumeIds []string, tags map[string]string) error {
+	if len(volumeIds) == 0 || len(tags) == 0 {
+		return nil
+	}
+
 	if !r.IsConnectedToProvider() {
 		if err := r.ConnectToProvider(); err != nil {
 			return err
 		}
-	}
-
-	if len(volumeIds) == 0 {
-		return nil
 	}
 
 	ec2Tags := make([]types.Tag, 0, len(tags))

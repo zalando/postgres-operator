@@ -532,20 +532,25 @@ func (c *Cluster) tagEBSVolumes() error {
 		desiredTags[labelKey] = labelValue
 	}
 
+	// Compute keys to delete once — keys in EBSTagsInheritLabels not present in desiredTags.
+	keysToDelete := make([]string, 0, len(c.OpConfig.EBSTagsInheritLabels))
+	for _, labelKey := range c.OpConfig.EBSTagsInheritLabels {
+		if _, wanted := desiredTags[labelKey]; !wanted {
+			keysToDelete = append(keysToDelete, labelKey)
+		}
+	}
+
 	volumesToTag := make([]string, 0, len(c.EBSVolumes))
-	volumesToUntag := make([]string, 0, len(c.EBSVolumes))
-	staleKeys := make(map[string]bool)
+	volumesToUntag := make(map[string]bool)
 
 	for volumeID, volumeProps := range c.EBSVolumes {
 		if len(desiredTags) > 0 && c.tagsNeedUpdate(volumeProps.Tags, desiredTags) {
 			volumesToTag = append(volumesToTag, volumeID)
 		}
-		for _, labelKey := range c.OpConfig.EBSTagsInheritLabels {
-			if _, wanted := desiredTags[labelKey]; !wanted {
-				if _, exists := volumeProps.Tags[labelKey]; exists {
-					volumesToUntag = append(volumesToUntag, volumeID)
-					staleKeys[labelKey] = true
-				}
+		for _, labelKey := range keysToDelete {
+			if _, exists := volumeProps.Tags[labelKey]; exists {
+				volumesToUntag[volumeID] = true
+				break
 			}
 		}
 	}
@@ -574,14 +579,14 @@ func (c *Cluster) tagEBSVolumes() error {
 	}
 
 	if len(volumesToUntag) > 0 {
-		keysToDelete := make([]string, 0, len(staleKeys))
-		for k := range staleKeys {
-			keysToDelete = append(keysToDelete, k)
+		untagIDs := make([]string, 0, len(volumesToUntag))
+		for id := range volumesToUntag {
+			untagIDs = append(untagIDs, id)
 		}
-		if err := c.VolumeResizer.UntagVolumes(volumesToUntag, keysToDelete); err != nil {
+		if err := c.VolumeResizer.UntagVolumes(untagIDs, keysToDelete); err != nil {
 			c.logger.Warningf("could not remove stale EBS tags %v: %v", keysToDelete, err)
 		} else {
-			c.logger.Infof("removed stale tags %v from %d EBS volumes", keysToDelete, len(volumesToUntag))
+			c.logger.Infof("removed stale tags %v from %d EBS volumes", keysToDelete, len(untagIDs))
 		}
 	}
 
