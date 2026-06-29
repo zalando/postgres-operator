@@ -228,6 +228,63 @@ func TestStatefulSetUpdateWithEnv(t *testing.T) {
 	}
 }
 
+func TestStatefulSetUpdateWithEnvFrom(t *testing.T) {
+	oldSpec := &acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: &acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+	}
+	oldSS, err := cl.generateStatefulSet(oldSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	newSpec := oldSpec.DeepCopy()
+	newSS, err := cl.generateStatefulSet(newSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	if !reflect.DeepEqual(oldSS, newSS) {
+		t.Errorf("in %s StatefulSet's must be equal", t.Name())
+	}
+
+	newSpec.EnvFrom = []v1.EnvFromSource{
+		{
+			ConfigMapRef: &v1.ConfigMapEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: "test-configmap",
+				},
+			},
+		},
+		{
+			SecretRef: &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: "test-secret",
+				},
+			},
+		},
+	}
+	newSS, err = cl.generateStatefulSet(newSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	if reflect.DeepEqual(oldSS, newSS) {
+		t.Errorf("in %s StatefulSet's must be not equal", t.Name())
+	}
+
+	postgresContainer := newSS.Spec.Template.Spec.Containers[0]
+	if !reflect.DeepEqual(postgresContainer.EnvFrom, newSpec.EnvFrom) {
+		t.Errorf("expected envFrom %v, got %v", newSpec.EnvFrom, postgresContainer.EnvFrom)
+	}
+}
+
 func TestInitRobotUsers(t *testing.T) {
 	tests := []struct {
 		testCase      string

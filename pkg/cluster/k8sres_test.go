@@ -4487,6 +4487,48 @@ func TestGenerateCapabilities(t *testing.T) {
 	}
 }
 
+func TestGenerateContainerWithEnvFrom(t *testing.T) {
+	dockerImage := "test-image"
+	resourceRequirements := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("100m"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+	envVars := []v1.EnvVar{{Name: "TEST_VAR", Value: "test-value"}}
+	envFrom := []v1.EnvFromSource{
+		{
+			ConfigMapRef: &v1.ConfigMapEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: "test-configmap"},
+			},
+		},
+		{
+			SecretRef: &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"},
+			},
+		},
+	}
+
+	container := generateContainer(
+		constants.PostgresContainerName,
+		&dockerImage,
+		resourceRequirements,
+		envVars,
+		envFrom,
+		[]v1.VolumeMount{},
+		false,
+		util.False(),
+		nil,
+	)
+
+	if !reflect.DeepEqual(container.Env, envVars) {
+		t.Errorf("expected env %v, got %v", envVars, container.Env)
+	}
+	if !reflect.DeepEqual(container.EnvFrom, envFrom) {
+		t.Errorf("expected envFrom %v, got %v", envFrom, container.EnvFrom)
+	}
+}
+
 func TestTopologySpreadConstraints(t *testing.T) {
 	clusterName := "acid-test-cluster"
 	namespace := "default"
