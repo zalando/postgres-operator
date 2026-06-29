@@ -63,6 +63,10 @@ spec:
                   aws_region:
                     default: eu-central-1
                     type: string
+                  ebs_tags_inherit_labels:
+                    items:
+                      type: string
+                    type: array
                   enable_ebs_gp3_migration:
                     type: boolean
                   enable_ebs_gp3_migration_max_size:

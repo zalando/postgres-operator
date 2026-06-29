@@ -193,6 +193,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.AdditionalSecretMountPath = fromCRD.AWSGCP.AdditionalSecretMountPath
 	result.EnableEBSGp3Migration = fromCRD.AWSGCP.EnableEBSGp3Migration
 	result.EnableEBSGp3MigrationMaxSize = util.CoalesceInt64(fromCRD.AWSGCP.EnableEBSGp3MigrationMaxSize, 1000)
+	result.EBSTagsInheritLabels = fromCRD.AWSGCP.EBSTagsInheritLabels
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
