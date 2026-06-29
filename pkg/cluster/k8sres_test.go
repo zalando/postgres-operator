@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -361,8 +360,8 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentObjectNotExists,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: still failing after %d retries: secret.core %q not found", maxRetries, testPodEnvironmentObjectNotExists),
@@ -372,8 +371,8 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretNameAPIError,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret API error"),
@@ -383,8 +382,8 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			envVars: []v1.EnvVar{
@@ -848,8 +847,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 						Name: testPodEnvironmentConfigMapName,
 					},
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			cloneDescription:   &acidv1.CloneDescription{},
@@ -877,8 +876,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 						Name: testPodEnvironmentConfigMapName,
 					},
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			cloneDescription:   &acidv1.CloneDescription{},
@@ -968,8 +967,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 				WALES3Bucket: "global-s3-bucket",
 			},
@@ -986,8 +985,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 				WALES3Bucket: "global-s3-bucket",
 			},
