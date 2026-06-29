@@ -139,7 +139,8 @@ func TestCreate(t *testing.T) {
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
-				PodManagementPolicy: "ordered_ready",
+				PodManagementPolicy:     "ordered_ready",
+				PodTerminateGracePeriod: &metav1.Duration{Duration: 600 * time.Second},
 				Resources: config.Resources{
 					ClusterLabels:         map[string]string{"application": "spilo"},
 					ClusterNameLabel:      "cluster-name",
@@ -148,8 +149,8 @@ func TestCreate(t *testing.T) {
 					DefaultMemoryRequest:  "300Mi",
 					DefaultMemoryLimit:    "300Mi",
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: &metav1.Duration{Duration: 3 * time.Second},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: 10 * time.Minute},
 				},
 				EnableFinalizers: util.True(),
 			},

@@ -297,8 +297,8 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 	cluster := New(
 		Config{
 			OpConfig: config.Config{
-				PatroniAPICheckInterval: time.Duration(1),
-				PatroniAPICheckTimeout:  time.Duration(5),
+				PatroniAPICheckInterval: &metav1.Duration{Duration: 1 * time.Second},
+				PatroniAPICheckTimeout:  &metav1.Duration{Duration: 5 * time.Second},
 				KubernetesUseConfigMaps: util.True(),
 				ConnectionPooler: config.ConnectionPooler{
 					ConnectionPoolerDefaultCPURequest:    "100m",
@@ -318,8 +318,8 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 					DefaultMemoryLimit:    "300Mi",
 					InheritedAnnotations:  []string{"owned-by"},
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 					MinInstances:          -1,
 					MaxInstances:          -1,
 				},

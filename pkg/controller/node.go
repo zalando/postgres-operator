@@ -152,7 +152,7 @@ func (c *Controller) nodeDelete(obj interface{}) {
 
 func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 	// retry to move master until configured timeout is reached
-	err := retryutil.Retry(1*time.Minute, c.opConfig.MasterPodMoveTimeout,
+	err := retryutil.Retry(1*time.Minute, c.opConfig.MasterPodMoveTimeout.Duration,
 		func() (bool, error) {
 			err := c.attemptToMoveMasterPodsOffNode(node)
 			if err != nil {
