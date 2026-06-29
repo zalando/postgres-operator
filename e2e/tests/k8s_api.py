@@ -92,10 +92,13 @@ class K8s:
             namespace='default'
         )
 
-    def pg_get_status(self, name="acid-minimal-cluster", namespace="default"):
+    def pg_get(self, name="acid-minimal-cluster", namespace="default"):
         pg = self.api.custom_objects_api.get_namespaced_custom_object(
             "acid.zalan.do", "v1", namespace, "postgresqls", name)
-        return pg.get("status", {}).get("PostgresClusterStatus", None)
+        return pg
+
+    def pg_get_status(self, name="acid-minimal-cluster", namespace="default"):
+        return pg_get(self, name, namespace).get("status", {})
 
     def wait_for_pod_start(self, pod_labels, namespace='default'):
         pod_phase = 'No pod running'
