@@ -69,13 +69,16 @@ $(GENERATED_CRDS): $(GENERATED)
 	go tool controller-gen crd:crdVersions=v1,allowDangerousTypes=true paths=./pkg/apis/acid.zalan.do/... output:crd:dir=manifests
 	@mv manifests/acid.zalan.do_postgresqls.yaml manifests/postgresql.crd.yaml
 	@# hack to use lowercase kind and listKind
-	@sed -i.bak 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml && rm manifests/postgresql.crd.yaml.bak
-	@sed -i.bak 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml && rm manifests/postgresql.crd.yaml.bak
+	@sed -i -e 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml
+	@sed -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
 	@hack/adjust_postgresql_crd.sh
 	@mv manifests/acid.zalan.do_operatorconfigurations.yaml manifests/operatorconfiguration.crd.yaml
 	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
 	@cp manifests/postgresql.crd.yaml pkg/apis/acid.zalan.do/v1/postgresql.crd.yaml
+	@cp manifests/postgresql.crd.yaml charts/postgres-operator/crds/postgresqls.yaml
 	@cp manifests/operatorconfiguration.crd.yaml pkg/apis/acid.zalan.do/v1/operatorconfiguration.crd.yaml
+	@cp manifests/operatorconfiguration.crd.yaml charts/postgres-operator/crds/operatorconfigurations.yaml
+	@cp manifests/postgresteam.crd.yaml charts/postgres-operator/crds/postgresteams.yaml
 
 local: ${SOURCES} $(GENERATED_CRDS)
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $(SOURCES)
