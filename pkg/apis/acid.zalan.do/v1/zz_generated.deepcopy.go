@@ -446,7 +446,7 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 	if in.KubernetesUseConfigMaps != nil {
 		in, out := &in.KubernetesUseConfigMaps, &out.KubernetesUseConfigMaps
 		*out = new(bool)
-    **out = **in
+		**out = **in
 	}
 	if in.ResyncPeriod != nil {
 		in, out := &in.ResyncPeriod, &out.ResyncPeriod
