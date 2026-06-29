@@ -229,7 +229,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *appsv1.StatefulSet, isUpdate b
 	}
 }
 
-func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isUpdate bool, reason string) {
+func (c *Cluster) logServiceChanges(role string, old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
 		c.logger.Infof("%s service %s has been changed",
 			role, util.NameFromMeta(old.ObjectMeta),
@@ -572,6 +572,10 @@ func (c *Cluster) oldReplicaDNSName(clusterName string) string {
 		"cluster", clusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
+}
+
+func (c *Cluster) migrationDNSName() string {
+	return c.masterDNSName(c.Name + "-migr")
 }
 
 func (c *Cluster) credentialSecretName(username string) string {

@@ -4,8 +4,9 @@ import "time"
 
 // General kubernetes-related constants
 const (
-	PostgresContainerName = "postgres"
-	K8sAPIPath            = "/apis"
+	PostgresContainerName  = "postgres"
+	K8sAPIPath             = "/apis"
+	MigrationServiceSuffix = "-migr"
 
 	QueueResyncPeriodPod  = 5 * time.Minute
 	QueueResyncPeriodTPR  = 5 * time.Minute

@@ -2067,6 +2067,54 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	return service
 }
 
+func (c *Cluster) generateMigrationService() *v1.Service {
+	serviceSpec := v1.ServiceSpec{
+		ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy),
+		Ports:                 []v1.ServicePort{{Name: "postgresql", Port: pgPort, TargetPort: intstr.IntOrString{IntVal: pgPort}}},
+		Selector:              c.roleLabelsSet(false, Master),
+		Type:                  v1.ServiceTypeLoadBalancer,
+	}
+
+	// Apply VPC CIDR as LoadBalancerSourceRanges
+	vpcCIDR := c.getVpcIPv4CIDR()
+	if vpcCIDR != "" {
+		serviceSpec.LoadBalancerSourceRanges = []string{vpcCIDR}
+	}
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s%s", c.Name, constants.MigrationServiceSuffix),
+			Namespace: c.Namespace,
+			Annotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-type":                              "nlb",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                          "true",
+				"service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
+			},
+			Labels:          c.roleLabelsSet(false, Master),
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: serviceSpec,
+	}
+
+	return service
+}
+
+func (c *Cluster) getVpcIPv4CIDR() string {
+	cm, err := c.KubeClient.ConfigMaps("kube-system").Get(context.TODO(), "deployment-config", metav1.GetOptions{})
+	if err != nil {
+		c.logger.Warnf("could not get deployment-config ConfigMap from kube-system: %v", err)
+		return ""
+	}
+
+	vpcCIDR, ok := cm.Data["cluster-vpc-ipv4-cidr"]
+	if !ok {
+		c.logger.Warn("cluster-vpc-ipv4-cidr not found in deployment-config ConfigMap")
+		return ""
+	}
+
+	return vpcCIDR
+}
+
 func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourceRanges []string) {
 	// spec.AllowedSourceRanges evaluates to the empty slice of zero length
 	// when omitted or set to 'null'/empty sequence in the PG manifest

@@ -76,11 +76,8 @@ type PostgresSpec struct {
 	EnableReplicaPoolerNodePort *bool  `json:"enableReplicaPoolerNodePort,omitempty"`
 	ReplicaPoolerNodePort       *int32 `json:"replicaPoolerNodePort,omitempty"`
 
-	// deprecated load balancer settings maintained for backward compatibility
-	// see "Load balancers" operator docs
+	// deprecated load balancer settings re-purposed for K8s migration
 	UseLoadBalancer *bool `json:"useLoadBalancer,omitempty"`
-	// deprecated
-	ReplicaLoadBalancer *bool `json:"replicaLoadBalancer,omitempty"`
 
 	// load balancers' source ranges are the same for master and replica services
 	// +nullable
