@@ -1165,7 +1165,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 
 	secret := &v1.Secret{}
 	var notFoundErr error
-	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			var err error
 			secret, err = c.KubeClient.Secrets(c.Namespace).Get(
@@ -1498,7 +1498,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		&tolerationSpec,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
 		spec.SchedulerName,
-		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		int64(util.CoalesceDuration(c.OpConfig.PodTerminateGracePeriod, "5m").Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
@@ -2431,7 +2431,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		&tolerationsSpec,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		nil,
-		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		int64(util.CoalesceDuration(c.OpConfig.PodTerminateGracePeriod, "5m").Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		"",
