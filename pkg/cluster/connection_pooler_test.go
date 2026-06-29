@@ -1181,6 +1181,9 @@ func TestConnectionPoolerSizes(t *testing.T) {
 	}
 	if sizes.minSize != 7 {
 		t.Errorf("expected minSize 7, got %d", sizes.minSize)
+	}
+}
+
 func TestConnectionPoolerServiceType(t *testing.T) {
 	testName := "Test connection pooler service type selection"
 
