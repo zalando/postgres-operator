@@ -9,6 +9,8 @@ metadata:
 #    "acid.zalan.do/controller": "second-operator"
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
+#    "myorg.io/application": "my-app"
+#    "myorg.io/team": "my-team"
 spec:
   dockerImage: ghcr.io/zalando/spilo-18:4.1-p1
   teamId: "acid"
