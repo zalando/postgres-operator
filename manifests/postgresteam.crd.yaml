@@ -4,6 +4,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
+  labels:
+    app.kubernetes.io/name: postgres-operator
   name: postgresteams.acid.zalan.do
 spec:
   group: acid.zalan.do

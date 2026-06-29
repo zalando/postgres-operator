@@ -5,8 +5,6 @@ package v1
 import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 
-	"time"
-
 	"github.com/zalando/postgres-operator/pkg/spec"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +22,7 @@ import (
 // +kubebuilder:printcolumn:name="Min-Instances",type=integer,JSONPath=`.configuration.min_instances`,description="Minimum number of instances per Postgres cluster"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,description="Age of the OperatorConfiguration resource"
 // +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels=app.kubernetes.io/name=postgres-operator
 type OperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -77,7 +76,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountRoleBindingDefinition string `json:"pod_service_account_role_binding_definition,omitempty"`
 	// +kubebuilder:default="5m"
 	// Postgres pods are terminated forcefully after this timeout
-	PodTerminateGracePeriod Duration `json:"pod_terminate_grace_period,omitempty"`
+	PodTerminateGracePeriod *metav1.Duration `json:"pod_terminate_grace_period,omitempty"`
 	// +optional
 	LivenessProbe   *v1.Probe `json:"liveness_probe"`
 	SpiloPrivileged bool      `json:"spilo_privileged,omitempty"`
@@ -142,9 +141,9 @@ type KubernetesMetaConfiguration struct {
 	PodPriorityClassName    string              `json:"pod_priority_class_name,omitempty"`
 	// +kubebuilder:default="20m"
 	// timeout for successful migration of master pods from unschedulable node
-	MasterPodMoveTimeout                     Duration `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity                    bool     `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityPreferredDuringScheduling bool     `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
+	MasterPodMoveTimeout                     *metav1.Duration `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity                    bool             `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityPreferredDuringScheduling bool             `json:"pod_antiaffinity_preferred_during_scheduling,omitempty"`
 	// +kubebuilder:default="kubernetes.io/hostname"
 	PodAntiAffinityTopologyKey string `json:"pod_antiaffinity_topology_key,omitempty"`
 	// +kubebuilder:validation:Enum=ordered_ready;parallel
@@ -185,28 +184,28 @@ type PostgresPodResourcesDefaults struct {
 type OperatorTimeouts struct {
 	// +kubebuilder:default="3s"
 	// interval to wait between consecutive attempts to check for some K8s resources
-	ResourceCheckInterval Duration `json:"resource_check_interval,omitempty"`
+	ResourceCheckInterval *metav1.Duration `json:"resource_check_interval,omitempty"`
 	// +kubebuilder:default="10m"
 	// timeout when waiting for the presence of a certain K8s resource
-	ResourceCheckTimeout Duration `json:"resource_check_timeout,omitempty"`
+	ResourceCheckTimeout *metav1.Duration `json:"resource_check_timeout,omitempty"`
 	// +kubebuilder:default="10m"
 	// timeout when waiting for pod role and cluster labels
-	PodLabelWaitTimeout Duration `json:"pod_label_wait_timeout,omitempty"`
+	PodLabelWaitTimeout *metav1.Duration `json:"pod_label_wait_timeout,omitempty"`
 	// +kubebuilder:default="10m"
 	// timeout when waiting for the Postgres pods to be deleted
-	PodDeletionWaitTimeout Duration `json:"pod_deletion_wait_timeout,omitempty"`
+	PodDeletionWaitTimeout *metav1.Duration `json:"pod_deletion_wait_timeout,omitempty"`
 	// +kubebuilder:default="4s"
 	// interval between consecutive attempts waiting for postgresql CRD to be created
-	ReadyWaitInterval Duration `json:"ready_wait_interval,omitempty"`
+	ReadyWaitInterval *metav1.Duration `json:"ready_wait_interval,omitempty"`
 	// +kubebuilder:default="30s"
 	// timeout for the complete postgres CRD creation
-	ReadyWaitTimeout Duration `json:"ready_wait_timeout,omitempty"`
+	ReadyWaitTimeout *metav1.Duration `json:"ready_wait_timeout,omitempty"`
 	// +kubebuilder:default="1s"
 	// interval between consecutive attempts of operator calling the Patroni API
-	PatroniAPICheckInterval Duration `json:"patroni_api_check_interval,omitempty"`
+	PatroniAPICheckInterval *metav1.Duration `json:"patroni_api_check_interval,omitempty"`
 	// +kubebuilder:default="5s"
 	// timeout when waiting for successful response from Patroni API
-	PatroniAPICheckTimeout Duration `json:"patroni_api_check_timeout,omitempty"`
+	PatroniAPICheckTimeout *metav1.Duration `json:"patroni_api_check_timeout,omitempty"`
 }
 
 // LoadBalancerConfiguration defines the LB configuration
@@ -284,7 +283,7 @@ type TeamsAPIConfiguration struct {
 	PamRoleName string `json:"pam_role_name,omitempty"`
 	// +kubebuilder:default="https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"
 	PamConfiguration string `json:"pam_configuration,omitempty"`
-	// +kubebuilder:default="[\"admin\", \"cron_admin\"]"
+	// +kubebuilder:default={"admin", "cron_admin"}
 	ProtectedRoles         []string `json:"protected_role_names,omitempty"`
 	PostgresSuperuserTeams []string `json:"postgres_superuser_teams,omitempty"`
 	// +kubebuilder:default=true
@@ -420,16 +419,16 @@ type OperatorConfigurationData struct {
 	Workers uint32 `json:"workers,omitempty"`
 	// +kubebuilder:default="30m"
 	// period between consecutive sync requests
-	ResyncPeriod Duration `json:"resync_period,omitempty"`
+	ResyncPeriod *metav1.Duration `json:"resync_period,omitempty"`
 	// +kubebuilder:default="5m"
 	// period between consecutive repair requests
-	RepairPeriod Duration `json:"repair_period,omitempty"`
+	RepairPeriod *metav1.Duration `json:"repair_period,omitempty"`
 	// +kubebuilder:default=true
 	EnableMaintenanceWindows *bool `json:"enable_maintenance_windows,omitempty"`
-	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=array
-	MaintenanceWindows      []MaintenanceWindow `json:"maintenance_windows,omitempty"`
-	SetMemoryRequestToLimit bool                `json:"set_memory_request_to_limit,omitempty"`
+	// +kubebuilder:validation:items:Pattern=`^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$`
+	MaintenanceWindows      []string `json:"maintenance_windows,omitempty"`
+	SetMemoryRequestToLimit bool     `json:"set_memory_request_to_limit,omitempty"`
 	// +kubebuilder:default=true
 	ShmVolume     *bool             `json:"enable_shm_volume,omitempty"`
 	SidecarImages map[string]string `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
@@ -478,6 +477,3 @@ type OperatorConfigurationData struct {
 	IgnoreInstanceLimitsAnnotationKey  string `json:"ignore_instance_limits_annotation_key,omitempty"`
 	IgnoreResourcesLimitsAnnotationKey string `json:"ignore_resources_limits_annotation_key,omitempty"`
 }
-
-// Duration shortens this frequently used name
-type Duration time.Duration
