@@ -9,32 +9,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	"github.com/zalando/postgres-operator/pkg/util"
 )
-
-func (c *Controller) nodeListFunc(options metav1.ListOptions) (runtime.Object, error) {
-	opts := metav1.ListOptions{
-		Watch:           options.Watch,
-		ResourceVersion: options.ResourceVersion,
-		TimeoutSeconds:  options.TimeoutSeconds,
-	}
-
-	return c.KubeClient.Nodes().List(context.TODO(), opts)
-}
-
-func (c *Controller) nodeWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
-	opts := metav1.ListOptions{
-		Watch:           options.Watch,
-		ResourceVersion: options.ResourceVersion,
-		TimeoutSeconds:  options.TimeoutSeconds,
-	}
-
-	return c.KubeClient.Nodes().Watch(context.TODO(), opts)
-}
 
 func (c *Controller) nodeAdd(obj interface{}) {
 	node, ok := obj.(*v1.Node)
@@ -174,7 +152,7 @@ func (c *Controller) nodeDelete(obj interface{}) {
 
 func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 	// retry to move master until configured timeout is reached
-	err := retryutil.Retry(1*time.Minute, c.opConfig.MasterPodMoveTimeout,
+	err := retryutil.Retry(1*time.Minute, c.opConfig.MasterPodMoveTimeout.Duration,
 		func() (bool, error) {
 			err := c.attemptToMoveMasterPodsOffNode(node)
 			if err != nil {

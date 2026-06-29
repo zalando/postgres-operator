@@ -24,6 +24,7 @@ import (
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,description="Age of the PostgreSQL cluster"
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.PostgresClusterStatus`,description="Current sync status of postgresql resource"
 // +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels=app.kubernetes.io/name=postgres-operator
 type Postgresql struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -63,6 +64,18 @@ type PostgresSpec struct {
 	EnableReplicaLoadBalancer       *bool `json:"enableReplicaLoadBalancer,omitempty"`
 	EnableReplicaPoolerLoadBalancer *bool `json:"enableReplicaPoolerLoadBalancer,omitempty"`
 
+	// vars to enable and configure nodeport services
+	// set ports to 0 or nil to let kubernetes decide which port to use
+	// overrides loadbalancer configuration
+	EnableMasterNodePort        *bool  `json:"enableMasterNodePort,omitempty"`
+	MasterNodePort              *int32 `json:"masterNodePort,omitempty"`
+	EnableMasterPoolerNodePort  *bool  `json:"enableMasterPoolerNodePort,omitempty"`
+	MasterPoolerNodePort        *int32 `json:"masterPoolerNodePort,omitempty"`
+	EnableReplicaNodePort       *bool  `json:"enableReplicaNodePort,omitempty"`
+	ReplicaNodePort             *int32 `json:"replicaNodePort,omitempty"`
+	EnableReplicaPoolerNodePort *bool  `json:"enableReplicaPoolerNodePort,omitempty"`
+	ReplicaPoolerNodePort       *int32 `json:"replicaPoolerNodePort,omitempty"`
+
 	// deprecated load balancer settings maintained for backward compatibility
 	// see "Load balancers" operator docs
 	UseLoadBalancer *bool `json:"useLoadBalancer,omitempty"`
@@ -71,7 +84,7 @@ type PostgresSpec struct {
 
 	// load balancers' source ranges are the same for master and replica services
 	// +nullable
-	// +kubebuilder:validation:items:Pattern=`^(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\/(\d|[1-2]\d|3[0-2])$`
+	// +kubebuilder:validation:items:Pattern=`^((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\/(\d|[1-2]\d|3[0-2])|(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))\/(12[0-8]|1[01][0-9]|[1-9]?[0-9]))$`
 	// +optional
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
@@ -87,7 +100,6 @@ type PostgresSpec struct {
 	NumberOfInstances int32 `json:"numberOfInstances"`
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=array
-	// +kubebuilde:validation:items:Type=string
 	MaintenanceWindows []MaintenanceWindow `json:"maintenanceWindows,omitempty"`
 	Clone              *CloneDescription   `json:"clone,omitempty"`
 	// Note: usernames specified here as database owners must be declared
@@ -98,6 +110,7 @@ type PostgresSpec struct {
 	NodeAffinity              *v1.NodeAffinity              `json:"nodeAffinity,omitempty"`
 	TopologySpreadConstraints []v1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 	Tolerations               []v1.Toleration               `json:"tolerations,omitempty"`
+	LivenessProbe             *v1.Probe                     `json:"livenessProbe,omitempty"`
 	Sidecars                  []Sidecar                     `json:"sidecars,omitempty"`
 	InitContainers            []v1.Container                `json:"initContainers,omitempty"`
 	PodPriorityClassName      string                        `json:"podPriorityClassName,omitempty"`

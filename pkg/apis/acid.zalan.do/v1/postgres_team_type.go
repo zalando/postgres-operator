@@ -11,6 +11,7 @@ import (
 // +k8s:deepcopy-gen=true
 // +kubebuilder:resource:shortName=pgteam,categories=all
 // +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels=app.kubernetes.io/name=postgres-operator
 type PostgresTeam struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`

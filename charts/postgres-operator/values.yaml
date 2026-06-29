@@ -231,6 +231,19 @@ configKubernetes:
   # whether the Spilo container should run with additional permissions other than parent.
   # required by cron which needs setuid
   spilo_allow_privilege_escalation: true
+
+  # liveness probe for the spilo pod
+  # liveness_probe:
+  #   httpGet:
+  #     scheme: HTTP
+  #     path: /liveness
+  #     port: 8008
+  #   initialDelaySeconds: 10
+  #   periodSeconds: 10
+  #   timeoutSeconds: 5
+  #   successThreshold: 1
+  #   failureThreshold: 3
+
   # storage resize strategy, available options are: ebs, pvc, off or mixed
   storage_resize_mode: pvc
   # pod toleration assigned to instances of every Postgres cluster
@@ -402,6 +415,12 @@ configLogicalBackup:
   logical_backup_schedule: "30 00 * * *"
   # secret to be used as reference for env variables in cronjob
   logical_backup_cronjob_environment_secret: ""
+  # number of successful backup jobs to keep in cronjob history
+  logical_backup_successful_jobs_history_limit: 3
+  # number of failed backup jobs to keep in cronjob history
+  logical_backup_failed_jobs_history_limit: 3
+  # TTL in seconds after which finished backup jobs are automatically deleted
+  logical_backup_ttl_seconds_after_finished: 86400
 
 # automate creation of human users with teams API service
 configTeamsApi:
@@ -499,7 +518,6 @@ podPriorityClassName:
 
 resources:
   limits:
-    cpu: 500m
     memory: 500Mi
   requests:
     cpu: 100m

@@ -171,7 +171,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 			msg = fmt.Sprintf("defined CPU limit %s for %q container is below required minimum %s and will be increased",
 				cpuLimit.String(), constants.PostgresContainerName, minCPULimit)
 			c.logger.Warningf("%s", msg)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+			c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
 			resources.Limits[v1.ResourceCPU], _ = resource.ParseQuantity(minCPULimit)
 		}
 	}
@@ -188,7 +188,7 @@ func (c *Cluster) enforceMinResourceLimits(resources *v1.ResourceRequirements) e
 			msg = fmt.Sprintf("defined memory limit %s for %q container is below required minimum %s and will be increased",
 				memoryLimit.String(), constants.PostgresContainerName, minMemoryLimit)
 			c.logger.Warningf("%s", msg)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
+			c.eventRecorder.Event(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", msg)
 			resources.Limits[v1.ResourceMemory], _ = resource.ParseQuantity(minMemoryLimit)
 		}
 	}
@@ -366,7 +366,7 @@ func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.
 
 	config.Bootstrap = pgBootstrap{}
 
-	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "md5"},
+	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "scram-sha-256"},
 		map[string]string{"auth-local": "trust"}}
 
 	initdbOptionNames := []string{}
@@ -1165,7 +1165,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 
 	secret := &v1.Secret{}
 	var notFoundErr error
-	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			var err error
 			secret, err = c.KubeClient.Secrets(c.Namespace).Get(
@@ -1299,6 +1299,19 @@ func generateSpiloReadinessProbe() *v1.Probe {
 	}
 }
 
+func generateSpiloLivenessProbe(probe, defaultProbe *v1.Probe) *v1.Probe {
+
+	if probe != nil {
+		return probe
+	}
+
+	if defaultProbe != nil {
+		return defaultProbe
+	}
+
+	return nil
+}
+
 func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
 
 	var (
@@ -1405,6 +1418,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		spiloContainer.ReadinessProbe = generateSpiloReadinessProbe()
 	}
 
+	spiloContainer.LivenessProbe = generateSpiloLivenessProbe(spec.LivenessProbe, c.OpConfig.LivenessProbe)
+
 	// generate container specs for sidecars specified in the cluster manifest
 	clusterSpecificSidecars := []v1.Container{}
 	if len(spec.Sidecars) > 0 {
@@ -1454,7 +1469,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	sidecarContainers, conflicts := mergeContainers(clusterSpecificSidecars, c.Config.OpConfig.SidecarContainers, globalSidecarContainersByDockerImage, scalyrSidecars)
-	for containerName := range conflicts {
+	for _, containerName := range conflicts {
 		c.logger.Warningf("a sidecar is specified twice. Ignoring sidecar %q in favor of %q with high a precedence",
 			containerName, containerName)
 	}
@@ -1483,7 +1498,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		&tolerationSpec,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
 		spec.SchedulerName,
-		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		int64(util.CoalesceDuration(c.OpConfig.PodTerminateGracePeriod, "5m").Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
@@ -1989,6 +2004,37 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 
 }
 
+func (c *Cluster) shouldCreateNodePortForService(role PostgresRole, spec *acidv1.PostgresSpec) (bool, int32) {
+	switch role {
+	case Replica:
+		// if the value is explicitly set in a Postgresql manifest, follow this setting
+		if spec.EnableReplicaNodePort != nil {
+			port := int32(0)
+			if spec.ReplicaNodePort != nil {
+				port = *spec.ReplicaNodePort
+			}
+
+			return *spec.EnableReplicaNodePort, port
+		}
+
+		// otherwise, follow the operator configuration
+		return c.OpConfig.EnableReplicaNodePort, 0
+	case Master:
+		if spec.EnableMasterNodePort != nil {
+			port := int32(0)
+			if spec.MasterNodePort != nil {
+				port = *spec.MasterNodePort
+			}
+
+			return *spec.EnableMasterNodePort, port
+		}
+
+		return c.OpConfig.EnableMasterNodePort, 0
+	default:
+		panic(fmt.Sprintf("Unknown role %v", role))
+	}
+}
+
 func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) *v1.Service {
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{{Name: "postgresql", Port: pgPort, TargetPort: intstr.IntOrString{IntVal: pgPort}}},
@@ -2001,7 +2047,9 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
 
-	if c.shouldCreateLoadBalancerForService(role, spec) {
+	if ok, port := c.shouldCreateNodePortForService(role, spec); ok {
+		c.configureNodePortService(&serviceSpec, port)
+	} else if c.shouldCreateLoadBalancerForService(role, spec) {
 		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
@@ -2034,10 +2082,21 @@ func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourc
 	serviceSpec.Type = v1.ServiceTypeLoadBalancer
 }
 
+func (c *Cluster) configureNodePortService(serviceSpec *v1.ServiceSpec, port int32) {
+	serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy)
+	serviceSpec.Type = v1.ServiceTypeNodePort
+
+	if port != 0 && len(serviceSpec.Ports) > 0 {
+		serviceSpec.Ports[0].NodePort = port
+	}
+}
+
 func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
 	annotations := c.getCustomServiceAnnotations(role, spec)
 
-	if c.shouldCreateLoadBalancerForService(role, spec) {
+	nodePort, _ := c.shouldCreateNodePortForService(role, spec)
+
+	if !nodePort && c.shouldCreateLoadBalancerForService(role, spec) {
 		dnsName := c.dnsName(role)
 
 		// External DNS name annotation is not customizable
@@ -2372,7 +2431,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		&tolerationsSpec,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		nil,
-		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		int64(util.CoalesceDuration(c.OpConfig.PodTerminateGracePeriod, "5m").Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		"",
@@ -2393,12 +2452,22 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 	// configure a batch job
 
 	jobSpec := batchv1.JobSpec{
-		Template: *podTemplate,
+		Template:                *podTemplate,
+		TTLSecondsAfterFinished: c.OpConfig.LogicalBackup.LogicalBackupTTLSecondsAfterFinished,
+	}
+
+	if jobSpec.TTLSecondsAfterFinished == nil {
+		defaultTTL := int32(86400)
+		jobSpec.TTLSecondsAfterFinished = &defaultTTL
 	}
 
 	// configure a cron job
 
 	jobTemplateSpec := batchv1.JobTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:      labels,
+			Annotations: c.annotationsSet(annotations),
+		},
 		Spec: jobSpec,
 	}
 
@@ -2407,18 +2476,32 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		schedule = c.OpConfig.LogicalBackupSchedule
 	}
 
+	successfulJobsHistoryLimit := c.OpConfig.LogicalBackup.LogicalBackupSuccessfulJobsHistoryLimit
+	if successfulJobsHistoryLimit == nil {
+		defaultLimit := int32(3)
+		successfulJobsHistoryLimit = &defaultLimit
+	}
+
+	failedJobsHistoryLimit := c.OpConfig.LogicalBackup.LogicalBackupFailedJobsHistoryLimit
+	if failedJobsHistoryLimit == nil {
+		defaultLimit := int32(3)
+		failedJobsHistoryLimit = &defaultLimit
+	}
+
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.getLogicalBackupJobName(),
 			Namespace:       c.Namespace,
-			Labels:          c.labelsSet(true),
-			Annotations:     c.annotationsSet(nil),
+			Labels:          labels,
+			Annotations:     c.annotationsSet(annotations),
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          schedule,
-			JobTemplate:       jobTemplateSpec,
-			ConcurrencyPolicy: batchv1.ForbidConcurrent,
+			Schedule:                   schedule,
+			JobTemplate:                jobTemplateSpec,
+			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
+			SuccessfulJobsHistoryLimit: successfulJobsHistoryLimit,
+			FailedJobsHistoryLimit:     failedJobsHistoryLimit,
 		},
 	}
 
