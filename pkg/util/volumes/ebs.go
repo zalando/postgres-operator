@@ -89,11 +89,18 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 	}
 
 	for _, v := range volumeOutput.Volumes {
+		tags := make(map[string]string)
+		for _, tag := range v.Tags {
+			if tag.Key != nil && tag.Value != nil {
+				tags[*tag.Key] = *tag.Value
+			}
+		}
+
 		switch v.VolumeType {
 		case "gp3":
-			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: int64(*v.Size), VolumeType: string(v.VolumeType), Iops: int64(*v.Iops), Throughput: int64(*v.Throughput)})
+			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: int64(*v.Size), VolumeType: string(v.VolumeType), Iops: int64(*v.Iops), Throughput: int64(*v.Throughput), Tags: tags})
 		case "gp2":
-			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: int64(*v.Size), VolumeType: string(v.VolumeType)})
+			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: int64(*v.Size), VolumeType: string(v.VolumeType), Tags: tags})
 		default:
 			return nil, fmt.Errorf("discovered unexpected volume type %s %s", *v.VolumeId, v.VolumeType)
 		}
@@ -204,6 +211,62 @@ func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSiz
 			}
 			return out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil
 		})
+}
+
+// TagVolumes tags the given EBS volumes with the provided tags.
+func (r *EBSVolumeResizer) TagVolumes(volumeIds []string, tags map[string]string) error {
+	if len(volumeIds) == 0 || len(tags) == 0 {
+		return nil
+	}
+
+	if !r.IsConnectedToProvider() {
+		if err := r.ConnectToProvider(); err != nil {
+			return err
+		}
+	}
+
+	ec2Tags := make([]types.Tag, 0, len(tags))
+	for key, value := range tags {
+		k, v := key, value
+		ec2Tags = append(ec2Tags, types.Tag{Key: &k, Value: &v})
+	}
+
+	_, err := r.connection.CreateTags(context.TODO(), &ec2.CreateTagsInput{
+		Resources: volumeIds,
+		Tags:      ec2Tags,
+	})
+	if err != nil {
+		return fmt.Errorf("could not tag EBS volumes: %v", err)
+	}
+	return nil
+}
+
+// UntagVolumes removes the given tag keys from the provided EBS volumes.
+func (r *EBSVolumeResizer) UntagVolumes(volumeIds []string, tagKeys []string) error {
+	if !r.IsConnectedToProvider() {
+		if err := r.ConnectToProvider(); err != nil {
+			return err
+		}
+	}
+
+	if len(volumeIds) == 0 || len(tagKeys) == 0 {
+		return nil
+	}
+
+	ec2Tags := make([]types.Tag, 0, len(tagKeys))
+	for _, key := range tagKeys {
+		k := key
+		ec2Tags = append(ec2Tags, types.Tag{Key: &k})
+	}
+
+	_, err := r.connection.DeleteTags(context.TODO(), &ec2.DeleteTagsInput{
+		Resources: volumeIds,
+		Tags:      ec2Tags,
+	})
+	if err != nil {
+		return fmt.Errorf("could not untag EBS volumes: %v", err)
+	}
+	return nil
 }
 
 // DisconnectFromProvider closes connection to the EC2 instance
