@@ -1098,3 +1098,27 @@ operator being able to provide some reasonable defaults.
   **connection_pooler_default_cpu_limit**
   **connection_pooler_default_memory_limit**
   Default resource configuration for connection pooler deployment.
+
+* **connection_pooler_generate_config**
+  When `true`, the operator renders a `pgbouncer.ini` into an operator-owned
+  ConfigMap, mounts it into the pooler pod, and overrides the container
+  command/args. Use for pgbouncer images that do not ship an entrypoint that
+  renders the config (e.g. FIPS/distroless images). The default `false`
+  preserves the stock behavior of relying on the image entrypoint.
+
+* **connection_pooler_command**
+  Container `command` override applied only when `connection_pooler_generate_config`
+  is enabled. Empty (default) keeps the image entrypoint.
+
+* **connection_pooler_args**
+  Container `args` applied only when `connection_pooler_generate_config` is
+  enabled. The default `["/etc/pgbouncer/pgbouncer.ini"]` points pgbouncer at the
+  mounted config.
+
+* **connection_pooler_auth_type**
+  `auth_type` written into the generated `pgbouncer.ini`. The default is
+  `scram-sha-256`.
+
+* **connection_pooler_config_path**
+  Mount path of the generated `pgbouncer.ini` inside the pooler container. The
+  default is `/etc/pgbouncer/pgbouncer.ini`.

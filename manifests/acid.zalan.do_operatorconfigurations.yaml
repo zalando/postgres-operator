@@ -88,6 +88,22 @@ spec:
                 description: ConnectionPoolerConfiguration defines default configuration
                   for connection pooler
                 properties:
+                  connection_pooler_args:
+                    default:
+                    - /etc/pgbouncer/pgbouncer.ini
+                    items:
+                      type: string
+                    type: array
+                  connection_pooler_auth_type:
+                    default: scram-sha-256
+                    type: string
+                  connection_pooler_command:
+                    items:
+                      type: string
+                    type: array
+                  connection_pooler_config_path:
+                    default: /etc/pgbouncer/pgbouncer.ini
+                    type: string
                   connection_pooler_default_cpu_limit:
                     pattern: ^(\d+m|\d+(\.\d{1,3})?)$
                     type: string
@@ -100,6 +116,9 @@ spec:
                   connection_pooler_default_memory_request:
                     pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                     type: string
+                  connection_pooler_generate_config:
+                    default: false
+                    type: boolean
                   connection_pooler_image:
                     default: ghcr.io/zalando/postgres-operator/pgbouncer:latest
                     type: string
@@ -940,25 +959,6 @@ spec:
                   super_username:
                     default: postgres
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                  connection_pooler_generate_config:
-                    type: boolean
-                    default: false
-                  connection_pooler_command:
-                    type: array
-                    items:
-                      type: string
-                  connection_pooler_args:
-                    type: array
-                    items:
-                      type: string
-                  connection_pooler_auth_type:
-                    type: string
-                    default: "scram-sha-256"
-                  connection_pooler_config_path:
-                    type: string
-                    default: "/etc/pgbouncer/pgbouncer.ini"
-              patroni:
                 type: object
               workers:
                 default: 8

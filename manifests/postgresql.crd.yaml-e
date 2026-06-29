@@ -13,7 +13,7 @@ spec:
     categories:
     - all
     kind: postgresql
-    listKind: postgresqlList
+    listKind: PostgresqlList
     plural: postgresqls
     shortNames:
     - pg

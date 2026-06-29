@@ -477,6 +477,15 @@ configConnectionPooler:
   connection_pooler_default_memory_request: 100Mi
   connection_pooler_default_cpu_limit: "1"
   connection_pooler_default_memory_limit: 100Mi
+  # whether the operator should generate the pgbouncer.ini config map and
+  # override the pooler container command/args (needed for images without an
+  # entrypoint that renders the config, e.g. the Chainguard FIPS pgbouncer image)
+  connection_pooler_generate_config: false
+  # connection_pooler_command: []
+  # connection_pooler_args:
+  #   - "/etc/pgbouncer/pgbouncer.ini"
+  connection_pooler_auth_type: "scram-sha-256"
+  connection_pooler_config_path: "/etc/pgbouncer/pgbouncer.ini"
 
 configPatroni:
   # enable Patroni DCS failsafe_mode feature
