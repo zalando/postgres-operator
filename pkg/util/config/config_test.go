@@ -228,16 +228,16 @@ var newFromMapTests = []struct {
 	{
 		description: "duration parsing",
 		input: map[string]string{
-			"ready_wait_interval": "10s",
-			"ready_wait_timeout":  "1m",
+			"patroni_api_check_interval": "1s",
+			"patroni_api_check_timeout":  "5s",
 		},
 		expectPanic: false,
 		validateFunc: func(t *testing.T, cfg *Config) {
-			if cfg.ReadyWaitInterval.Seconds() != 10 {
-				t.Errorf("expected ReadyWaitInterval=10s, got %v", cfg.ReadyWaitInterval)
+			if cfg.PatroniAPICheckInterval.Seconds() != 1 {
+				t.Errorf("expected check interval of 1s, got %.0fs", cfg.PatroniAPICheckInterval.Seconds())
 			}
-			if cfg.ReadyWaitTimeout.Minutes() != 1 {
-				t.Errorf("expected ReadyWaitTimeout=1m, got %v", cfg.ReadyWaitTimeout)
+			if cfg.PatroniAPICheckTimeout.Seconds() != 5 {
+				t.Errorf("expected check timeout of 5s, got %.0fs", cfg.PatroniAPICheckTimeout.Seconds())
 			}
 		},
 	},

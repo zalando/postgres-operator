@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"time"
-
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
@@ -44,8 +42,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.MaxInstances = fromCRD.MaxInstances
 	result.IgnoreInstanceLimitsAnnotationKey = fromCRD.IgnoreInstanceLimitsAnnotationKey
 	result.IgnoreResourcesLimitsAnnotationKey = fromCRD.IgnoreResourcesLimitsAnnotationKey
-	result.ResyncPeriod = util.CoalesceDuration(time.Duration(fromCRD.ResyncPeriod), "30m")
-	result.RepairPeriod = util.CoalesceDuration(time.Duration(fromCRD.RepairPeriod), "5m")
+	result.ResyncPeriod = util.CoalesceDuration(fromCRD.ResyncPeriod, "30m")
+	result.RepairPeriod = util.CoalesceDuration(fromCRD.RepairPeriod, "5m")
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 	result.ShmVolume = util.CoalesceBool(fromCRD.ShmVolume, util.True())
 	result.SidecarImages = fromCRD.SidecarImages
@@ -75,7 +73,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
 	result.PodEnvironmentConfigMap = fromCRD.Kubernetes.PodEnvironmentConfigMap
 	result.PodEnvironmentSecret = fromCRD.Kubernetes.PodEnvironmentSecret
-	result.PodTerminateGracePeriod = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod), "5m")
+	result.PodTerminateGracePeriod = util.CoalesceDuration(fromCRD.Kubernetes.PodTerminateGracePeriod, "5m")
 	result.LivenessProbe = fromCRD.Kubernetes.LivenessProbe
 	result.SpiloPrivileged = fromCRD.Kubernetes.SpiloPrivileged
 	result.SpiloAllowPrivilegeEscalation = util.CoalesceBool(fromCRD.Kubernetes.SpiloAllowPrivilegeEscalation, util.True())
@@ -129,7 +127,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableSecretsDeletion = util.CoalesceBool(fromCRD.Kubernetes.EnableSecretsDeletion, util.True())
 	result.EnablePersistentVolumeClaimDeletion = util.CoalesceBool(fromCRD.Kubernetes.EnablePersistentVolumeClaimDeletion, util.True())
 	result.EnableReadinessProbe = fromCRD.Kubernetes.EnableReadinessProbe
-	result.MasterPodMoveTimeout = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout), "10m")
+	result.MasterPodMoveTimeout = util.CoalesceDuration(fromCRD.Kubernetes.MasterPodMoveTimeout, "10m")
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity
 	result.PodAntiAffinityTopologyKey = util.Coalesce(fromCRD.Kubernetes.PodAntiAffinityTopologyKey, "kubernetes.io/hostname")
 	result.PodAntiAffinityPreferredDuringScheduling = fromCRD.Kubernetes.PodAntiAffinityPreferredDuringScheduling
@@ -146,14 +144,14 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.MaxMemoryRequest = fromCRD.PostgresPodResources.MaxMemoryRequest
 
 	// timeout config
-	result.ResourceCheckInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ResourceCheckInterval), "3s")
-	result.ResourceCheckTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ResourceCheckTimeout), "10m")
-	result.PodLabelWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PodLabelWaitTimeout), "10m")
-	result.PodDeletionWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PodDeletionWaitTimeout), "10m")
-	result.ReadyWaitInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ReadyWaitInterval), "4s")
-	result.ReadyWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ReadyWaitTimeout), "30s")
-	result.PatroniAPICheckInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PatroniAPICheckInterval), "1s")
-	result.PatroniAPICheckTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PatroniAPICheckTimeout), "5s")
+	result.ResourceCheckInterval = util.CoalesceDuration(fromCRD.Timeouts.ResourceCheckInterval, "3s")
+	result.ResourceCheckTimeout = util.CoalesceDuration(fromCRD.Timeouts.ResourceCheckTimeout, "10m")
+	result.PodLabelWaitTimeout = util.CoalesceDuration(fromCRD.Timeouts.PodLabelWaitTimeout, "10m")
+	result.PodDeletionWaitTimeout = util.CoalesceDuration(fromCRD.Timeouts.PodDeletionWaitTimeout, "10m")
+	result.ReadyWaitInterval = util.CoalesceDuration(fromCRD.Timeouts.ReadyWaitInterval, "4s")
+	result.ReadyWaitTimeout = util.CoalesceDuration(fromCRD.Timeouts.ReadyWaitTimeout, "30s")
+	result.PatroniAPICheckInterval = util.CoalesceDuration(fromCRD.Timeouts.PatroniAPICheckInterval, "1s")
+	result.PatroniAPICheckTimeout = util.CoalesceDuration(fromCRD.Timeouts.PatroniAPICheckTimeout, "5s")
 
 	// load balancer config
 	result.DbHostedZone = util.Coalesce(fromCRD.LoadBalancer.DbHostedZone, "db.example.com")
