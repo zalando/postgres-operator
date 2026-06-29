@@ -26,4 +26,5 @@ type VolumeResizer interface {
 	DisconnectFromProvider() error
 	DescribeVolumes(providerVolumesID []string) ([]VolumeProperties, error)
 	TagVolumes(providerVolumesID []string, tags map[string]string) error
+	UntagVolumes(providerVolumesID []string, tagKeys []string) error
 }

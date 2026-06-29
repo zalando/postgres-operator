@@ -532,19 +532,25 @@ func (c *Cluster) tagEBSVolumes() error {
 		desiredTags[labelKey] = labelValue
 	}
 
-	if len(desiredTags) == 0 {
-		c.logger.Debugf("no tags to apply from configured labels")
-		return nil
-	}
-
 	volumesToTag := make([]string, 0, len(c.EBSVolumes))
+	volumesToUntag := make([]string, 0, len(c.EBSVolumes))
+	staleKeys := make(map[string]bool)
+
 	for volumeID, volumeProps := range c.EBSVolumes {
-		if c.tagsNeedUpdate(volumeProps.Tags, desiredTags) {
+		if len(desiredTags) > 0 && c.tagsNeedUpdate(volumeProps.Tags, desiredTags) {
 			volumesToTag = append(volumesToTag, volumeID)
+		}
+		for _, labelKey := range c.OpConfig.EBSTagsInheritLabels {
+			if _, wanted := desiredTags[labelKey]; !wanted {
+				if _, exists := volumeProps.Tags[labelKey]; exists {
+					volumesToUntag = append(volumesToUntag, volumeID)
+					staleKeys[labelKey] = true
+				}
+			}
 		}
 	}
 
-	if len(volumesToTag) == 0 {
+	if len(volumesToTag) == 0 && len(volumesToUntag) == 0 {
 		c.logger.Debugf("all EBS volumes already have the desired tags")
 		return nil
 	}
@@ -560,11 +566,25 @@ func (c *Cluster) tagEBSVolumes() error {
 		}()
 	}
 
-	if err := c.VolumeResizer.TagVolumes(volumesToTag, desiredTags); err != nil {
-		return fmt.Errorf("could not tag EBS volumes: %v", err)
+	if len(volumesToTag) > 0 {
+		if err := c.VolumeResizer.TagVolumes(volumesToTag, desiredTags); err != nil {
+			return fmt.Errorf("could not tag EBS volumes: %v", err)
+		}
+		c.logger.Infof("successfully tagged %d EBS volumes with labels: %v", len(volumesToTag), desiredTags)
 	}
 
-	c.logger.Infof("successfully tagged %d EBS volumes with labels: %v", len(volumesToTag), desiredTags)
+	if len(volumesToUntag) > 0 {
+		keysToDelete := make([]string, 0, len(staleKeys))
+		for k := range staleKeys {
+			keysToDelete = append(keysToDelete, k)
+		}
+		if err := c.VolumeResizer.UntagVolumes(volumesToUntag, keysToDelete); err != nil {
+			c.logger.Warningf("could not remove stale EBS tags %v: %v", keysToDelete, err)
+		} else {
+			c.logger.Infof("removed stale tags %v from %d EBS volumes", keysToDelete, len(volumesToUntag))
+		}
+	}
+
 	return nil
 }
 

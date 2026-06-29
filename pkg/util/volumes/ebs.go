@@ -241,6 +241,34 @@ func (r *EBSVolumeResizer) TagVolumes(volumeIds []string, tags map[string]string
 	return nil
 }
 
+// UntagVolumes removes the given tag keys from the provided EBS volumes.
+func (r *EBSVolumeResizer) UntagVolumes(volumeIds []string, tagKeys []string) error {
+	if !r.IsConnectedToProvider() {
+		if err := r.ConnectToProvider(); err != nil {
+			return err
+		}
+	}
+
+	if len(volumeIds) == 0 || len(tagKeys) == 0 {
+		return nil
+	}
+
+	ec2Tags := make([]types.Tag, 0, len(tagKeys))
+	for _, key := range tagKeys {
+		k := key
+		ec2Tags = append(ec2Tags, types.Tag{Key: &k})
+	}
+
+	_, err := r.connection.DeleteTags(context.TODO(), &ec2.DeleteTagsInput{
+		Resources: volumeIds,
+		Tags:      ec2Tags,
+	})
+	if err != nil {
+		return fmt.Errorf("could not untag EBS volumes: %v", err)
+	}
+	return nil
+}
+
 // DisconnectFromProvider closes connection to the EC2 instance
 func (r *EBSVolumeResizer) DisconnectFromProvider() error {
 	r.connection = nil
