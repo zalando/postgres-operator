@@ -211,6 +211,38 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 }
 
 // replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL CRD.
+func (c *Cluster) relabelPodsForSelector(newSelector map[string]string) error {
+	pods, err := c.listPods()
+	if err != nil {
+		return fmt.Errorf("could not list pods for relabeling: %v", err)
+	}
+
+	for _, pod := range pods {
+		// only patch pods that are missing one or more of the new selector labels
+		needsPatch := false
+		for k, v := range newSelector {
+			if pod.Labels[k] != v {
+				needsPatch = true
+				break
+			}
+		}
+		if !needsPatch {
+			continue
+		}
+
+		patchData, err := metaLabelsPatch(newSelector)
+		if err != nil {
+			return fmt.Errorf("could not form label patch for pod %q: %v", pod.Name, err)
+		}
+		if _, err := c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("could not relabel pod %q: %v", pod.Name, err)
+		}
+		c.logger.Infof("relabeled pod %q with new selector labels", pod.Name)
+	}
+
+	return nil
+}
+
 func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("replacing statefulset")
 	if c.Statefulset == nil {
@@ -219,6 +251,14 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
 	c.logger.Debug("replacing statefulset")
+
+	// If the new selector has labels the existing pods don't carry, relabel them first
+	// so the new StatefulSet can adopt them after the cascade=orphan delete.
+	if !util.MapContains(c.Statefulset.Spec.Selector.MatchLabels, newStatefulSet.Spec.Selector.MatchLabels) {
+		if err := c.relabelPodsForSelector(newStatefulSet.Spec.Selector.MatchLabels); err != nil {
+			return fmt.Errorf("could not relabel pods before statefulset replacement: %v", err)
+		}
+	}
 
 	// Delete the current statefulset without deleting the pods
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
