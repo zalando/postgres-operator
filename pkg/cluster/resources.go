@@ -250,6 +250,40 @@ func (c *Cluster) relabelPodsForSelector(oldSelector, newSelector map[string]str
 	return nil
 }
 
+func (c *Cluster) relabelPVCsForSelector(oldSelector, newSelector map[string]string) error {
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(oldSelector).String(),
+	}
+	pvcList, err := c.KubeClient.PersistentVolumeClaims(c.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return fmt.Errorf("could not list PVCs for relabeling: %v", err)
+	}
+
+	for _, pvc := range pvcList.Items {
+		needsPatch := false
+		for k, v := range newSelector {
+			if pvc.Labels[k] != v {
+				needsPatch = true
+				break
+			}
+		}
+		if !needsPatch {
+			continue
+		}
+
+		patchData, err := metaLabelsPatch(newSelector)
+		if err != nil {
+			return fmt.Errorf("could not form label patch for PVC %q: %v", pvc.Name, err)
+		}
+		if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("could not relabel PVC %q: %v", pvc.Name, err)
+		}
+		c.logger.Infof("relabeled PVC %q with new selector labels", pvc.Name)
+	}
+
+	return nil
+}
+
 func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("replacing statefulset")
 	if c.Statefulset == nil {
@@ -264,6 +298,9 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	if !util.MapContains(c.Statefulset.Spec.Selector.MatchLabels, newStatefulSet.Spec.Selector.MatchLabels) {
 		if err := c.relabelPodsForSelector(c.Statefulset.Spec.Selector.MatchLabels, newStatefulSet.Spec.Selector.MatchLabels); err != nil {
 			return fmt.Errorf("could not relabel pods before statefulset replacement: %v", err)
+		}
+		if err := c.relabelPVCsForSelector(c.Statefulset.Spec.Selector.MatchLabels, newStatefulSet.Spec.Selector.MatchLabels); err != nil {
+			return fmt.Errorf("could not relabel PVCs before statefulset replacement: %v", err)
 		}
 	}
 
