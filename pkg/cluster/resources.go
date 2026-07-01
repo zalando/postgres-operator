@@ -222,24 +222,14 @@ func (c *Cluster) relabelPodsForSelector(oldSelector, newSelector map[string]str
 	if err != nil {
 		return fmt.Errorf("could not list pods for relabeling: %v", err)
 	}
-	pods := podList.Items
+	patchData, err := metaLabelsPatch(newSelector)
+	if err != nil {
+		return fmt.Errorf("could not form label patch for pods: %v", err)
+	}
 
-	for _, pod := range pods {
-		// only patch pods that are missing one or more of the new selector labels
-		needsPatch := false
-		for k, v := range newSelector {
-			if pod.Labels[k] != v {
-				needsPatch = true
-				break
-			}
-		}
-		if !needsPatch {
+	for _, pod := range podList.Items {
+		if util.MapContains(pod.Labels, newSelector) {
 			continue
-		}
-
-		patchData, err := metaLabelsPatch(newSelector)
-		if err != nil {
-			return fmt.Errorf("could not form label patch for pod %q: %v", pod.Name, err)
 		}
 		if _, err := c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
 			return fmt.Errorf("could not relabel pod %q: %v", pod.Name, err)
@@ -259,21 +249,14 @@ func (c *Cluster) relabelPVCsForSelector(oldSelector, newSelector map[string]str
 		return fmt.Errorf("could not list PVCs for relabeling: %v", err)
 	}
 
-	for _, pvc := range pvcList.Items {
-		needsPatch := false
-		for k, v := range newSelector {
-			if pvc.Labels[k] != v {
-				needsPatch = true
-				break
-			}
-		}
-		if !needsPatch {
-			continue
-		}
+	patchData, err := metaLabelsPatch(newSelector)
+	if err != nil {
+		return fmt.Errorf("could not form label patch for PVCs: %v", err)
+	}
 
-		patchData, err := metaLabelsPatch(newSelector)
-		if err != nil {
-			return fmt.Errorf("could not form label patch for PVC %q: %v", pvc.Name, err)
+	for _, pvc := range pvcList.Items {
+		if util.MapContains(pvc.Labels, newSelector) {
+			continue
 		}
 		if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
 			return fmt.Errorf("could not relabel PVC %q: %v", pvc.Name, err)
@@ -431,6 +414,17 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(context.TODO(), newService.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("could not patch annotations for service %q: %v", oldService.Name, err)
+		}
+	}
+
+	if !util.MapContains(oldService.Labels, newService.Labels) {
+		patchData, err := metaLabelsPatch(newService.Labels)
+		if err != nil {
+			return nil, fmt.Errorf("could not form patch for service %q labels: %v", oldService.Name, err)
+		}
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(context.TODO(), newService.Name, types.MergePatchType, patchData, metav1.PatchOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not patch labels for service %q: %v", oldService.Name, err)
 		}
 	}
 
