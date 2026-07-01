@@ -11,6 +11,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -211,11 +212,17 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 }
 
 // replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL CRD.
-func (c *Cluster) relabelPodsForSelector(newSelector map[string]string) error {
-	pods, err := c.listPods()
+func (c *Cluster) relabelPodsForSelector(oldSelector, newSelector map[string]string) error {
+	// list pods using the OLD selector — at this point c.labelsSet already reflects
+	// the new cluster_labels config, so listPods() would find nothing.
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(oldSelector).String(),
+	}
+	podList, err := c.KubeClient.Pods(c.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("could not list pods for relabeling: %v", err)
 	}
+	pods := podList.Items
 
 	for _, pod := range pods {
 		// only patch pods that are missing one or more of the new selector labels
@@ -255,7 +262,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	// If the new selector has labels the existing pods don't carry, relabel them first
 	// so the new StatefulSet can adopt them after the cascade=orphan delete.
 	if !util.MapContains(c.Statefulset.Spec.Selector.MatchLabels, newStatefulSet.Spec.Selector.MatchLabels) {
-		if err := c.relabelPodsForSelector(newStatefulSet.Spec.Selector.MatchLabels); err != nil {
+		if err := c.relabelPodsForSelector(c.Statefulset.Spec.Selector.MatchLabels, newStatefulSet.Spec.Selector.MatchLabels); err != nil {
 			return fmt.Errorf("could not relabel pods before statefulset replacement: %v", err)
 		}
 	}
