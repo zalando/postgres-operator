@@ -1077,9 +1077,15 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
 
+	// Service
+	if err := c.syncServices(); err != nil {
+		c.logger.Errorf("could not sync services: %v", err)
+		updateFailed = true
+	}
+	
 	// Patroni service and endpoints / config maps
 	if err := c.syncPatroniResources(); err != nil {
-		c.logger.Errorf("could not sync services: %v", err)
+		c.logger.Errorf("could not sync Patroni resources: %v", err)
 		updateFailed = true
 	}
 
