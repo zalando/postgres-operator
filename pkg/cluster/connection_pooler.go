@@ -1283,7 +1283,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 	if service, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{}); err == nil {
 		c.ConnectionPooler[role].Service = service
 		desiredSvc := c.generateConnectionPoolerService(c.ConnectionPooler[role])
-		newService, err = c.updateService(string(role), service, desiredSvc)
+		newService, err = c.updateService(role, service, desiredSvc)
 		if err != nil {
 			return syncReason, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}

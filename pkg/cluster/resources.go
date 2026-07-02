@@ -310,7 +310,7 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 	return service, nil
 }
 
-func (c *Cluster) updateService(role string, oldService *v1.Service, newService *v1.Service) (*v1.Service, error) {
+func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newService *v1.Service) (*v1.Service, error) {
 	var err error
 	svc := oldService
 

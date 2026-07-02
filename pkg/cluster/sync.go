@@ -379,7 +379,7 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		updatedSvc, err := c.updateService(string(role), svc, desiredSvc)
+		updatedSvc, err := c.updateService(role, svc, desiredSvc)
 		if err != nil {
 			return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}

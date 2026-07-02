@@ -72,7 +72,6 @@ type kubeResources struct {
 	CriticalOpPodDisruptionBudget *policyv1.PodDisruptionBudget
 	LogicalBackupJob              *batchv1.CronJob
 	Streams                       map[string]*zalandov1.FabricEventStream
-
 	// Pods are treated separately
 }
 
@@ -1082,7 +1081,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		c.logger.Errorf("could not sync services: %v", err)
 		updateFailed = true
 	}
-	
+
 	// Patroni service and endpoints / config maps
 	if err := c.syncPatroniResources(); err != nil {
 		c.logger.Errorf("could not sync Patroni resources: %v", err)
