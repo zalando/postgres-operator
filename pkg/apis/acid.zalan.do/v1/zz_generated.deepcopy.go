@@ -848,11 +848,6 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.UseLoadBalancer != nil {
-		in, out := &in.UseLoadBalancer, &out.UseLoadBalancer
-		*out = new(bool)
-		**out = **in
-	}
 	if in.AllowedSourceRanges != nil {
 		in, out := &in.AllowedSourceRanges, &out.AllowedSourceRanges
 		*out = make([]string, len(*in))
