@@ -411,7 +411,7 @@ type OperatorConfigurationData struct {
 	// +kubebuilder:default=""
 	EtcdHost string `json:"etcd_host,omitempty"`
 	// +kubebuilder:default=true
-	KubernetesUseConfigMaps bool `json:"kubernetes_use_configmaps,omitempty"`
+	KubernetesUseConfigMaps *bool `json:"kubernetes_use_configmaps,omitempty"`
 	// +kubebuilder:default="ghcr.io/zalando/spilo-18:4.1-p1"
 	DockerImage string `json:"docker_image,omitempty"`
 	// +kubebuilder:validation:Minimum=1

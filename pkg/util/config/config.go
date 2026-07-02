@@ -177,7 +177,7 @@ type Config struct {
 	ConnectionPooler
 
 	WatchedNamespace         string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	KubernetesUseConfigMaps  bool              `name:"kubernetes_use_configmaps" default:"false"`
+	KubernetesUseConfigMaps  *bool             `name:"kubernetes_use_configmaps" default:"true"`
 	EtcdHost                 string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
 	EnableMaintenanceWindows *bool             `name:"enable_maintenance_windows" default:"true"`
 	MaintenanceWindows       []string          `name:"maintenance_windows"`
