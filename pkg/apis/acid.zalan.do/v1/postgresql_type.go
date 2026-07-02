@@ -124,11 +124,6 @@ type PostgresSpec struct {
 	AdditionalVolumes         []AdditionalVolume `json:"additionalVolumes,omitempty"`
 	Streams                   []Stream           `json:"streams,omitempty"`
 	Env                       []v1.EnvVar        `json:"env,omitempty"`
-
-	// deprecated
-	InitContainersOld []v1.Container `json:"init_containers,omitempty"`
-	// deprecated
-	PodPriorityClassNameOld string `json:"pod_priority_class_name,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
