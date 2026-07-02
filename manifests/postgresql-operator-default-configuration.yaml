@@ -167,6 +167,9 @@ configuration:
     # additional_secret_mount: "some-secret-name"
     # additional_secret_mount_path: "/some/dir"
     aws_region: eu-central-1
+    # ebs_volume_tags_from_annotations:
+    #   application: "myorg.io/application"
+    #   team: "myorg.io/team"
     enable_ebs_gp3_migration: false
     # enable_ebs_gp3_migration_max_size: 1000
     # gcp_credentials: ""
