@@ -4679,10 +4679,6 @@ spec:
                   - whenUnsatisfiable
                   type: object
                 type: array
-              useLoadBalancer:
-                description: deprecated load balancer settings re-purposed for K8s
-                  migration
-                type: boolean
               users:
                 additionalProperties:
                   description: UserFlags defines flags (such as superuser, nologin)

@@ -75,9 +75,6 @@ type PostgresSpec struct {
 	EnableReplicaPoolerNodePort *bool  `json:"enableReplicaPoolerNodePort,omitempty"`
 	ReplicaPoolerNodePort       *int32 `json:"replicaPoolerNodePort,omitempty"`
 
-	// deprecated load balancer settings re-purposed for K8s migration
-	UseLoadBalancer *bool `json:"useLoadBalancer,omitempty"`
-
 	// load balancers' source ranges are the same for master and replica services
 	// +nullable
 	// +kubebuilder:validation:items:Pattern=`^((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\/(\d|[1-2]\d|3[0-2])|(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))\/(12[0-8]|1[01][0-9]|[1-9]?[0-9]))$`

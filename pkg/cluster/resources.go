@@ -52,10 +52,6 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found %s service: %q (uid: %q)", role, util.NameFromMeta(service.ObjectMeta), service.UID)
 	}
 
-	if c.MigrationService != nil {
-		c.logger.Infof("found migration service: %q (uid: %q)", util.NameFromMeta(c.MigrationService.ObjectMeta), c.MigrationService.UID)
-	}
-
 	for role, endpoint := range c.Endpoints {
 		c.logger.Infof("found %s endpoint: %q (uid: %q)", role, util.NameFromMeta(endpoint.ObjectMeta), endpoint.UID)
 	}
@@ -314,19 +310,6 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 	return service, nil
 }
 
-func (c *Cluster) createMigrationService() (*v1.Service, error) {
-	c.setProcessName("creating migration service")
-
-	serviceSpec := c.generateMigrationService()
-	service, err := c.KubeClient.Services(serviceSpec.Namespace).Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	c.MigrationService = service
-	return service, nil
-}
-
 func (c *Cluster) updateService(role string, oldService *v1.Service, newService *v1.Service) (*v1.Service, error) {
 	var err error
 	svc := oldService
@@ -389,24 +372,6 @@ func (c *Cluster) deleteService(role PostgresRole) error {
 	c.logger.Infof("%s service %q has been deleted", role, util.NameFromMeta(c.Services[role].ObjectMeta))
 	delete(c.Services, role)
 
-	return nil
-}
-
-func (c *Cluster) deleteMigrationService() error {
-	c.setProcessName("deleting migration service")
-	c.logger.Debug("deleting migration service")
-	if c.MigrationService == nil {
-		c.logger.Debug("No migration service was found, nothing to delete")
-		return nil
-	}
-	if err := c.KubeClient.Services(c.MigrationService.Namespace).Delete(context.TODO(), c.MigrationService.Name, c.deleteOptions); err != nil {
-		if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("could not delete migration service: %v", err)
-		}
-		c.logger.Debug("migration service has already been deleted")
-	}
-	c.logger.Infof("migration service %q has been deleted", util.NameFromMeta(c.MigrationService.ObjectMeta))
-	c.MigrationService = nil
 	return nil
 }
 

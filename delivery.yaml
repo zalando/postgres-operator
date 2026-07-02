@@ -24,7 +24,6 @@ pipeline:
       - desc: Run unit tests
         cmd: |
           make mocks test
-          git clean -fd mocks/
           if ! git diff --quiet; then
             echo "Build resulted in files being changed, likely they were not checked in"
             exit 1

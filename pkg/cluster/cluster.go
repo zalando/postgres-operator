@@ -73,7 +73,6 @@ type kubeResources struct {
 	LogicalBackupJob              *batchv1.CronJob
 	Streams                       map[string]*zalandov1.FabricEventStream
 
-	MigrationService *v1.Service
 	// Pods are treated separately
 }
 
@@ -1078,15 +1077,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
 
-	// Service
-	if oldSpec.Spec.UseLoadBalancer != nil && *oldSpec.Spec.UseLoadBalancer && (newSpec.Spec.UseLoadBalancer == nil || !*newSpec.Spec.UseLoadBalancer) {
-		c.deleteMigrationService()
-	}
-	if err := c.syncServices(); err != nil {
-		c.logger.Errorf("could not sync services: %v", err)
-		updateFailed = true
-	}
-
 	// Patroni service and endpoints / config maps
 	if err := c.syncPatroniResources(); err != nil {
 		c.logger.Errorf("could not sync services: %v", err)
@@ -1325,14 +1315,6 @@ func (c *Cluster) Delete() error {
 			anyErrors = true
 			c.logger.Warningf("could not delete %s service: %v", role, err)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete %s service: %v", role, err)
-		}
-	}
-
-	if c.MigrationService != nil {
-		if err := c.deleteMigrationService(); err != nil {
-			anyErrors = true
-			c.logger.Warningf("could not delete migration service: %v", err)
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "could not delete migration service: %v", err)
 		}
 	}
 
