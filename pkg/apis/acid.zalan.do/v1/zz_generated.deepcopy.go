@@ -443,6 +443,11 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.KubernetesUseConfigMaps != nil {
+		in, out := &in.KubernetesUseConfigMaps, &out.KubernetesUseConfigMaps
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ResyncPeriod != nil {
 		in, out := &in.ResyncPeriod, &out.ResyncPeriod
 		*out = new(metav1.Duration)
