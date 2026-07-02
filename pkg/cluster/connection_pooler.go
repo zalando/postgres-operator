@@ -292,7 +292,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	if connectionPoolerSpec == nil {
 		connectionPoolerSpec = &acidv1.ConnectionPooler{}
 	}
-	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
+	gracePeriod := int64(util.CoalesceDuration(c.OpConfig.PodTerminateGracePeriod, "5m").Seconds())
 	resources, err := c.generateResourceRequirements(
 		connectionPoolerSpec.Resources,
 		makeDefaultConnectionPoolerResources(&c.OpConfig),

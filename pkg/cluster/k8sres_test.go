@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -361,8 +360,8 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentObjectNotExists,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: still failing after %d retries: secret.core %q not found", maxRetries, testPodEnvironmentObjectNotExists),
@@ -372,8 +371,8 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretNameAPIError,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret API error"),
@@ -383,8 +382,8 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			envVars: []v1.EnvVar{
@@ -583,60 +582,60 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 	expectedValuesS3Bucket := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "WAL_S3_BUCKET",
 			envVarValue:    "global-s3-bucket",
 		},
 		{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    fmt.Sprintf("/%s", dummyUUID),
 		},
 		{
-			envIndex:       17,
+			envIndex:       18,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 	}
 	expectedValuesGCPCreds := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "global-gs-bucket",
 		},
 		{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    fmt.Sprintf("/%s", dummyUUID),
 		},
 		{
-			envIndex:       17,
+			envIndex:       18,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 		{
-			envIndex:       18,
+			envIndex:       19,
 			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
 			envVarValue:    "some-path-to-credentials",
 		},
 	}
 	expectedS3BucketConfigMap := []ExpectedValue{
 		{
-			envIndex:       17,
+			envIndex:       18,
 			envVarConstant: "wal_s3_bucket",
 			envVarValue:    "global-s3-bucket-configmap",
 		},
 	}
 	expectedCustomS3BucketSpec := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "WAL_S3_BUCKET",
 			envVarValue:    "custom-s3-bucket",
 		},
 	}
 	expectedCustomVariableSecret := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "custom_variable",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -650,72 +649,72 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 	expectedCustomVariableConfigMap := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "custom_variable",
 			envVarValue:    "configmap-test",
 		},
 	}
 	expectedCustomVariableSpec := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "CUSTOM_VARIABLE",
 			envVarValue:    "spec-env-test",
 		},
 	}
 	expectedCloneEnvSpec := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "CLONE_WALE_S3_PREFIX",
 			envVarValue:    "s3://another-bucket",
 		},
 		{
-			envIndex:       19,
+			envIndex:       20,
 			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 		{
-			envIndex:       20,
+			envIndex:       21,
 			envVarConstant: "CLONE_AWS_ENDPOINT",
 			envVarValue:    "s3.eu-central-1.amazonaws.com",
 		},
 	}
 	expectedCloneEnvSpecEnv := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "test-cluster",
 		},
 		{
-			envIndex:       17,
+			envIndex:       18,
 			envVarConstant: "CLONE_WALE_S3_PREFIX",
 			envVarValue:    "s3://another-bucket",
 		},
 		{
-			envIndex:       21,
+			envIndex:       22,
 			envVarConstant: "CLONE_AWS_ENDPOINT",
 			envVarValue:    "s3.eu-central-1.amazonaws.com",
 		},
 	}
 	expectedCloneEnvConfigMap := []ExpectedValue{
 		{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "CLONE_WAL_S3_BUCKET",
 			envVarValue:    "global-s3-bucket",
 		},
 		{
-			envIndex:       17,
+			envIndex:       18,
 			envVarConstant: "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    fmt.Sprintf("/%s", dummyUUID),
 		},
 		{
-			envIndex:       21,
+			envIndex:       22,
 			envVarConstant: "clone_aws_endpoint",
 			envVarValue:    "s3.eu-west-1.amazonaws.com",
 		},
 	}
 	expectedCloneEnvSecret := []ExpectedValue{
 		{
-			envIndex:       21,
+			envIndex:       22,
 			envVarConstant: "clone_aws_access_key_id",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -729,12 +728,12 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 	expectedStandbyEnvSecret := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "STANDBY_WALE_GS_PREFIX",
 			envVarValue:    "gs://some/path/",
 		},
 		{
-			envIndex:       20,
+			envIndex:       21,
 			envVarConstant: "standby_google_application_credentials",
 			envVarValueRef: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -848,8 +847,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 						Name: testPodEnvironmentConfigMapName,
 					},
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			cloneDescription:   &acidv1.CloneDescription{},
@@ -877,8 +876,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 						Name: testPodEnvironmentConfigMapName,
 					},
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 			},
 			cloneDescription:   &acidv1.CloneDescription{},
@@ -968,8 +967,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 				WALES3Bucket: "global-s3-bucket",
 			},
@@ -986,8 +985,8 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 			opConfig: config.Config{
 				Resources: config.Resources{
 					PodEnvironmentSecret:  testPodEnvironmentSecretName,
-					ResourceCheckInterval: time.Duration(testResourceCheckInterval),
-					ResourceCheckTimeout:  time.Duration(testResourceCheckTimeout),
+					ResourceCheckInterval: &metav1.Duration{Duration: testResourceCheckInterval},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: testResourceCheckTimeout},
 				},
 				WALES3Bucket: "global-s3-bucket",
 			},
@@ -2977,6 +2976,7 @@ func getServices(serviceType v1.ServiceType, sourceRanges []string, extTrafficPo
 			ExternalTrafficPolicy:    v1.ServiceExternalTrafficPolicyType(extTrafficPolicy),
 			LoadBalancerSourceRanges: sourceRanges,
 			Ports:                    []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}, NodePort: nodePort}},
+			Selector:                 map[string]string{"spilo-role": "master", "application": "spilo", "cluster-name": clusterName},
 			Type:                     serviceType,
 		},
 		{

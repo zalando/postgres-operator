@@ -67,6 +67,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	if !c.patroniKubernetesUseConfigMaps() {
+		c.logger.Warning("K8s endpoints are deprecated. Please, enable kubernetes_use_configmaps. Requires scale-in to a single primary, see v1 -> v2 migration docs!")
+	}
+
 	if err = c.syncFinalizer(); err != nil {
 		c.logger.Debugf("could not sync finalizers: %v", err)
 	}

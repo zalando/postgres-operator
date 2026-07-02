@@ -24,6 +24,7 @@ import (
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,description="Age of the PostgreSQL cluster"
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.PostgresClusterStatus`,description="Current sync status of postgresql resource"
 // +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels=app.kubernetes.io/name=postgres-operator
 type Postgresql struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
