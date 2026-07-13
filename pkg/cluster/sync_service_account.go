@@ -25,13 +25,11 @@ func (c *Cluster) syncPodServiceAccount() error {
 
 	changed := false
 
-	if c.OpConfig.EnableIRSA {
-		if c.OpConfig.KubeIAMRole != "" {
-			if val, ok := sa.Annotations[constants.IrsaAnnotation]; !ok || val != c.OpConfig.KubeIAMRole {
-				v := c.OpConfig.KubeIAMRole
-				patchAnnotations[constants.IrsaAnnotation] = &v
-				changed = true
-			}
+	if c.OpConfig.IrsaRoleARN != "" {
+		if val, ok := sa.Annotations[constants.IrsaAnnotation]; !ok || val != c.OpConfig.IrsaRoleARN {
+			v := c.OpConfig.IrsaRoleARN
+			patchAnnotations[constants.IrsaAnnotation] = &v
+			changed = true
 		}
 	} else {
 		if _, ok := sa.Annotations[constants.IrsaAnnotation]; ok {
@@ -51,7 +49,7 @@ func (c *Cluster) syncPodServiceAccount() error {
 		c.logger.Infof("synced annotations on pod service account %q", sa.Name)
 	}
 
-	if c.OpConfig.EnableIRSA {
+	if c.OpConfig.IrsaRoleARN != "" {
 		c.logIRSAMigrationProgress()
 	}
 
