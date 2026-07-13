@@ -635,7 +635,7 @@ func (c *Cluster) syncStatefulSet() error {
 			updatedPodAnnotations := map[string]*string{}
 			for _, anno := range cmp.deletedPodAnnotations {
 				// during IRSA migration let kube2iam annotation drain naturally via pod rotation
-				if c.OpConfig.EnableIRSA && anno == constants.KubeIAmAnnotation {
+				if c.OpConfig.IrsaRoleARN != "" && anno == constants.KubeIAmAnnotation {
 					continue
 				}
 				updatedPodAnnotations[anno] = nil

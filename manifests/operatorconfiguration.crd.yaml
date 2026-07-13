@@ -71,9 +71,9 @@ spec:
                   enable_ebs_gp3_migration_max_size:
                     format: int64
                     type: integer
-                  enable_irsa:
-                    type: boolean
                   gcp_credentials:
+                    type: string
+                  irsa_role_arn:
                     type: string
                   kube_iam_role:
                     type: string
