@@ -107,6 +107,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	if err = c.syncPodServiceAccount(); err != nil {
+		c.logger.Errorf("could not sync pod service account: %v", err)
+	}
+
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
@@ -630,6 +634,10 @@ func (c *Cluster) syncStatefulSet() error {
 		if !cmp.rollingUpdate {
 			updatedPodAnnotations := map[string]*string{}
 			for _, anno := range cmp.deletedPodAnnotations {
+				// during IRSA migration let kube2iam annotation drain naturally via pod rotation
+				if c.OpConfig.EnableIRSA && anno == constants.KubeIAmAnnotation {
+					continue
+				}
 				updatedPodAnnotations[anno] = nil
 			}
 			for anno, val := range desiredSts.Spec.Template.Annotations {
@@ -1802,6 +1810,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 
 	// no existing logical backup job, create new one
 	c.logger.Info("could not find the cluster's logical backup job")
+
 
 	if err = c.createLogicalBackupJob(); err == nil {
 		c.logger.Infof("created missing logical backup job %s", jobName)
