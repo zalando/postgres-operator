@@ -247,6 +247,12 @@ func (c *Controller) initPodServiceAccount() {
 			c.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
 		}
 		c.PodServiceAccount.Namespace = ""
+		if c.opConfig.EnableIRSA && c.opConfig.KubeIAMRole != "" {
+			if c.PodServiceAccount.Annotations == nil {
+				c.PodServiceAccount.Annotations = make(map[string]string)
+			}
+			c.PodServiceAccount.Annotations[constants.IrsaAnnotation] = c.opConfig.KubeIAMRole
+		}
 	}
 
 	// actual service accounts are deployed at the time of Postgres/Spilo cluster creation
