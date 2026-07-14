@@ -635,7 +635,7 @@ func (c *Cluster) syncStatefulSet() error {
 			updatedPodAnnotations := map[string]*string{}
 			for _, anno := range cmp.deletedPodAnnotations {
 				// during IRSA migration let kube2iam annotation drain naturally via pod rotation
-				if c.OpConfig.IrsaRoleARN != "" && anno == constants.KubeIAmAnnotation {
+				if c.OpConfig.IRSARoleARN != "" && anno == constants.KubeIAmAnnotation {
 					continue
 				}
 				updatedPodAnnotations[anno] = nil
@@ -1842,15 +1842,15 @@ func (c *Cluster) syncPodServiceAccount() error {
 
 	changed := false
 
-	if c.OpConfig.IrsaRoleARN != "" {
-		if val, ok := sa.Annotations[constants.IrsaAnnotation]; !ok || val != c.OpConfig.IrsaRoleARN {
-			v := c.OpConfig.IrsaRoleARN
-			patchAnnotations[constants.IrsaAnnotation] = &v
+	if c.OpConfig.IRSARoleARN != "" {
+		if val, ok := sa.Annotations[constants.IRSAAnnotation]; !ok || val != c.OpConfig.IRSARoleARN {
+			v := c.OpConfig.IRSARoleARN
+			patchAnnotations[constants.IRSAAnnotation] = &v
 			changed = true
 		}
 	} else {
-		if _, ok := sa.Annotations[constants.IrsaAnnotation]; ok {
-			patchAnnotations[constants.IrsaAnnotation] = nil
+		if _, ok := sa.Annotations[constants.IRSAAnnotation]; ok {
+			patchAnnotations[constants.IRSAAnnotation] = nil
 			changed = true
 		}
 	}
@@ -1866,7 +1866,7 @@ func (c *Cluster) syncPodServiceAccount() error {
 		c.logger.Infof("synced annotations on pod service account %q", sa.Name)
 	}
 
-	if c.OpConfig.IrsaRoleARN != "" {
+	if c.OpConfig.IRSARoleARN != "" {
 		c.logIRSAMigrationProgress()
 	}
 

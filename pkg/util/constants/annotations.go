@@ -4,7 +4,7 @@ package constants
 const (
 	ZalandoDNSNameAnnotation           = "external-dns.alpha.kubernetes.io/hostname"
 	KubeIAmAnnotation                  = "iam.amazonaws.com/role"
-	IrsaAnnotation                     = "eks.amazonaws.com/role-arn"
+	IRSAAnnotation                     = "eks.amazonaws.com/role-arn"
 	VolumeStorateProvisionerAnnotation = "pv.kubernetes.io/provisioned-by"
 	PostgresqlControllerAnnotationKey  = "acid.zalan.do/controller"
 )
