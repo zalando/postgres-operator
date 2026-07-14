@@ -1165,7 +1165,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 
 	secret := &v1.Secret{}
 	var notFoundErr error
-	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			var err error
 			secret, err = c.KubeClient.Secrets(c.Namespace).Get(
@@ -1340,28 +1340,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 	}
 
-	// backward compatible check for InitContainers
-	if spec.InitContainersOld != nil {
-		msg := "manifest parameter init_containers is deprecated."
-		if spec.InitContainers == nil {
-			c.logger.Warningf("%s Consider using initContainers instead.", msg)
-			spec.InitContainers = spec.InitContainersOld
-		} else {
-			c.logger.Warningf("%s Only value from initContainers is used", msg)
-		}
-	}
-
-	// backward compatible check for PodPriorityClassName
-	if spec.PodPriorityClassNameOld != "" {
-		msg := "manifest parameter pod_priority_class_name is deprecated."
-		if spec.PodPriorityClassName == "" {
-			c.logger.Warningf("%s Consider using podPriorityClassName instead.", msg)
-			spec.PodPriorityClassName = spec.PodPriorityClassNameOld
-		} else {
-			c.logger.Warningf("%s Only value from podPriorityClassName is used", msg)
-		}
-	}
-
 	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, &c.OpConfig, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
@@ -1498,7 +1476,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		&tolerationSpec,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
 		spec.SchedulerName,
-		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		int64(util.CoalesceDuration(c.OpConfig.PodTerminateGracePeriod, "5m").Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
@@ -2437,7 +2415,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		&tolerationsSpec,
 		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		nil,
-		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		int64(util.CoalesceDuration(c.OpConfig.PodTerminateGracePeriod, "5m").Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		"",
