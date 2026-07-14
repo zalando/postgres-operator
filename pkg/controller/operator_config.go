@@ -175,7 +175,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.AWSRegion = fromCRD.AWSGCP.AWSRegion
 	result.LogS3Bucket = fromCRD.AWSGCP.LogS3Bucket
 	result.KubeIAMRole = fromCRD.AWSGCP.KubeIAMRole
-	result.IrsaRoleARN = fromCRD.AWSGCP.IrsaRoleARN
+	result.IRSARoleARN = fromCRD.AWSGCP.IRSARoleARN
 	result.WALGSBucket = fromCRD.AWSGCP.WALGSBucket
 	result.GCPCredentials = fromCRD.AWSGCP.GCPCredentials
 	result.WALAZStorageAccount = fromCRD.AWSGCP.WALAZStorageAccount
