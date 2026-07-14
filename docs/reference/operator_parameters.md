@@ -100,15 +100,13 @@ Those are top-level keys, containing both leaf keys and groups.
   Kubernetes-native DCS).
 
 * **kubernetes_use_configmaps**
-  Select if setup uses endpoints (default), or configmaps to manage leader when
+  Select if setup uses endpoints or configmaps (default) to manage leader when
   DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to
   use endpoints option, and configmaps is required. Starting with K8s 1.33,
   endpoints are marked as deprecated. It's recommended to switch to config maps
   instead. But, to do so make sure you scale the Postgres cluster down to just
   one primary pod (e.g. using `max_instances` option). Otherwise, you risk
-  running into a split-brain scenario.
-  By default, `kubernetes_use_configmaps: false`, meaning endpoints will be used.
-  Starting from v1.16.0 the default will be changed to `true`.
+  running into a split-brain scenario. Default is `true`.
 
 * **docker_image**
   Spilo Docker image for Postgres instances. For production, don't rely on the

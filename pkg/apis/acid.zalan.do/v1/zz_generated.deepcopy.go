@@ -443,6 +443,11 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.KubernetesUseConfigMaps != nil {
+		in, out := &in.KubernetesUseConfigMaps, &out.KubernetesUseConfigMaps
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ResyncPeriod != nil {
 		in, out := &in.ResyncPeriod, &out.ResyncPeriod
 		*out = new(metav1.Duration)
@@ -843,16 +848,6 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.UseLoadBalancer != nil {
-		in, out := &in.UseLoadBalancer, &out.UseLoadBalancer
-		*out = new(bool)
-		**out = **in
-	}
-	if in.ReplicaLoadBalancer != nil {
-		in, out := &in.ReplicaLoadBalancer, &out.ReplicaLoadBalancer
-		*out = new(bool)
-		**out = **in
-	}
 	if in.AllowedSourceRanges != nil {
 		in, out := &in.AllowedSourceRanges, &out.AllowedSourceRanges
 		*out = make([]string, len(*in))
@@ -1017,13 +1012,6 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]corev1.EnvVar, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
-	if in.InitContainersOld != nil {
-		in, out := &in.InitContainersOld, &out.InitContainersOld
-		*out = make([]corev1.Container, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
