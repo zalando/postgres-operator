@@ -1833,35 +1833,26 @@ func (c *Cluster) syncPodServiceAccount() error {
 		return fmt.Errorf("could not get pod service account %q: %v", c.OpConfig.PodServiceAccountName, err)
 	}
 
-	patch := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"annotations": map[string]*string{},
-		},
-	}
-	patchAnnotations := patch["metadata"].(map[string]interface{})["annotations"].(map[string]*string)
-
 	changed := false
 
 	if c.OpConfig.IRSARoleARN != "" {
 		if val, ok := sa.Annotations[constants.IRSAAnnotation]; !ok || val != c.OpConfig.IRSARoleARN {
-			v := c.OpConfig.IRSARoleARN
-			patchAnnotations[constants.IRSAAnnotation] = &v
+			if sa.Annotations == nil {
+				sa.Annotations = make(map[string]string)
+			}
+			sa.Annotations[constants.IRSAAnnotation] = c.OpConfig.IRSARoleARN
 			changed = true
 		}
 	} else {
 		if _, ok := sa.Annotations[constants.IRSAAnnotation]; ok {
-			patchAnnotations[constants.IRSAAnnotation] = nil
+			delete(sa.Annotations, constants.IRSAAnnotation)
 			changed = true
 		}
 	}
 
 	if changed {
-		patchData, err := json.Marshal(patch)
-		if err != nil {
-			return fmt.Errorf("could not marshal service account patch: %v", err)
-		}
-		if _, err = c.KubeClient.ServiceAccounts(c.Namespace).Patch(context.TODO(), sa.Name, types.StrategicMergePatchType, patchData, metav1.PatchOptions{}); err != nil {
-			return fmt.Errorf("could not patch pod service account %q: %v", sa.Name, err)
+		if _, err = c.KubeClient.ServiceAccounts(c.Namespace).Update(context.TODO(), sa, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("could not update pod service account %q: %v", sa.Name, err)
 		}
 		c.logger.Infof("synced annotations on pod service account %q", sa.Name)
 	}
