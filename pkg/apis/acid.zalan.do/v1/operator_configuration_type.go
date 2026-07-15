@@ -252,6 +252,7 @@ type AWSGCPConfiguration struct {
 	WALAZStorageAccount          string `json:"wal_az_storage_account,omitempty"`
 	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
 	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
+	IRSARoleARN                  string `json:"irsa_role_arn,omitempty"`
 	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
 	AdditionalSecretMountPath    string `json:"additional_secret_mount_path,omitempty"`
 	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration,omitempty"`
