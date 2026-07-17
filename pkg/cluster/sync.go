@@ -67,6 +67,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	if !c.patroniKubernetesUseConfigMaps() {
+		c.logger.Warning("K8s endpoints are deprecated. Please, enable kubernetes_use_configmaps. Requires scale-in to a single primary, see v1 -> v2 migration docs!")
+	}
+
 	if err = c.syncFinalizer(); err != nil {
 		c.logger.Debugf("could not sync finalizers: %v", err)
 	}
@@ -101,6 +105,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		if nil != err {
 			return err
 		}
+	}
+
+	if err = c.syncPodServiceAccount(); err != nil {
+		c.logger.Errorf("could not sync pod service account: %v", err)
 	}
 
 	if err = c.syncStatefulSet(); err != nil {
@@ -626,6 +634,10 @@ func (c *Cluster) syncStatefulSet() error {
 		if !cmp.rollingUpdate {
 			updatedPodAnnotations := map[string]*string{}
 			for _, anno := range cmp.deletedPodAnnotations {
+				// during IRSA migration let kube2iam annotation drain naturally via pod rotation
+				if c.OpConfig.IRSARoleARN != "" && anno == constants.KubeIAmAnnotation {
+					continue
+				}
 				updatedPodAnnotations[anno] = nil
 			}
 			for anno, val := range desiredSts.Spec.Template.Annotations {
@@ -1799,6 +1811,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	// no existing logical backup job, create new one
 	c.logger.Info("could not find the cluster's logical backup job")
 
+
 	if err = c.createLogicalBackupJob(); err == nil {
 		c.logger.Infof("created missing logical backup job %s", jobName)
 	} else {
@@ -1812,4 +1825,63 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) syncPodServiceAccount() error {
+	sa, err := c.KubeClient.ServiceAccounts(c.Namespace).Get(context.TODO(), c.OpConfig.PodServiceAccountName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("could not get pod service account %q: %v", c.OpConfig.PodServiceAccountName, err)
+	}
+
+	changed := false
+
+	if c.OpConfig.IRSARoleARN != "" {
+		if val, ok := sa.Annotations[constants.IRSAAnnotation]; !ok || val != c.OpConfig.IRSARoleARN {
+			if sa.Annotations == nil {
+				sa.Annotations = make(map[string]string)
+			}
+			sa.Annotations[constants.IRSAAnnotation] = c.OpConfig.IRSARoleARN
+			changed = true
+		}
+	} else {
+		if _, ok := sa.Annotations[constants.IRSAAnnotation]; ok {
+			delete(sa.Annotations, constants.IRSAAnnotation)
+			changed = true
+		}
+	}
+
+	if changed {
+		if _, err = c.KubeClient.ServiceAccounts(c.Namespace).Update(context.TODO(), sa, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("could not update pod service account %q: %v", sa.Name, err)
+		}
+		c.logger.Infof("synced annotations on pod service account %q", sa.Name)
+	}
+
+	if c.OpConfig.IRSARoleARN != "" {
+		c.logIRSAMigrationProgress()
+	}
+
+	return nil
+}
+
+func (c *Cluster) logIRSAMigrationProgress() {
+	pods, err := c.listPods()
+	if err != nil {
+		c.logger.Warnf("IRSA migration: could not list pods: %v", err)
+		return
+	}
+
+	total := len(pods)
+	remaining := 0
+	for _, pod := range pods {
+		if _, ok := pod.Annotations[constants.KubeIAmAnnotation]; ok {
+			remaining++
+		}
+	}
+
+	if remaining > 0 {
+		c.logger.Infof("IRSA migration in progress: %d/%d pods still carry kube2iam annotation, will be removed on next rotation", remaining, total)
+	} else {
+		c.logger.Infof("IRSA migration complete: all %d pods have rotated, kube2iam annotation fully drained", total)
+	}
 }
