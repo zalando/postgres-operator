@@ -798,6 +798,15 @@ yet officially supported.
   [kube2iam](https://github.com/jtblin/kube2iam) project on AWS. The default is
   empty.
 
+* **irsa_role_arn**
+  Full AWS IAM role ARN to supply in the `eks.amazonaws.com/role-arn` annotation
+  of the Postgres pod service account, enabling
+  [IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+  (IAM Roles for Service Accounts) on EKS. When set, the operator annotates the
+  pod service account on every sync so that the EKS OIDC webhook can inject AWS
+  credentials directly into pods. Must be a full ARN, e.g.
+  `arn:aws:iam::123456789012:role/my-postgres-role`. The default is empty.
+
 * **aws_region**
   AWS region used to store EBS volumes. The default is `eu-central-1`. Note,
   this option is not meant for specifying the AWS region for backups and
