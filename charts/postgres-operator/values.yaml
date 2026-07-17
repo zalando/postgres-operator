@@ -50,7 +50,7 @@ configGeneral:
   # ignore_resources_limits_annotation_key: ""
 
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
-  # kubernetes_use_configmaps: false
+  kubernetes_use_configmaps: true
 
   # maintenance windows applied to all Postgres clusters unless overridden in the manifest
   # maintenance_windows:
@@ -360,6 +360,8 @@ configAwsOrGcp:
 
   # AWS IAM role to supply in the iam.amazonaws.com/role annotation of Postgres pods
   # kube_iam_role: ""
+  # Full ARN for IRSA (IAM Roles for Service Accounts) on EKS
+  # irsa_role_arn: ""
 
   # S3 bucket to use for shipping postgres daily logs
   # log_s3_bucket: ""
@@ -536,7 +538,6 @@ podPriorityClassName:
 
 resources:
   limits:
-    cpu: 500m
     memory: 500Mi
   requests:
     cpu: 100m
