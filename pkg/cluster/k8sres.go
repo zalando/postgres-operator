@@ -1340,28 +1340,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 	}
 
-	// backward compatible check for InitContainers
-	if spec.InitContainersOld != nil {
-		msg := "manifest parameter init_containers is deprecated."
-		if spec.InitContainers == nil {
-			c.logger.Warningf("%s Consider using initContainers instead.", msg)
-			spec.InitContainers = spec.InitContainersOld
-		} else {
-			c.logger.Warningf("%s Only value from initContainers is used", msg)
-		}
-	}
-
-	// backward compatible check for PodPriorityClassName
-	if spec.PodPriorityClassNameOld != "" {
-		msg := "manifest parameter pod_priority_class_name is deprecated."
-		if spec.PodPriorityClassName == "" {
-			c.logger.Warningf("%s Consider using podPriorityClassName instead.", msg)
-			spec.PodPriorityClassName = spec.PodPriorityClassNameOld
-		} else {
-			c.logger.Warningf("%s Only value from podPriorityClassName is used", msg)
-		}
-	}
-
 	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, &c.OpConfig, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
@@ -2298,6 +2276,12 @@ func (c *Cluster) generatePrimaryPodDisruptionBudget() *policyv1.PodDisruptionBu
 	labels := c.labelsSet(false)
 	if pdbMasterLabelSelector == nil || *c.OpConfig.PDBMasterLabelSelector {
 		labels[c.OpConfig.PodRoleLabel] = string(Master)
+	}
+
+	// When master selector is disabled and synchronous_mode_strict is on, require
+	// master + synchronous_node_count (default 1) healthy pods for write quorum.
+	if pdbMasterLabelSelector != nil && !*pdbMasterLabelSelector && minAvailable.IntVal > 0 && c.Spec.SynchronousModeStrict {
+		minAvailable = intstr.FromInt32(int32(c.Spec.SynchronousNodeCount + 1))
 	}
 
 	return &policyv1.PodDisruptionBudget{

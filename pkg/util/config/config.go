@@ -183,7 +183,7 @@ type Config struct {
 	ConnectionPooler
 
 	WatchedNamespace         string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	KubernetesUseConfigMaps  bool              `name:"kubernetes_use_configmaps" default:"false"`
+	KubernetesUseConfigMaps  *bool             `name:"kubernetes_use_configmaps" default:"true"`
 	EtcdHost                 string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
 	EnableMaintenanceWindows *bool             `name:"enable_maintenance_windows" default:"true"`
 	MaintenanceWindows       []string          `name:"maintenance_windows"`
@@ -200,6 +200,7 @@ type Config struct {
 	WALES3Bucket                             string            `name:"wal_s3_bucket"`
 	LogS3Bucket                              string            `name:"log_s3_bucket"`
 	KubeIAMRole                              string            `name:"kube_iam_role"`
+	IRSARoleARN                              string            `name:"irsa_role_arn"`
 	WALGSBucket                              string            `name:"wal_gs_bucket"`
 	GCPCredentials                           string            `name:"gcp_credentials"`
 	WALAZStorageAccount                      string            `name:"wal_az_storage_account"`

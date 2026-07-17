@@ -252,6 +252,7 @@ type AWSGCPConfiguration struct {
 	WALAZStorageAccount          string `json:"wal_az_storage_account,omitempty"`
 	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
 	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
+	IRSARoleARN                  string `json:"irsa_role_arn,omitempty"`
 	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
 	AdditionalSecretMountPath    string `json:"additional_secret_mount_path,omitempty"`
 	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration,omitempty"`
@@ -419,7 +420,7 @@ type OperatorConfigurationData struct {
 	// +kubebuilder:default=""
 	EtcdHost string `json:"etcd_host,omitempty"`
 	// +kubebuilder:default=true
-	KubernetesUseConfigMaps bool `json:"kubernetes_use_configmaps,omitempty"`
+	KubernetesUseConfigMaps *bool `json:"kubernetes_use_configmaps,omitempty"`
 	// +kubebuilder:default="ghcr.io/zalando/spilo-18:4.1-p1"
 	DockerImage string `json:"docker_image,omitempty"`
 	// +kubebuilder:validation:Minimum=1

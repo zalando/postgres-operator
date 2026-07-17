@@ -53,6 +53,7 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset
 		EndpointsGetter:              clientSet.CoreV1(),
 		ConfigMapsGetter:             clientSet.CoreV1(),
 		PodsGetter:                   clientSet.CoreV1(),
+		ServiceAccountsGetter:        clientSet.CoreV1(),
 		DeploymentsGetter:            clientSet.AppsV1(),
 		CronJobsGetter:               clientSet.BatchV1(),
 	}, clientSet
@@ -299,7 +300,7 @@ func newInheritedAnnotationsCluster(client k8sutil.KubernetesClient) (*Cluster, 
 			OpConfig: config.Config{
 				PatroniAPICheckInterval: &metav1.Duration{Duration: 1 * time.Second},
 				PatroniAPICheckTimeout:  &metav1.Duration{Duration: 5 * time.Second},
-				KubernetesUseConfigMaps: true,
+				KubernetesUseConfigMaps: util.True(),
 				ConnectionPooler: config.ConnectionPooler{
 					ConnectionPoolerDefaultCPURequest:    "100m",
 					ConnectionPoolerDefaultCPULimit:      "100m",
@@ -388,7 +389,7 @@ func createPatroniResources(cluster *Cluster) error {
 			Labels: cluster.labelsSet(false),
 		}
 
-		if cluster.OpConfig.KubernetesUseConfigMaps {
+		if cluster.OpConfig.KubernetesUseConfigMaps != nil && *cluster.OpConfig.KubernetesUseConfigMaps {
 			configMap := v1.ConfigMap{
 				ObjectMeta: metadata,
 			}
@@ -598,7 +599,7 @@ func TestInheritedAnnotations(t *testing.T) {
 	// 3. Change from ConfigMaps to Endpoints
 	err = cluster.deletePatroniResources()
 	assert.NoError(t, err)
-	cluster.OpConfig.KubernetesUseConfigMaps = false
+	cluster.OpConfig.KubernetesUseConfigMaps = util.False()
 	err = createPatroniResources(cluster)
 	assert.NoError(t, err)
 	err = cluster.Sync(newSpec.DeepCopy())

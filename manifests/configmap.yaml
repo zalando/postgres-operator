@@ -79,6 +79,7 @@ data:
   # inherited_annotations: owned-by
   # inherited_labels: application,environment
   # kube_iam_role: ""
+  # irsa_role_arn: ""
   kubernetes_use_configmaps: "false"
   # log_s3_bucket: ""
   # logical_backup_azure_storage_account_name: ""
