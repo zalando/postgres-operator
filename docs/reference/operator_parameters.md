@@ -42,14 +42,14 @@ and change it.
 
 To test the CRD-based configuration locally, use the following
 
-```bash
-  kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
-  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+```
+kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
+kubectl create -f manifests/postgresql-operator-default-configuration.yaml
 
-  kubectl create -f manifests/operator-service-account-rbac.yaml
-  kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
+kubectl create -f manifests/operator-service-account-rbac.yaml
+kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
 
-  kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
+kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
 ```
 
 The CRD-based configuration is more powerful than the one based on ConfigMaps
