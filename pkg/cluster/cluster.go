@@ -1140,6 +1140,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume size sync.")
 	}
 
+	// Pod service account (IRSA annotation sync)
+	if err := c.syncPodServiceAccount(); err != nil {
+		c.logger.Errorf("could not sync pod service account: %v", err)
+		updateFailed = true
+	}
+
 	// Statefulset
 	func() {
 		if err := c.syncStatefulSet(); err != nil {

@@ -29,15 +29,18 @@ PKG := `go list ./... | grep -v /vendor/`
 
 ifeq ($(DEBUG),1)
 	DOCKERFILE = DebugDockerfile
-	DEBUG_POSTFIX := -debug-$(shell date hhmmss)
+	DEBUG_POSTFIX := -debug-$(shell date +"%H%M%S")
 	BUILD_FLAGS += -gcflags "-N -l"
 else
 	DOCKERFILE = Dockerfile
 endif
 
+
 ifeq ($(FRESH),1)
   DEBUG_FRESH=$(shell date +"%H-%M-%S")
 endif
+
+SED := $(shell command -v gsed 2>/dev/null || command -v sed)
 
 ifdef CDP_PULL_REQUEST_NUMBER
 	CDP_TAG := -${CDP_BUILD_VERSION}
@@ -69,8 +72,8 @@ $(GENERATED_CRDS): $(GENERATED)
 	go tool controller-gen crd:crdVersions=v1,allowDangerousTypes=true paths=./pkg/apis/acid.zalan.do/... output:crd:dir=manifests
 	@mv manifests/acid.zalan.do_postgresqls.yaml manifests/postgresql.crd.yaml
 	@# hack to use lowercase kind and listKind
-	@sed -i -e 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml
-	@sed -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
+	@$(SED) -i -e 's/kind: Postgresql/kind: postgresql/' manifests/postgresql.crd.yaml
+	@$(SED) -i -e 's/listKind: PostgresqlList/listKind: postgresqlList/' manifests/postgresql.crd.yaml
 	@hack/adjust_postgresql_crd.sh
 	@mv manifests/acid.zalan.do_operatorconfigurations.yaml manifests/operatorconfiguration.crd.yaml
 	@mv manifests/acid.zalan.do_postgresteams.yaml manifests/postgresteam.crd.yaml
