@@ -42,14 +42,14 @@ and change it.
 
 To test the CRD-based configuration locally, use the following
 
-```bash
-  kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
-  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+```
+kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
+kubectl create -f manifests/postgresql-operator-default-configuration.yaml
 
-  kubectl create -f manifests/operator-service-account-rbac.yaml
-  kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
+kubectl create -f manifests/operator-service-account-rbac.yaml
+kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
 
-  kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
+kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
 ```
 
 The CRD-based configuration is more powerful than the one based on ConfigMaps
@@ -797,6 +797,15 @@ yet officially supported.
   pods. Only used when combined with
   [kube2iam](https://github.com/jtblin/kube2iam) project on AWS. The default is
   empty.
+
+* **irsa_role_arn**
+  Full AWS IAM role ARN to supply in the `eks.amazonaws.com/role-arn` annotation
+  of the Postgres pod service account, enabling
+  [IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+  (IAM Roles for Service Accounts) on EKS. When set, the operator annotates the
+  pod service account on every sync so that the EKS OIDC webhook can inject AWS
+  credentials directly into pods. Must be a full ARN, e.g.
+  `arn:aws:iam::123456789012:role/my-postgres-role`. The default is empty.
 
 * **aws_region**
   AWS region used to store EBS volumes. The default is `eu-central-1`. Note,

@@ -77,6 +77,8 @@ spec:
                     type: integer
                   gcp_credentials:
                     type: string
+                  irsa_role_arn:
+                    type: string
                   kube_iam_role:
                     type: string
                   log_s3_bucket:

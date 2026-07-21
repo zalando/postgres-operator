@@ -2278,6 +2278,12 @@ func (c *Cluster) generatePrimaryPodDisruptionBudget() *policyv1.PodDisruptionBu
 		labels[c.OpConfig.PodRoleLabel] = string(Master)
 	}
 
+	// When master selector is disabled and synchronous_mode_strict is on, require
+	// master + synchronous_node_count (default 1) healthy pods for write quorum.
+	if pdbMasterLabelSelector != nil && !*pdbMasterLabelSelector && minAvailable.IntVal > 0 && c.Spec.SynchronousModeStrict {
+		minAvailable = intstr.FromInt32(int32(c.Spec.SynchronousNodeCount + 1))
+	}
+
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.PrimaryPodDisruptionBudgetName(),

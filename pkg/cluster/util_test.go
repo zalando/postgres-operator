@@ -53,6 +53,7 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset
 		EndpointsGetter:              clientSet.CoreV1(),
 		ConfigMapsGetter:             clientSet.CoreV1(),
 		PodsGetter:                   clientSet.CoreV1(),
+		ServiceAccountsGetter:        clientSet.CoreV1(),
 		DeploymentsGetter:            clientSet.AppsV1(),
 		CronJobsGetter:               clientSet.BatchV1(),
 	}, clientSet

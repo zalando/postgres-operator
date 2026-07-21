@@ -1094,6 +1094,32 @@ configuration:
     wal_s3_bucket: your-backup-path
 ```
 
+Alternatively, if your cluster uses EKS with OIDC, you can use
+[IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+(IAM Roles for Service Accounts) instead of kube2iam. Set `irsa_role_arn` to
+the full ARN of the IAM role:
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  aws_or_gcp:
+    aws_region: eu-central-1
+    irsa_role_arn: arn:aws:iam::123456789012:role/postgres-pod-role
+    wal_s3_bucket: your-backup-path
+```
+
+When `irsa_role_arn` is set the operator annotates the pod service account with
+`eks.amazonaws.com/role-arn` on every reconcile. The EKS OIDC webhook then
+injects an AWS web identity token into each pod, which takes precedence over
+the EC2 metadata credentials used by kube2iam. Both `kube_iam_role` and
+`irsa_role_arn` can coexist during a migration — existing pods retain the
+kube2iam annotation until they are rotated, at which point only IRSA is used.
+
 The referenced IAM role should contain the following privileges to make sure
 Postgres can send compressed WAL files to the given S3 bucket:
 
@@ -1204,6 +1230,7 @@ aws_or_gcp:
   # additional_secret_mount_path: ""
   # aws_region: eu-central-1
   # kube_iam_role: ""
+  # irsa_role_arn: ""
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
   wal_gs_bucket: "postgres-backups-bucket-28302F2"  # name of bucket on where to save the WAL-E logs
@@ -1253,6 +1280,7 @@ aws_or_gcp:
   additional_secret_mount_path: "/var/secrets/google"  # or where ever you want to mount the file
   # aws_region: eu-central-1
   # kube_iam_role: ""
+  # irsa_role_arn: ""
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
   wal_gs_bucket: "postgres-backups-bucket-28302F2"  # name of bucket on where to save the WAL-E logs
