@@ -101,8 +101,8 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 					DefaultMemoryLimit:    "300Mi",
 					InheritedAnnotations:  []string{inheritedAnnotation},
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: &metav1.Duration{Duration: 3 * time.Second},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: 10 * time.Minute},
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -187,8 +187,8 @@ func TestPodAnnotationsSync(t *testing.T) {
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
-				PatroniAPICheckInterval: time.Duration(1),
-				PatroniAPICheckTimeout:  time.Duration(5),
+				PatroniAPICheckInterval: &metav1.Duration{Duration: 1 * time.Second},
+				PatroniAPICheckTimeout:  &metav1.Duration{Duration: 5 * time.Second},
 				PodManagementPolicy:     "ordered_ready",
 				CustomPodAnnotations:    customPodAnnotations,
 				ConnectionPooler: config.ConnectionPooler{
@@ -207,8 +207,8 @@ func TestPodAnnotationsSync(t *testing.T) {
 					DefaultMemoryLimit:    "300Mi",
 					MaxInstances:          -1,
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: &metav1.Duration{Duration: 3 * time.Second},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: 10 * time.Minute},
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -381,8 +381,8 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 					DefaultMemoryRequest:  "300Mi",
 					DefaultMemoryLimit:    "300Mi",
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: &metav1.Duration{Duration: 3 * time.Second},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: 10 * time.Minute},
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -694,8 +694,8 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
-				PatroniAPICheckInterval: time.Duration(1),
-				PatroniAPICheckTimeout:  time.Duration(5),
+				PatroniAPICheckInterval: &metav1.Duration{Duration: 1 * time.Second},
+				PatroniAPICheckTimeout:  &metav1.Duration{Duration: 5 * time.Second},
 				PodManagementPolicy:     "ordered_ready",
 				Resources: config.Resources{
 					ClusterLabels:         map[string]string{"application": applicationLabel},
@@ -707,8 +707,8 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 					MinInstances:          int32(-1),
 					MaxInstances:          int32(-1),
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: &metav1.Duration{Duration: 3 * time.Second},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: 10 * time.Minute},
 				},
 			},
 		}, client, pg, logger, eventRecorder)

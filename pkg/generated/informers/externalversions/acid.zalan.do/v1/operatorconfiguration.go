@@ -28,10 +28,10 @@ import (
 	context "context"
 	time "time"
 
-	apiszalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	apisacidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/generated/listers/zalando.org/v1"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/generated/listers/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,38 +39,38 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// FabricEventStreamInformer provides access to a shared informer and lister for
-// FabricEventStreams.
-type FabricEventStreamInformer interface {
+// OperatorConfigurationInformer provides access to a shared informer and lister for
+// OperatorConfigurations.
+type OperatorConfigurationInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() zalandoorgv1.FabricEventStreamLister
+	Lister() acidzalandov1.OperatorConfigurationLister
 }
 
-type fabricEventStreamInformer struct {
+type operatorConfigurationInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewFabricEventStreamInformer constructs a new informer for FabricEventStream type.
+// NewOperatorConfigurationInformer constructs a new informer for OperatorConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFabricEventStreamInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFabricEventStreamInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+func NewOperatorConfigurationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewOperatorConfigurationInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
-// NewFilteredFabricEventStreamInformer constructs a new informer for FabricEventStream type.
+// NewFilteredOperatorConfigurationInformer constructs a new informer for OperatorConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredFabricEventStreamInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFabricEventStreamInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+func NewFilteredOperatorConfigurationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	return NewOperatorConfigurationInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
-// NewFabricEventStreamInformerWithOptions constructs a new informer for FabricEventStream type with additional options.
+// NewOperatorConfigurationInformerWithOptions constructs a new informer for OperatorConfiguration type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFabricEventStreamInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "zalando.org", Version: "v1", Resource: "fabriceventstreams"}
+func NewOperatorConfigurationInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "acid.zalan.do", Version: "v1", Resource: "operatorconfigurations"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewSharedIndexInformerWithOptions(
@@ -79,28 +79,28 @@ func NewFabricEventStreamInformerWithOptions(client versioned.Interface, namespa
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.ZalandoV1().FabricEventStreams(namespace).List(context.Background(), opts)
+				return client.AcidV1().OperatorConfigurations(namespace).List(context.Background(), opts)
 			},
 			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.ZalandoV1().FabricEventStreams(namespace).Watch(context.Background(), opts)
+				return client.AcidV1().OperatorConfigurations(namespace).Watch(context.Background(), opts)
 			},
 			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.ZalandoV1().FabricEventStreams(namespace).List(ctx, opts)
+				return client.AcidV1().OperatorConfigurations(namespace).List(ctx, opts)
 			},
 			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.ZalandoV1().FabricEventStreams(namespace).Watch(ctx, opts)
+				return client.AcidV1().OperatorConfigurations(namespace).Watch(ctx, opts)
 			},
 		}, client),
-		&apiszalandoorgv1.FabricEventStream{},
+		&apisacidzalandov1.OperatorConfiguration{},
 		cache.SharedIndexInformerOptions{
 			ResyncPeriod: options.ResyncPeriod,
 			Indexers:     options.Indexers,
@@ -109,14 +109,14 @@ func NewFabricEventStreamInformerWithOptions(client versioned.Interface, namespa
 	)
 }
 
-func (f *fabricEventStreamInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFabricEventStreamInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+func (f *operatorConfigurationInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewOperatorConfigurationInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
-func (f *fabricEventStreamInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiszalandoorgv1.FabricEventStream{}, f.defaultInformer)
+func (f *operatorConfigurationInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&apisacidzalandov1.OperatorConfiguration{}, f.defaultInformer)
 }
 
-func (f *fabricEventStreamInformer) Lister() zalandoorgv1.FabricEventStreamLister {
-	return zalandoorgv1.NewFabricEventStreamLister(f.Informer().GetIndexer())
+func (f *operatorConfigurationInformer) Lister() acidzalandov1.OperatorConfigurationLister {
+	return acidzalandov1.NewOperatorConfigurationLister(f.Informer().GetIndexer())
 }

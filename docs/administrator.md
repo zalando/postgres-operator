@@ -891,15 +891,13 @@ cluster manifest. In the case any of these variables are omitted from the
 manifest, the operator configuration settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in all namespaces watched by the operator.
-If load balancing is enabled two default annotations will be applied to its
-services:
+If load balancing is enabled the following default annotation will be applied to
+its services:
 
 - `external-dns.alpha.kubernetes.io/hostname` with the value defined by the
   operator configs `master_dns_name_format` and `replica_dns_name_format`.
   This value can't be overwritten. If any changing in its value is needed, it
   MUST be done changing the DNS format operator config parameters; and
-- `service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout` with
-  a default value of "3600".
 
 There are multiple options to specify service annotations that will be merged
 with each other and override in the following order (where latter take
@@ -929,6 +927,41 @@ pods with manifest flags `enableMasterPoolerLoadBalancer` and/or
 For the `external-dns.alpha.kubernetes.io/hostname` annotation the `-pooler`
 suffix will be appended to the cluster name used in the template which is
 defined in `master|replica_dns_name_format`.
+
+## Node Ports
+
+Alternatively to Load Balancers Node Ports can be used. Kubernetes services with type
+`NodePort` redirect traffic from a specified port on your kubernetes nodes to your service.
+To expose your services to an external network with NodePorts you can set `enableMasterNodePort` and/or `enableReplicaNodePort` to `true`
+in your cluster manifest. In the case any of these variables are omitted from the manifest, the operator configuration settings `enable_master_node_port` and `enable_replica_node_port` apply.
+Note that the operator settings affect all Postgresql services running in all namespaces watched
+by the operator.
+
+**Enabling a NodePort configuration will override the corresponding LoadBalancer configuration.**
+
+There are multiple options to specify service annotations that will be merged
+with each other and override in the following order (where latter take
+precedence):
+
+1. Globally configured `custom_service_annotations`
+2. `serviceAnnotations` specified in the cluster manifest
+3. `masterServiceAnnotations` and `replicaServiceAnnotations` specified in the cluster manifest
+
+Load-Balancer specific annotations are not applied.
+
+Node port services can also be configured for the [connection pooler](user.md#connection-pooler) pods
+with the manifest flags `enableMasterPoolerNodePort` and/or `enableReplicaPoolerNodePort` or in the operator configuration with `enable_master_pooler_node_port`
+and/or `enable_replica_pooler_node_port`.
+
+To configure which ports Kubernetes should use for your NodePort service you can configure ports in your cluster manifest
+for each type:
+
+- masterNodePort
+- masterPoolerNodePort
+- replicaNodePort
+- replicaPoolerNodePort
+
+When not defined or set to 0 kubernetes will choose a port for you from [your kubernetes cluster's configured range](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport).
 
 ## Running periodic 'autorepair' scans of K8s objects
 
@@ -1061,6 +1094,32 @@ configuration:
     wal_s3_bucket: your-backup-path
 ```
 
+Alternatively, if your cluster uses EKS with OIDC, you can use
+[IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+(IAM Roles for Service Accounts) instead of kube2iam. Set `irsa_role_arn` to
+the full ARN of the IAM role:
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  aws_or_gcp:
+    aws_region: eu-central-1
+    irsa_role_arn: arn:aws:iam::123456789012:role/postgres-pod-role
+    wal_s3_bucket: your-backup-path
+```
+
+When `irsa_role_arn` is set the operator annotates the pod service account with
+`eks.amazonaws.com/role-arn` on every reconcile. The EKS OIDC webhook then
+injects an AWS web identity token into each pod, which takes precedence over
+the EC2 metadata credentials used by kube2iam. Both `kube_iam_role` and
+`irsa_role_arn` can coexist during a migration — existing pods retain the
+kube2iam annotation until they are rotated, at which point only IRSA is used.
+
 The referenced IAM role should contain the following privileges to make sure
 Postgres can send compressed WAL files to the given S3 bucket:
 
@@ -1171,6 +1230,7 @@ aws_or_gcp:
   # additional_secret_mount_path: ""
   # aws_region: eu-central-1
   # kube_iam_role: ""
+  # irsa_role_arn: ""
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
   wal_gs_bucket: "postgres-backups-bucket-28302F2"  # name of bucket on where to save the WAL-E logs
@@ -1220,6 +1280,7 @@ aws_or_gcp:
   additional_secret_mount_path: "/var/secrets/google"  # or where ever you want to mount the file
   # aws_region: eu-central-1
   # kube_iam_role: ""
+  # irsa_role_arn: ""
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
   wal_gs_bucket: "postgres-backups-bucket-28302F2"  # name of bucket on where to save the WAL-E logs

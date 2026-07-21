@@ -37,6 +37,10 @@ spec:
       - name: {{ .Chart.Name }}
         image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.extraArgs }}
+        args:
+{{ toYaml .Values.extraArgs | indent 8 }}
+        {{- end }}
         env:
       {{- if .Values.enableJsonLogging }}
         - name: ENABLE_JSON_LOGGING

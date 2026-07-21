@@ -42,14 +42,14 @@ and change it.
 
 To test the CRD-based configuration locally, use the following
 
-```bash
-  kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
-  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+```
+kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
+kubectl create -f manifests/postgresql-operator-default-configuration.yaml
 
-  kubectl create -f manifests/operator-service-account-rbac.yaml
-  kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
+kubectl create -f manifests/operator-service-account-rbac.yaml
+kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
 
-  kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
+kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
 ```
 
 The CRD-based configuration is more powerful than the one based on ConfigMaps
@@ -79,11 +79,6 @@ Those are top-level keys, containing both leaf keys and groups.
   Instruct the operator to create/update the CRDs. If disabled the operator will rely on the CRDs being managed separately.
   The default is `true`.
 
-* **enable_crd_validation**
-  *deprecated*: toggles if the operator will create or update CRDs with
-  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
-  The default is `true`. `false` will be ignored, since `apiextensions.io/v1` requires a structural schema definition.
-
 * **crd_categories**
   The operator will register CRDs in the `all` category by default so that they will be returned by a `kubectl get all` call. You are free to change categories or leave them empty.
 
@@ -105,15 +100,13 @@ Those are top-level keys, containing both leaf keys and groups.
   Kubernetes-native DCS).
 
 * **kubernetes_use_configmaps**
-  Select if setup uses endpoints (default), or configmaps to manage leader when
+  Select if setup uses endpoints or configmaps (default) to manage leader when
   DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to
   use endpoints option, and configmaps is required. Starting with K8s 1.33,
   endpoints are marked as deprecated. It's recommended to switch to config maps
   instead. But, to do so make sure you scale the Postgres cluster down to just
   one primary pod (e.g. using `max_instances` option). Otherwise, you risk
-  running into a split-brain scenario.
-  By default, `kubernetes_use_configmaps: false`, meaning endpoints will be used.
-  Starting from v1.16.0 the default will be changed to `true`.
+  running into a split-brain scenario. Default is `true`.
 
 * **docker_image**
   Spilo Docker image for Postgres instances. For production, don't rely on the
@@ -333,6 +326,10 @@ configuration they are grouped under the `kubernetes` key.
 * **pod_terminate_grace_period**
   Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination)
   after this timeout. The default is `5m`.
+
+* **liveness_probe**
+  Allows for adding a liveness probe to the Spilo container to detect if it's
+  running properly. Cannot be configured via ConfigMap. Default is empty.
 
 * **custom_pod_annotations**
   This key/value map provides a list of annotations that get attached to each pod
@@ -801,6 +798,15 @@ yet officially supported.
   [kube2iam](https://github.com/jtblin/kube2iam) project on AWS. The default is
   empty.
 
+* **irsa_role_arn**
+  Full AWS IAM role ARN to supply in the `eks.amazonaws.com/role-arn` annotation
+  of the Postgres pod service account, enabling
+  [IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+  (IAM Roles for Service Accounts) on EKS. When set, the operator annotates the
+  pod service account on every sync so that the EKS OIDC webhook can inject AWS
+  credentials directly into pods. Must be a full ARN, e.g.
+  `arn:aws:iam::123456789012:role/my-postgres-role`. The default is empty.
+
 * **aws_region**
   AWS region used to store EBS volumes. The default is `eu-central-1`. Note,
   this option is not meant for specifying the AWS region for backups and
@@ -899,6 +905,28 @@ grouped under the `logical_backup` key.
 
 * **logical_backup_cronjob_environment_secret**
   Reference to a Kubernetes secret, which keys will be added as environment variables to the cronjob. Default: ""
+
+* **logical_backup_successful_jobs_history_limit**
+  number of successful backup jobs to keep in cronjob history. The default is `3`.
+
+* **logical_backup_failed_jobs_history_limit**
+  number of failed backup jobs to keep in cronjob history. The default is `3`.
+
+* **logical_backup_ttl_seconds_after_finished**
+  TTL in seconds after which finished backup jobs are automatically deleted. The default is `86400`.
+
+The following environment variables can be passed to the logical backup
+cronjob via `logical_backup_cronjob_environment_secret` to control
+connectivity checks before the backup starts:
+
+* **LOGICAL_BACKUP_CONNECT_RETRIES**
+  Number of times to retry connecting to the target PostgreSQL pod before
+  giving up. This is useful when NetworkPolicy enforcement introduces a
+  short delay before a newly-created pod's IP is allowed through ingress
+  rules on the destination node. Default: "10"
+
+* **LOGICAL_BACKUP_CONNECT_RETRY_DELAY**
+  Delay in seconds between connectivity retries. Default: "2"
 
 ## Debugging the operator
 
@@ -1062,7 +1090,7 @@ operator being able to provide some reasonable defaults.
 
 * **connection_pooler_image**
   Docker image to use for connection pooler deployment.
-  Default: "registry.opensource.zalan.do/acid/pgbouncer"
+  Default: "ghcr.io/zalando/postgres-operator/pgbouncer:latest"
 
 * **connection_pooler_max_db_connections**
   How many connections the pooler can max hold. This value is divided among the

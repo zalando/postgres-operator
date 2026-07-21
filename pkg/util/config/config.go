@@ -3,34 +3,34 @@ package config
 import (
 	"encoding/json"
 	"strings"
-	"time"
 
 	"fmt"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CRD describes CustomResourceDefinition specific configuration parameters
 type CRD struct {
-	ReadyWaitInterval     time.Duration `name:"ready_wait_interval" default:"4s"`
-	ReadyWaitTimeout      time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod          time.Duration `name:"resync_period" default:"30m"`
-	RepairPeriod          time.Duration `name:"repair_period" default:"5m"`
-	EnableCRDRegistration *bool         `name:"enable_crd_registration" default:"true"`
-	EnableCRDValidation   *bool         `name:"enable_crd_validation" default:"true"`
-	CRDCategories         []string      `name:"crd_categories" default:"all"`
+	ReadyWaitInterval     *metav1.Duration `name:"ready_wait_interval" default:"4s"`
+	ReadyWaitTimeout      *metav1.Duration `name:"ready_wait_timeout" default:"30s"`
+	ResyncPeriod          *metav1.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod          *metav1.Duration `name:"repair_period" default:"5m"`
+	EnableCRDRegistration *bool            `name:"enable_crd_registration" default:"true"`
+	CRDCategories         []string         `name:"crd_categories" default:"all"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
 type Resources struct {
 	EnableOwnerReferences         *bool               `name:"enable_owner_references" default:"false"`
-	ResourceCheckInterval         time.Duration       `name:"resource_check_interval" default:"3s"`
-	ResourceCheckTimeout          time.Duration       `name:"resource_check_timeout" default:"10m"`
-	PodLabelWaitTimeout           time.Duration       `name:"pod_label_wait_timeout" default:"10m"`
-	PodDeletionWaitTimeout        time.Duration       `name:"pod_deletion_wait_timeout" default:"10m"`
-	PodTerminateGracePeriod       time.Duration       `name:"pod_terminate_grace_period" default:"5m"`
+	ResourceCheckInterval         *metav1.Duration    `name:"resource_check_interval" default:"3s"`
+	ResourceCheckTimeout          *metav1.Duration    `name:"resource_check_timeout" default:"10m"`
+	PodLabelWaitTimeout           *metav1.Duration    `name:"pod_label_wait_timeout" default:"10m"`
+	PodDeletionWaitTimeout        *metav1.Duration    `name:"pod_deletion_wait_timeout" default:"10m"`
+	PodTerminateGracePeriod       *metav1.Duration    `name:"pod_terminate_grace_period" default:"5m"`
+	LivenessProbe                 *v1.Probe           `name:"-"`
 	SpiloRunAsUser                *int64              `name:"spilo_runasuser"`
 	SpiloRunAsGroup               *int64              `name:"spilo_runasgroup"`
 	SpiloFSGroup                  *int64              `name:"spilo_fsgroup"`
@@ -148,6 +148,9 @@ type LogicalBackup struct {
 	LogicalBackupMemoryRequest                string `name:"logical_backup_memory_request"`
 	LogicalBackupCPULimit                     string `name:"logical_backup_cpu_limit"`
 	LogicalBackupMemoryLimit                  string `name:"logical_backup_memory_limit"`
+	LogicalBackupSuccessfulJobsHistoryLimit   *int32 `name:"logical_backup_successful_jobs_history_limit" default:"3"`
+	LogicalBackupFailedJobsHistoryLimit       *int32 `name:"logical_backup_failed_jobs_history_limit" default:"3"`
+	LogicalBackupTTLSecondsAfterFinished      *int32 `name:"logical_backup_ttl_seconds_after_finished" default:"86400"`
 }
 
 // Operator options for connection pooler
@@ -155,7 +158,7 @@ type ConnectionPooler struct {
 	NumberOfInstances                    *int32 `name:"connection_pooler_number_of_instances" default:"2"`
 	Schema                               string `name:"connection_pooler_schema" default:"pooler"`
 	User                                 string `name:"connection_pooler_user" default:"pooler"`
-	Image                                string `name:"connection_pooler_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
+	Image                                string `name:"connection_pooler_image" default:"ghcr.io/zalando/postgres-operator/pgbouncer:latest"`
 	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
 	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
 	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request"`
@@ -174,7 +177,7 @@ type Config struct {
 	ConnectionPooler
 
 	WatchedNamespace         string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	KubernetesUseConfigMaps  bool              `name:"kubernetes_use_configmaps" default:"false"`
+	KubernetesUseConfigMaps  *bool             `name:"kubernetes_use_configmaps" default:"true"`
 	EtcdHost                 string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
 	EnableMaintenanceWindows *bool             `name:"enable_maintenance_windows" default:"true"`
 	MaintenanceWindows       []string          `name:"maintenance_windows"`
@@ -185,12 +188,13 @@ type Config struct {
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition              string            `name:"pod_service_account_definition" default:""`
 	PodServiceAccountRoleBindingDefinition   string            `name:"pod_service_account_role_binding_definition" default:""`
-	MasterPodMoveTimeout                     time.Duration     `name:"master_pod_move_timeout" default:"20m"`
+	MasterPodMoveTimeout                     *metav1.Duration  `name:"master_pod_move_timeout" default:"20m"`
 	DbHostedZone                             string            `name:"db_hosted_zone" default:"db.example.com"`
 	AWSRegion                                string            `name:"aws_region" default:"eu-central-1"`
 	WALES3Bucket                             string            `name:"wal_s3_bucket"`
 	LogS3Bucket                              string            `name:"log_s3_bucket"`
 	KubeIAMRole                              string            `name:"kube_iam_role"`
+	IRSARoleARN                              string            `name:"irsa_role_arn"`
 	WALGSBucket                              string            `name:"wal_gs_bucket"`
 	GCPCredentials                           string            `name:"gcp_credentials"`
 	WALAZStorageAccount                      string            `name:"wal_az_storage_account"`
@@ -212,6 +216,10 @@ type Config struct {
 	EnableMasterPoolerLoadBalancer           bool              `name:"enable_master_pooler_load_balancer" default:"false"`
 	EnableReplicaLoadBalancer                bool              `name:"enable_replica_load_balancer" default:"false"`
 	EnableReplicaPoolerLoadBalancer          bool              `name:"enable_replica_pooler_load_balancer" default:"false"`
+	EnableMasterNodePort                     bool              `name:"enable_master_node_port" default:"false"`
+	EnableMasterPoolerNodePort               bool              `name:"enable_master_pooler_node_port" default:"false"`
+	EnableReplicaNodePort                    bool              `name:"enable_replica_node_port" default:"false"`
+	EnableReplicaPoolerNodePort              bool              `name:"enable_replica_pooler_node_port" default:"false"`
 	CustomServiceAnnotations                 map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                     map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                    bool              `name:"enable_pod_antiaffinity" default:"false"`
@@ -235,7 +243,7 @@ type Config struct {
 	RingLogLines                             int               `name:"ring_log_lines" default:"100"`
 	ClusterHistoryEntries                    int               `name:"cluster_history_entries" default:"1000"`
 	TeamAPIRoleConfiguration                 map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
-	PodTerminateGracePeriod                  time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	PodTerminateGracePeriod                  *metav1.Duration  `name:"pod_terminate_grace_period" default:"5m"`
 	PodManagementPolicy                      string            `name:"pod_management_policy" default:"ordered_ready"`
 	EnableReadinessProbe                     bool              `name:"enable_readiness_probe" default:"false"`
 	ProtectedRoles                           []string          `name:"protected_role_names" default:"admin,cron_admin"`
@@ -251,8 +259,8 @@ type Config struct {
 	MajorVersionUpgradeTeamAllowList         []string          `name:"major_version_upgrade_team_allow_list" default:""`
 	MinimalMajorVersion                      string            `name:"minimal_major_version" default:"14"`
 	TargetMajorVersion                       string            `name:"target_major_version" default:"18"`
-	PatroniAPICheckInterval                  time.Duration     `name:"patroni_api_check_interval" default:"1s"`
-	PatroniAPICheckTimeout                   time.Duration     `name:"patroni_api_check_timeout" default:"5s"`
+	PatroniAPICheckInterval                  *metav1.Duration  `name:"patroni_api_check_interval" default:"1s"`
+	PatroniAPICheckTimeout                   *metav1.Duration  `name:"patroni_api_check_timeout" default:"5s"`
 	EnablePatroniFailsafeMode                *bool             `name:"enable_patroni_failsafe_mode" default:"false"`
 	EnableSecretsDeletion                    *bool             `name:"enable_secrets_deletion" default:"true"`
 	EnablePersistentVolumeClaimDeletion      *bool             `name:"enable_persistent_volume_claim_deletion" default:"true"`
