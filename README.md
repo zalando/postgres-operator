@@ -20,12 +20,13 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Pod protection during bootstrap phase and configurable maintenance windows
 * Restore and cloning Postgres clusters on AWS, GCS and Azure
 * Additionally logical backups to S3 or GCS bucket can be configured
-* Standby cluster from S3 or GCS WAL archive
+* Standby cluster from S3 or GCS WAL archive or remote host
 * Configurable for non-cloud environments
 * Basic credential and user management on K8s, eases application deployments
 * Support for custom TLS certificates
 * UI to create and edit Postgres cluster manifests
 * Compatible with OpenShift
+* Multi-arch support
 
 ### PostgreSQL features
 
@@ -63,18 +64,21 @@ production for over five years.
 
 | Release   | Postgres versions | K8s versions      | Golang  |
 | :-------- | :---------------: | :---------------: | :-----: |
-| next      | 14 &rarr; 18      | 1.27+             | 1.26.4  |
+| v2.0.0    | 14 &rarr; 18      | 1.27+             | 1.26.4  |
 | v1.15.1   | 13 &rarr; 17      | 1.27+             | 1.25.3  |
 | v1.14.0   | 13 &rarr; 17      | 1.27+             | 1.23.4  |
 | v1.13.0   | 12 &rarr; 16      | 1.27+             | 1.22.5  |
 | v1.12.0   | 11 &rarr; 16      | 1.27+             | 1.22.3  |
 | v1.11.0   | 11 &rarr; 16      | 1.27+             | 1.21.7  |
-| v1.10.1   | 10 &rarr; 15      | 1.21+             | 1.19.8  |
 
 ## Getting started
 
 For a quick first impression follow the instructions of this
 [tutorial](docs/quickstart.md).
+
+## Migrating from v1 to v2 operator
+
+If you have been using Postgres Operator since v1.x (thank you), make sure you have read the [migration docs](docs/migrate.md) before deploying a v2 operator.
 
 ## Supported setups of Postgres and Applications
 
@@ -88,6 +92,7 @@ There is a browser-friendly version of this documentation at
 
 * [How it works](docs/index.md)
 * [Installation](docs/quickstart.md#deployment-options)
+* [Migration from v1](docs/migrate.md)
 * [The Postgres experience on K8s](docs/user.md)
 * [The Postgres Operator UI](docs/operator-ui.md)
 * [DBA options - from RBAC to backup](docs/administrator.md)

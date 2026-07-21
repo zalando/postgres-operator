@@ -128,7 +128,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v2.0.0"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
 	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
@@ -181,7 +181,7 @@ type Config struct {
 	EtcdHost                 string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
 	EnableMaintenanceWindows *bool             `name:"enable_maintenance_windows" default:"true"`
 	MaintenanceWindows       []string          `name:"maintenance_windows"`
-	DockerImage              string            `name:"docker_image" default:"ghcr.io/zalando/spilo-18:4.1-p1"`
+	DockerImage              string            `name:"docker_image" default:"ghcr.io/zalando/spilo-18:4.1-p2"`
 	SidecarImages            map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers        []v1.Container    `name:"sidecars"`
 	PodServiceAccountName    string            `name:"pod_service_account_name" default:"postgres-pod"`
