@@ -2214,6 +2214,11 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		}
 	}
 
+	if c.OpConfig.IRSARoleARN != "" {
+		result = append(result, v1.EnvVar{Name: "CLONE_AWS_ROLE_ARN", Value: c.OpConfig.IRSARoleARN})
+		result = append(result, v1.EnvVar{Name: "CLONE_AWS_WEB_IDENTITY_TOKEN_FILE", Value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"})
+	}
+
 	return result
 }
 
@@ -2257,6 +2262,11 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 		})
 		result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+	}
+
+	if c.OpConfig.IRSARoleARN != "" {
+		result = append(result, v1.EnvVar{Name: "STANDBY_AWS_ROLE_ARN", Value: c.OpConfig.IRSARoleARN})
+		result = append(result, v1.EnvVar{Name: "STANDBY_AWS_WEB_IDENTITY_TOKEN_FILE", Value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"})
 	}
 
 	return result
