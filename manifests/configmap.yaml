@@ -41,6 +41,7 @@ data:
   enable_cross_namespace_secret: "false"
   enable_finalizers: "false"
   enable_database_access: "true"
+  # ebs_tags_inherit_labels: "application,team"
   enable_ebs_gp3_migration: "false"
   enable_ebs_gp3_migration_max_size: "1000"
   enable_init_containers: "true"

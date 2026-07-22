@@ -17,7 +17,7 @@ const (
 	resize2fs = "resize2fs"
 )
 
-//Ext234Resize implements the FilesystemResizer interface for the ext4/3/2fs.
+// Ext234Resize implements the FilesystemResizer interface for the ext4/3/2fs.
 type Ext234Resize struct {
 }
 

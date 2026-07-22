@@ -246,17 +246,18 @@ type LoadBalancerConfiguration struct {
 type AWSGCPConfiguration struct {
 	WALES3Bucket string `json:"wal_s3_bucket,omitempty"`
 	// +kubebuilder:default=eu-central-1
-	AWSRegion                    string `json:"aws_region,omitempty"`
-	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
-	GCPCredentials               string `json:"gcp_credentials,omitempty"`
-	WALAZStorageAccount          string `json:"wal_az_storage_account,omitempty"`
-	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
-	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
-	IRSARoleARN                  string `json:"irsa_role_arn,omitempty"`
-	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
-	AdditionalSecretMountPath    string `json:"additional_secret_mount_path,omitempty"`
-	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration,omitempty"`
-	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size,omitempty"`
+	AWSRegion                    string   `json:"aws_region,omitempty"`
+	WALGSBucket                  string   `json:"wal_gs_bucket,omitempty"`
+	GCPCredentials               string   `json:"gcp_credentials,omitempty"`
+	WALAZStorageAccount          string   `json:"wal_az_storage_account,omitempty"`
+	LogS3Bucket                  string   `json:"log_s3_bucket,omitempty"`
+	KubeIAMRole                  string   `json:"kube_iam_role,omitempty"`
+  IRSARoleARN                  string   `json:"irsa_role_arn,omitempty"`
+	AdditionalSecretMount        string   `json:"additional_secret_mount,omitempty"`
+	AdditionalSecretMountPath    string   `json:"additional_secret_mount_path,omitempty"`
+	EnableEBSGp3Migration        bool     `json:"enable_ebs_gp3_migration,omitempty"`
+	EnableEBSGp3MigrationMaxSize int64    `json:"enable_ebs_gp3_migration_max_size,omitempty"`
+	EBSTagsInheritLabels         []string `json:"ebs_tags_inherit_labels,omitempty"`
 }
 
 // OperatorDebugConfiguration defines options for the debug mode

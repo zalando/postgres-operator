@@ -11,6 +11,7 @@ type VolumeProperties struct {
 	Size       int64
 	Iops       int64
 	Throughput int64
+	Tags       map[string]string
 }
 
 // VolumeResizer defines the set of methods used to implememnt provider-specific resizing of persistent volumes.
@@ -24,4 +25,6 @@ type VolumeResizer interface {
 	ModifyVolume(providerVolumeID string, newType *string, newSize *int64, iops *int64, throughput *int64) error
 	DisconnectFromProvider() error
 	DescribeVolumes(providerVolumesID []string) ([]VolumeProperties, error)
+	TagVolumes(providerVolumesID []string, tags map[string]string) error
+	UntagVolumes(providerVolumesID []string, tagKeys []string) error
 }
