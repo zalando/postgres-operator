@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/filesystems"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -198,6 +199,7 @@ func (c *Cluster) syncVolumeClaims() error {
 	if err != nil {
 		return fmt.Errorf("could not list persistent volume claims: %v", err)
 	}
+	newLabels := c.labelsSet(true)
 	for _, pvc := range pvcs {
 		c.VolumeClaims[pvc.UID] = &pvc
 		needsUpdate := false
@@ -235,6 +237,19 @@ func (c *Cluster) syncVolumeClaims() error {
 				return fmt.Errorf("could not patch annotations of the persistent volume claim for volume %q: %v", pvc.Name, err)
 			}
 			c.VolumeClaims[pvc.UID] = patchedPvc
+		}
+
+		if !util.MapContains(pvc.Labels, newLabels) {
+			patchData, err := metaLabelsPatch(newLabels)
+			if err != nil {
+				return fmt.Errorf("could not form patch for labels of persistent volume claim %q: %v", pvc.Name, err)
+			}
+			patchedPvc, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, patchData, metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch labels of persistent volume claim %q: %v", pvc.Name, err)
+			}
+			c.VolumeClaims[pvc.UID] = patchedPvc
+			c.logger.Infof("updated labels on persistent volume claim %q", pvc.Name)
 		}
 	}
 
