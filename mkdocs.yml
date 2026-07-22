@@ -8,6 +8,7 @@ nav:
   - Postgres Operator UI: 'operator-ui.md'
   - Admin guide: 'administrator.md'
   - User guide: 'user.md'
+  - PgBouncer generated config: 'pgbouncer-generated-config.md'
   - Developer guide: 'developer.md'
   - Reference:
     - Config parameters: 'reference/operator_parameters.md'

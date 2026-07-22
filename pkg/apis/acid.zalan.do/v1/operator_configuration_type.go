@@ -347,6 +347,15 @@ type ConnectionPoolerConfiguration struct {
 	DefaultCPULimit string `json:"connection_pooler_default_cpu_limit,omitempty"`
 	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
 	DefaultMemoryLimit string `json:"connection_pooler_default_memory_limit,omitempty"`
+	// +kubebuilder:default=false
+	GenerateConfig *bool    `json:"connection_pooler_generate_config,omitempty"`
+	Command        []string `json:"connection_pooler_command,omitempty"`
+	// +kubebuilder:default={"/etc/pgbouncer/pgbouncer.ini"}
+	Args []string `json:"connection_pooler_args,omitempty"`
+	// +kubebuilder:default="scram-sha-256"
+	AuthType string `json:"connection_pooler_auth_type,omitempty"`
+	// +kubebuilder:default="/etc/pgbouncer/pgbouncer.ini"
+	ConfigPath string `json:"connection_pooler_config_path,omitempty"`
 }
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup

@@ -235,5 +235,11 @@ configuration:
     connection_pooler_number_of_instances: 2
     # connection_pooler_schema: "pooler"
     # connection_pooler_user: "pooler"
+    connection_pooler_generate_config: false
+    # connection_pooler_command: []
+    # connection_pooler_args:
+    #   - "/etc/pgbouncer/pgbouncer.ini"
+    connection_pooler_auth_type: "scram-sha-256"
+    connection_pooler_config_path: "/etc/pgbouncer/pgbouncer.ini"
   patroni:
     enable_patroni_failsafe_mode: false
