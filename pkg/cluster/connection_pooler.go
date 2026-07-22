@@ -471,6 +471,9 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			Volumes:                       poolerVolumes,
 			SecurityContext:               &securityContext,
 			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
+			PriorityClassName: util.Coalesce(
+				connectionPoolerSpec.PriorityClassName,
+				c.OpConfig.ConnectionPooler.PriorityClassName),
 		},
 	}
 
@@ -891,6 +894,16 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		msg := fmt.Sprintf("dockerImage is different (having %s, required %s)",
 			poolerContainer.Image, config.Image)
 		reasons = append(reasons, msg)
+	}
+
+	if spec.PriorityClassName == "" {
+		expectedPriorityClassName := config.PriorityClassName
+		if podTemplate.Spec.PriorityClassName != expectedPriorityClassName {
+			sync = true
+			msg := fmt.Sprintf("priorityClassName is different (having %s, required %s)",
+				podTemplate.Spec.PriorityClassName, expectedPriorityClassName)
+			reasons = append(reasons, msg)
+		}
 	}
 
 	expectedResources, err := c.generateResourceRequirements(spec.Resources,

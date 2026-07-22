@@ -119,6 +119,8 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
+                  connection_pooler_priority_class_name:
+                    type: string
                   connection_pooler_schema:
                     default: pooler
                     type: string

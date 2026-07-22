@@ -1100,6 +1100,12 @@ operator being able to provide some reasonable defaults.
 * **connection_pooler_mode**
   Default pooler mode, `session` or `transaction`. Default is `transaction`.
 
+* **connection_pooler_priority_class_name**
+  The name of the priority class to assign to connection pooler pods by default.
+  A cluster can override this with `connectionPooler.priorityClassName`. When
+  unset, the pooler pods use no priority class. The empty string signifies no
+  assignment.
+
 * **connection_pooler_default_cpu_request**
   **connection_pooler_default_memory_reques**
   **connection_pooler_default_cpu_limit**
