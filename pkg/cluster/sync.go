@@ -17,6 +17,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -1518,7 +1519,18 @@ DBUSERS:
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, newUsers)
-	if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
+
+	err = retryutil.Retry(
+		constants.PostgresConnectTimeout,
+		constants.PostgresConnectRetryTimeout,
+		func() (bool, error) {
+			err2 := c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb)
+			if err2 != nil {
+				return false, err2
+			}
+			return true, nil
+		})
+	if err != nil {
 		return fmt.Errorf("error executing sync statements: %v", err)
 	}
 
