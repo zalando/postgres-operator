@@ -80,11 +80,6 @@ For a quick first impression follow the instructions of this
 
 If you have been using Postgres Operator since v1.x (thank you), make sure you have read the [migration docs](docs/migrate.md) before deploying a v2 operator.
 
-## Supported setups of Postgres and Applications
-
-![Features](docs/diagrams/neutral_operator_dark.png#gh-dark-mode-only)
-![Features](docs/diagrams/neutral_operator_light.png#gh-light-mode-only)
-
 ## Documentation
 
 There is a browser-friendly version of this documentation at
@@ -92,7 +87,6 @@ There is a browser-friendly version of this documentation at
 
 * [How it works](docs/index.md)
 * [Installation](docs/quickstart.md#deployment-options)
-* [Migration from v1](docs/migrate.md)
 * [The Postgres experience on K8s](docs/user.md)
 * [The Postgres Operator UI](docs/operator-ui.md)
 * [DBA options - from RBAC to backup](docs/administrator.md)

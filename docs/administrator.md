@@ -725,9 +725,9 @@ that cannot be overridden to guarantee core functionality. Only variables with
 shipping to be specified differently. There are three ways to specify extra
 environment variables (or override existing ones) for database pods:
 
-* [Via ConfigMap](#via-configmap)
-* [Via Secret](#via-secret)
-* [Via Postgres Cluster Manifest](#via-postgres-cluster-manifest)
+* [Globally via ConfigMap](#via-configmap)
+* [Globally via Secret](#via-secret)
+* [Locally via Postgres Cluster Manifest](#via-postgres-cluster-manifest)
 
 The first two options must be referenced from the operator configuration
 making them global settings for all Postgres cluster the operator watches.
@@ -736,10 +736,10 @@ environment variables. Another case could be to provide custom cloud
 provider or backup settings.
 
 The last options allows for specifying environment variables individual to
-every cluster via the `env` section in the manifest. For example, if you use
-individual backup locations for each of your clusters. Or you want to disable
-WAL archiving for a certain cluster by setting `WAL_S3_BUCKET`, `WAL_GS_BUCKET`
-or `AZURE_STORAGE_ACCOUNT` to an empty string.
+every cluster via the `env` or `envFrom` section in the manifest. For example,
+if you use individual backup locations for each of your clusters. Or you want
+to disable WAL archiving for a certain cluster by setting `WAL_S3_BUCKET`,
+`WAL_GS_BUCKET` or `AZURE_STORAGE_ACCOUNT` to an empty string.
 
 The operator will give precedence to environment variables in the following
 order (e.g. a variable defined in 4. overrides a variable with the same name
@@ -752,6 +752,9 @@ in 5.):
 5. Pod environment secret via operator config
 6. Pod environment config map via operator config
 7. WAL and logical backup settings from operator config
+
+The `envFrom` section is treated separately and allows for a very flexible
+local configuration referecing a config map or secret.
 
 ### Via ConfigMap
 

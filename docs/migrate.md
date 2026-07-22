@@ -2,6 +2,12 @@
 
 Version 2.0 changes some default settings and removes deprecated fields. Please read the following sections before upgrading the Postgres Operator deployment.
 
+## scram-sha-256 by default
+
+The new operator will default password encryption to `scram-sha-256`. Unless you configure `password_encryption: md5` in the manifest under `spec.postgresql.parameters` the operator will encrypt existing passwords in the secrets with `scram-sha-256` and alter the database passwords. Make sure that your used clients and drivers support `scram-sha-256` as pods will get rotated in rolling fashion after updating to Postgres Operator v2.
+
+The default Spilo image (`spilo-18:4.1-p2`) still configures the pg_hba.conf file to allow `md5` passwords but Postgres will validate `scram-sha-256` passwords correctly. Passwords of users that are not managed by the operator and are still `md5` enrypted need be altered before the next tagged Spilo image which will drop `md5` completely.
+
 ## K8s Endpoints are deprecated
 
 If your current operator v1.x deployment is relying on K8s endpoints (the default setup) for Patroni to manage the HA state you have to start planning to switch to configmaps, because endpoints are deprecated from K8s 1.33 onwards. The default of the corresponding parameter `kubernetes_use_configmaps` is changing to `true` with v2.0 of the operator. This means you have to explicity set it to `false` in your configuration before you start the upgrade.
@@ -15,7 +21,6 @@ We explicitly warn you to go straight to configmap-based HA management with data
 3. Check again that all clusters are healthy with configmaps created. There should be three for each cluster called like cluster name with suffixes `-config`, `-failover` and `-leader`. Now, revert the changes from step 1 and scale-out the to number of instances set in the manifests.
 
 4. The orphaned endpoints, which use the same names like the new configmaps, have to be deleted by you or your K8s garbage collection.
-
 
 ## Dropped manifest fields
 
