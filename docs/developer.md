@@ -30,8 +30,7 @@ git clone https://github.com/zalando/postgres-operator.git
 We use [Go Modules](https://github.com/golang/go/wiki/Modules) for handling dependencies.
 Run `go mod vendor && go mod tidy` to install them.
 
-Build the operator with the `make docker` command. You may define the TAG variable to assign an explicit tag to your Docker image and the IMAGE to set the image name. By default, the tag is computed with
-`git describe --tags --always --dirty` and the image is `ghcr.io/zalando/postgres-operator`. On macos search and replace `sed -i` commands with `sed -i ''` for the make commands to work.
+Build the operator with the `make docker` command. You may define the TAG variable to assign an explicit tag to your Docker image and the IMAGE to set the image name. By default, the tag is computed with `git describe --tags --always --dirty` and the image is `ghcr.io/zalando/postgres-operator`.
 
 ```bash
 export TAG=$(git describe --tags --always --dirty)
