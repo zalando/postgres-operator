@@ -37,7 +37,7 @@ copy: clean
 	mkdir tls
 
 docker:
-	docker build -t "$(IMAGE):$(TAG)" .
+	docker buildx build --load --rm -t "$(IMAGE):$(TAG)" .
 
 push: docker
 	docker push "$(IMAGE):$(TAG)"

@@ -1568,7 +1568,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t ghcr.io/zalando/postgres-operator-ui:v2.0.0 .
+docker buildx build --load -t ghcr.io/zalando/postgres-operator-ui:v2.0.0 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/
