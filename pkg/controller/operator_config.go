@@ -282,6 +282,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest = fromCRD.ConnectionPooler.DefaultMemoryRequest
 	result.ConnectionPooler.ConnectionPoolerDefaultCPULimit = fromCRD.ConnectionPooler.DefaultCPULimit
 	result.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit = fromCRD.ConnectionPooler.DefaultMemoryLimit
+	result.ConnectionPooler.PriorityClassName = fromCRD.ConnectionPooler.PriorityClassName
 
 	result.ConnectionPooler.MaxDBConnections = util.CoalesceInt32(
 		fromCRD.ConnectionPooler.MaxDBConnections,

@@ -474,6 +474,8 @@ configConnectionPooler:
   connection_pooler_mode: "transaction"
   # number of pooler instances
   connection_pooler_number_of_instances: 2
+  # priorityClassName to assign to pooler pods
+  # connection_pooler_priority_class_name: ""
   # default resources
   connection_pooler_default_cpu_request: 500m
   connection_pooler_default_memory_request: 100Mi

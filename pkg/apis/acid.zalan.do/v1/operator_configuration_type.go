@@ -347,6 +347,7 @@ type ConnectionPoolerConfiguration struct {
 	DefaultCPULimit string `json:"connection_pooler_default_cpu_limit,omitempty"`
 	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
 	DefaultMemoryLimit string `json:"connection_pooler_default_memory_limit,omitempty"`
+	PriorityClassName  string `json:"connection_pooler_priority_class_name,omitempty"`
 }
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
