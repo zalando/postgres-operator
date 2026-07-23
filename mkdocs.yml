@@ -5,6 +5,7 @@ theme: readthedocs
 nav:
   - Concepts: 'index.md'
   - Quickstart: 'quickstart.md'
+  - Migration from v1: 'migrate.md'
   - Postgres Operator UI: 'operator-ui.md'
   - Admin guide: 'administrator.md'
   - User guide: 'user.md'

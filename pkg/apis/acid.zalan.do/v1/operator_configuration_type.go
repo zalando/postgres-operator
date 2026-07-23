@@ -354,7 +354,7 @@ type OperatorLogicalBackupConfiguration struct {
 	// +kubebuilder:validation:Pattern=`^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$`
 	// +kubebuilder:default="30 00 * * *"
 	Schedule string `json:"logical_backup_schedule,omitempty"`
-	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
+	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/logical-backup:v2.0.0"
 	DockerImage string `json:"logical_backup_docker_image,omitempty"`
 	// +kubebuilder:validation:Enum=az;gcs;s3
 	// +kubebuilder:default=s3
@@ -412,7 +412,7 @@ type OperatorConfigurationData struct {
 	EtcdHost string `json:"etcd_host,omitempty"`
 	// +kubebuilder:default=true
 	KubernetesUseConfigMaps *bool `json:"kubernetes_use_configmaps,omitempty"`
-	// +kubebuilder:default="ghcr.io/zalando/spilo-18:4.1-p1"
+	// +kubebuilder:default="ghcr.io/zalando/spilo-18:4.1-p2"
 	DockerImage string `json:"docker_image,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=8

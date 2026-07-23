@@ -47,15 +47,8 @@ flexibility to complement it with other tools like [ZMON](https://opensource.zal
 Here is a diagram, that summarizes what would be created by the operator, when a
 new Postgres cluster CRD is submitted:
 
-![postgresql-operator](diagrams/operator.png "K8s resources, created by operator")
-
-This picture is not complete without an overview of what is inside a single
-cluster pod, so let's zoom in:
-
-![pod](diagrams/pod.png "Database pod components")
-
-These two diagrams should help you to understand the basics of what kind of
-functionality the operator provides.
+![Features](docs/diagrams/neutral_operator_dark.png#gh-dark-mode-only)
+![Features](docs/diagrams/neutral_operator_light.png#gh-light-mode-only)
 
 ## Status
 

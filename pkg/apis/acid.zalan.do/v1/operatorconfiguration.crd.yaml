@@ -142,7 +142,7 @@ spec:
                     type: boolean
                 type: object
               docker_image:
-                default: ghcr.io/zalando/spilo-18:4.1-p1
+                default: ghcr.io/zalando/spilo-18:4.1-p2
                 type: string
               enable_crd_registration:
                 default: true
@@ -649,7 +649,7 @@ spec:
                   logical_backup_cronjob_environment_secret:
                     type: string
                   logical_backup_docker_image:
-                    default: ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1
+                    default: ghcr.io/zalando/postgres-operator/logical-backup:v2.0.0
                     type: string
                   logical_backup_failed_jobs_history_limit:
                     default: 3
