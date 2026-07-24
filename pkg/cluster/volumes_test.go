@@ -34,7 +34,7 @@ var testVol = testVolume{
 	size:        100,
 	iops:        300,
 	throughtput: 125,
-	volType:     "gp2",
+	volType:     "gp3",
 }
 
 func newFakeK8sPVCclient() (k8sutil.KubernetesClient, *fake.Clientset) {
