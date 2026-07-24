@@ -155,23 +155,32 @@ func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 
 // ModifyVolume Modify EBS volume
 func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSize *int64, iops *int64, throughput *int64) error {
-	/* first check if the volume is already of a requested size */
 	var sizeInt32 *int32
 	var iopsInt32 *int32
 	var throughputInt32 *int32
+
+	input := ec2.ModifyVolumeInput{
+		VolumeId: &volumeID,
+	}
 	if newSize != nil {
 		s := int32(*newSize)
 		sizeInt32 = &s
+		input.Size = sizeInt32
 	}
 	if iops != nil {
 		i := int32(*iops)
 		iopsInt32 = &i
+		input.Iops = iopsInt32
 	}
 	if throughput != nil {
 		t := int32(*throughput)
 		throughputInt32 = &t
+		input.Throughput = throughputInt32
 	}
-	input := ec2.ModifyVolumeInput{Size: sizeInt32, VolumeId: &volumeID, VolumeType: types.VolumeType(*newType), Iops: iopsInt32, Throughput: throughputInt32}
+	if newType != nil {
+		input.VolumeType = types.VolumeType(*newType)
+	}
+
 	output, err := r.connection.ModifyVolume(context.TODO(), &input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)

@@ -21,5 +21,12 @@ jobs:
       run: make codegen
     - name: Run unit tests
       run: make test
+    - name: Pre-pull heavy images directly on Kind nodes
+      run: |
+        FOR_NODE=$(kind get nodes --name postgres-operator-e2e-tests 2>/dev/null || true)
+        for node in $FOR_NODE; do
+          echo "Pulling Spilo image on node $node..."
+          docker exec "$node" crictl pull ghcr.io/zalando/spilo-18:4.1-p2
+        done
     - name: Run end-2-end tests
       run: make e2e

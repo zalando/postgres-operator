@@ -24,6 +24,15 @@ esac
 echo "Clustername: ${cluster_name}"
 echo "Kubeconfig path: ${kubeconfig_path}"
 
+# Helper function to pull images directly into kind nodes via crictl (bypasses host disk duplication)
+function pull_on_kind_nodes() {
+  local img="$1"
+  echo "Pulling ${img} directly on kind nodes..."
+  for node in $(kind get nodes --name "${cluster_name}"); do
+    docker exec "$node" crictl pull "${img}"
+  done
+}
+
 function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
   components=("postgres-operator" "pooler")
@@ -66,14 +75,14 @@ function start_kind(){
   export KUBECONFIG="${kubeconfig_path}"
   kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml  
   
-  echo "Pulling Spilo image for platform ${PLATFORM}"
-  docker pull --platform ${PLATFORM} "${spilo_image}"
-  kind load docker-image "${spilo_image}" --name ${cluster_name}
+  echo "Pulling Spilo image on kind nodes directly..."
+  pull_on_kind_nodes "${spilo_image}"
 }
 
 function load_operator_images() {
   echo "Loading operator images"
   export KUBECONFIG="${kubeconfig_path}"
+  # For locally built operator images, kind load is still fine since they're light
   kind load docker-image "${operator_image}" --name ${cluster_name}
   kind load docker-image "${pooler_image}" --name ${cluster_name}
 }
