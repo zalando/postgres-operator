@@ -639,9 +639,11 @@ masters in single-node clusters and/or the last remaining running instance in a 
 cluster.
 
 ## PDB for critical operations
-The `MinAvailable` parameter of this PDB is equal to the `numberOfInstances` set in the
-cluster manifest, while label selector includes `critical-operation=true` condition. This
-allows to protect all pods of a cluster, given they are labeled accordingly.
+The `MaxUnavailable` parameter of this PDB is set to `0`, while label selector includes
+`critical-operation=true` condition. This blocks voluntary disruptions for all pods of a
+cluster that are labeled accordingly, without leaving an unsatisfiable budget behind when
+no pods carry the label (which previously kept monitoring alerts like
+`KubePdbNotEnoughHealthyPods` firing permanently).
 For example, Operator labels all Spilo pods with `critical-operation=true` during the major
 version upgrade run. You may want to protect cluster pods during other critical operations
 by assigning the label to pods yourself or using other means of automation.
@@ -651,7 +653,8 @@ The PDB is only relaxed in two scenarios:
 * If a cluster is scaled down to `0` instances (e.g. for draining nodes)
 * If the PDB is disabled in the configuration (`enable_pod_disruption_budget`)
 
-The PDBs are still in place having `MinAvailable` set to `0`. Disabling PDBs
+The PDBs are still in place: the primary PDB with `MinAvailable` set to `0` and the
+critical operations PDB with `MaxUnavailable` set to `100%`. Disabling PDBs
 helps avoiding blocking Kubernetes upgrades in managed K8s environments at the
 cost of prolonged DB downtime. See PR [#384](https://github.com/zalando/postgres-operator/pull/384)
 for the use case.
