@@ -2315,12 +2315,18 @@ func (c *Cluster) generatePrimaryPodDisruptionBudget() *policyv1.PodDisruptionBu
 }
 
 func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptionBudget {
-	minAvailable := intstr.FromInt32(c.Spec.NumberOfInstances)
+	// MaxUnavailable: 0 blocks voluntary disruption of any pod carrying the
+	// critical-operation label, while keeping the budget satisfied when no
+	// pod matches (status.desiredHealthy stays 0 outside critical
+	// operations). The previous MinAvailable: N spec left desiredHealthy at
+	// N with zero matching pods during normal operation, permanently firing
+	// alerts like kube-prometheus-stack's KubePdbNotEnoughHealthyPods (#3020).
+	maxUnavailable := intstr.FromInt32(0)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 
-	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
+	// if PodDisruptionBudget is disabled or if there are no DB pods, allow all disruptions.
 	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
-		minAvailable = intstr.FromInt(0)
+		maxUnavailable = intstr.FromString("100%")
 	}
 
 	labels := c.labelsSet(false)
@@ -2335,7 +2341,7 @@ func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptio
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
-			MinAvailable: &minAvailable,
+			MaxUnavailable: &maxUnavailable,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
