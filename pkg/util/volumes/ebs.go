@@ -171,7 +171,15 @@ func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSiz
 		t := int32(*throughput)
 		throughputInt32 = &t
 	}
-	input := ec2.ModifyVolumeInput{Size: sizeInt32, VolumeId: &volumeID, VolumeType: types.VolumeType(*newType), Iops: iopsInt32, Throughput: throughputInt32}
+	input := ec2.ModifyVolumeInput{
+		Size:       sizeInt32,
+		VolumeId:   &volumeID,
+		Iops:       iopsInt32,
+		Throughput: throughputInt32,
+	}
+	if newType != nil {
+		input.VolumeType = types.VolumeType(*newType)
+	}
 	output, err := r.connection.ModifyVolume(context.TODO(), &input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)
