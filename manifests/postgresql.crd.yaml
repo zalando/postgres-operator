@@ -3259,6 +3259,7 @@ spec:
                 properties:
                   iops:
                     format: int32
+                    maximum: 80000
                     type: integer
                   isSubPathExpr:
                     type: boolean
@@ -3320,6 +3321,7 @@ spec:
                     type: string
                   throughput:
                     format: int32
+                    maximum: 2000
                     type: integer
                   type:
                     type: string
