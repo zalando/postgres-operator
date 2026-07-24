@@ -653,8 +653,14 @@ The PDB is only relaxed in two scenarios:
 * If a cluster is scaled down to `0` instances (e.g. for draining nodes)
 * If the PDB is disabled in the configuration (`enable_pod_disruption_budget`)
 
-The PDBs are still in place: the primary PDB with `MinAvailable` set to `0` and the
-critical operations PDB with `MaxUnavailable` set to `100%`. Disabling PDBs
+The PDBs are still in place but fully relaxed: the primary PDB with `MinAvailable`
+set to `0` and the critical operations PDB with `MaxUnavailable` set to `100%`.
+The two PDBs intentionally use different budget fields matching their purposes:
+the primary PDB guarantees a minimum count of always-present pods
+(`MinAvailable`), while the critical operations PDB freezes disruptions for
+whatever pods currently carry the `critical-operation=true` label - a
+usually-empty set, which `MaxUnavailable: 0` expresses without producing an
+unsatisfiable budget while idle. Disabling PDBs
 helps avoiding blocking Kubernetes upgrades in managed K8s environments at the
 cost of prolonged DB downtime. See PR [#384](https://github.com/zalando/postgres-operator/pull/384)
 for the use case.
