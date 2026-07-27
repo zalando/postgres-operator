@@ -582,7 +582,7 @@ configuration they are grouped under the `kubernetes` key.
     1. `ebs`   : operator resizes EBS volumes directly and executes `resizefs` within a pod
     2. `pvc`   : operator only changes PVC definition
     3. `off`   : disables resize of the volumes.
-    4. `mixed` : operator uses AWS API to adjust size, throughput, and IOPS, and calls pvc change for file system resize
+    4. `mixed` : operator uses AWS API to adjust size, type, throughput, and IOPS, and calls pvc change for file system resize
     Default is "pvc".
 
 ## Kubernetes resource requests
@@ -820,16 +820,6 @@ yet officially supported.
 * **additional_secret_mount_path**
   Path to mount the above Secret in the filesystem of the container(s).
   The default is empty.
-
-* **enable_ebs_gp3_migration**
-  enable automatic migration on AWS from gp2 to gp3 volumes, that are smaller
-  than the configured max size (see below). This ignores that EBS gp3 is by
-  default only 125 MB/sec vs 250 MB/sec for gp2 >= 333GB.
-  The default is `false`.
-
-* **enable_ebs_gp3_migration_max_size**
-  defines the maximum volume size in GB until which auto migration happens.
-  Default is 1000 (1TB) which matches 3000 IOPS.
 
 ## Logical backup
 

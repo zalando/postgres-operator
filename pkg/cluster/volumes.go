@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/filesystems"
@@ -79,9 +78,6 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 	}
 	targetSize := quantityToGigabyte(newSize)
 
-	awsGp3 := aws.String("gp3")
-	awsIo2 := aws.String("io2")
-
 	errors := make([]string, 0)
 
 	for _, volume := range c.EBSVolumes {
@@ -106,20 +102,11 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 			modifySize = &targetSize
 		}
 
-		if modifyIops != nil || modifyThroughput != nil || modifySize != nil {
-			if modifyIops != nil || modifyThroughput != nil {
-				// we default to gp3 if iops and throughput are configured
-				modifyType = awsGp3
-				if targetValue.VolumeType == "io2" {
-					modifyType = awsIo2
-				}
-			} else if targetValue.VolumeType == "gp3" && volume.VolumeType != "gp3" {
-				modifyType = awsGp3
-			} else {
-				// do not touch type
-				modifyType = nil
-			}
+		if targetValue.VolumeType != "" && targetValue.VolumeType != volume.VolumeType {
+			modifyType = &targetValue.VolumeType
+		}
 
+		if modifyIops != nil || modifyThroughput != nil || modifySize != nil || modifyType != nil {
 			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, modifyType, modifySize, modifyIops, modifyThroughput)
 			if err != nil {
 				errors = append(errors, fmt.Sprintf("modify failed: %v, showing current EBS values: volume-id=%s size=%d iops=%d throughput=%d", err, volume.VolumeID, volume.Size, volume.Iops, volume.Throughput))
@@ -452,48 +439,4 @@ func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedNam
 
 func quantityToGigabyte(q resource.Quantity) int64 {
 	return q.ScaledValue(0) / (1 * constants.Gigabyte)
-}
-
-func (c *Cluster) executeEBSMigration() error {
-	pvs, err := c.listPersistentVolumes()
-	if err != nil {
-		return fmt.Errorf("could not list persistent volumes: %v", err)
-	}
-	if len(pvs) == 0 {
-		c.logger.Warningf("no persistent volumes found - skipping EBS migration")
-		return nil
-	}
-	c.logger.Debugf("found %d volumes, size of known volumes %d", len(pvs), len(c.EBSVolumes))
-
-	if len(pvs) == len(c.EBSVolumes) {
-		hasGp2 := false
-		for _, v := range c.EBSVolumes {
-			if v.VolumeType == "gp2" {
-				hasGp2 = true
-			}
-		}
-
-		if !hasGp2 {
-			c.logger.Debugf("no EBS gp2 volumes left to migrate")
-			return nil
-		}
-	}
-
-	var i3000 int64 = 3000
-	var i125 int64 = 125
-
-	for _, volume := range c.EBSVolumes {
-		if volume.VolumeType == "gp2" && volume.Size < c.OpConfig.EnableEBSGp3MigrationMaxSize {
-			c.logger.Infof("modifying EBS volume %s to type gp3 migration (%d)", volume.VolumeID, volume.Size)
-			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, aws.String("gp3"), &volume.Size, &i3000, &i125)
-			if nil != err {
-				c.logger.Warningf("modifying volume %s failed: %v", volume.VolumeID, err)
-			}
-		} else {
-			c.logger.Debugf("skipping EBS volume %s to type gp3 migration (%d)", volume.VolumeID, volume.Size)
-		}
-		c.EBSVolumes[volume.VolumeID] = volume
-	}
-
-	return nil
 }
