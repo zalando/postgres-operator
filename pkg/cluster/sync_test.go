@@ -101,8 +101,8 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 					DefaultMemoryLimit:    "300Mi",
 					InheritedAnnotations:  []string{inheritedAnnotation},
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: &metav1.Duration{Duration: 3 * time.Second},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: 10 * time.Minute},
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -187,8 +187,8 @@ func TestPodAnnotationsSync(t *testing.T) {
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
-				PatroniAPICheckInterval: time.Duration(1),
-				PatroniAPICheckTimeout:  time.Duration(5),
+				PatroniAPICheckInterval: &metav1.Duration{Duration: 1 * time.Second},
+				PatroniAPICheckTimeout:  &metav1.Duration{Duration: 5 * time.Second},
 				PodManagementPolicy:     "ordered_ready",
 				CustomPodAnnotations:    customPodAnnotations,
 				ConnectionPooler: config.ConnectionPooler{
@@ -207,8 +207,8 @@ func TestPodAnnotationsSync(t *testing.T) {
 					DefaultMemoryLimit:    "300Mi",
 					MaxInstances:          -1,
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: &metav1.Duration{Duration: 3 * time.Second},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: 10 * time.Minute},
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -381,8 +381,8 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 					DefaultMemoryRequest:  "300Mi",
 					DefaultMemoryLimit:    "300Mi",
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: &metav1.Duration{Duration: 3 * time.Second},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: 10 * time.Minute},
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -694,8 +694,8 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
-				PatroniAPICheckInterval: time.Duration(1),
-				PatroniAPICheckTimeout:  time.Duration(5),
+				PatroniAPICheckInterval: &metav1.Duration{Duration: 1 * time.Second},
+				PatroniAPICheckTimeout:  &metav1.Duration{Duration: 5 * time.Second},
 				PodManagementPolicy:     "ordered_ready",
 				Resources: config.Resources{
 					ClusterLabels:         map[string]string{"application": applicationLabel},
@@ -707,8 +707,8 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 					MinInstances:          int32(-1),
 					MaxInstances:          int32(-1),
 					PodRoleLabel:          "spilo-role",
-					ResourceCheckInterval: time.Duration(3),
-					ResourceCheckTimeout:  time.Duration(10),
+					ResourceCheckInterval: &metav1.Duration{Duration: 3 * time.Second},
+					ResourceCheckTimeout:  &metav1.Duration{Duration: 10 * time.Minute},
 				},
 			},
 		}, client, pg, logger, eventRecorder)
@@ -799,6 +799,41 @@ func TestSyncStandbyClusterConfiguration(t *testing.T) {
 	assert.NotContains(t, updatedSts2.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
 
 	// this should update the Patroni config again
+	err = cluster.syncStandbyClusterConfiguration()
+	assert.NoError(t, err)
+
+	// test with standby_host, standby_port and standby_primary_slot_name
+	cluster.Spec.StandbyCluster = &acidv1.StandbyDescription{
+		StandbyHost:            "remote-primary.example.com",
+		StandbyPort:            "5433",
+		StandbyPrimarySlotName: "standby_slot",
+	}
+	cluster.syncStatefulSet()
+	updatedSts4 := cluster.Statefulset
+
+	// check that pods have all three STANDBY_* environment variables
+	assert.Contains(t, updatedSts4.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_HOST", Value: "remote-primary.example.com"})
+	assert.Contains(t, updatedSts4.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PORT", Value: "5433"})
+	assert.Contains(t, updatedSts4.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PRIMARY_SLOT_NAME", Value: "standby_slot"})
+
+	// this should update the Patroni config with host, port and primary_slot_name
+	err = cluster.syncStandbyClusterConfiguration()
+	assert.NoError(t, err)
+
+	// test property deletion: remove standby_primary_slot_name
+	cluster.Spec.StandbyCluster = &acidv1.StandbyDescription{
+		StandbyHost: "remote-primary.example.com",
+		StandbyPort: "5433",
+	}
+	cluster.syncStatefulSet()
+	updatedSts5 := cluster.Statefulset
+
+	// check that STANDBY_PRIMARY_SLOT_NAME is not present
+	assert.Contains(t, updatedSts5.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_HOST", Value: "remote-primary.example.com"})
+	assert.Contains(t, updatedSts5.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PORT", Value: "5433"})
+	assert.NotContains(t, updatedSts5.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "STANDBY_PRIMARY_SLOT_NAME", Value: "standby_slot"})
+
+	// this should update the Patroni config and set primary_slot_name to nil
 	err = cluster.syncStandbyClusterConfiguration()
 	assert.NoError(t, err)
 }
@@ -1015,6 +1050,6 @@ func TestUpdateSecretNameConflict(t *testing.T) {
 	assert.Error(t, err)
 
 	// the order of secrets to sync is not deterministic, check only first part of the error message
-	expectedError := fmt.Sprintf("syncing secret %s failed: could not update secret because of user name mismatch", "default/prepared-owner-user.acid-test-cluster.credentials")
+	expectedError := fmt.Sprintf("syncing secret %s failed: error while checking for password rotation: could not update secret because of user name mismatch", "default/prepared-owner-user.acid-test-cluster.credentials")
 	assert.Contains(t, err.Error(), expectedError)
 }

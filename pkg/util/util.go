@@ -87,7 +87,7 @@ func NewEncryptor(encryption string) *Encryptor {
 	}
 	hasher, ok := m[encryption]
 	if !ok {
-		hasher = e.PGUserPasswordMD5
+		hasher = e.PGUserPasswordScramSHA256
 	}
 	e.encrypt = hasher
 	return &e
@@ -311,14 +311,14 @@ func CoalesceBool(val, defaultVal *bool) *bool {
 	return val
 }
 
-// CoalesceDuration works like coalesce but for time.Duration
-func CoalesceDuration(val time.Duration, defaultVal string) time.Duration {
-	if val == 0 {
+// CoalesceDuration works like coalesce but for metav1.Duration
+func CoalesceDuration(val *metav1.Duration, defaultVal string) *metav1.Duration {
+	if val == nil || val.Duration == 0 {
 		duration, err := time.ParseDuration(defaultVal)
 		if err != nil {
 			panic(err)
 		}
-		return duration
+		return &metav1.Duration{Duration: duration}
 	}
 	return val
 }

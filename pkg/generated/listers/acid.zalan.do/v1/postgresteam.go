@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,10 +25,10 @@ SOFTWARE.
 package v1
 
 import (
-	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PostgresTeamLister helps list PostgresTeams.
@@ -36,7 +36,7 @@ import (
 type PostgresTeamLister interface {
 	// List lists all PostgresTeams in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PostgresTeam, err error)
+	List(selector labels.Selector) (ret []*acidzalandov1.PostgresTeam, err error)
 	// PostgresTeams returns an object that can list and get PostgresTeams.
 	PostgresTeams(namespace string) PostgresTeamNamespaceLister
 	PostgresTeamListerExpansion
@@ -44,25 +44,17 @@ type PostgresTeamLister interface {
 
 // postgresTeamLister implements the PostgresTeamLister interface.
 type postgresTeamLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*acidzalandov1.PostgresTeam]
 }
 
 // NewPostgresTeamLister returns a new PostgresTeamLister.
 func NewPostgresTeamLister(indexer cache.Indexer) PostgresTeamLister {
-	return &postgresTeamLister{indexer: indexer}
-}
-
-// List lists all PostgresTeams in the indexer.
-func (s *postgresTeamLister) List(selector labels.Selector) (ret []*v1.PostgresTeam, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.PostgresTeam))
-	})
-	return ret, err
+	return &postgresTeamLister{listers.New[*acidzalandov1.PostgresTeam](indexer, acidzalandov1.Resource("postgresteam"))}
 }
 
 // PostgresTeams returns an object that can list and get PostgresTeams.
 func (s *postgresTeamLister) PostgresTeams(namespace string) PostgresTeamNamespaceLister {
-	return postgresTeamNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return postgresTeamNamespaceLister{listers.NewNamespaced[*acidzalandov1.PostgresTeam](s.ResourceIndexer, namespace)}
 }
 
 // PostgresTeamNamespaceLister helps list and get PostgresTeams.
@@ -70,36 +62,15 @@ func (s *postgresTeamLister) PostgresTeams(namespace string) PostgresTeamNamespa
 type PostgresTeamNamespaceLister interface {
 	// List lists all PostgresTeams in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PostgresTeam, err error)
+	List(selector labels.Selector) (ret []*acidzalandov1.PostgresTeam, err error)
 	// Get retrieves the PostgresTeam from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.PostgresTeam, error)
+	Get(name string) (*acidzalandov1.PostgresTeam, error)
 	PostgresTeamNamespaceListerExpansion
 }
 
 // postgresTeamNamespaceLister implements the PostgresTeamNamespaceLister
 // interface.
 type postgresTeamNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all PostgresTeams in the indexer for a given namespace.
-func (s postgresTeamNamespaceLister) List(selector labels.Selector) (ret []*v1.PostgresTeam, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.PostgresTeam))
-	})
-	return ret, err
-}
-
-// Get retrieves the PostgresTeam from the indexer for a given namespace and name.
-func (s postgresTeamNamespaceLister) Get(name string) (*v1.PostgresTeam, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("postgresteam"), name)
-	}
-	return obj.(*v1.PostgresTeam), nil
+	listers.ResourceIndexer[*acidzalandov1.PostgresTeam]
 }

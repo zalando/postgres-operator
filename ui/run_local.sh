@@ -28,14 +28,14 @@ default_operator_ui_config='{
   "cost_memory": 0.014375,
   "free_iops": 3000,
   "free_throughput": 125,
-  "limit_iops": 16000,
-  "limit_throughput": 1000,
+  "limit_iops": 80000,
+  "limit_throughput": 2000,
   "postgresql_versions": [
+    "18",
     "17",
     "16",
     "15",
     "14",
-    "13"
   ],
   "static_network_whitelist": {
     "localhost": ["172.0.0.1/32"]

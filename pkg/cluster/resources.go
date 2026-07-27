@@ -234,7 +234,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	// wait until the statefulset is truly deleted
 	c.logger.Debug("waiting for the statefulset to be deleted")
 
-	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			_, err2 := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(context.TODO(), oldStatefulset.Name, metav1.GetOptions{})
 			if err2 == nil {
@@ -324,9 +324,14 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 		// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
 		oldServiceType := oldService.Spec.Type
 		newServiceType := newService.Spec.Type
-		if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
+		if newServiceType != oldServiceType && oldServiceType == v1.ServiceTypeLoadBalancer {
+			// Kubernetes rejects updates that change type away from LoadBalancer while
+			// loadBalancerSourceRanges is still set; clear it before updating
+			newService.Spec.LoadBalancerSourceRanges = nil
 			newService.ResourceVersion = oldService.ResourceVersion
-			newService.Spec.ClusterIP = oldService.Spec.ClusterIP
+			if newServiceType == v1.ServiceTypeClusterIP {
+				newService.Spec.ClusterIP = oldService.Spec.ClusterIP
+			}
 		}
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
 		if err != nil {
@@ -545,7 +550,7 @@ func (c *Cluster) deletePrimaryPodDisruptionBudget() error {
 	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.PrimaryPodDisruptionBudget.ObjectMeta))
 	c.PrimaryPodDisruptionBudget = nil
 
-	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			_, err2 := c.KubeClient.PodDisruptionBudgets(pdbName.Namespace).Get(context.TODO(), pdbName.Name, metav1.GetOptions{})
 			if err2 == nil {
@@ -583,7 +588,7 @@ func (c *Cluster) deleteCriticalOpPodDisruptionBudget() error {
 	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.CriticalOpPodDisruptionBudget.ObjectMeta))
 	c.CriticalOpPodDisruptionBudget = nil
 
-	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			_, err2 := c.KubeClient.PodDisruptionBudgets(pdbName.Namespace).Get(context.TODO(), pdbName.Name, metav1.GetOptions{})
 			if err2 == nil {

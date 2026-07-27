@@ -80,8 +80,8 @@ func (c *Controller) GetStatus() *spec.ControllerStatus {
 	c.clustersMu.RUnlock()
 
 	queueSizes := make(map[int]int, c.opConfig.Workers)
-	for workerID, queue := range c.clusterEventQueues {
-		queueSizes[workerID] = len(queue.ListKeys())
+	for workerID, store := range c.clusterEventStores {
+		queueSizes[workerID] = len(store.ListKeys())
 	}
 
 	return &spec.ControllerStatus{
@@ -180,11 +180,11 @@ func (c *Controller) Fire(e *logrus.Entry) error {
 
 // ListQueue dumps cluster event queue of the provided worker
 func (c *Controller) ListQueue(workerID uint32) (*spec.QueueDump, error) {
-	if workerID >= uint32(len(c.clusterEventQueues)) {
+	if workerID >= uint32(len(c.clusterEventStores)) {
 		return nil, fmt.Errorf("could not find worker")
 	}
 
-	q := c.clusterEventQueues[workerID]
+	q := c.clusterEventStores[workerID]
 	return &spec.QueueDump{
 		Keys: q.ListKeys(),
 		List: q.List(),
@@ -196,7 +196,7 @@ func (c *Controller) GetWorkersCnt() uint32 {
 	return c.opConfig.Workers
 }
 
-//WorkerStatus provides status of the worker
+// WorkerStatus provides status of the worker
 func (c *Controller) WorkerStatus(workerID uint32) (*cluster.WorkerStatus, error) {
 	obj, ok := c.curWorkerCluster.Load(workerID)
 	if !ok || obj == nil {

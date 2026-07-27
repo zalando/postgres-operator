@@ -1,38 +1,13 @@
 package controller
 
 import (
-	"context"
-
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"k8s.io/apimachinery/pkg/types"
 )
-
-func (c *Controller) podListFunc(options metav1.ListOptions) (runtime.Object, error) {
-	opts := metav1.ListOptions{
-		Watch:           options.Watch,
-		ResourceVersion: options.ResourceVersion,
-		TimeoutSeconds:  options.TimeoutSeconds,
-	}
-
-	return c.KubeClient.Pods(c.opConfig.WatchedNamespace).List(context.TODO(), opts)
-}
-
-func (c *Controller) podWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
-	opts := metav1.ListOptions{
-		Watch:           options.Watch,
-		ResourceVersion: options.ResourceVersion,
-		TimeoutSeconds:  options.TimeoutSeconds,
-	}
-
-	return c.KubeClient.Pods(c.opConfig.WatchedNamespace).Watch(context.TODO(), opts)
-}
 
 func (c *Controller) dispatchPodEvent(clusterName spec.NamespacedName, event cluster.PodEvent) {
 	c.clustersMu.RLock()

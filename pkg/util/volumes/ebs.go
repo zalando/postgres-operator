@@ -1,12 +1,13 @@
 package volumes
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -15,17 +16,17 @@ import (
 
 // EBSVolumeResizer implements volume resizing interface for AWS EBS volumes.
 type EBSVolumeResizer struct {
-	connection *ec2.EC2
+	connection *ec2.Client
 	AWSRegion  string
 }
 
 // ConnectToProvider connects to AWS.
 func (r *EBSVolumeResizer) ConnectToProvider() error {
-	sess, err := session.NewSession(&aws.Config{Region: aws.String(r.AWSRegion)})
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(r.AWSRegion))
 	if err != nil {
 		return fmt.Errorf("could not establish AWS session: %v", err)
 	}
-	r.connection = ec2.New(sess)
+	r.connection = ec2.NewFromConfig(cfg)
 	return nil
 }
 
@@ -77,7 +78,7 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 		}
 	}
 
-	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: aws.StringSlice((volumeIds))})
+	volumeOutput, err := r.connection.DescribeVolumes(context.TODO(), &ec2.DescribeVolumesInput{VolumeIds: volumeIds})
 	if err != nil {
 		return nil, err
 	}
@@ -88,23 +89,23 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 	}
 
 	for _, v := range volumeOutput.Volumes {
-		switch *v.VolumeType {
-		case "gp3":
-			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: *v.Size, VolumeType: *v.VolumeType, Iops: *v.Iops, Throughput: *v.Throughput})
-		case "gp2":
-			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: *v.Size, VolumeType: *v.VolumeType})
-		default:
-			return nil, fmt.Errorf("discovered unexpected volume type %s %s", *v.VolumeId, *v.VolumeType)
+		vp := VolumeProperties{VolumeID: *v.VolumeId, Size: int32(*v.Size), VolumeType: string(v.VolumeType)}
+		if v.Iops != nil {
+			vp.Iops = int32(*v.Iops)
 		}
+		if v.Throughput != nil {
+			vp.Throughput = int32(*v.Throughput)
+		}
+		p = append(p, vp)
 	}
 
 	return p, nil
 }
 
 // ResizeVolume actually calls AWS API to resize the EBS volume if necessary.
-func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
+func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int32) error {
 	/* first check if the volume is already of a requested size */
-	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeID}})
+	volumeOutput, err := r.connection.DescribeVolumes(context.TODO(), &ec2.DescribeVolumesInput{VolumeIds: []string{volumeID}})
 	if err != nil {
 		return fmt.Errorf("could not get information about the volume: %v", err)
 	}
@@ -117,12 +118,12 @@ func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 		return nil
 	}
 	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeID}
-	output, err := r.connection.ModifyVolume(&input)
+	output, err := r.connection.ModifyVolume(context.TODO(), &input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)
 	}
 
-	state := *output.VolumeModification.ModificationState
+	state := output.VolumeModification.ModificationState
 	if state == constants.EBSVolumeStateFailed {
 		return fmt.Errorf("could not modify persistent volume %q: modification state failed", volumeID)
 	}
@@ -133,10 +134,10 @@ func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 		return nil
 	}
 	// wait until the volume reaches the "optimizing" or "completed" state
-	in := ec2.DescribeVolumesModificationsInput{VolumeIds: []*string{&volumeID}}
+	in := ec2.DescribeVolumesModificationsInput{VolumeIds: []string{volumeID}}
 	return retryutil.Retry(constants.EBSVolumeResizeWaitInterval, constants.EBSVolumeResizeWaitTimeout,
 		func() (bool, error) {
-			out, err := r.connection.DescribeVolumesModifications(&in)
+			out, err := r.connection.DescribeVolumesModifications(context.TODO(), &in)
 			if err != nil {
 				return false, fmt.Errorf("could not describe volume modification: %v", err)
 			}
@@ -147,20 +148,32 @@ func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 				return false, fmt.Errorf("non-matching volume id when describing modifications: %q is different from %q",
 					*out.VolumesModifications[0].VolumeId, volumeID)
 			}
-			return *out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil
+			return out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil
 		})
 }
 
 // ModifyVolume Modify EBS volume
-func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSize *int64, iops *int64, throughput *int64) error {
-	/* first check if the volume is already of a requested size */
-	input := ec2.ModifyVolumeInput{Size: newSize, VolumeId: &volumeID, VolumeType: newType, Iops: iops, Throughput: throughput}
-	output, err := r.connection.ModifyVolume(&input)
+func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSize *int32, iops *int32, throughput *int32) error {
+	input := ec2.ModifyVolumeInput{VolumeId: &volumeID}
+	if newSize != nil {
+		input.Size = newSize
+	}
+	if iops != nil {
+		input.Iops = iops
+	}
+	if throughput != nil {
+		input.Throughput = throughput
+	}
+	if newType != nil {
+		input.VolumeType = types.VolumeType(*newType)
+	}
+
+	output, err := r.connection.ModifyVolume(context.TODO(), &input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)
 	}
 
-	state := *output.VolumeModification.ModificationState
+	state := output.VolumeModification.ModificationState
 	if state == constants.EBSVolumeStateFailed {
 		return fmt.Errorf("could not modify persistent volume %q: modification state failed", volumeID)
 	}
@@ -171,10 +184,10 @@ func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSiz
 		return nil
 	}
 	// wait until the volume reaches the "optimizing" or "completed" state
-	in := ec2.DescribeVolumesModificationsInput{VolumeIds: []*string{&volumeID}}
+	in := ec2.DescribeVolumesModificationsInput{VolumeIds: []string{volumeID}}
 	return retryutil.Retry(constants.EBSVolumeResizeWaitInterval, constants.EBSVolumeResizeWaitTimeout,
 		func() (bool, error) {
-			out, err := r.connection.DescribeVolumesModifications(&in)
+			out, err := r.connection.DescribeVolumesModifications(context.TODO(), &in)
 			if err != nil {
 				return false, fmt.Errorf("could not describe volume modification: %v", err)
 			}
@@ -185,7 +198,7 @@ func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSiz
 				return false, fmt.Errorf("non-matching volume id when describing modifications: %q is different from %q",
 					*out.VolumesModifications[0].VolumeId, volumeID)
 			}
-			return *out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil
+			return out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil
 		})
 }
 

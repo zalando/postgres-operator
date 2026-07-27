@@ -9,4 +9,4 @@ mkdir -p "$team_repo"
 ln -s "$PWD" "$project_dir"
 cd "$project_dir"
 
-make deps clean docker push
+make clean docker push

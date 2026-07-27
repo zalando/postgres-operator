@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -161,6 +162,14 @@ func specPatch(spec interface{}) ([]byte, error) {
 func metaAnnotationsPatch(annotations map[string]string) ([]byte, error) {
 	var meta metav1.ObjectMeta
 	meta.Annotations = annotations
+	return json.Marshal(struct {
+		ObjMeta interface{} `json:"metadata"`
+	}{&meta})
+}
+
+func metaLabelsPatch(labels map[string]string) ([]byte, error) {
+	var meta metav1.ObjectMeta
+	meta.Labels = labels
 	return json.Marshal(struct {
 		ObjMeta interface{} `json:"metadata"`
 	}{&meta})
@@ -333,7 +342,7 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 }
 
 func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{}, role *PostgresRole) (*v1.Pod, error) {
-	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
+	timeout := time.After(c.OpConfig.PodLabelWaitTimeout.Duration)
 	for {
 		select {
 		case podEvent := <-podEvents:
@@ -355,7 +364,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{},
 }
 
 func (c *Cluster) waitForPodDeletion(podEvents chan PodEvent) error {
-	timeout := time.After(c.OpConfig.PodDeletionWaitTimeout)
+	timeout := time.After(c.OpConfig.PodDeletionWaitTimeout.Duration)
 	for {
 		select {
 		case podEvent := <-podEvents:
@@ -369,7 +378,7 @@ func (c *Cluster) waitForPodDeletion(podEvents chan PodEvent) error {
 }
 
 func (c *Cluster) waitStatefulsetReady() error {
-	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	return retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			listOptions := metav1.ListOptions{
 				LabelSelector: c.labelsSet(false).String(),
@@ -419,7 +428,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 		c.logger.Debug("Waiting for any replica pod to become ready")
 	}
 
-	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval.Duration, c.OpConfig.ResourceCheckTimeout.Duration,
 		func() (bool, error) {
 			masterCount := 0
 			if !anyReplica {
@@ -618,9 +627,12 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 	if !c.patroniUsesKubernetes() {
 		return false
 	}
+	if c.OpConfig.KubernetesUseConfigMaps == nil {
+		return true
+	}
 
 	// otherwise, follow the operator configuration
-	return c.OpConfig.KubernetesUseConfigMaps
+	return *c.OpConfig.KubernetesUseConfigMaps
 }
 
 // Earlier arguments take priority
@@ -663,15 +675,40 @@ func parseResourceRequirements(resourcesRequirement v1.ResourceRequirements) (ac
 	return resources, nil
 }
 
-func isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
-	if len(specMaintenanceWindows) == 0 {
+func isStandbyCluster(spec *acidv1.PostgresSpec) bool {
+	for _, env := range spec.Env {
+		hasStandbyEnv, _ := regexp.MatchString(`^STANDBY_WALE_(S3|GS|GSC|SWIFT)_PREFIX$`, env.Name)
+		if hasStandbyEnv && env.Value != "" {
+			return true
+		}
+	}
+	return spec.StandbyCluster != nil
+}
+
+func (c *Cluster) isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
+	ignoreMaintenanceWindows := c.OpConfig.EnableMaintenanceWindows != nil && !*c.OpConfig.EnableMaintenanceWindows
+	noWindowsDefined := len(specMaintenanceWindows) == 0 && len(c.OpConfig.MaintenanceWindows) == 0
+	if noWindowsDefined || ignoreMaintenanceWindows {
 		return true
 	}
 	now := time.Now()
 	currentDay := now.Weekday()
 	currentTime := now.Format("15:04")
 
-	for _, window := range specMaintenanceWindows {
+	maintenanceWindows := specMaintenanceWindows
+	if len(maintenanceWindows) == 0 {
+		maintenanceWindows = make([]acidv1.MaintenanceWindow, 0, len(c.OpConfig.MaintenanceWindows))
+		for _, windowStr := range c.OpConfig.MaintenanceWindows {
+			var window acidv1.MaintenanceWindow
+			if err := window.UnmarshalJSON([]byte(windowStr)); err != nil {
+				c.logger.Errorf("could not parse default maintenance window %q: %v", windowStr, err)
+				continue
+			}
+			maintenanceWindows = append(maintenanceWindows, window)
+		}
+	}
+
+	for _, window := range maintenanceWindows {
 		startTime := window.StartTime.Format("15:04")
 		endTime := window.EndTime.Format("15:04")
 

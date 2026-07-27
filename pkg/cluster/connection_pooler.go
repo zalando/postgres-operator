@@ -31,6 +31,7 @@ var poolerRunAsGroup = int64(101)
 
 // ConnectionPoolerObjects K8s objects that are belong to connection pooler
 type ConnectionPoolerObjects struct {
+	AuthSecret  *v1.Secret
 	Deployment  *appsv1.Deployment
 	Service     *v1.Service
 	Name        string
@@ -167,6 +168,38 @@ func (c *Cluster) createConnectionPooler(LookupFunction InstallFunction) (SyncRe
 	return reason, nil
 }
 
+func (c *Cluster) generateUserlist() string {
+	var sb strings.Builder
+
+	poolerAdminUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
+	fmt.Fprintf(&sb, "\"%s\" \"%s\"\n", poolerAdminUser.Name, poolerAdminUser.Password)
+
+	for roleName, infraRole := range c.InfrastructureRoles {
+		if infraRole.Password != "" {
+			fmt.Fprintf(&sb, "\"%s\" \"%s\"\n", roleName, infraRole.Password)
+		}
+	}
+
+	return sb.String()
+}
+
+func (c *Cluster) generateConnectionPoolerAuthSecret(connectionPooler *ConnectionPoolerObjects) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:          c.connectionPoolerLabels(connectionPooler.Role, true).MatchLabels,
+			Name:            fmt.Sprintf("%s-u", connectionPooler.Name),
+			Namespace:       connectionPooler.Namespace,
+			Annotations:     c.annotationsSet(nil),
+			OwnerReferences: c.ownerReferences(),
+		},
+		Type: v1.SecretTypeOpaque,
+		// Secret data must be bytes. Kubernetes handles the encoding.
+		StringData: map[string]string{
+			"userlist.txt": c.generateUserlist(),
+		},
+	}
+}
+
 // Generate pool size related environment variables.
 //
 // MAX_DB_CONN would specify the global maximum for connections to a target
@@ -259,7 +292,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	if connectionPoolerSpec == nil {
 		connectionPoolerSpec = &acidv1.ConnectionPooler{}
 	}
-	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
+	gracePeriod := int64(util.CoalesceDuration(c.OpConfig.PodTerminateGracePeriod, "5m").Seconds())
 	resources, err := c.generateResourceRequirements(
 		connectionPoolerSpec.Resources,
 		makeDefaultConnectionPoolerResources(&c.OpConfig),
@@ -320,6 +353,18 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	}
 	envVars = append(envVars, c.getConnectionPoolerEnvVars()...)
 
+	infraRolesList := make([]string, 0)
+	for infraRoleName := range c.InfrastructureRoles {
+		infraRolesList = append(infraRolesList, infraRoleName)
+	}
+
+	if len(infraRolesList) > 0 {
+		envVars = append(envVars, v1.EnvVar{
+			Name:  "INFRASTRUCTURE_ROLES",
+			Value: strings.Join(infraRolesList, ","),
+		})
+	}
+
 	poolerContainer := v1.Container{
 		Name:            connectionPoolerContainer,
 		Image:           effectiveDockerImage,
@@ -343,12 +388,29 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 	}
 
+	var poolerVolumes []v1.Volume
+	var volumeMounts []v1.VolumeMount
+
+	// mount secret volume with userlist.txt for pgBouncer to authenticate users
+	poolerVolumes = append(poolerVolumes, v1.Volume{
+		Name: fmt.Sprintf("%s-u", c.connectionPoolerName(role)),
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: fmt.Sprintf("%s-u", c.connectionPoolerName(role)),
+			},
+		},
+	})
+	volumeMounts = append(volumeMounts, v1.VolumeMount{
+		Name:      fmt.Sprintf("%s-u", c.connectionPoolerName(role)),
+		MountPath: "/etc/pgbouncer/userlist.txt",
+		SubPath:   "userlist.txt",
+		ReadOnly:  true,
+	})
+
 	// If the cluster has custom TLS certificates configured, we do the following:
 	//  1. Add environment variables to tell pgBouncer where to find the TLS certificates
 	//  2. Reference the secret in a volume
 	//  3. Mount the volume to the container at /tls
-	var poolerVolumes []v1.Volume
-	var volumeMounts []v1.VolumeMount
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
 		getPoolerTLSEnv := func(k string) string {
 			keyName := ""
@@ -504,7 +566,9 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 		},
 	}
 
-	if c.shouldCreateLoadBalancerForPoolerService(poolerRole, spec) {
+	if ok, port := c.shouldCreateNodePortForPoolerService(poolerRole, spec); ok {
+		c.configureNodePortService(&serviceSpec, port)
+	} else if c.shouldCreateLoadBalancerForPoolerService(poolerRole, spec) {
 		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
 	}
 
@@ -532,11 +596,9 @@ func (c *Cluster) generatePoolerServiceAnnotations(role PostgresRole, spec *acid
 	var dnsString string
 	annotations := c.getCustomServiceAnnotations(role, spec)
 
-	if c.shouldCreateLoadBalancerForPoolerService(role, spec) {
-		// set ELB Timeout annotation with default value
-		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
-			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
-		}
+	nodePort, _ := c.shouldCreateNodePortForPoolerService(role, spec)
+
+	if !nodePort && c.shouldCreateLoadBalancerForPoolerService(role, spec) {
 		// -repl suffix will be added by replicaDNSName
 		clusterNameWithPoolerSuffix := c.connectionPoolerName(Master)
 		if role == Master {
@@ -572,6 +634,37 @@ func (c *Cluster) shouldCreateLoadBalancerForPoolerService(role PostgresRole, sp
 		}
 		return c.OpConfig.EnableMasterPoolerLoadBalancer
 
+	default:
+		panic(fmt.Sprintf("Unknown role %v", role))
+	}
+}
+
+func (c *Cluster) shouldCreateNodePortForPoolerService(role PostgresRole, spec *acidv1.PostgresSpec) (bool, int32) {
+	switch role {
+	case Replica:
+		// if the value is explicitly set in a Postgresql manifest, follow this setting
+		if spec.EnableReplicaPoolerNodePort != nil {
+			port := int32(0)
+			if spec.ReplicaPoolerNodePort != nil {
+				port = *spec.ReplicaPoolerNodePort
+			}
+
+			return *spec.EnableReplicaPoolerNodePort, port
+		}
+
+		// otherwise, follow the operator configuration
+		return c.OpConfig.EnableReplicaPoolerNodePort, 0
+	case Master:
+		if spec.EnableMasterPoolerNodePort != nil {
+			port := int32(0)
+			if spec.MasterPoolerNodePort != nil {
+				port = *spec.MasterPoolerNodePort
+			}
+
+			return *spec.EnableMasterPoolerNodePort, port
+		}
+
+		return c.OpConfig.EnableMasterPoolerNodePort, 0
 	default:
 		panic(fmt.Sprintf("Unknown role %v", role))
 	}
@@ -639,12 +732,31 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 		c.logger.Infof("connection pooler service %s has been deleted for role %s", service.Name, role)
 	}
 
+	// Repeat the same for the auth secret
+	authSecret := c.ConnectionPooler[role].AuthSecret
+	if authSecret == nil {
+		c.logger.Debug("no connection pooler auth secret to delete")
+	} else {
+		err := c.KubeClient.
+			Secrets(c.Namespace).
+			Delete(context.TODO(), authSecret.Name, metav1.DeleteOptions{})
+
+		if k8sutil.ResourceNotFound(err) {
+			c.logger.Debugf("connection pooler auth secret %s for role %s has already been deleted", authSecret.Name, role)
+		} else if err != nil {
+			return fmt.Errorf("could not delete connection pooler auth secret: %v", err)
+		}
+
+		c.logger.Infof("connection pooler auth secret %s has been deleted for role %s", authSecret.Name, role)
+	}
+
+	c.ConnectionPooler[role].AuthSecret = nil
 	c.ConnectionPooler[role].Deployment = nil
 	c.ConnectionPooler[role].Service = nil
 	return nil
 }
 
-// delete connection pooler
+// delete connection pooler secret
 func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 	// Repeat the same for the secret object
 	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
@@ -660,6 +772,7 @@ func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 			return fmt.Errorf("could not delete pooler secret: %v", err)
 		}
 	}
+
 	return nil
 }
 
@@ -912,7 +1025,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 
 			// in this case also do not forget to install lookup function
 			// skip installation in standby clusters, since they are read-only
-			if !c.ConnectionPooler[role].LookupFunction && c.Spec.StandbyCluster == nil {
+			if !c.ConnectionPooler[role].LookupFunction && !isStandbyCluster(&newSpec.Spec) {
 				connectionPooler := c.Spec.ConnectionPooler
 				specSchema := ""
 				specUser := ""
@@ -975,11 +1088,42 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		pods          []v1.Pod
 		service       *v1.Service
 		newService    *v1.Service
+		authSecret    *v1.Secret
+		newAuthSecret *v1.Secret
 		err           error
 	)
 
 	updatedPodAnnotations := map[string]*string{}
 	syncReason := make([]string, 0)
+
+	// create extra secret for connection pooler authentication
+	newAuthSecret = c.generateConnectionPoolerAuthSecret(c.ConnectionPooler[role])
+	if authSecret, err = c.KubeClient.Secrets(c.Namespace).Get(context.TODO(), fmt.Sprintf("%s-u", c.connectionPoolerName(role)), metav1.GetOptions{}); err == nil {
+		c.ConnectionPooler[role].AuthSecret = authSecret
+		// make sure existing annotations are preserved
+		newAuthSecret.Annotations = c.annotationsSet(authSecret.Annotations)
+		authSecret, err = c.KubeClient.Secrets(authSecret.Namespace).Update(context.TODO(), newAuthSecret, metav1.UpdateOptions{})
+		if err != nil {
+			return NoSync, fmt.Errorf("could not update connection pooler auth secret: %v", err)
+		}
+		c.ConnectionPooler[role].AuthSecret = authSecret
+	} else if !k8sutil.ResourceNotFound(err) {
+		return NoSync, fmt.Errorf("could not get auth secret for connection pooler to sync: %v", err)
+	}
+
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Warningf("auth secret %s for connection pooler is not found, create it", fmt.Sprintf("%s-u", c.connectionPoolerName(role)))
+		authSecret, err = c.KubeClient.
+			Secrets(newAuthSecret.Namespace).
+			Create(context.TODO(), newAuthSecret, metav1.CreateOptions{})
+
+		if err != nil {
+			return NoSync, err
+		}
+		c.ConnectionPooler[role].AuthSecret = authSecret
+	}
+
+	// next the pooler deployment
 	deployment, err = c.KubeClient.
 		Deployments(c.Namespace).
 		Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{})
