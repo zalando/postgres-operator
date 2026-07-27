@@ -66,11 +66,6 @@ spec:
                   aws_region:
                     default: eu-central-1
                     type: string
-                  enable_ebs_gp3_migration:
-                    type: boolean
-                  enable_ebs_gp3_migration_max_size:
-                    format: int64
-                    type: integer
                   gcp_credentials:
                     type: string
                   irsa_role_arn:

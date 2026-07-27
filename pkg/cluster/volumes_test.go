@@ -13,7 +13,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/zalando/postgres-operator/mocks"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -25,9 +24,9 @@ import (
 )
 
 type testVolume struct {
-	size        int64
-	iops        int64
-	throughtput int64
+	size        int32
+	iops        int32
+	throughtput int32
 	volType     string
 }
 
@@ -121,7 +120,7 @@ func TestQuantityToGigabyte(t *testing.T) {
 	tests := []struct {
 		name        string
 		quantityStr string
-		expected    int64
+		expected    int32
 	}{
 		{
 			"test with 1Gi",
@@ -131,12 +130,12 @@ func TestQuantityToGigabyte(t *testing.T) {
 		{
 			"test with float",
 			"1.5Gi",
-			int64(1),
+			int32(1),
 		},
 		{
 			"test with 1000Mi",
 			"1000Mi",
-			int64(0),
+			int32(0),
 		},
 	}
 
@@ -177,64 +176,6 @@ func CreatePVCs(namespace string, clusterName string, labels labels.Set, n int, 
 	}
 
 	return pvcList
-}
-
-func TestMigrateEBS(t *testing.T) {
-	client, _ := newFakeK8sPVCclient()
-	clusterName := "acid-test-cluster"
-	namespace := "default"
-
-	// new cluster with pvc storage resize mode and configured labels
-	var cluster = New(
-		Config{
-			OpConfig: config.Config{
-				Resources: config.Resources{
-					ClusterLabels:    map[string]string{"application": "spilo"},
-					ClusterNameLabel: "cluster-name",
-				},
-				StorageResizeMode:            "pvc",
-				EnableEBSGp3Migration:        true,
-				EnableEBSGp3MigrationMaxSize: 1000,
-			},
-		}, client, acidv1.Postgresql{}, logger, eventRecorder)
-	cluster.Spec.Volume.Size = "1Gi"
-
-	// set metadata, so that labels will get correct values
-	cluster.Name = clusterName
-	cluster.Namespace = namespace
-	filterLabels := cluster.labelsSet(false)
-
-	testVolumes := []testVolume{testVol, testVol}
-
-	initTestVolumesAndPods(cluster.KubeClient, namespace, clusterName, filterLabels, testVolumes)
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	resizer := mocks.NewMockVolumeResizer(ctrl)
-
-	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-1")).Return("ebs-volume-1", nil)
-	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-2")).Return("ebs-volume-2", nil)
-
-	resizer.EXPECT().GetProviderVolumeID(gomock.Any()).
-		DoAndReturn(func(pv *v1.PersistentVolume) (string, error) {
-			return resizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
-		}).
-		Times(2)
-
-	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2"})).Return(
-		[]volumes.VolumeProperties{
-			{VolumeID: "ebs-volume-1", VolumeType: "gp2", Size: 100},
-			{VolumeID: "ebs-volume-2", VolumeType: "gp3", Size: 100}}, nil)
-
-	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-
-	cluster.VolumeResizer = resizer
-	err := cluster.populateVolumeMetaData()
-	assert.NoError(t, err)
-	err = cluster.executeEBSMigration()
-	assert.NoError(t, err)
 }
 
 func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustername string, labels labels.Set, volumes []testVolume) {
@@ -287,7 +228,7 @@ func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustern
 	}
 }
 
-func TestMigrateGp3Support(t *testing.T) {
+func TestGp2Gp3Migration(t *testing.T) {
 	client, _ := newFakeK8sPVCclient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
@@ -300,77 +241,13 @@ func TestMigrateGp3Support(t *testing.T) {
 					ClusterLabels:    map[string]string{"application": "spilo"},
 					ClusterNameLabel: "cluster-name",
 				},
-				StorageResizeMode:            "mixed",
-				EnableEBSGp3Migration:        false,
-				EnableEBSGp3MigrationMaxSize: 1000,
+				StorageResizeMode: "mixed",
 			},
-		}, client, acidv1.Postgresql{}, logger, eventRecorder)
+		}, client, acidv1.Postgresql{Spec: acidv1.PostgresSpec{Volume: acidv1.Volume{VolumeType: "gp3"}}}, logger, eventRecorder)
 
 	cluster.Spec.Volume.Size = "150Gi"
-	cluster.Spec.Volume.Iops = aws.Int64(6000)
-	cluster.Spec.Volume.Throughput = aws.Int64(275)
-
-	// set metadata, so that labels will get correct values
-	cluster.Name = clusterName
-	cluster.Namespace = namespace
-	filterLabels := cluster.labelsSet(false)
-
-	testVolumes := []testVolume{testVol, testVol, testVol}
-
-	initTestVolumesAndPods(cluster.KubeClient, namespace, clusterName, filterLabels, testVolumes)
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	resizer := mocks.NewMockVolumeResizer(ctrl)
-
-	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-1")).Return("ebs-volume-1", nil)
-	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-2")).Return("ebs-volume-2", nil)
-	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-3")).Return("ebs-volume-3", nil)
-
-	resizer.EXPECT().GetProviderVolumeID(gomock.Any()).
-		DoAndReturn(func(pv *v1.PersistentVolume) (string, error) {
-			return resizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
-		}).
-		Times(3)
-
-	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2", "ebs-volume-3"})).Return(
-		[]volumes.VolumeProperties{
-			{VolumeID: "ebs-volume-1", VolumeType: "gp3", Size: 100, Iops: 3000},
-			{VolumeID: "ebs-volume-2", VolumeType: "gp3", Size: 105, Iops: 4000},
-			{VolumeID: "ebs-volume-3", VolumeType: "gp3", Size: 151, Iops: 6000, Throughput: 275}}, nil)
-
-	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Eq(aws.Int64(150)), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Eq(aws.String("gp3")), gomock.Eq(aws.Int64(150)), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
-	// resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-3"), gomock.Eq(aws.String("gp3")), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-
-	cluster.VolumeResizer = resizer
-	cluster.syncVolumes()
-}
-
-func TestManualGp2Gp3Support(t *testing.T) {
-	client, _ := newFakeK8sPVCclient()
-	clusterName := "acid-test-cluster"
-	namespace := "default"
-
-	// new cluster with pvc storage resize mode and configured labels
-	var cluster = New(
-		Config{
-			OpConfig: config.Config{
-				Resources: config.Resources{
-					ClusterLabels:    map[string]string{"application": "spilo"},
-					ClusterNameLabel: "cluster-name",
-				},
-				StorageResizeMode:            "mixed",
-				EnableEBSGp3Migration:        false,
-				EnableEBSGp3MigrationMaxSize: 1000,
-			},
-		}, client, acidv1.Postgresql{}, logger, eventRecorder)
-
-	cluster.Spec.Volume.Size = "150Gi"
-	cluster.Spec.Volume.Iops = aws.Int64(6000)
-	cluster.Spec.Volume.Throughput = aws.Int64(275)
+	cluster.Spec.Volume.Iops = aws.Int32(6000)
+	cluster.Spec.Volume.Throughput = aws.Int32(275)
 
 	// set metadata, so that labels will get correct values
 	cluster.Name = clusterName
@@ -402,14 +279,14 @@ func TestManualGp2Gp3Support(t *testing.T) {
 		}, nil)
 
 	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int32(6000)), gomock.Eq(aws.Int32(275))).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int32(6000)), gomock.Eq(aws.Int32(275))).Return(nil)
 
 	cluster.VolumeResizer = resizer
 	cluster.syncVolumes()
 }
 
-func TestDontTouchType(t *testing.T) {
+func TestNoVolumeTypeChange(t *testing.T) {
 	client, _ := newFakeK8sPVCclient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
@@ -422,9 +299,7 @@ func TestDontTouchType(t *testing.T) {
 					ClusterLabels:    map[string]string{"application": "spilo"},
 					ClusterNameLabel: "cluster-name",
 				},
-				StorageResizeMode:            "mixed",
-				EnableEBSGp3Migration:        false,
-				EnableEBSGp3MigrationMaxSize: 1000,
+				StorageResizeMode: "mixed",
 			},
 		}, client, acidv1.Postgresql{}, logger, eventRecorder)
 
@@ -467,8 +342,8 @@ func TestDontTouchType(t *testing.T) {
 		}, nil)
 
 	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Nil(), gomock.Eq(aws.Int64(177)), gomock.Nil(), gomock.Nil()).Return(nil)
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Nil(), gomock.Eq(aws.Int64(177)), gomock.Nil(), gomock.Nil()).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Nil(), gomock.Eq(aws.Int32(177)), gomock.Nil(), gomock.Nil()).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Nil(), gomock.Eq(aws.Int32(177)), gomock.Nil(), gomock.Nil()).Return(nil)
 
 	cluster.VolumeResizer = resizer
 	cluster.syncVolumes()

@@ -3260,7 +3260,8 @@ spec:
                 description: Volume describes a single volume in the manifest.
                 properties:
                   iops:
-                    format: int64
+                    format: int32
+                    maximum: 80000
                     type: integer
                   isSubPathExpr:
                     type: boolean
@@ -3321,7 +3322,8 @@ spec:
                   subPath:
                     type: string
                   throughput:
-                    format: int64
+                    format: int32
+                    maximum: 2000
                     type: integer
                   type:
                     type: string

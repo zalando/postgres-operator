@@ -2556,6 +2556,17 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		}
 	}
 
+	hasMaxUnavailable := func(expected string) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+			actual := podDisruptionBudget.Spec.MaxUnavailable.String()
+			if actual != expected {
+				return fmt.Errorf("PodDisruptionBudget MaxUnavailable is incorrect, got %s, expected %s",
+					actual, expected)
+			}
+			return nil
+		}
+	}
+
 	hasMinAvailable := func(expectedMinAvailable int) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
 		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
 			actual := podDisruptionBudget.Spec.MinAvailable.IntVal
@@ -2749,7 +2760,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
 				hasName("postgres-myapp-database-critical-op-pdb"),
-				hasMinAvailable(3),
+				hasMaxUnavailable("0"),
 				testLabelsAndSelectors(false),
 			},
 		},
@@ -2766,7 +2777,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
 				hasName("postgres-myapp-database-critical-op-pdb"),
-				hasMinAvailable(0),
+				hasMaxUnavailable("100%"),
 				testLabelsAndSelectors(false),
 			},
 		},
@@ -2783,7 +2794,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
 				hasName("postgres-myapp-database-critical-op-pdb"),
-				hasMinAvailable(0),
+				hasMaxUnavailable("100%"),
 				testLabelsAndSelectors(false),
 			},
 		},
@@ -2800,7 +2811,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
 				hasName("postgres-myapp-database-critical-op-pdb"),
-				hasMinAvailable(3),
+				hasMaxUnavailable("0"),
 				testLabelsAndSelectors(false),
 			},
 		},

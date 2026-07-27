@@ -167,9 +167,11 @@ type Volume struct {
 	StorageClass  string `json:"storageClass,omitempty"`
 	SubPath       string `json:"subPath,omitempty"`
 	IsSubPathExpr *bool  `json:"isSubPathExpr,omitempty"`
-	Iops          *int64 `json:"iops,omitempty"`
-	Throughput    *int64 `json:"throughput,omitempty"`
-	VolumeType    string `json:"type,omitempty"`
+	// +kubebuilder:validation:Maximum=80000
+	Iops *int32 `json:"iops,omitempty"`
+	// +kubebuilder:validation:Maximum=2000
+	Throughput *int32 `json:"throughput,omitempty"`
+	VolumeType string `json:"type,omitempty"`
 }
 
 // AdditionalVolume specs additional optional volumes for statefulset

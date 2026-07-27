@@ -95,16 +95,8 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		c.logger.Errorf("could not sync Patroni resources: %v", err)
 	}
 
-	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
 	if err = c.syncVolumes(); err != nil {
 		return err
-	}
-
-	if c.OpConfig.EnableEBSGp3Migration && len(c.EBSVolumes) > 0 {
-		err = c.executeEBSMigration()
-		if nil != err {
-			return err
-		}
 	}
 
 	if err = c.syncPodServiceAccount(); err != nil {
@@ -1810,7 +1802,6 @@ func (c *Cluster) syncLogicalBackupJob() error {
 
 	// no existing logical backup job, create new one
 	c.logger.Info("could not find the cluster's logical backup job")
-
 
 	if err = c.createLogicalBackupJob(); err == nil {
 		c.logger.Infof("created missing logical backup job %s", jobName)
