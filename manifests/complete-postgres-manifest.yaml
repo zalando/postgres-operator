@@ -60,8 +60,8 @@ spec:
   volume:
     size: 1Gi
 #    storageClass: my-sc
-#    iops: 1000  # for EBS gp3
-#    throughput: 250  # in MB/s for EBS gp3
+#    iops: 1000
+#    throughput: 250  # in MB/s
 #    selector:
 #      matchExpressions:
 #        - { key: flavour, operator: In, values: [ "banana", "chocolate" ] }

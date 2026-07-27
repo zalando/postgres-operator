@@ -89,14 +89,14 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 	}
 
 	for _, v := range volumeOutput.Volumes {
-		switch v.VolumeType {
-		case "gp3":
-			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: int64(*v.Size), VolumeType: string(v.VolumeType), Iops: int64(*v.Iops), Throughput: int64(*v.Throughput)})
-		case "gp2":
-			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: int64(*v.Size), VolumeType: string(v.VolumeType)})
-		default:
-			return nil, fmt.Errorf("discovered unexpected volume type %s %s", *v.VolumeId, v.VolumeType)
+		vp := VolumeProperties{VolumeID: *v.VolumeId, Size: int64(*v.Size), VolumeType: string(v.VolumeType)}
+		if v.Iops != nil {
+			vp.Iops = int64(*v.Iops)
 		}
+		if v.Throughput != nil {
+			vp.Throughput = int64(*v.Throughput)
+		}
+		p = append(p, vp)
 	}
 
 	return p, nil
