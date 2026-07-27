@@ -1686,12 +1686,12 @@ func (in *Volume) DeepCopyInto(out *Volume) {
 	}
 	if in.Iops != nil {
 		in, out := &in.Iops, &out.Iops
-		*out = new(int64)
+		*out = new(int32)
 		**out = **in
 	}
 	if in.Throughput != nil {
 		in, out := &in.Throughput, &out.Throughput
-		*out = new(int64)
+		*out = new(int32)
 		**out = **in
 	}
 	return

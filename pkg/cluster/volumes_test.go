@@ -13,7 +13,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/zalando/postgres-operator/mocks"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -25,9 +24,9 @@ import (
 )
 
 type testVolume struct {
-	size        int64
-	iops        int64
-	throughtput int64
+	size        int32
+	iops        int32
+	throughtput int32
 	volType     string
 }
 
@@ -121,7 +120,7 @@ func TestQuantityToGigabyte(t *testing.T) {
 	tests := []struct {
 		name        string
 		quantityStr string
-		expected    int64
+		expected    int32
 	}{
 		{
 			"test with 1Gi",
@@ -131,12 +130,12 @@ func TestQuantityToGigabyte(t *testing.T) {
 		{
 			"test with float",
 			"1.5Gi",
-			int64(1),
+			int32(1),
 		},
 		{
 			"test with 1000Mi",
 			"1000Mi",
-			int64(0),
+			int32(0),
 		},
 	}
 
@@ -247,8 +246,8 @@ func TestGp2Gp3Migration(t *testing.T) {
 		}, client, acidv1.Postgresql{Spec: acidv1.PostgresSpec{Volume: acidv1.Volume{VolumeType: "gp3"}}}, logger, eventRecorder)
 
 	cluster.Spec.Volume.Size = "150Gi"
-	cluster.Spec.Volume.Iops = aws.Int64(6000)
-	cluster.Spec.Volume.Throughput = aws.Int64(275)
+	cluster.Spec.Volume.Iops = aws.Int32(6000)
+	cluster.Spec.Volume.Throughput = aws.Int32(275)
 
 	// set metadata, so that labels will get correct values
 	cluster.Name = clusterName
@@ -280,8 +279,8 @@ func TestGp2Gp3Migration(t *testing.T) {
 		}, nil)
 
 	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int32(6000)), gomock.Eq(aws.Int32(275))).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int32(6000)), gomock.Eq(aws.Int32(275))).Return(nil)
 
 	cluster.VolumeResizer = resizer
 	cluster.syncVolumes()
@@ -343,8 +342,8 @@ func TestNoVolumeTypeChange(t *testing.T) {
 		}, nil)
 
 	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Nil(), gomock.Eq(aws.Int64(177)), gomock.Nil(), gomock.Nil()).Return(nil)
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Nil(), gomock.Eq(aws.Int64(177)), gomock.Nil(), gomock.Nil()).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Nil(), gomock.Eq(aws.Int32(177)), gomock.Nil(), gomock.Nil()).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Nil(), gomock.Eq(aws.Int32(177)), gomock.Nil(), gomock.Nil()).Return(nil)
 
 	cluster.VolumeResizer = resizer
 	cluster.syncVolumes()

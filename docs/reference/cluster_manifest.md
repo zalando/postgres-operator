@@ -554,11 +554,11 @@ properties of the persistent storage that stores Postgres data.
 
 * **iops**
   When running the operator on AWS the latest generation of EBS volumes (`gp3`)
-  allows for configuring the number of IOPS. Maximum is 16000. Optional.
+  allows for configuring the number of IOPS. Maximum is 80000. Optional.
 
 * **throughput**
   When running the operator on AWS the latest generation of EBS volumes (`gp3`)
-  allows for configuring the throughput in MB/s. Maximum is 1000. Optional.
+  allows for configuring the throughput in MB/s. Maximum is 2000. Optional.
 
 * **selector**
   A label query over PVs to consider for binding. See the [Kubernetes 

@@ -89,12 +89,12 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 	}
 
 	for _, v := range volumeOutput.Volumes {
-		vp := VolumeProperties{VolumeID: *v.VolumeId, Size: int64(*v.Size), VolumeType: string(v.VolumeType)}
+		vp := VolumeProperties{VolumeID: *v.VolumeId, Size: int32(*v.Size), VolumeType: string(v.VolumeType)}
 		if v.Iops != nil {
-			vp.Iops = int64(*v.Iops)
+			vp.Iops = int32(*v.Iops)
 		}
 		if v.Throughput != nil {
-			vp.Throughput = int64(*v.Throughput)
+			vp.Throughput = int32(*v.Throughput)
 		}
 		p = append(p, vp)
 	}
@@ -103,7 +103,7 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 }
 
 // ResizeVolume actually calls AWS API to resize the EBS volume if necessary.
-func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
+func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int32) error {
 	/* first check if the volume is already of a requested size */
 	volumeOutput, err := r.connection.DescribeVolumes(context.TODO(), &ec2.DescribeVolumesInput{VolumeIds: []string{volumeID}})
 	if err != nil {
@@ -113,12 +113,11 @@ func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 	if *vol.VolumeId != volumeID {
 		return fmt.Errorf("describe volume %q returned information about a non-matching volume %q", volumeID, *vol.VolumeId)
 	}
-	sizeInt32 := int32(newSize)
-	if *vol.Size == sizeInt32 {
+	if *vol.Size == newSize {
 		// nothing to do
 		return nil
 	}
-	input := ec2.ModifyVolumeInput{Size: &sizeInt32, VolumeId: &volumeID}
+	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeID}
 	output, err := r.connection.ModifyVolume(context.TODO(), &input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)
@@ -154,28 +153,16 @@ func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 }
 
 // ModifyVolume Modify EBS volume
-func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSize *int64, iops *int64, throughput *int64) error {
-	var sizeInt32 *int32
-	var iopsInt32 *int32
-	var throughputInt32 *int32
-
-	input := ec2.ModifyVolumeInput{
-		VolumeId: &volumeID,
-	}
+func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSize *int32, iops *int32, throughput *int32) error {
+	input := ec2.ModifyVolumeInput{VolumeId: &volumeID}
 	if newSize != nil {
-		s := int32(*newSize)
-		sizeInt32 = &s
-		input.Size = sizeInt32
+		input.Size = newSize
 	}
 	if iops != nil {
-		i := int32(*iops)
-		iopsInt32 = &i
-		input.Iops = iopsInt32
+		input.Iops = iops
 	}
 	if throughput != nil {
-		t := int32(*throughput)
-		throughputInt32 = &t
-		input.Throughput = throughputInt32
+		input.Throughput = throughput
 	}
 	if newType != nil {
 		input.VolumeType = types.VolumeType(*newType)
