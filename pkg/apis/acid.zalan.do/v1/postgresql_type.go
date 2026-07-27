@@ -167,8 +167,8 @@ type Volume struct {
 	StorageClass  string `json:"storageClass,omitempty"`
 	SubPath       string `json:"subPath,omitempty"`
 	IsSubPathExpr *bool  `json:"isSubPathExpr,omitempty"`
-	Iops          *int64 `json:"iops,omitempty"`
-	Throughput    *int64 `json:"throughput,omitempty"`
+	Iops          *int32 `json:"iops,omitempty"`
+	Throughput    *int32 `json:"throughput,omitempty"`
 	VolumeType    string `json:"type,omitempty"`
 }
 

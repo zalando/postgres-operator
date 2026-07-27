@@ -81,24 +81,24 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 	errors := make([]string, 0)
 
 	for _, volume := range c.EBSVolumes {
-		var modifyIops *int64
-		var modifyThroughput *int64
-		var modifySize *int64
+		var modifyIops *int32
+		var modifyThroughput *int32
+		var modifySize *int32
 		var modifyType *string
 
-		if targetValue.Iops != nil && *targetValue.Iops >= int64(3000) {
-			if volume.Iops != int64(*targetValue.Iops) {
+		if targetValue.Iops != nil && *targetValue.Iops >= int32(3000) {
+			if volume.Iops != int32(*targetValue.Iops) {
 				modifyIops = targetValue.Iops
 			}
 		}
 
-		if targetValue.Throughput != nil && *targetValue.Throughput >= int64(125) {
-			if volume.Throughput != int64(*targetValue.Throughput) {
+		if targetValue.Throughput != nil && *targetValue.Throughput >= int32(125) {
+			if volume.Throughput != int32(*targetValue.Throughput) {
 				modifyThroughput = targetValue.Throughput
 			}
 		}
 
-		if targetSize > int64(volume.Size) {
+		if targetSize > volume.Size {
 			modifySize = &targetSize
 		}
 
@@ -437,6 +437,6 @@ func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedNam
 	return &spec.NamespacedName{Namespace: namespace, Name: name}
 }
 
-func quantityToGigabyte(q resource.Quantity) int64 {
-	return q.ScaledValue(0) / (1 * constants.Gigabyte)
+func quantityToGigabyte(q resource.Quantity) int32 {
+	return int32(q.ScaledValue(0) / (1 * constants.Gigabyte))
 }

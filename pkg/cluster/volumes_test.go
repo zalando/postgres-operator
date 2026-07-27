@@ -13,7 +13,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/zalando/postgres-operator/mocks"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -25,9 +24,9 @@ import (
 )
 
 type testVolume struct {
-	size        int64
-	iops        int64
-	throughtput int64
+	size        int32
+	iops        int32
+	throughtput int32
 	volType     string
 }
 
@@ -121,7 +120,7 @@ func TestQuantityToGigabyte(t *testing.T) {
 	tests := []struct {
 		name        string
 		quantityStr string
-		expected    int64
+		expected    int32
 	}{
 		{
 			"test with 1Gi",
@@ -131,12 +130,12 @@ func TestQuantityToGigabyte(t *testing.T) {
 		{
 			"test with float",
 			"1.5Gi",
-			int64(1),
+			int32(1),
 		},
 		{
 			"test with 1000Mi",
 			"1000Mi",
-			int64(0),
+			int32(0),
 		},
 	}
 
