@@ -6,7 +6,7 @@ Version 2.0 changes some default settings and removes deprecated fields. Please 
 
 The new operator will default password encryption to `scram-sha-256`. Unless you configure `password_encryption: md5` in the manifest under `spec.postgresql.parameters` the operator will encrypt existing passwords in the secrets with `scram-sha-256` and alter the database passwords. Make sure that your used clients and drivers support `scram-sha-256` as pods will get rotated in rolling fashion after updating to Postgres Operator v2.
 
-The default Spilo image (`spilo-18:4.1-p2`) still configures the pg_hba.conf file to allow `md5` passwords but Postgres will validate `scram-sha-256` passwords correctly. Passwords of users that are not managed by the operator and are still `md5` enrypted need be altered before the next tagged Spilo image which will drop `md5` completely.
+The default Spilo image (`spilo-18:4.1-p2`) still configures the pg_hba.conf file to allow `md5` passwords but Postgres will validate `scram-sha-256` passwords correctly. Passwords of users that are not managed by the operator and are still `md5` encrypted need be altered before the next tagged Spilo image which will drop `md5` completely.
 
 ## K8s Endpoints are deprecated
 

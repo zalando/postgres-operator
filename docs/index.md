@@ -47,8 +47,8 @@ flexibility to complement it with other tools like [ZMON](https://opensource.zal
 Here is a diagram, that summarizes what would be created by the operator, when a
 new Postgres cluster CRD is submitted:
 
-![Features](docs/diagrams/neutral_operator_dark.png#gh-dark-mode-only)
-![Features](docs/diagrams/neutral_operator_light.png#gh-light-mode-only)
+![Features](diagrams/neutral_operator_dark.png#gh-dark-mode-only)
+![Features](diagrams/neutral_operator_light.png#gh-light-mode-only)
 
 ## Status
 

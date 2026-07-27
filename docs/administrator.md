@@ -763,7 +763,7 @@ in 5.):
 7. WAL and logical backup settings from operator config
 
 The `envFrom` section is treated separately and allows for a very flexible
-local configuration referecing a config map or secret.
+local configuration referencing a ConfigMap or a Secret.
 
 ### Via ConfigMap
 
