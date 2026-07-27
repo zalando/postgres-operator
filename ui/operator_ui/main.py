@@ -86,9 +86,9 @@ COST_ELB = float(getenv('COST_ELB', 0.03))     # per hour
 
 # maximum and limitation of IOPS and throughput 
 FREE_IOPS = float(getenv('FREE_IOPS', 3000)) 
-LIMIT_IOPS = float(getenv('LIMIT_IOPS', 16000))
+LIMIT_IOPS = float(getenv('LIMIT_IOPS', 80000))
 FREE_THROUGHPUT = float(getenv('FREE_THROUGHPUT', 125))
-LIMIT_THROUGHPUT = float(getenv('LIMIT_THROUGHPUT', 1000))
+LIMIT_THROUGHPUT = float(getenv('LIMIT_THROUGHPUT', 2000))
 # get the default value of core and memory
 DEFAULT_MEMORY = getenv('DEFAULT_MEMORY', '300Mi')
 DEFAULT_MEMORY_LIMIT = getenv('DEFAULT_MEMORY_LIMIT', '300Mi')
