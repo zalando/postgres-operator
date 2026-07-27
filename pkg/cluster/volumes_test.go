@@ -279,8 +279,8 @@ func TestGp2Gp3Migration(t *testing.T) {
 		}, nil)
 
 	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int32(6000)), gomock.Eq(aws.Int32(275))).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Eq(aws.String("gp3")), gomock.Nil(), gomock.Eq(aws.Int32(6000)), gomock.Eq(aws.Int32(275))).Return(nil)
 
 	cluster.VolumeResizer = resizer
 	cluster.syncVolumes()
@@ -342,8 +342,8 @@ func TestNoVolumeTypeChange(t *testing.T) {
 		}, nil)
 
 	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Nil(), gomock.Eq(aws.Int64(177)), gomock.Nil(), gomock.Nil()).Return(nil)
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Nil(), gomock.Eq(aws.Int64(177)), gomock.Nil(), gomock.Nil()).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Nil(), gomock.Eq(aws.Int32(177)), gomock.Nil(), gomock.Nil()).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Nil(), gomock.Eq(aws.Int32(177)), gomock.Nil(), gomock.Nil()).Return(nil)
 
 	cluster.VolumeResizer = resizer
 	cluster.syncVolumes()
