@@ -34,7 +34,7 @@ var testVol = testVolume{
 	size:        100,
 	iops:        300,
 	throughtput: 125,
-	volType:     "gp3",
+	volType:     "gp2",
 }
 
 func newFakeK8sPVCclient() (k8sutil.KubernetesClient, *fake.Clientset) {
@@ -246,8 +246,8 @@ func TestGp2Gp3Migration(t *testing.T) {
 		}, client, acidv1.Postgresql{Spec: acidv1.PostgresSpec{Volume: acidv1.Volume{VolumeType: "gp3"}}}, logger, eventRecorder)
 
 	cluster.Spec.Volume.Size = "150Gi"
-	cluster.Spec.Volume.Iops = aws.Int64(6000)
-	cluster.Spec.Volume.Throughput = aws.Int64(275)
+	cluster.Spec.Volume.Iops = aws.Int32(6000)
+	cluster.Spec.Volume.Throughput = aws.Int32(275)
 
 	// set metadata, so that labels will get correct values
 	cluster.Name = clusterName
