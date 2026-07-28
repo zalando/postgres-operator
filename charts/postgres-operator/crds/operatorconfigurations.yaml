@@ -226,24 +226,7 @@ spec:
                       type: string
                     type: array
                   infrastructure_roles_secret_name:
-                    description: |-
-                      NamespacedName comprises a resource name, with a mandatory namespace,
-                      rendered as "<namespace>/<name>".  Being a type captures intent and
-                      helps make sure that UIDs, namespaced names and non-namespaced names
-                      do not get conflated in code.  For most use cases, namespace and name
-                      will already have been format validated at the API entry point, so we
-                      don't do that here.  Where that's not the case (e.g. in testing),
-                      consider using NamespacedNameOrDie() in testing.go in this package.
-
-                      from: https://github.com/kubernetes/apimachinery/blob/master/pkg/types/namespacedname.go
-                    properties:
-                      name:
-                        type: string
-                      namespace:
-                        type: string
-                    required:
-                    - name
-                    type: object
+                    type: string
                   infrastructure_roles_secrets:
                     description: namespaced name of the secret containing infrastructure
                       roles names and passwords
@@ -265,14 +248,7 @@ spec:
                           description: |-
                             Name of a secret which describes the role, and optionally name of a
                             configmap with an extra information
-                          properties:
-                            name:
-                              type: string
-                            namespace:
-                              type: string
-                          required:
-                          - name
-                          type: object
+                          type: string
                         template:
                           type: boolean
                         userkey:
@@ -458,14 +434,7 @@ spec:
                     default: postgres-operator
                     description: namespaced name of the secret containing the OAuth2
                       token to pass to the teams API
-                    properties:
-                      name:
-                        type: string
-                      namespace:
-                        type: string
-                    required:
-                    - name
-                    type: object
+                    type: string
                   pdb_master_label_selector:
                     default: true
                     type: boolean
@@ -485,14 +454,7 @@ spec:
                   pod_environment_configmap:
                     description: namespaced name of the ConfigMap with environment
                       variables to populate on every pod
-                    properties:
-                      name:
-                        type: string
-                      namespace:
-                        type: string
-                    required:
-                    - name
-                    type: object
+                    type: string
                   pod_environment_secret:
                     type: string
                   pod_management_policy:
