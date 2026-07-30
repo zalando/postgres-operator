@@ -2,8 +2,30 @@ apiVersion: v1
 entries:
   postgres-operator:
   - apiVersion: v2
+    appVersion: 2.0.1
+    created: "2026-07-30T05:31:19.462094+02:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
+    digest: bb54c367441fe36cefc08d1c83e52e4baaea3522e32da14d40ea45eba4669ff1
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-2.0.1.tgz
+    version: 2.0.1
+  - apiVersion: v2
     appVersion: 2.0.0
-    created: "2026-07-28T16:30:13.110262+02:00"
+    created: "2026-07-30T05:31:19.460757+02:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 2622899b573e4c46cd2a70677d5941a9e5da24c7db2a0ff774ddc49ad9d5c544
@@ -25,7 +47,7 @@ entries:
     version: 2.0.0
   - apiVersion: v2
     appVersion: 1.15.1
-    created: "2026-07-28T16:30:13.108848+02:00"
+    created: "2026-07-30T05:31:19.45921+02:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 9f3edc3d796105c02c04eaae28a78e58fb08c1847a9de012245fd6ac2c0d2c00
@@ -47,7 +69,7 @@ entries:
     version: 1.15.1
   - apiVersion: v2
     appVersion: 1.15.0
-    created: "2026-07-28T16:30:13.108147+02:00"
+    created: "2026-07-30T05:31:19.458416+02:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 002dd47647bf51fbba023bd1762d807be478cf37de7a44b80cd01ac1f20bd94a
@@ -69,7 +91,7 @@ entries:
     version: 1.15.0
   - apiVersion: v2
     appVersion: 1.14.0
-    created: "2026-07-28T16:30:13.107421+02:00"
+    created: "2026-07-30T05:31:19.457596+02:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 36e1571f3f455b213f16cdda7b1158648e8e84deb804ba47ed6b9b6d19263ba8
@@ -91,7 +113,7 @@ entries:
     version: 1.14.0
   - apiVersion: v2
     appVersion: 1.13.0
-    created: "2026-07-28T16:30:13.106643+02:00"
+    created: "2026-07-30T05:31:19.456373+02:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: a839601689aea0a7e6bc0712a5244d435683cf3314c95794097ff08540e1dfef
@@ -113,7 +135,7 @@ entries:
     version: 1.13.0
   - apiVersion: v2
     appVersion: 1.12.2
-    created: "2026-07-28T16:30:13.105204+02:00"
+    created: "2026-07-30T05:31:19.45558+02:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 65858d14a40d7fd90c32bd9fc60021acc9555c161079f43a365c70171eaf21d8
@@ -135,7 +157,7 @@ entries:
     version: 1.12.2
   - apiVersion: v2
     appVersion: 1.11.0
-    created: "2026-07-28T16:30:13.104449+02:00"
+    created: "2026-07-30T05:31:19.454725+02:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 3914b5e117bda0834f05c9207f007e2ac372864cf6e86dcc2e1362bbe46c14d9
@@ -155,4 +177,4 @@ entries:
     urls:
     - postgres-operator-1.11.0.tgz
     version: 1.11.0
-generated: "2026-07-28T16:30:13.103286+02:00"
+generated: "2026-07-30T05:31:19.453397+02:00"
