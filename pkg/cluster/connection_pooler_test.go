@@ -871,6 +871,72 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 	}
 }
 
+func TestConnectionPoolerPriorityClassName(t *testing.T) {
+	newCluster := func(specPooler, opPooler, specPod, opPod string) *Cluster {
+		c := New(
+			Config{
+				OpConfig: config.Config{
+					Resources: config.Resources{
+						PodPriorityClassName: opPod,
+					},
+					ConnectionPooler: config.ConnectionPooler{
+						PriorityClassName: opPooler,
+					},
+				},
+			}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+		c.Spec = acidv1.PostgresSpec{
+			PodPriorityClassName: specPod,
+			ConnectionPooler:     &acidv1.ConnectionPooler{PriorityClassName: specPooler},
+		}
+		return c
+	}
+
+	tests := []struct {
+		subTest  string
+		cluster  *Cluster
+		expected string
+	}{
+		{
+			subTest:  "pooler spec wins over everything",
+			cluster:  newCluster("pooler-spec", "pooler-op", "pod-spec", "pod-op"),
+			expected: "pooler-spec",
+		},
+		{
+			subTest:  "pooler operator default when spec empty",
+			cluster:  newCluster("", "pooler-op", "pod-spec", "pod-op"),
+			expected: "pooler-op",
+		},
+		{
+			subTest:  "does not inherit cluster pod priority class",
+			cluster:  newCluster("", "", "pod-spec", "pod-op"),
+			expected: "",
+		},
+		{
+			subTest:  "does not inherit operator pod priority class",
+			cluster:  newCluster("", "", "", "pod-op"),
+			expected: "",
+		},
+		{
+			subTest:  "empty when nothing set",
+			cluster:  newCluster("", "", "", ""),
+			expected: "",
+		},
+	}
+
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		for _, tt := range tests {
+			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(role)
+			if err != nil {
+				t.Fatalf("%s [%s]: unexpected error %v", role, tt.subTest, err)
+			}
+			if podSpec.Spec.PriorityClassName != tt.expected {
+				t.Errorf("%s [%s]: got priorityClassName %q, expected %q",
+					role, tt.subTest, podSpec.Spec.PriorityClassName, tt.expected)
+			}
+		}
+	}
+}
+
 func testServiceAccount(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	poolerServiceAccount := podSpec.Spec.ServiceAccountName
 
