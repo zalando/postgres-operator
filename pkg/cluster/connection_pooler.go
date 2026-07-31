@@ -34,6 +34,7 @@ type ConnectionPoolerObjects struct {
 	AuthSecret  *v1.Secret
 	Deployment  *appsv1.Deployment
 	Service     *v1.Service
+	ConfigMap   *v1.ConfigMap
 	Name        string
 	ClusterName string
 	Namespace   string
@@ -200,6 +201,52 @@ func (c *Cluster) generateConnectionPoolerAuthSecret(connectionPooler *Connectio
 	}
 }
 
+type connectionPoolerSizes struct {
+	maxDBConn     int32
+	defaultSize   int32
+	minSize       int32
+	reserveSize   int32
+	maxClientConn int32
+}
+
+// connectionPoolerSizes computes the pgBouncer pool sizing from the cluster
+// spec and operator config. Shared by getConnectionPoolerEnvVars (stock image,
+// via env vars) and generatePgBouncerIni (generated config).
+func (c *Cluster) connectionPoolerSizes() connectionPoolerSizes {
+	spec := &c.Spec
+	connectionPoolerSpec := spec.ConnectionPooler
+	if connectionPoolerSpec == nil {
+		connectionPoolerSpec = &acidv1.ConnectionPooler{}
+	}
+
+	numberOfInstances := connectionPoolerSpec.NumberOfInstances
+	if numberOfInstances == nil {
+		numberOfInstances = util.CoalesceInt32(
+			c.OpConfig.ConnectionPooler.NumberOfInstances,
+			k8sutil.Int32ToPointer(1))
+	}
+
+	effectiveMaxDBConn := util.CoalesceInt32(
+		connectionPoolerSpec.MaxDBConnections,
+		c.OpConfig.ConnectionPooler.MaxDBConnections)
+	if effectiveMaxDBConn == nil {
+		effectiveMaxDBConn = k8sutil.Int32ToPointer(
+			constants.ConnectionPoolerMaxDBConnections)
+	}
+
+	maxDBConn := *effectiveMaxDBConn / *numberOfInstances
+	defaultSize := maxDBConn / 2
+	minSize := defaultSize / 2
+
+	return connectionPoolerSizes{
+		maxDBConn:     maxDBConn,
+		defaultSize:   defaultSize,
+		minSize:       minSize,
+		reserveSize:   minSize,
+		maxClientConn: constants.ConnectionPoolerMaxClientConnections,
+	}
+}
+
 // Generate pool size related environment variables.
 //
 // MAX_DB_CONN would specify the global maximum for connections to a target
@@ -220,7 +267,6 @@ func (c *Cluster) generateConnectionPoolerAuthSecret(connectionPooler *Connectio
 //	have to wait for spinning up a new connections.
 //
 // RESERVE_SIZE is how many additional connections to allow for a pooler.
-
 func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	spec := &c.Spec
 	connectionPoolerSpec := spec.ConnectionPooler
@@ -231,27 +277,7 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 		connectionPoolerSpec.Mode,
 		c.OpConfig.ConnectionPooler.Mode)
 
-	numberOfInstances := connectionPoolerSpec.NumberOfInstances
-	if numberOfInstances == nil {
-		numberOfInstances = util.CoalesceInt32(
-			c.OpConfig.ConnectionPooler.NumberOfInstances,
-			k8sutil.Int32ToPointer(1))
-	}
-
-	effectiveMaxDBConn := util.CoalesceInt32(
-		connectionPoolerSpec.MaxDBConnections,
-		c.OpConfig.ConnectionPooler.MaxDBConnections)
-
-	if effectiveMaxDBConn == nil {
-		effectiveMaxDBConn = k8sutil.Int32ToPointer(
-			constants.ConnectionPoolerMaxDBConnections)
-	}
-
-	maxDBConn := *effectiveMaxDBConn / *numberOfInstances
-
-	defaultSize := maxDBConn / 2
-	minSize := defaultSize / 2
-	reserveSize := minSize
+	sizes := c.connectionPoolerSizes()
 
 	return []v1.EnvVar{
 		{
@@ -264,23 +290,23 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 		},
 		{
 			Name:  "CONNECTION_POOLER_DEFAULT_SIZE",
-			Value: fmt.Sprint(defaultSize),
+			Value: fmt.Sprint(sizes.defaultSize),
 		},
 		{
 			Name:  "CONNECTION_POOLER_MIN_SIZE",
-			Value: fmt.Sprint(minSize),
+			Value: fmt.Sprint(sizes.minSize),
 		},
 		{
 			Name:  "CONNECTION_POOLER_RESERVE_SIZE",
-			Value: fmt.Sprint(reserveSize),
+			Value: fmt.Sprint(sizes.reserveSize),
 		},
 		{
 			Name:  "CONNECTION_POOLER_MAX_CLIENT_CONN",
-			Value: fmt.Sprint(constants.ConnectionPoolerMaxClientConnections),
+			Value: fmt.Sprint(sizes.maxClientConn),
 		},
 		{
 			Name:  "CONNECTION_POOLER_MAX_DB_CONN",
-			Value: fmt.Sprint(maxDBConn),
+			Value: fmt.Sprint(sizes.maxDBConn),
 		},
 	}
 }
@@ -441,6 +467,33 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		}
 	}
 
+	// When enabled, mount an operator-generated pgbouncer.ini and override the
+	// container command/args (e.g. for images like the Chainguard FIPS pgbouncer
+	// whose entrypoint is the bare binary with no config-rendering wrapper).
+	if c.OpConfig.ConnectionPooler.GenerateConfig {
+		configVolumeName := c.connectionPoolerConfigMapName(role)
+		poolerVolumes = append(poolerVolumes, v1.Volume{
+			Name: configVolumeName,
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: configVolumeName,
+					},
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, v1.VolumeMount{
+			Name:      configVolumeName,
+			MountPath: c.OpConfig.ConnectionPooler.ConfigPath,
+			SubPath:   pgBouncerConfigFileName,
+			ReadOnly:  true,
+		})
+		if len(c.OpConfig.ConnectionPooler.Command) > 0 {
+			poolerContainer.Command = c.OpConfig.ConnectionPooler.Command
+		}
+		poolerContainer.Args = c.OpConfig.ConnectionPooler.Args
+	}
+
 	poolerContainer.Env = envVars
 	poolerContainer.VolumeMounts = volumeMounts
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
@@ -458,11 +511,16 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		securityContext.FSGroup = effectiveFSGroup
 	}
 
+	podAnnotations, err := c.connectionPoolerPodAnnotations(role)
+	if err != nil {
+		return nil, err
+	}
+
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      c.connectionPoolerLabels(role, true).MatchLabels,
 			Namespace:   c.Namespace,
-			Annotations: c.annotationsSet(c.generatePodAnnotations(spec)),
+			Annotations: podAnnotations,
 		},
 		Spec: v1.PodSpec{
 			TerminationGracePeriodSeconds: &gracePeriod,
@@ -750,9 +808,28 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 		c.logger.Infof("connection pooler auth secret %s has been deleted for role %s", authSecret.Name, role)
 	}
 
+	// Repeat the same for the generated config map
+	configMap := c.ConnectionPooler[role].ConfigMap
+	if configMap == nil {
+		c.logger.Debug("no connection pooler config map object to delete")
+	} else {
+		err = c.KubeClient.
+			ConfigMaps(c.Namespace).
+			Delete(context.TODO(), configMap.Name, options)
+
+		if k8sutil.ResourceNotFound(err) {
+			c.logger.Debugf("connection pooler config map %s for role %s has already been deleted", configMap.Name, role)
+		} else if err != nil {
+			return fmt.Errorf("could not delete connection pooler config map: %v", err)
+		}
+
+		c.logger.Infof("connection pooler config map %s has been deleted for role %s", configMap.Name, role)
+	}
+
 	c.ConnectionPooler[role].AuthSecret = nil
 	c.ConnectionPooler[role].Deployment = nil
 	c.ConnectionPooler[role].Service = nil
+	c.ConnectionPooler[role].ConfigMap = nil
 	return nil
 }
 
@@ -773,6 +850,40 @@ func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 		}
 	}
 
+	return nil
+}
+
+// syncConnectionPoolerConfigMap reconciles the operator-generated pgbouncer
+// config map for the given role: create if missing, update on drift.
+func (c *Cluster) syncConnectionPoolerConfigMap(role PostgresRole) error {
+	desired, err := c.generateConnectionPoolerConfigMap(role)
+	if err != nil {
+		return fmt.Errorf("could not generate connection pooler config map: %v", err)
+	}
+
+	existing, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), desired.Name, metav1.GetOptions{})
+	if k8sutil.ResourceNotFound(err) {
+		created, cErr := c.KubeClient.ConfigMaps(c.Namespace).Create(context.TODO(), desired, metav1.CreateOptions{})
+		if cErr != nil {
+			return fmt.Errorf("could not create connection pooler config map: %v", cErr)
+		}
+		c.ConnectionPooler[role].ConfigMap = created
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("could not get connection pooler config map: %v", err)
+	}
+
+	if !reflect.DeepEqual(existing.Data, desired.Data) {
+		desired.ResourceVersion = existing.ResourceVersion
+		updated, uErr := c.KubeClient.ConfigMaps(c.Namespace).Update(context.TODO(), desired, metav1.UpdateOptions{})
+		if uErr != nil {
+			return fmt.Errorf("could not update connection pooler config map: %v", uErr)
+		}
+		c.ConnectionPooler[role].ConfigMap = updated
+		return nil
+	}
+
+	c.ConnectionPooler[role].ConfigMap = existing
 	return nil
 }
 
@@ -1123,6 +1234,14 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		c.ConnectionPooler[role].AuthSecret = authSecret
 	}
 
+	// reconcile the generated pgbouncer config map before the deployment so the
+	// mounted config exists when pods start
+	if c.OpConfig.ConnectionPooler.GenerateConfig {
+		if cmErr := c.syncConnectionPoolerConfigMap(role); cmErr != nil {
+			return NoSync, cmErr
+		}
+	}
+
 	// next the pooler deployment
 	deployment, err = c.KubeClient.
 		Deployments(c.Namespace).
@@ -1183,7 +1302,10 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			syncReason = append(syncReason, specReason...)
 		}
 
-		newPodAnnotations := c.annotationsSet(c.generatePodAnnotations(&c.Spec))
+		newPodAnnotations, annErr := c.connectionPoolerPodAnnotations(role)
+		if annErr != nil {
+			return nil, fmt.Errorf("could not generate pod annotations for connection pooler: %v", annErr)
+		}
 		deletedPodAnnotations := []string{}
 		if changed, reason := c.compareAnnotations(deployment.Spec.Template.Annotations, newPodAnnotations, &deletedPodAnnotations); changed {
 			specSync = true

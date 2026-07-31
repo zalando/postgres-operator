@@ -66,9 +66,12 @@ spec:
                   aws_region:
                     default: eu-central-1
                     type: string
+                  enable_ebs_gp3_migration:
+                    type: boolean
+                  enable_ebs_gp3_migration_max_size:
+                    format: int64
+                    type: integer
                   gcp_credentials:
-                    type: string
-                  irsa_role_arn:
                     type: string
                   kube_iam_role:
                     type: string
@@ -85,6 +88,22 @@ spec:
                 description: ConnectionPoolerConfiguration defines default configuration
                   for connection pooler
                 properties:
+                  connection_pooler_args:
+                    default:
+                    - /etc/pgbouncer/pgbouncer.ini
+                    items:
+                      type: string
+                    type: array
+                  connection_pooler_auth_type:
+                    default: scram-sha-256
+                    type: string
+                  connection_pooler_command:
+                    items:
+                      type: string
+                    type: array
+                  connection_pooler_config_path:
+                    default: /etc/pgbouncer/pgbouncer.ini
+                    type: string
                   connection_pooler_default_cpu_limit:
                     pattern: ^(\d+m|\d+(\.\d{1,3})?)$
                     type: string
@@ -97,8 +116,11 @@ spec:
                   connection_pooler_default_memory_request:
                     pattern: ^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$
                     type: string
+                  connection_pooler_generate_config:
+                    default: false
+                    type: boolean
                   connection_pooler_image:
-                    default: ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.1
+                    default: ghcr.io/zalando/postgres-operator/pgbouncer:latest
                     type: string
                   connection_pooler_max_db_connections:
                     format: int32
@@ -137,7 +159,7 @@ spec:
                     type: boolean
                 type: object
               docker_image:
-                default: ghcr.io/zalando/spilo-18:4.1-p2
+                default: ghcr.io/zalando/spilo-18:4.1-p1
                 type: string
               enable_crd_registration:
                 default: true
@@ -226,7 +248,24 @@ spec:
                       type: string
                     type: array
                   infrastructure_roles_secret_name:
-                    type: string
+                    description: |-
+                      NamespacedName comprises a resource name, with a mandatory namespace,
+                      rendered as "<namespace>/<name>".  Being a type captures intent and
+                      helps make sure that UIDs, namespaced names and non-namespaced names
+                      do not get conflated in code.  For most use cases, namespace and name
+                      will already have been format validated at the API entry point, so we
+                      don't do that here.  Where that's not the case (e.g. in testing),
+                      consider using NamespacedNameOrDie() in testing.go in this package.
+
+                      from: https://github.com/kubernetes/apimachinery/blob/master/pkg/types/namespacedname.go
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - name
+                    type: object
                   infrastructure_roles_secrets:
                     description: namespaced name of the secret containing infrastructure
                       roles names and passwords
@@ -248,7 +287,14 @@ spec:
                           description: |-
                             Name of a secret which describes the role, and optionally name of a
                             configmap with an extra information
-                          type: string
+                          properties:
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                          required:
+                          - name
+                          type: object
                         template:
                           type: boolean
                         userkey:
@@ -434,7 +480,14 @@ spec:
                     default: postgres-operator
                     description: namespaced name of the secret containing the OAuth2
                       token to pass to the teams API
-                    type: string
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - name
+                    type: object
                   pdb_master_label_selector:
                     default: true
                     type: boolean
@@ -454,7 +507,14 @@ spec:
                   pod_environment_configmap:
                     description: namespaced name of the ConfigMap with environment
                       variables to populate on every pod
-                    type: string
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - name
+                    type: object
                   pod_environment_secret:
                     type: string
                   pod_management_policy:
@@ -606,7 +666,7 @@ spec:
                   logical_backup_cronjob_environment_secret:
                     type: string
                   logical_backup_docker_image:
-                    default: ghcr.io/zalando/postgres-operator/logical-backup:v2.0.1
+                    default: ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1
                     type: string
                   logical_backup_failed_jobs_history_limit:
                     default: 3
@@ -899,25 +959,6 @@ spec:
                   super_username:
                     default: postgres
                     type: string
-                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                  connection_pooler_generate_config:
-                    type: boolean
-                    default: false
-                  connection_pooler_command:
-                    type: array
-                    items:
-                      type: string
-                  connection_pooler_args:
-                    type: array
-                    items:
-                      type: string
-                  connection_pooler_auth_type:
-                    type: string
-                    default: "scram-sha-256"
-                  connection_pooler_config_path:
-                    type: string
-                    default: "/etc/pgbouncer/pgbouncer.ini"
-              patroni:
                 type: object
               workers:
                 default: 8
