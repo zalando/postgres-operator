@@ -12,9 +12,9 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/sirupsen/logrus"
-	"github.com/zalando/postgres-operator/mocks"
+	"github.com/zalando/postgres-operator/v2/mocks"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/api/core/v1"
 )
 
