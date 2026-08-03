@@ -27,8 +27,8 @@ package v1
 import (
 	http "net/http"
 
-	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
+	acidzalandov1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	scheme "github.com/zalando/postgres-operator/v2/pkg/generated/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
