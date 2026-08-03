@@ -28,8 +28,8 @@ import (
 	fmt "fmt"
 	http "net/http"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	zalandov1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/zalando.org/v1"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	zalandov1 "github.com/zalando/postgres-operator/v2/pkg/generated/clientset/versioned/typed/zalando.org/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
