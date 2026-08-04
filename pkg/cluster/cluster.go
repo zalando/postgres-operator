@@ -530,11 +530,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	}
 	if (c.Statefulset.Spec.Selector != nil) && (statefulSet.Spec.Selector != nil) {
 		if !reflect.DeepEqual(c.Statefulset.Spec.Selector.MatchLabels, statefulSet.Spec.Selector.MatchLabels) {
-			// forbid introducing new labels in the selector on the new statefulset, as it would cripple replacements
-			// due to the fact that the new statefulset won't be able to pick up old pods with non-matching labels.
 			if !util.MapContains(c.Statefulset.Spec.Selector.MatchLabels, statefulSet.Spec.Selector.MatchLabels) {
-				c.logger.Warningf("new statefulset introduces extra labels in the label selector, cannot continue")
-				return &compareStatefulsetResult{}
+				// new selector has labels the existing pods don't carry yet; pods will be
+				// relabeled before the StatefulSet is replaced so they can be adopted.
+				c.logger.Warningf("new statefulset introduces extra labels in the selector, pods will be relabeled before replacement")
 			}
 			needsReplace = true
 			reasons = append(reasons, "new statefulset's selector does not match the current one")

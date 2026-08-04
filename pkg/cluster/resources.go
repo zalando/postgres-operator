@@ -11,6 +11,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -211,6 +212,61 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 }
 
 // replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL CRD.
+func (c *Cluster) relabelPodsForSelector(oldSelector, newSelector map[string]string) error {
+	// list pods using the OLD selector — at this point c.labelsSet already reflects
+	// the new cluster_labels config, so listPods() would find nothing.
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(oldSelector).String(),
+	}
+	podList, err := c.KubeClient.Pods(c.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return fmt.Errorf("could not list pods for relabeling: %v", err)
+	}
+	patchData, err := metaLabelsPatch(newSelector)
+	if err != nil {
+		return fmt.Errorf("could not form label patch for pods: %v", err)
+	}
+
+	for _, pod := range podList.Items {
+		if util.MapContains(pod.Labels, newSelector) {
+			continue
+		}
+		if _, err := c.KubeClient.Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("could not relabel pod %q: %v", pod.Name, err)
+		}
+		c.logger.Infof("relabeled pod %q with new selector labels", pod.Name)
+	}
+
+	return nil
+}
+
+func (c *Cluster) relabelPVCsForSelector(oldSelector, newSelector map[string]string) error {
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(oldSelector).String(),
+	}
+	pvcList, err := c.KubeClient.PersistentVolumeClaims(c.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return fmt.Errorf("could not list PVCs for relabeling: %v", err)
+	}
+
+	patchData, err := metaLabelsPatch(newSelector)
+	if err != nil {
+		return fmt.Errorf("could not form label patch for PVCs: %v", err)
+	}
+
+	for _, pvc := range pvcList.Items {
+		if util.MapContains(pvc.Labels, newSelector) {
+			continue
+		}
+		if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Patch(context.TODO(), pvc.Name, types.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("could not relabel PVC %q: %v", pvc.Name, err)
+		}
+		c.logger.Infof("relabeled PVC %q with new selector labels", pvc.Name)
+	}
+
+	return nil
+}
+
 func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("replacing statefulset")
 	if c.Statefulset == nil {
@@ -219,6 +275,17 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
 	c.logger.Debug("replacing statefulset")
+
+	// If the new selector has labels the existing pods don't carry, relabel them first
+	// so the new StatefulSet can adopt them after the cascade=orphan delete.
+	if !util.MapContains(c.Statefulset.Spec.Selector.MatchLabels, newStatefulSet.Spec.Selector.MatchLabels) {
+		if err := c.relabelPodsForSelector(c.Statefulset.Spec.Selector.MatchLabels, newStatefulSet.Spec.Selector.MatchLabels); err != nil {
+			return fmt.Errorf("could not relabel pods before statefulset replacement: %v", err)
+		}
+		if err := c.relabelPVCsForSelector(c.Statefulset.Spec.Selector.MatchLabels, newStatefulSet.Spec.Selector.MatchLabels); err != nil {
+			return fmt.Errorf("could not relabel PVCs before statefulset replacement: %v", err)
+		}
+	}
 
 	// Delete the current statefulset without deleting the pods
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
@@ -347,6 +414,17 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(context.TODO(), newService.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("could not patch annotations for service %q: %v", oldService.Name, err)
+		}
+	}
+
+	if !util.MapContains(oldService.Labels, newService.Labels) {
+		patchData, err := metaLabelsPatch(newService.Labels)
+		if err != nil {
+			return nil, fmt.Errorf("could not form patch for service %q labels: %v", oldService.Name, err)
+		}
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(context.TODO(), newService.Name, types.MergePatchType, patchData, metav1.PatchOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not patch labels for service %q: %v", oldService.Name, err)
 		}
 	}
 
