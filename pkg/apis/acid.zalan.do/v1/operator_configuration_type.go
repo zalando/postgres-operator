@@ -430,9 +430,7 @@ type OperatorConfigurationData struct {
 	// +kubebuilder:default=true
 	ShmVolume     *bool             `json:"enable_shm_volume,omitempty"`
 	SidecarImages map[string]string `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
-	// +kubebuilder:validation:XPreserveUnknownFields
-	// +kubebuilder:validation:Type=object
-	// +kubebuilder:validation:Schemaless
+	// +nullable
 	SidecarContainers []v1.Container `json:"sidecars,omitempty"`
 	// +optional
 	PostgresUsersConfiguration PostgresUsersConfiguration `json:"users"`
