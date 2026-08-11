@@ -289,8 +289,12 @@ configuration they are grouped under the `kubernetes` key.
 * **enable_owner_references**
   The operator can set owner references on its child resources (except PVCs,
   Patroni config service/endpoint, cross-namespace secrets) to improve cluster
-  monitoring and enable cascading deletion. The default is `false`. Warning,
-  enabling this option disables configured delete protection checks (see below).
+  monitoring and enable cascading deletion. User-credential secrets are also
+  excluded from controller owner references whenever
+  [enable_secrets_deletion](#enable_secrets_deletion) is `false`, so that
+  Kubernetes garbage collection does not cascade-delete them when the
+  Postgresql resource is removed. The default is `false`. Warning, enabling
+  this option disables configured delete protection checks (see below).
 
 * **delete_annotation_date_key**
   key name for annotation that compares manifest value with current date in the
@@ -381,7 +385,15 @@ configuration they are grouped under the `kubernetes` key.
 
 * **enable_secrets_deletion**
   By default, the operator deletes secrets when removing the Postgres cluster
-  manifest. To keep secrets, set this option to `false`. The default is `true`.
+  manifest. To keep secrets, set this option to `false`. Note that this only
+  guards the operator's own deletion logic; Kubernetes garbage collection can
+  still remove user-credential secrets when
+  [enable_owner_references](#enable_owner_references) is `true` because the
+  Postgresql resource acts as a controller owner. To prevent that, the
+  operator skips the controller owner reference on user-credential secrets
+  whenever `enable_secrets_deletion` is `false`, so the two settings work
+  together. This protection takes effect on the cluster's next sync after
+  the setting is applied. The default is `true`.
 
 * **enable_persistent_volume_claim_deletion**
   By default, the operator deletes persistent volume claims when removing the
