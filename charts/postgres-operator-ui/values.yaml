@@ -8,7 +8,7 @@ replicaCount: 1
 image:
   registry: ghcr.io
   repository: zalando/postgres-operator-ui
-  tag: v2.0.1
+  tag: v2.0.2
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.

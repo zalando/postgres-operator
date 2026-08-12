@@ -1,7 +1,7 @@
 image:
   registry: ghcr.io
   repository: zalando/postgres-operator
-  tag: v2.0.1
+  tag: v2.0.2
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -385,7 +385,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.1"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.2"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -463,7 +463,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.1"
+  connection_pooler_image: "ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.2"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode
