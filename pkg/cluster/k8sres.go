@@ -1931,9 +1931,15 @@ func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 		lbls = c.connectionPoolerLabels("", false).MatchLabels
 	}
 
-	// if secret lives in another namespace we cannot set ownerReferences
+	// Skip a controller ownerReference on user-credential secrets when the
+	// operator is configured to keep them (enable_secrets_deletion=false);
+	// otherwise Kubernetes garbage collection would still cascade-delete them
+	// once the owning Postgresql CR is removed, defeating that setting.
+	// Cross-namespace secrets also have no ownerReference because K8s forbids
+	// cross-namespace ownerRefs by design.
 	var ownerReferences []metav1.OwnerReference
-	if c.Config.OpConfig.EnableCrossNamespaceSecret && c.Postgresql.ObjectMeta.Namespace != pgUser.Namespace {
+	secretsDeletionDisabled := c.OpConfig.EnableSecretsDeletion != nil && !*c.OpConfig.EnableSecretsDeletion
+	if secretsDeletionDisabled || (c.Config.OpConfig.EnableCrossNamespaceSecret && c.Postgresql.ObjectMeta.Namespace != pgUser.Namespace) {
 		ownerReferences = nil
 	} else {
 		ownerReferences = c.ownerReferences()

@@ -2829,6 +2829,134 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 	}
 }
 
+func TestGenerateSingleUserSecret_OwnerReferences(t *testing.T) {
+	testName := "Test generateSingleUserSecret owner references"
+
+	newCluster := func(ownerRefs, secretsDeletion *bool, crossNamespaceSecret bool) *Cluster {
+		cfg := Config{
+			OpConfig: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:      "cluster-name",
+					PodRoleLabel:          "spilo-role",
+					EnableOwnerReferences: ownerRefs,
+				},
+				EnableSecretsDeletion:      secretsDeletion,
+				EnableCrossNamespaceSecret: crossNamespaceSecret,
+			},
+		}
+		pg := acidv1.Postgresql{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myapp-database",
+				Namespace: "myapp",
+				UID:       types.UID("myapp-database-uid"),
+			},
+			Spec: acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 1},
+		}
+		return New(cfg, k8sutil.KubernetesClient{}, pg, logger, eventRecorder)
+	}
+
+	newPgUser := func(namespace string) spec.PgUser {
+		return spec.PgUser{
+			Name:      "app_user",
+			Namespace: namespace,
+			Password:  "secret",
+		}
+	}
+
+	hasControllerOwnerRef := func(cluster *Cluster) func(*v1.Secret) error {
+		return func(secret *v1.Secret) error {
+			for _, ref := range secret.OwnerReferences {
+				if ref.UID == cluster.Postgresql.ObjectMeta.UID &&
+					ref.Name == cluster.Postgresql.ObjectMeta.Name &&
+					ref.Controller != nil && *ref.Controller {
+					return nil
+				}
+			}
+			return fmt.Errorf("expected a controller owner reference pointing at the Postgresql CR, got %#v",
+				secret.OwnerReferences)
+		}
+	}
+
+	hasNoControllerOwnerRef := func(cluster *Cluster) func(*v1.Secret) error {
+		return func(secret *v1.Secret) error {
+			for _, ref := range secret.OwnerReferences {
+				if ref.UID == cluster.Postgresql.ObjectMeta.UID && ref.Controller != nil && *ref.Controller {
+					return fmt.Errorf("expected no controller owner reference, got %#v", secret.OwnerReferences)
+				}
+			}
+			return nil
+		}
+	}
+
+	tests := []struct {
+		scenario              string
+		cluster               *Cluster
+		pgUser                spec.PgUser
+		expectControllerOwner bool
+	}{
+		{
+			scenario:              "owner refs + secrets deletion enabled (default)",
+			cluster:               newCluster(util.True(), util.True(), false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: true,
+		},
+		{
+			scenario:              "owner refs enabled, secrets deletion disabled (skip owner ref)",
+			cluster:               newCluster(util.True(), util.False(), false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: false,
+		},
+		{
+			scenario:              "owner refs enabled, secrets deletion unset (default true)",
+			cluster:               newCluster(util.True(), nil, false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: true,
+		},
+		{
+			scenario:              "owner refs disabled, secrets deletion enabled",
+			cluster:               newCluster(util.False(), util.True(), false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: false,
+		},
+		{
+			scenario:              "owner refs disabled, secrets deletion disabled",
+			cluster:               newCluster(util.False(), util.False(), false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: false,
+		},
+		{
+			scenario:              "cross-namespace secret, owner refs + secrets deletion enabled",
+			cluster:               newCluster(util.True(), util.True(), true),
+			pgUser:                newPgUser("other-ns"),
+			expectControllerOwner: false,
+		},
+		{
+			scenario:              "cross-namespace secret, owner refs enabled, secrets deletion disabled",
+			cluster:               newCluster(util.True(), util.False(), true),
+			pgUser:                newPgUser("other-ns"),
+			expectControllerOwner: false,
+		},
+	}
+
+	for _, tt := range tests {
+		secret := tt.cluster.generateSingleUserSecret(tt.pgUser)
+		if secret == nil {
+			t.Errorf("%s [%s]: expected a non-nil secret", testName, tt.scenario)
+			continue
+		}
+
+		var check func(*v1.Secret) error
+		if tt.expectControllerOwner {
+			check = hasControllerOwnerRef(tt.cluster)
+		} else {
+			check = hasNoControllerOwnerRef(tt.cluster)
+		}
+		if err := check(secret); err != nil {
+			t.Errorf("%s [%s]: %+v", testName, tt.scenario, err)
+		}
+	}
+}
+
 func TestGenerateService(t *testing.T) {
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster

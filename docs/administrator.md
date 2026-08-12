@@ -285,11 +285,12 @@ will differ and trigger a rolling update of the pods.
 ## Owner References and Finalizers
 
 The Postgres Operator can set [owner references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/) to most of a cluster's child resources to improve
-monitoring with GitOps tools and enable cascading deletes. There are two
+monitoring with GitOps tools and enable cascading deletes. There are three
 exceptions:
 
 * Persistent Volume Claims, because they are handled by the [PV Reclaim Policy]https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/ of the Stateful Set
 * Cross-namespace secrets, because owner references are not allowed across namespaces by design
+* User-credential secrets when [`enable_secrets_deletion`](reference/operator_parameters.md#enable_secrets_deletion) is `false`, so Kubernetes garbage collection does not cascade-delete them after the Postgresql resource is removed (the `enable_secrets_deletion` flag alone only suppresses the operator's own delete path, not K8s GC)
 
 The operator would clean these resources up with its regular delete loop
 unless they got synced correctly. If for some reason the initial cluster sync
