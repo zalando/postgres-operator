@@ -60,11 +60,13 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 			}
 		} else {
 			r := spec.PgSyncUserRequest{}
-			newMD5Password := util.NewEncryptor(strategy.PasswordEncryption).PGUserPassword(newUser)
 
-			// do not compare for roles coming from docker image
-			if dbUser.Password != newMD5Password {
-				r.User.Password = newMD5Password
+			// A plain string comparison with a freshly generated hash would
+			// re-issue ALTER ROLE on every sync for SCRAM-SHA-256, because
+			// each generated verifier embeds a new random salt. Verify the
+			// stored hash against the desired password instead.
+			if !util.PGUserPasswordUpToDate(newUser, dbUser.Password, strategy.PasswordEncryption) {
+				r.User.Password = util.NewEncryptor(strategy.PasswordEncryption).PGUserPassword(newUser)
 				r.Kind = spec.PGsyncUserAlter
 			}
 			if addNewRoles, equal := util.SubstractStringSlices(newUser.MemberOf, dbUser.MemberOf); !equal {
