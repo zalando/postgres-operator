@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
 	"golang.org/x/crypto/pbkdf2"
 )
 

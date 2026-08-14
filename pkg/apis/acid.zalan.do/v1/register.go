@@ -1,7 +1,7 @@
 package v1
 
 import (
-	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
+	acidzalando "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

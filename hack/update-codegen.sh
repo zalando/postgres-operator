@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 SRC="github.com"
-GOPKG="$SRC/zalando/postgres-operator"
+GOPKG="$SRC/zalando/postgres-operator/v2"
 CUSTOM_RESOURCE_NAME_ZAL="zalando.org"
 CUSTOM_RESOURCE_NAME_ACID="acid.zalan.do"
 CUSTOM_RESOURCE_VERSION="v1"
