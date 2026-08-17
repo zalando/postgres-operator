@@ -210,12 +210,14 @@ func scramVerifierMatches(password, verifier string) bool {
 	}
 
 	key := pbkdf2.Key([]byte(password), salt, iterationCount, 32, sha256.New)
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte("Server Key"))
-	derivedServerKey := mac.Sum(nil)
-	mac = hmac.New(sha256.New, key)
-	mac.Write([]byte("Client Key"))
-	derivedStoredKey := sha256.Sum256(mac.Sum(nil))
+
+	serverMAC := hmac.New(sha256.New, key)
+	serverMAC.Write([]byte("Server Key"))
+	derivedServerKey := serverMAC.Sum(nil)
+
+	clientMAC := hmac.New(sha256.New, key)
+	clientMAC.Write([]byte("Client Key"))
+	derivedStoredKey := sha256.Sum256(clientMAC.Sum(nil))
 
 	return hmac.Equal(derivedServerKey, serverKey) && hmac.Equal(derivedStoredKey[:], storedKey)
 }
