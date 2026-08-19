@@ -1783,31 +1783,22 @@ func (c *Cluster) syncLogicalBackupJob() error {
 				return fmt.Errorf("could not patch labels of the logical backup job %q: %v", jobName, err)
 			}
 		}
-		_, kubeIamInCurrent := job.Annotations[constants.KubeIAmAnnotation]
-		_, kubeIamInDesired := desiredJob.Annotations[constants.KubeIAmAnnotation]
-		kubeIamNeedsRemoval := kubeIamInCurrent && !kubeIamInDesired
-		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations, nil); changed || kubeIamNeedsRemoval {
-			patchAnnotations := make(map[string]interface{})
-			for k, v := range desiredJob.Annotations {
-				patchAnnotations[k] = v
-			}
-			if kubeIamNeedsRemoval {
-				patchAnnotations[constants.KubeIAmAnnotation] = nil
-			}
-			patchData, err := json.Marshal(map[string]interface{}{
-				"metadata": map[string]interface{}{"annotations": patchAnnotations},
-			})
+		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations, nil); changed {
+			patchData, err := metaAnnotationsPatch(desiredJob.Annotations)
 			if err != nil {
-				return fmt.Errorf("could not form patch for the logical backup job %q annotations: %v", jobName, err)
+				return fmt.Errorf("could not form patch for the logical backup job %q: %v", jobName, err)
 			}
-			_, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.MergePatchType, patchData, metav1.PatchOptions{})
+			_, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 			if err != nil {
 				return fmt.Errorf("could not patch annotations of the logical backup job %q: %v", jobName, err)
 			}
 		}
-		if _, ok := job.Spec.JobTemplate.Annotations[constants.KubeIAmAnnotation]; ok {
-			if _, exists := desiredJob.Spec.JobTemplate.Annotations[constants.KubeIAmAnnotation]; !exists {
+		if _, ok := job.Annotations[constants.KubeIAmAnnotation]; ok {
+			if _, exists := desiredJob.Annotations[constants.KubeIAmAnnotation]; !exists {
 				patchData, err := json.Marshal(map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"annotations": map[string]*string{constants.KubeIAmAnnotation: nil},
+					},
 					"spec": map[string]interface{}{
 						"jobTemplate": map[string]interface{}{
 							"metadata": map[string]interface{}{
@@ -1817,11 +1808,11 @@ func (c *Cluster) syncLogicalBackupJob() error {
 					},
 				})
 				if err != nil {
-					return fmt.Errorf("could not form patch for the logical backup job %q job template annotations: %v", jobName, err)
+					return fmt.Errorf("could not form patch to remove kube2iam annotation from logical backup job %q: %v", jobName, err)
 				}
 				_, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.MergePatchType, patchData, metav1.PatchOptions{})
 				if err != nil {
-					return fmt.Errorf("could not remove kube2iam annotation from logical backup job %q job template: %v", jobName, err)
+					return fmt.Errorf("could not remove kube2iam annotation from logical backup job %q: %v", jobName, err)
 				}
 			}
 		}
