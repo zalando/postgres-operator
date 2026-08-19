@@ -1793,7 +1793,9 @@ func (c *Cluster) syncLogicalBackupJob() error {
 				return fmt.Errorf("could not patch annotations of the logical backup job %q: %v", jobName, err)
 			}
 		}
-		if _, ok := job.Annotations[constants.KubeIAmAnnotation]; ok {
+		_, kubeIamInCronJob := job.Annotations[constants.KubeIAmAnnotation]
+		_, kubeIamInTemplate := job.Spec.JobTemplate.Annotations[constants.KubeIAmAnnotation]
+		if kubeIamInCronJob || kubeIamInTemplate {
 			if _, exists := desiredJob.Annotations[constants.KubeIAmAnnotation]; !exists {
 				patchData, err := json.Marshal(map[string]interface{}{
 					"metadata": map[string]interface{}{
