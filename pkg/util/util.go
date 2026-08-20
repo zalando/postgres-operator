@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,12 +95,19 @@ func NewEncryptor(encryption string) *Encryptor {
 }
 
 func (e *Encryptor) PGUserPassword(user spec.PgUser) string {
-	if (len(user.Password) == md5.Size*2+len(md5prefix) && user.Password[:3] == md5prefix) ||
-		(len(user.Password) > len(scramsha256prefix) && user.Password[:len(scramsha256prefix)] == scramsha256prefix) || user.Password == "" {
+	if isMD5Hash(user.Password) || isScramHash(user.Password) || user.Password == "" {
 		// Avoid processing already encrypted or empty passwords
 		return user.Password
 	}
 	return e.encrypt(user)
+}
+
+func isMD5Hash(password string) bool {
+	return len(password) == md5.Size*2+len(md5prefix) && password[:3] == md5prefix
+}
+
+func isScramHash(password string) bool {
+	return len(password) > len(scramsha256prefix) && password[:len(scramsha256prefix)] == scramsha256prefix
 }
 
 func (e *Encryptor) PGUserPasswordMD5(user spec.PgUser) string {
@@ -125,6 +133,93 @@ func (e *Encryptor) PGUserPasswordScramSHA256(user spec.PgUser) string {
 		base64.StdEncoding.EncodeToString(serverKey),
 	)
 	return pass
+}
+
+// PGUserPasswordUpToDate reports whether the password hash stored in the
+// database already corresponds to the user's desired password and the
+// configured password encryption, i.e. whether ALTER ROLE ... PASSWORD can
+// be skipped during role sync.
+//
+// A SCRAM-SHA-256 verifier embeds a random salt, so regenerating one from
+// the plaintext and comparing strings never matches. Instead, the salt and
+// iteration count are taken from the stored verifier and the derived keys
+// are compared. A stored hash whose type differs from the configured
+// encryption is reported as outdated so that changing password_encryption
+// still re-hashes the roles.
+func PGUserPasswordUpToDate(user spec.PgUser, storedPassword, encryption string) bool {
+	// Empty and pre-hashed desired passwords can only be compared verbatim,
+	// mirroring the early return in PGUserPassword.
+	if user.Password == "" || isMD5Hash(user.Password) || isScramHash(user.Password) {
+		return user.Password == storedPassword
+	}
+
+	switch {
+	case isMD5Hash(storedPassword):
+		if encryption != "md5" {
+			return false
+		}
+		return NewEncryptor(encryption).PGUserPassword(user) == storedPassword
+	case isScramHash(storedPassword):
+		if encryption == "md5" {
+			return false
+		}
+		return scramVerifierMatches(user.Password, storedPassword)
+	}
+
+	return false
+}
+
+// scramVerifierMatches verifies a plaintext password against a stored
+// SCRAM-SHA-256 verifier of the form
+// SCRAM-SHA-256$<iterations>:<salt>$<storedKey>:<serverKey>
+// by re-deriving the keys with the stored salt and iteration count.
+func scramVerifierMatches(password, verifier string) bool {
+	rest := strings.TrimPrefix(verifier, scramsha256prefix+"$")
+	if rest == verifier {
+		return false
+	}
+
+	saltedParams, keys, found := strings.Cut(rest, "$")
+	if !found {
+		return false
+	}
+	iterationsPart, saltPart, found := strings.Cut(saltedParams, ":")
+	if !found {
+		return false
+	}
+	storedKeyPart, serverKeyPart, found := strings.Cut(keys, ":")
+	if !found {
+		return false
+	}
+
+	iterationCount, err := strconv.Atoi(iterationsPart)
+	if err != nil || iterationCount < 1 {
+		return false
+	}
+	salt, err := base64.StdEncoding.DecodeString(saltPart)
+	if err != nil {
+		return false
+	}
+	storedKey, err := base64.StdEncoding.DecodeString(storedKeyPart)
+	if err != nil {
+		return false
+	}
+	serverKey, err := base64.StdEncoding.DecodeString(serverKeyPart)
+	if err != nil {
+		return false
+	}
+
+	key := pbkdf2.Key([]byte(password), salt, iterationCount, 32, sha256.New)
+
+	serverMAC := hmac.New(sha256.New, key)
+	serverMAC.Write([]byte("Server Key"))
+	derivedServerKey := serverMAC.Sum(nil)
+
+	clientMAC := hmac.New(sha256.New, key)
+	clientMAC.Write([]byte("Client Key"))
+	derivedStoredKey := sha256.Sum256(clientMAC.Sum(nil))
+
+	return hmac.Equal(derivedServerKey, serverKey) && hmac.Equal(derivedStoredKey[:], storedKey)
 }
 
 // Diff returns diffs between 2 objects

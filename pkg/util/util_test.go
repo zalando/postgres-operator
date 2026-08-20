@@ -162,6 +162,41 @@ func TestPGUserPassword(t *testing.T) {
 	}
 }
 
+func TestPGUserPasswordUpToDate(t *testing.T) {
+	user := spec.PgUser{Name: "someuser", Password: "password"}
+	md5Hash := NewEncryptor("md5").PGUserPassword(user)
+	// real generation path: random salt in the verifier
+	scramHash := NewEncryptor("scram-sha-256").PGUserPassword(user)
+
+	tests := []struct {
+		name       string
+		user       spec.PgUser
+		stored     string
+		encryption string
+		want       bool
+	}{
+		{"scram verifier matches its plaintext", user, scramHash, "scram-sha-256", true},
+		{"a differently salted verifier of the same password matches", user, NewEncryptor("scram-sha-256").PGUserPassword(user), "scram-sha-256", true},
+		{"scram verifier of another password does not match", spec.PgUser{Name: "someuser", Password: "different"}, scramHash, "scram-sha-256", false},
+		{"md5 hash matches its plaintext", user, md5Hash, "md5", true},
+		{"md5 hash of another password does not match", spec.PgUser{Name: "someuser", Password: "different"}, md5Hash, "md5", false},
+		{"stored md5 is outdated when scram is configured", user, md5Hash, "scram-sha-256", false},
+		{"stored scram is outdated when md5 is configured", user, scramHash, "md5", false},
+		{"pre-hashed desired password compares verbatim", spec.PgUser{Name: "someuser", Password: md5Hash}, md5Hash, "md5", true},
+		{"pre-hashed desired password differs from stored", spec.PgUser{Name: "someuser", Password: md5Hash}, scramHash, "md5", false},
+		{"empty desired password matches empty stored", spec.PgUser{Name: "someuser"}, "", "scram-sha-256", true},
+		{"empty desired password differs from stored hash", spec.PgUser{Name: "someuser"}, scramHash, "scram-sha-256", false},
+		{"malformed stored hash is outdated", user, "not-a-hash", "scram-sha-256", false},
+		{"truncated scram verifier is outdated", user, "SCRAM-SHA-256$4096:c2FsdA==", "scram-sha-256", false},
+		{"scram verifier with bad base64 is outdated", user, "SCRAM-SHA-256$4096:!!$aaaa:bbbb", "scram-sha-256", false},
+	}
+	for _, tt := range tests {
+		if got := PGUserPasswordUpToDate(tt.user, tt.stored, tt.encryption); got != tt.want {
+			t.Errorf("%s: PGUserPasswordUpToDate expected %v, got %v", tt.name, tt.want, got)
+		}
+	}
+}
+
 func TestPrettyDiff(t *testing.T) {
 	for _, tt := range prettyDiffTest {
 		if actual := PrettyDiff(tt.inA, tt.inB); actual != tt.out {
