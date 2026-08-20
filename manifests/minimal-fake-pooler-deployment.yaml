@@ -23,7 +23,7 @@ spec:
       serviceAccountName: postgres-operator
       containers:
       - name: postgres-operator
-        image: ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.1
+        image: ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.2
         imagePullPolicy: IfNotPresent
         resources:
           requests:

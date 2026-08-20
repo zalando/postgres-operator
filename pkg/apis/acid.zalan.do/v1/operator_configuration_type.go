@@ -331,7 +331,7 @@ type ConnectionPoolerConfiguration struct {
 	Schema string `json:"connection_pooler_schema,omitempty"`
 	// +kubebuilder:default=pooler
 	User string `json:"connection_pooler_user,omitempty"`
-	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.1"
+	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.2"
 	Image string `json:"connection_pooler_image,omitempty"`
 	// +kubebuilder:validation:Enum=session;transaction
 	// +kubebuilder:default=transaction
@@ -352,7 +352,7 @@ type OperatorLogicalBackupConfiguration struct {
 	// +kubebuilder:validation:Pattern=`^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$`
 	// +kubebuilder:default="30 00 * * *"
 	Schedule string `json:"logical_backup_schedule,omitempty"`
-	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/logical-backup:v2.0.1"
+	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/logical-backup:v2.0.2"
 	DockerImage string `json:"logical_backup_docker_image,omitempty"`
 	// +kubebuilder:validation:Enum=az;gcs;s3
 	// +kubebuilder:default=s3

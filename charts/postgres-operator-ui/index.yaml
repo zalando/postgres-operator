@@ -2,8 +2,31 @@ apiVersion: v1
 entries:
   postgres-operator-ui:
   - apiVersion: v2
+    appVersion: 2.0.2
+    created: "2026-08-12T16:14:09.689921+02:00"
+    description: Postgres Operator UI provides a graphical interface for a convenient
+      database-as-a-service user experience
+    digest: 2dea5c2768a611ec90f3531e32336c2be988e4a6cf2c4cc231835290b2863017
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - ui
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator-ui
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-ui-2.0.2.tgz
+    version: 2.0.2
+  - apiVersion: v2
     appVersion: 2.0.1
-    created: "2026-07-28T19:23:51.430413+02:00"
+    created: "2026-08-12T16:14:09.689744+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: 9bd0cfb82bc9e849fc01fe5a2d14e42941d102d719ff6a182a5a63237138c2a3
@@ -26,7 +49,7 @@ entries:
     version: 2.0.1
   - apiVersion: v2
     appVersion: 2.0.0
-    created: "2026-07-28T19:23:51.429462+02:00"
+    created: "2026-08-12T16:14:09.689359+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: 80098eb9290d77fcaaf813347386c3b7d34de0d4e846b50ac177d4ac4a9e2ecb
@@ -49,7 +72,7 @@ entries:
     version: 2.0.0
   - apiVersion: v2
     appVersion: 1.15.1
-    created: "2026-07-28T19:23:51.429214+02:00"
+    created: "2026-08-12T16:14:09.688865+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: 4bbb750934366038d692711f924151182b7be131b6822d011f5a4e51cf609482
@@ -72,7 +95,7 @@ entries:
     version: 1.15.1
   - apiVersion: v2
     appVersion: 1.14.0
-    created: "2026-07-28T19:23:51.428962+02:00"
+    created: "2026-08-12T16:14:09.688617+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: e87ed898079a852957a67a4caf3fbd27b9098e413f5d961b7a771a6ae8b3e17c
@@ -95,7 +118,7 @@ entries:
     version: 1.14.0
   - apiVersion: v2
     appVersion: 1.13.0
-    created: "2026-07-28T19:23:51.428701+02:00"
+    created: "2026-08-12T16:14:09.688362+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: e0444e516b50f82002d1a733527813c51759a627cefdd1005cea73659f824ea8
@@ -118,7 +141,7 @@ entries:
     version: 1.13.0
   - apiVersion: v2
     appVersion: 1.12.2
-    created: "2026-07-28T19:23:51.428173+02:00"
+    created: "2026-08-12T16:14:09.68809+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: cbcef400c23ccece27d97369ad629278265c013e0a45c0b7f33e7568a082fedd
@@ -141,7 +164,7 @@ entries:
     version: 1.12.2
   - apiVersion: v2
     appVersion: 1.11.0
-    created: "2026-07-28T19:23:51.427892+02:00"
+    created: "2026-08-12T16:14:09.687752+02:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
     digest: a45f2284045c2a9a79750a36997386444f39b01ac722b17c84b431457577a3a2
@@ -162,4 +185,4 @@ entries:
     urls:
     - postgres-operator-ui-1.11.0.tgz
     version: 1.11.0
-generated: "2026-07-28T19:23:51.42722+02:00"
+generated: "2026-08-12T16:14:09.687119+02:00"
