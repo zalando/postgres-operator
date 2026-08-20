@@ -3,9 +3,9 @@ package controller
 import (
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/zalando/postgres-operator/pkg/cluster"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/cluster"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
 	"k8s.io/apimachinery/pkg/types"
 )
 

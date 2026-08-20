@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/retryutil"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	"github.com/zalando/postgres-operator/pkg/cluster"
-	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/cluster"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
 )
 
 func (c *Controller) nodeAdd(obj interface{}) {

@@ -27,8 +27,8 @@ package externalversions
 import (
 	fmt "fmt"
 
-	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	v1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	zalandoorgv1 "github.com/zalando/postgres-operator/v2/pkg/apis/zalando.org/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
