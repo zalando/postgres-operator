@@ -7,6 +7,10 @@ metadata:
   labels:
     app.kubernetes.io/name: postgres-operator
   name: postgresqls.acid.zalan.do
+  # finalizer to prevent accidental deletion of the CRD which would erase
+  # all postgresql custom resources. Remove explicitly to delete the CRD.
+  finalizers:
+  - acid.zalan.do/crd-protection
 spec:
   group: acid.zalan.do
   names:
