@@ -13,7 +13,7 @@ stats_users = $INFRASTRUCTURE_ROLES
 auth_dbname = postgres
 auth_file = /etc/pgbouncer/userlist.txt
 auth_query = SELECT * FROM $PGSCHEMA.user_lookup($1)
-auth_type = md5
+auth_type = scram-sha-256
 logfile = /var/log/pgbouncer/pgbouncer.log
 pidfile = /var/run/pgbouncer/pgbouncer.pid
 
