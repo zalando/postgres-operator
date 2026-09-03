@@ -142,6 +142,21 @@ func (in *ConnectionPoolerConfiguration) DeepCopyInto(out *ConnectionPoolerConfi
 		*out = new(int32)
 		**out = **in
 	}
+	if in.GenerateConfig != nil {
+		in, out := &in.GenerateConfig, &out.GenerateConfig
+		*out = new(bool)
+		**out = **in
+	}
+	if in.Command != nil {
+		in, out := &in.Command, &out.Command
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Args != nil {
+		in, out := &in.Args, &out.Args
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
