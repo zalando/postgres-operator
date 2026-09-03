@@ -142,6 +142,16 @@ func (in *ConnectionPoolerConfiguration) DeepCopyInto(out *ConnectionPoolerConfi
 		*out = new(int32)
 		**out = **in
 	}
+	if in.PodSecurityContext != nil {
+		in, out := &in.PodSecurityContext, &out.PodSecurityContext
+		*out = new(corev1.PodSecurityContext)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.SecurityContext != nil {
+		in, out := &in.SecurityContext, &out.SecurityContext
+		*out = new(corev1.SecurityContext)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

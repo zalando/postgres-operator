@@ -29,6 +29,51 @@ import (
 var poolerRunAsUser = int64(100)
 var poolerRunAsGroup = int64(101)
 
+// generateConnectionPoolerPodSecurityContext returns the pod-level securityContext for the
+// connection pooler. When the operator configuration provides one it is used as the base
+// (deep-copied); otherwise an empty context is used. The historical defaults (RunAsUser/RunAsGroup
+// 100/101) and the spilo FSGroup are applied only for fields the configuration leaves unset, so
+// behavior is unchanged when no override is configured.
+func (c *Cluster) generateConnectionPoolerPodSecurityContext(spec *acidv1.PostgresSpec) *v1.PodSecurityContext {
+	var securityContext v1.PodSecurityContext
+	if c.OpConfig.ConnectionPooler.PodSecurityContext != nil {
+		securityContext = *c.OpConfig.ConnectionPooler.PodSecurityContext.DeepCopy()
+	}
+
+	if securityContext.RunAsUser == nil {
+		securityContext.RunAsUser = &poolerRunAsUser
+	}
+	if securityContext.RunAsGroup == nil {
+		securityContext.RunAsGroup = &poolerRunAsGroup
+	}
+
+	if securityContext.FSGroup == nil {
+		effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
+		if spec.SpiloFSGroup != nil {
+			effectiveFSGroup = spec.SpiloFSGroup
+		}
+		if effectiveFSGroup != nil {
+			securityContext.FSGroup = effectiveFSGroup
+		}
+	}
+
+	return &securityContext
+}
+
+// generateConnectionPoolerContainerSecurityContext returns the container-level securityContext for
+// the pooler. A configured context is used as the base (deep-copied); AllowPrivilegeEscalation
+// defaults to false when left unset, preserving prior behavior.
+func (c *Cluster) generateConnectionPoolerContainerSecurityContext() *v1.SecurityContext {
+	var securityContext v1.SecurityContext
+	if c.OpConfig.ConnectionPooler.SecurityContext != nil {
+		securityContext = *c.OpConfig.ConnectionPooler.SecurityContext.DeepCopy()
+	}
+	if securityContext.AllowPrivilegeEscalation == nil {
+		securityContext.AllowPrivilegeEscalation = util.False()
+	}
+	return &securityContext
+}
+
 // ConnectionPoolerObjects K8s objects that are belong to connection pooler
 type ConnectionPoolerObjects struct {
 	AuthSecret  *v1.Secret
@@ -383,9 +428,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 				},
 			},
 		},
-		SecurityContext: &v1.SecurityContext{
-			AllowPrivilegeEscalation: util.False(),
-		},
+		SecurityContext: c.generateConnectionPoolerContainerSecurityContext(),
 	}
 
 	var poolerVolumes []v1.Volume
@@ -444,19 +487,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	poolerContainer.Env = envVars
 	poolerContainer.VolumeMounts = volumeMounts
 	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
-	securityContext := v1.PodSecurityContext{}
-
-	// determine the User, Group and FSGroup for the pooler pod
-	securityContext.RunAsUser = &poolerRunAsUser
-	securityContext.RunAsGroup = &poolerRunAsGroup
-
-	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
-	if spec.SpiloFSGroup != nil {
-		effectiveFSGroup = spec.SpiloFSGroup
-	}
-	if effectiveFSGroup != nil {
-		securityContext.FSGroup = effectiveFSGroup
-	}
+	securityContext := c.generateConnectionPoolerPodSecurityContext(spec)
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
@@ -469,7 +500,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			Containers:                    []v1.Container{poolerContainer},
 			Tolerations:                   tolerationsSpec,
 			Volumes:                       poolerVolumes,
-			SecurityContext:               &securityContext,
+			SecurityContext:               securityContext,
 			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
 		},
 	}
