@@ -165,6 +165,12 @@ type ConnectionPooler struct {
 	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request"`
 	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit"`
 	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit"`
+	GenerateConfig                       bool   `name:"connection_pooler_generate_config" default:"false"`
+	// Command is nil when not configured (keeps the image entrypoint).
+	Command    []string `name:"connection_pooler_command"`
+	Args       []string `name:"connection_pooler_args" default:"/etc/pgbouncer/pgbouncer.ini"`
+	AuthType   string   `name:"connection_pooler_auth_type" default:"scram-sha-256"`
+	ConfigPath string   `name:"connection_pooler_config_path" default:"/etc/pgbouncer/pgbouncer.ini"`
 }
 
 // Config describes operator config
