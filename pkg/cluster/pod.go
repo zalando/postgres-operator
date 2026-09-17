@@ -250,7 +250,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 	// we may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case
 	masterCandidateName := podName
-	masterCandidatePod := oldMaster
+	var masterCandidatePod *v1.Pod
 	if *c.Statefulset.Spec.Replicas > 1 {
 		if masterCandidateName, err = c.getSwitchoverCandidate(oldMaster); err != nil {
 			return fmt.Errorf("could not find suitable replica pod as candidate for failover: %v", err)
