@@ -559,9 +559,8 @@ configuration they are grouped under the `kubernetes` key.
   respective replicas on healthy nodes. For a single-pod cluster, the operator
   instead recreates the master on another node and waits for its role label,
   without attempting a switchover. This causes downtime until the pod returns.
-  The situation where master pods still
-  exist on the old node after this timeout expires has to be fixed manually.
-  The default is 20 minutes.
+  The situation where master pods still exist on the old node after this
+  timeout expires has to be fixed manually. The default is 20 minutes.
 
 * **enable_pod_antiaffinity**
   toggles [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
