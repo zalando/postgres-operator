@@ -100,13 +100,17 @@ func (c *Cluster) pgConnectionString(dbname string) string {
 	if dbname == "" {
 		dbname = "postgres"
 	}
+	
+	// TODO add global config option for this
+	var options = "-c log_statement=all"
 
-	return fmt.Sprintf("host='%s' dbname='%s' sslmode=require user='%s' password='%s' connect_timeout='%d'",
+	return fmt.Sprintf("host='%s' dbname='%s' sslmode=require user='%s' password='%s' connect_timeout='%d' options='%s'",
 		fmt.Sprintf("%s.%s.svc.%s", c.Name, c.Namespace, c.OpConfig.ClusterDomain),
 		dbname,
 		c.systemUsers[constants.SuperuserKeyName].Name,
 		strings.Replace(password, "$", "\\$", -1),
-		constants.PostgresConnectTimeout/time.Second)
+		constants.PostgresConnectTimeout/time.Second,
+		options)
 }
 
 func (c *Cluster) databaseAccessDisabled() bool {
