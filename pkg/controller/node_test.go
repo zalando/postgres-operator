@@ -1,12 +1,13 @@
 package controller
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	logrustest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/sirupsen/logrus"
 	"github.com/zalando/postgres-operator/v2/pkg/spec"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -116,16 +117,17 @@ func TestMoveMasterPodsOffNodeRetriesOnError(t *testing.T) {
 	// the single retry attempt resolves synchronously without a real sleep.
 	controller.opConfig.MasterPodMoveTimeout = &metav1.Duration{Duration: 1 * time.Minute}
 
-	logger, hook := logrustest.NewNullLogger()
+	var logOutput bytes.Buffer
+	logger := logrus.New()
+	logger.SetOutput(&logOutput)
 	controller.logger = logger.WithField("pkg", "controller")
 
 	controller.moveMasterPodsOffNode(makeNode(map[string]string{}, false))
 
-	lastEntry := hook.LastEntry()
-	if lastEntry == nil {
+	if logOutput.Len() == 0 {
 		t.Fatal("expected moveMasterPodsOffNode to log a warning")
 	}
-	if !strings.Contains(lastEntry.Message, "still failing after") {
-		t.Errorf("expected the retry loop to run out of attempts instead of aborting on the first error, got log message: %q", lastEntry.Message)
+	if !strings.Contains(logOutput.String(), "still failing after") {
+		t.Errorf("expected the retry loop to run out of attempts instead of aborting on the first error, got log output: %q", logOutput.String())
 	}
 }
