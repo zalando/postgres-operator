@@ -253,6 +253,11 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	minSize := defaultSize / 2
 	reserveSize := minSize
 
+	passwordEncryption, ok := c.Spec.PostgresqlParam.Parameters["password_encryption"]
+	if !ok {
+		passwordEncryption = "scram-sha-256"
+	}
+
 	return []v1.EnvVar{
 		{
 			Name:  "CONNECTION_POOLER_PORT",
@@ -261,6 +266,10 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 		{
 			Name:  "CONNECTION_POOLER_MODE",
 			Value: effectiveMode,
+		},
+		{
+			Name:  "CONNECTION_POOLER_AUTH_TYPE",
+			Value: passwordEncryption,
 		},
 		{
 			Name:  "CONNECTION_POOLER_DEFAULT_SIZE",
