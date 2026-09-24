@@ -253,7 +253,7 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	minSize := defaultSize / 2
 	reserveSize := minSize
 
-	passwordEncryption, ok := c.Spec.PostgresqlParam.Parameters["password_encryption"]
+	passwordEncryption, ok := spec.PostgresqlParam.Parameters["password_encryption"]
 	if !ok {
 		passwordEncryption = "scram-sha-256"
 	}
@@ -942,6 +942,17 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 			sync = true
 			msg := fmt.Sprintf("pooler schema is different (having %s, required %s)",
 				env.Value, config.Schema)
+			reasons = append(reasons, msg)
+		}
+
+		passwordEncryption, ok := c.Spec.PostgresqlParam.Parameters["password_encryption"]
+		if !ok {
+			passwordEncryption = "scram-sha-256"
+		}
+		if env.Name == "CONNECTION_POOLER_AUTH_TYPE" && passwordEncryption != env.Value {
+			sync = true
+			msg := fmt.Sprintf("pooler auth type is different (having %s, required %s)",
+				env.Value, passwordEncryption)
 			reasons = append(reasons, msg)
 		}
 	}
