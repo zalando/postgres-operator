@@ -556,10 +556,11 @@ configuration they are grouped under the `kubernetes` key.
 * **master_pod_move_timeout**
   The period of time to wait for the success of migration of master pods from
   an unschedulable node. The migration includes Patroni switchovers to
-  respective replicas on healthy nodes. A failed migration attempt is retried
-  every minute until this timeout expires. The situation where master pods
-  still exist on the old node after this timeout expires has to be fixed
-  manually. The default is 20 minutes.
+  respective replicas on healthy nodes. For a single-pod cluster, the operator
+  instead recreates the master on another node and waits for its role label,
+  without attempting a switchover. This causes downtime until the pod returns.
+  The situation where master pods still exist on the old node after this
+  timeout expires has to be fixed manually. The default is 20 minutes.
 
 * **enable_pod_antiaffinity**
   toggles [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
