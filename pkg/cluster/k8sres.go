@@ -24,14 +24,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando/postgres-operator/pkg/util/patroni"
-	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/patroni"
+	"github.com/zalando/postgres-operator/v2/pkg/util/retryutil"
 )
 
 const (
@@ -697,6 +697,7 @@ func generateContainer(
 	dockerImage *string,
 	resourceRequirements *v1.ResourceRequirements,
 	envVars []v1.EnvVar,
+	envFrom []v1.EnvFromSource,
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
 	privilegeEscalationMode *bool,
@@ -723,6 +724,7 @@ func generateContainer(
 		},
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
+		EnvFrom:      envFrom,
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: privilegeEscalationMode,
 			Privileged:               &privilegedMode,
@@ -1099,6 +1101,10 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
+	if c.OpConfig.IRSARoleARN != "" {
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "SPILO_PROVIDER", Value: "aws"})
+	}
+
 	envVars = appendEnvVars(envVars, opConfigEnvVars...)
 
 	return envVars, nil
@@ -1385,6 +1391,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		&effectiveDockerImage,
 		resourceRequirements,
 		spiloEnvVars,
+		spec.EnvFrom,
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
@@ -1928,9 +1935,15 @@ func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 		lbls = c.connectionPoolerLabels("", false).MatchLabels
 	}
 
-	// if secret lives in another namespace we cannot set ownerReferences
+	// Skip a controller ownerReference on user-credential secrets when the
+	// operator is configured to keep them (enable_secrets_deletion=false);
+	// otherwise Kubernetes garbage collection would still cascade-delete them
+	// once the owning Postgresql CR is removed, defeating that setting.
+	// Cross-namespace secrets also have no ownerReference because K8s forbids
+	// cross-namespace ownerRefs by design.
 	var ownerReferences []metav1.OwnerReference
-	if c.Config.OpConfig.EnableCrossNamespaceSecret && c.Postgresql.ObjectMeta.Namespace != pgUser.Namespace {
+	secretsDeletionDisabled := c.OpConfig.EnableSecretsDeletion != nil && !*c.OpConfig.EnableSecretsDeletion
+	if secretsDeletionDisabled || (c.Config.OpConfig.EnableCrossNamespaceSecret && c.Postgresql.ObjectMeta.Namespace != pgUser.Namespace) {
 		ownerReferences = nil
 	} else {
 		ownerReferences = c.ownerReferences()
@@ -2214,6 +2227,12 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		}
 	}
 
+	if c.OpConfig.IRSARoleARN != "" {
+		result = append(result, v1.EnvVar{Name: "CLONE_AWS_ROLE_ARN", Value: c.OpConfig.IRSARoleARN})
+		result = append(result, v1.EnvVar{Name: "CLONE_AWS_WEB_IDENTITY_TOKEN_FILE", Value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"})
+		result = append(result, v1.EnvVar{Name: "CLONE_AWS_REGION", Value: c.OpConfig.AWSRegion})
+	}
+
 	return result
 }
 
@@ -2259,6 +2278,12 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 		result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
+	if c.OpConfig.IRSARoleARN != "" {
+		result = append(result, v1.EnvVar{Name: "STANDBY_AWS_ROLE_ARN", Value: c.OpConfig.IRSARoleARN})
+		result = append(result, v1.EnvVar{Name: "STANDBY_AWS_WEB_IDENTITY_TOKEN_FILE", Value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"})
+		result = append(result, v1.EnvVar{Name: "STANDBY_AWS_REGION", Value: c.OpConfig.AWSRegion})
+	}
+
 	return result
 }
 
@@ -2302,12 +2327,18 @@ func (c *Cluster) generatePrimaryPodDisruptionBudget() *policyv1.PodDisruptionBu
 }
 
 func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptionBudget {
-	minAvailable := intstr.FromInt32(c.Spec.NumberOfInstances)
+	// MaxUnavailable: 0 blocks voluntary disruption of any pod carrying the
+	// critical-operation label, while keeping the budget satisfied when no
+	// pod matches (status.desiredHealthy stays 0 outside critical
+	// operations). The previous MinAvailable: N spec left desiredHealthy at
+	// N with zero matching pods during normal operation, permanently firing
+	// alerts like kube-prometheus-stack's KubePdbNotEnoughHealthyPods (#3020).
+	maxUnavailable := intstr.FromInt32(0)
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 
-	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
+	// if PodDisruptionBudget is disabled or if there are no DB pods, allow all disruptions.
 	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
-		minAvailable = intstr.FromInt(0)
+		maxUnavailable = intstr.FromString("100%")
 	}
 
 	labels := c.labelsSet(false)
@@ -2322,7 +2353,7 @@ func (c *Cluster) generateCriticalOpPodDisruptionBudget() *policyv1.PodDisruptio
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
-			MinAvailable: &minAvailable,
+			MaxUnavailable: &maxUnavailable,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -2375,6 +2406,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
 		resourceRequirements,
 		envVars,
+		nil,
 		[]v1.VolumeMount{},
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
 		c.OpConfig.SpiloAllowPrivilegeEscalation,

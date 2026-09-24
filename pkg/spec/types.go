@@ -23,6 +23,11 @@ import (
 // consider using NamespacedNameOrDie() in testing.go in this package.
 //
 // from: https://github.com/kubernetes/apimachinery/blob/master/pkg/types/namespacedname.go
+//
+// NamespacedName marshals to and unmarshals from a plain JSON string
+// ("<namespace>/<name>") via its custom MarshalJSON/UnmarshalJSON, so its CRD
+// schema must be a string rather than the struct controller-gen would infer.
+// +kubebuilder:validation:Type=string
 type NamespacedName struct {
 	Namespace string `json:"namespace,omitempty"`
 	Name      string `json:"name"`

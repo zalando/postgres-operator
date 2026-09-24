@@ -1,7 +1,7 @@
 image:
   registry: ghcr.io
   repository: zalando/postgres-operator
-  tag: v1.15.1
+  tag: v2.0.2
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -41,7 +41,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: ghcr.io/zalando/spilo-18:4.1-p1
+  docker_image: ghcr.io/zalando/spilo-18:4.1-p2
 
   # key name for annotation to ignore globally configured instance limits
   # ignore_instance_limits_annotation_key: ""
@@ -350,16 +350,12 @@ configAwsOrGcp:
   # AWS region used to store EBS volumes
   aws_region: eu-central-1
 
-  # enable automatic migration on AWS from gp2 to gp3 volumes
-  enable_ebs_gp3_migration: false
-  # defines maximum volume size in GB until which auto migration happens
-  # enable_ebs_gp3_migration_max_size: 1000
-
   # GCP credentials that will be used by the operator / pods
   # gcp_credentials: ""
 
   # AWS IAM role to supply in the iam.amazonaws.com/role annotation of Postgres pods
   # kube_iam_role: ""
+
   # Full ARN for IRSA (IAM Roles for Service Accounts) on EKS
   # irsa_role_arn: ""
 
@@ -389,7 +385,7 @@ configLogicalBackup:
   # logical_backup_memory_request: ""
 
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
+  logical_backup_docker_image: "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.2"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -467,7 +463,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "ghcr.io/zalando/postgres-operator/pgbouncer:latest"
+  connection_pooler_image: "ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.2"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode

@@ -25,7 +25,7 @@ SOFTWARE.
 package v1
 
 import (
-	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	zalandoorgv1 "github.com/zalando/postgres-operator/v2/pkg/apis/zalando.org/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"

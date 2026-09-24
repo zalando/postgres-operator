@@ -9,13 +9,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	fakeacidv1 "github.com/zalando/postgres-operator/v2/pkg/generated/clientset/versioned/fake"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -2556,6 +2556,17 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		}
 	}
 
+	hasMaxUnavailable := func(expected string) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
+			actual := podDisruptionBudget.Spec.MaxUnavailable.String()
+			if actual != expected {
+				return fmt.Errorf("PodDisruptionBudget MaxUnavailable is incorrect, got %s, expected %s",
+					actual, expected)
+			}
+			return nil
+		}
+	}
+
 	hasMinAvailable := func(expectedMinAvailable int) func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
 		return func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error {
 			actual := podDisruptionBudget.Spec.MinAvailable.IntVal
@@ -2749,7 +2760,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
 				hasName("postgres-myapp-database-critical-op-pdb"),
-				hasMinAvailable(3),
+				hasMaxUnavailable("0"),
 				testLabelsAndSelectors(false),
 			},
 		},
@@ -2766,7 +2777,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
 				hasName("postgres-myapp-database-critical-op-pdb"),
-				hasMinAvailable(0),
+				hasMaxUnavailable("100%"),
 				testLabelsAndSelectors(false),
 			},
 		},
@@ -2783,7 +2794,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
 				hasName("postgres-myapp-database-critical-op-pdb"),
-				hasMinAvailable(0),
+				hasMaxUnavailable("100%"),
 				testLabelsAndSelectors(false),
 			},
 		},
@@ -2800,7 +2811,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 			check: []func(cluster *Cluster, podDisruptionBudget *policyv1.PodDisruptionBudget) error{
 				testPodDisruptionBudgetOwnerReference,
 				hasName("postgres-myapp-database-critical-op-pdb"),
-				hasMinAvailable(3),
+				hasMaxUnavailable("0"),
 				testLabelsAndSelectors(false),
 			},
 		},
@@ -2814,6 +2825,134 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				t.Errorf("%s [%s]: PodDisruptionBudget spec is incorrect, %+v",
 					testName, tt.scenario, err)
 			}
+		}
+	}
+}
+
+func TestGenerateSingleUserSecret_OwnerReferences(t *testing.T) {
+	testName := "Test generateSingleUserSecret owner references"
+
+	newCluster := func(ownerRefs, secretsDeletion *bool, crossNamespaceSecret bool) *Cluster {
+		cfg := Config{
+			OpConfig: config.Config{
+				Resources: config.Resources{
+					ClusterNameLabel:      "cluster-name",
+					PodRoleLabel:          "spilo-role",
+					EnableOwnerReferences: ownerRefs,
+				},
+				EnableSecretsDeletion:      secretsDeletion,
+				EnableCrossNamespaceSecret: crossNamespaceSecret,
+			},
+		}
+		pg := acidv1.Postgresql{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myapp-database",
+				Namespace: "myapp",
+				UID:       types.UID("myapp-database-uid"),
+			},
+			Spec: acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 1},
+		}
+		return New(cfg, k8sutil.KubernetesClient{}, pg, logger, eventRecorder)
+	}
+
+	newPgUser := func(namespace string) spec.PgUser {
+		return spec.PgUser{
+			Name:      "app_user",
+			Namespace: namespace,
+			Password:  "secret",
+		}
+	}
+
+	hasControllerOwnerRef := func(cluster *Cluster) func(*v1.Secret) error {
+		return func(secret *v1.Secret) error {
+			for _, ref := range secret.OwnerReferences {
+				if ref.UID == cluster.Postgresql.ObjectMeta.UID &&
+					ref.Name == cluster.Postgresql.ObjectMeta.Name &&
+					ref.Controller != nil && *ref.Controller {
+					return nil
+				}
+			}
+			return fmt.Errorf("expected a controller owner reference pointing at the Postgresql CR, got %#v",
+				secret.OwnerReferences)
+		}
+	}
+
+	hasNoControllerOwnerRef := func(cluster *Cluster) func(*v1.Secret) error {
+		return func(secret *v1.Secret) error {
+			for _, ref := range secret.OwnerReferences {
+				if ref.UID == cluster.Postgresql.ObjectMeta.UID && ref.Controller != nil && *ref.Controller {
+					return fmt.Errorf("expected no controller owner reference, got %#v", secret.OwnerReferences)
+				}
+			}
+			return nil
+		}
+	}
+
+	tests := []struct {
+		scenario              string
+		cluster               *Cluster
+		pgUser                spec.PgUser
+		expectControllerOwner bool
+	}{
+		{
+			scenario:              "owner refs + secrets deletion enabled (default)",
+			cluster:               newCluster(util.True(), util.True(), false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: true,
+		},
+		{
+			scenario:              "owner refs enabled, secrets deletion disabled (skip owner ref)",
+			cluster:               newCluster(util.True(), util.False(), false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: false,
+		},
+		{
+			scenario:              "owner refs enabled, secrets deletion unset (default true)",
+			cluster:               newCluster(util.True(), nil, false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: true,
+		},
+		{
+			scenario:              "owner refs disabled, secrets deletion enabled",
+			cluster:               newCluster(util.False(), util.True(), false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: false,
+		},
+		{
+			scenario:              "owner refs disabled, secrets deletion disabled",
+			cluster:               newCluster(util.False(), util.False(), false),
+			pgUser:                newPgUser("myapp"),
+			expectControllerOwner: false,
+		},
+		{
+			scenario:              "cross-namespace secret, owner refs + secrets deletion enabled",
+			cluster:               newCluster(util.True(), util.True(), true),
+			pgUser:                newPgUser("other-ns"),
+			expectControllerOwner: false,
+		},
+		{
+			scenario:              "cross-namespace secret, owner refs enabled, secrets deletion disabled",
+			cluster:               newCluster(util.True(), util.False(), true),
+			pgUser:                newPgUser("other-ns"),
+			expectControllerOwner: false,
+		},
+	}
+
+	for _, tt := range tests {
+		secret := tt.cluster.generateSingleUserSecret(tt.pgUser)
+		if secret == nil {
+			t.Errorf("%s [%s]: expected a non-nil secret", testName, tt.scenario)
+			continue
+		}
+
+		var check func(*v1.Secret) error
+		if tt.expectControllerOwner {
+			check = hasControllerOwnerRef(tt.cluster)
+		} else {
+			check = hasNoControllerOwnerRef(tt.cluster)
+		}
+		if err := check(secret); err != nil {
+			t.Errorf("%s [%s]: %+v", testName, tt.scenario, err)
 		}
 	}
 }
@@ -4485,6 +4624,48 @@ func TestGenerateCapabilities(t *testing.T) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
 				t.Name(), tt.subTest, tt.capabilities, caps)
 		}
+	}
+}
+
+func TestGenerateContainerWithEnvFrom(t *testing.T) {
+	dockerImage := "test-image"
+	resourceRequirements := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("100m"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+	envVars := []v1.EnvVar{{Name: "TEST_VAR", Value: "test-value"}}
+	envFrom := []v1.EnvFromSource{
+		{
+			ConfigMapRef: &v1.ConfigMapEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: "test-configmap"},
+			},
+		},
+		{
+			SecretRef: &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"},
+			},
+		},
+	}
+
+	container := generateContainer(
+		constants.PostgresContainerName,
+		&dockerImage,
+		resourceRequirements,
+		envVars,
+		envFrom,
+		[]v1.VolumeMount{},
+		false,
+		util.False(),
+		nil,
+	)
+
+	if !reflect.DeepEqual(container.Env, envVars) {
+		t.Errorf("expected env %v, got %v", envVars, container.Env)
+	}
+	if !reflect.DeepEqual(container.EnvFrom, envFrom) {
+		t.Errorf("expected envFrom %v, got %v", envFrom, container.EnvFrom)
 	}
 }
 

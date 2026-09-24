@@ -28,7 +28,7 @@ SOFTWARE.
 package v1
 
 import (
-	config "github.com/zalando/postgres-operator/pkg/util/config"
+	config "github.com/zalando/postgres-operator/v2/pkg/util/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -1031,6 +1031,13 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.EnvFrom != nil {
+		in, out := &in.EnvFrom, &out.EnvFrom
+		*out = make([]corev1.EnvFromSource, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
@@ -1694,12 +1701,12 @@ func (in *Volume) DeepCopyInto(out *Volume) {
 	}
 	if in.Iops != nil {
 		in, out := &in.Iops, &out.Iops
-		*out = new(int64)
+		*out = new(int32)
 		**out = **in
 	}
 	if in.Throughput != nil {
 		in, out := &in.Throughput, &out.Throughput
-		*out = new(int64)
+		*out = new(int32)
 		**out = **in
 	}
 	return

@@ -11,15 +11,15 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando/postgres-operator/pkg/util/patroni"
-	"github.com/zalando/postgres-operator/pkg/util/teams"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	fakeacidv1 "github.com/zalando/postgres-operator/v2/pkg/generated/clientset/versioned/fake"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/patroni"
+	"github.com/zalando/postgres-operator/v2/pkg/util/teams"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -226,6 +226,63 @@ func TestStatefulSetUpdateWithEnv(t *testing.T) {
 
 	if reflect.DeepEqual(oldSS, newSS) {
 		t.Errorf("in %s StatefulSet's must be not equal", t.Name())
+	}
+}
+
+func TestStatefulSetUpdateWithEnvFrom(t *testing.T) {
+	oldSpec := &acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: &acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+	}
+	oldSS, err := cl.generateStatefulSet(oldSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	newSpec := oldSpec.DeepCopy()
+	newSS, err := cl.generateStatefulSet(newSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	if !reflect.DeepEqual(oldSS, newSS) {
+		t.Errorf("in %s StatefulSet's must be equal", t.Name())
+	}
+
+	newSpec.EnvFrom = []v1.EnvFromSource{
+		{
+			ConfigMapRef: &v1.ConfigMapEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: "test-configmap",
+				},
+			},
+		},
+		{
+			SecretRef: &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: "test-secret",
+				},
+			},
+		},
+	}
+	newSS, err = cl.generateStatefulSet(newSpec)
+	if err != nil {
+		t.Errorf("in %s no StatefulSet created %v", t.Name(), err)
+	}
+
+	if reflect.DeepEqual(oldSS, newSS) {
+		t.Errorf("in %s StatefulSet's must be not equal", t.Name())
+	}
+
+	postgresContainer := newSS.Spec.Template.Spec.Containers[0]
+	if !reflect.DeepEqual(postgresContainer.EnvFrom, newSpec.EnvFrom) {
+		t.Errorf("expected envFrom %v, got %v", newSpec.EnvFrom, postgresContainer.EnvFrom)
 	}
 }
 
@@ -1635,8 +1692,8 @@ func newCronJob(image, schedule string, vars []v1.EnvVar, mounts []v1.VolumeMoun
 
 func TestCompareLogicalBackupJob(t *testing.T) {
 
-	img1 := "ghcr.io/zalando/postgres-operator/logical-backup:v1.14.0"
-	img2 := "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
+	img1 := "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.1"
+	img2 := "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.2"
 
 	clientSet := fake.NewSimpleClientset()
 	acidClientSet := fakeacidv1.NewSimpleClientset()

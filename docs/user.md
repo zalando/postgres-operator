@@ -1129,7 +1129,7 @@ When using AWS with gp3 volumes you should set the mode to `mixed` because it
 will also adjust the IOPS and throughput that can be defined in the manifest.
 Check the [AWS docs](https://aws.amazon.com/ebs/general-purpose/) to learn
 about default and maximum values. Keep in mind that AWS rate-limits updating
-volume specs to no more than once every 6 hours.
+volume specs to no more than 4 times within 24 hours.
 
 ```yaml
 spec:

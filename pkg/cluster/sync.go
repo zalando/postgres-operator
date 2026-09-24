@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -95,16 +95,8 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		c.logger.Errorf("could not sync Patroni resources: %v", err)
 	}
 
-	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
 	if err = c.syncVolumes(); err != nil {
 		return err
-	}
-
-	if c.OpConfig.EnableEBSGp3Migration && len(c.EBSVolumes) > 0 {
-		err = c.executeEBSMigration()
-		if nil != err {
-			return err
-		}
 	}
 
 	if err = c.syncPodServiceAccount(); err != nil {
@@ -1810,7 +1802,6 @@ func (c *Cluster) syncLogicalBackupJob() error {
 
 	// no existing logical backup job, create new one
 	c.logger.Info("could not find the cluster's logical backup job")
-
 
 	if err = c.createLogicalBackupJob(); err == nil {
 		c.logger.Infof("created missing logical backup job %s", jobName)

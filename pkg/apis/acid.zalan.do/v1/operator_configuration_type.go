@@ -3,9 +3,9 @@ package v1
 // Operator configuration CRD definition, please use snake_case for field names.
 
 import (
-	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
 
-	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -246,17 +246,15 @@ type LoadBalancerConfiguration struct {
 type AWSGCPConfiguration struct {
 	WALES3Bucket string `json:"wal_s3_bucket,omitempty"`
 	// +kubebuilder:default=eu-central-1
-	AWSRegion                    string `json:"aws_region,omitempty"`
-	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
-	GCPCredentials               string `json:"gcp_credentials,omitempty"`
-	WALAZStorageAccount          string `json:"wal_az_storage_account,omitempty"`
-	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
-	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
-	IRSARoleARN                  string `json:"irsa_role_arn,omitempty"`
-	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
-	AdditionalSecretMountPath    string `json:"additional_secret_mount_path,omitempty"`
-	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration,omitempty"`
-	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size,omitempty"`
+	AWSRegion                 string `json:"aws_region,omitempty"`
+	WALGSBucket               string `json:"wal_gs_bucket,omitempty"`
+	GCPCredentials            string `json:"gcp_credentials,omitempty"`
+	WALAZStorageAccount       string `json:"wal_az_storage_account,omitempty"`
+	LogS3Bucket               string `json:"log_s3_bucket,omitempty"`
+	KubeIAMRole               string `json:"kube_iam_role,omitempty"`
+	IRSARoleARN               string `json:"irsa_role_arn,omitempty"`
+	AdditionalSecretMount     string `json:"additional_secret_mount,omitempty"`
+	AdditionalSecretMountPath string `json:"additional_secret_mount_path,omitempty"`
 }
 
 // OperatorDebugConfiguration defines options for the debug mode
@@ -333,7 +331,7 @@ type ConnectionPoolerConfiguration struct {
 	Schema string `json:"connection_pooler_schema,omitempty"`
 	// +kubebuilder:default=pooler
 	User string `json:"connection_pooler_user,omitempty"`
-	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/pgbouncer:latest"
+	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.2"
 	Image string `json:"connection_pooler_image,omitempty"`
 	// +kubebuilder:validation:Enum=session;transaction
 	// +kubebuilder:default=transaction
@@ -363,7 +361,7 @@ type OperatorLogicalBackupConfiguration struct {
 	// +kubebuilder:validation:Pattern=`^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$`
 	// +kubebuilder:default="30 00 * * *"
 	Schedule string `json:"logical_backup_schedule,omitempty"`
-	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
+	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/logical-backup:v2.0.2"
 	DockerImage string `json:"logical_backup_docker_image,omitempty"`
 	// +kubebuilder:validation:Enum=az;gcs;s3
 	// +kubebuilder:default=s3
@@ -421,7 +419,7 @@ type OperatorConfigurationData struct {
 	EtcdHost string `json:"etcd_host,omitempty"`
 	// +kubebuilder:default=true
 	KubernetesUseConfigMaps *bool `json:"kubernetes_use_configmaps,omitempty"`
-	// +kubebuilder:default="ghcr.io/zalando/spilo-18:4.1-p1"
+	// +kubebuilder:default="ghcr.io/zalando/spilo-18:4.1-p2"
 	DockerImage string `json:"docker_image,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=8
@@ -441,9 +439,7 @@ type OperatorConfigurationData struct {
 	// +kubebuilder:default=true
 	ShmVolume     *bool             `json:"enable_shm_volume,omitempty"`
 	SidecarImages map[string]string `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
-	// +kubebuilder:validation:XPreserveUnknownFields
-	// +kubebuilder:validation:Type=object
-	// +kubebuilder:validation:Schemaless
+	// +nullable
 	SidecarContainers []v1.Container `json:"sidecars,omitempty"`
 	// +optional
 	PostgresUsersConfiguration PostgresUsersConfiguration `json:"users"`

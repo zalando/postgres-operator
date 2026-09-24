@@ -6,8 +6,8 @@ import (
 
 	"fmt"
 
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -128,7 +128,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"ghcr.io/zalando/postgres-operator/logical-backup:v2.0.2"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupAzureStorageAccountName      string `name:"logical_backup_azure_storage_account_name" default:""`
 	LogicalBackupAzureStorageContainer        string `name:"logical_backup_azure_storage_container" default:""`
@@ -158,7 +158,7 @@ type ConnectionPooler struct {
 	NumberOfInstances                    *int32 `name:"connection_pooler_number_of_instances" default:"2"`
 	Schema                               string `name:"connection_pooler_schema" default:"pooler"`
 	User                                 string `name:"connection_pooler_user" default:"pooler"`
-	Image                                string `name:"connection_pooler_image" default:"ghcr.io/zalando/postgres-operator/pgbouncer:latest"`
+	Image                                string `name:"connection_pooler_image" default:"ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.2"`
 	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
 	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
 	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request"`
@@ -187,7 +187,7 @@ type Config struct {
 	EtcdHost                 string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
 	EnableMaintenanceWindows *bool             `name:"enable_maintenance_windows" default:"true"`
 	MaintenanceWindows       []string          `name:"maintenance_windows"`
-	DockerImage              string            `name:"docker_image" default:"ghcr.io/zalando/spilo-18:4.1-p1"`
+	DockerImage              string            `name:"docker_image" default:"ghcr.io/zalando/spilo-18:4.1-p2"`
 	SidecarImages            map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers        []v1.Container    `name:"sidecars"`
 	PodServiceAccountName    string            `name:"pod_service_account_name" default:"postgres-pod"`
@@ -206,8 +206,6 @@ type Config struct {
 	WALAZStorageAccount                      string            `name:"wal_az_storage_account"`
 	AdditionalSecretMount                    string            `name:"additional_secret_mount"`
 	AdditionalSecretMountPath                string            `name:"additional_secret_mount_path"`
-	EnableEBSGp3Migration                    bool              `name:"enable_ebs_gp3_migration" default:"false"`
-	EnableEBSGp3MigrationMaxSize             int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
 	DebugLogging                             bool              `name:"debug_logging" default:"true"`
 	EnableDBAccess                           bool              `name:"enable_database_access" default:"true"`
 	EnableTeamsAPI                           bool              `name:"enable_teams_api" default:"true"`

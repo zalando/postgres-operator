@@ -3,7 +3,7 @@
 FROM python:3.11-slim
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
-ENV TERM xterm-256color
+ENV TERM=xterm-256color
 
 RUN apt-get -qq -y update \
  # https://www.psycopg.org/docs/install.html#psycopg-vs-psycopg-binary
