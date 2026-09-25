@@ -253,6 +253,11 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	minSize := defaultSize / 2
 	reserveSize := minSize
 
+	passwordEncryption, ok := spec.PostgresqlParam.Parameters["password_encryption"]
+	if !ok {
+		passwordEncryption = "scram-sha-256"
+	}
+
 	return []v1.EnvVar{
 		{
 			Name:  "CONNECTION_POOLER_PORT",
@@ -261,6 +266,10 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 		{
 			Name:  "CONNECTION_POOLER_MODE",
 			Value: effectiveMode,
+		},
+		{
+			Name:  "CONNECTION_POOLER_AUTH_TYPE",
+			Value: passwordEncryption,
 		},
 		{
 			Name:  "CONNECTION_POOLER_DEFAULT_SIZE",
@@ -912,6 +921,11 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		return false, reasons
 	}
 
+	authTypeFound := false
+	passwordEncryption, ok := c.Spec.PostgresqlParam.Parameters["password_encryption"]
+	if !ok {
+		passwordEncryption = "scram-sha-256"
+	}
 	for _, env := range poolerContainer.Env {
 		if spec.User == "" && env.Name == "PGUSER" {
 			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
@@ -935,6 +949,22 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 				env.Value, config.Schema)
 			reasons = append(reasons, msg)
 		}
+
+		if env.Name == "CONNECTION_POOLER_AUTH_TYPE" {
+			authTypeFound = true
+			if passwordEncryption != env.Value {
+				sync = true
+				msg := fmt.Sprintf("pooler auth type is different (having %s, required %s)",
+					env.Value, passwordEncryption)
+				reasons = append(reasons, msg)
+			}
+		}
+	}
+
+	// env var is missing on deployments created before it was introduced
+	if !authTypeFound {
+		sync = true
+		reasons = append(reasons, "pooler auth type env variable is missing")
 	}
 
 	return sync, reasons
