@@ -921,6 +921,11 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		return false, reasons
 	}
 
+	authTypeFound := false
+	passwordEncryption, ok := c.Spec.PostgresqlParam.Parameters["password_encryption"]
+	if !ok {
+		passwordEncryption = "scram-sha-256"
+	}
 	for _, env := range poolerContainer.Env {
 		if spec.User == "" && env.Name == "PGUSER" {
 			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
@@ -945,16 +950,21 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 			reasons = append(reasons, msg)
 		}
 
-		passwordEncryption, ok := c.Spec.PostgresqlParam.Parameters["password_encryption"]
-		if !ok {
-			passwordEncryption = "scram-sha-256"
+		if env.Name == "CONNECTION_POOLER_AUTH_TYPE" {
+			authTypeFound = true
+			if passwordEncryption != env.Value {
+				sync = true
+				msg := fmt.Sprintf("pooler auth type is different (having %s, required %s)",
+					env.Value, passwordEncryption)
+				reasons = append(reasons, msg)
+			}
 		}
-		if env.Name == "CONNECTION_POOLER_AUTH_TYPE" && passwordEncryption != env.Value {
-			sync = true
-			msg := fmt.Sprintf("pooler auth type is different (having %s, required %s)",
-				env.Value, passwordEncryption)
-			reasons = append(reasons, msg)
-		}
+	}
+
+	// env var is missing on deployments created before it was introduced
+	if !authTypeFound {
+		sync = true
+		reasons = append(reasons, "pooler auth type env variable is missing")
 	}
 
 	return sync, reasons
