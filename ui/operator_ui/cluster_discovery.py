@@ -24,14 +24,16 @@ def generate_cluster_id(url: str):
     return CLUSTER_ID_INVALID_CHARS.sub('-', url.lower()).strip('-')
 
 
-class StaticAuthorizationHeaderAuth(AuthBase):
-    '''Static authentication with given "Authorization" header'''
+class KubernetesConfigAuth(AuthBase):
+    '''Dynamic authentication using the Kubernetes configuration to load the service account token'''
 
-    def __init__(self, authorization):
-        self.authorization = authorization
+    def __init__(self, config):
+        self.config = config
 
     def __call__(self, request):
-        request.headers['Authorization'] = self.authorization
+        authorization = self.config.get_api_key_with_prefix('authorization')
+        if authorization:
+            request.headers['Authorization'] = authorization
         return request
 
 
@@ -66,19 +68,20 @@ class StaticClusterDiscoverer:
 
         if not api_server_urls:
             try:
-                kubernetes.config.load_incluster_config()
+                config = kubernetes.client.Configuration()
+                kubernetes.config.load_incluster_config(config)
             except kubernetes.config.ConfigException:
                 # we are not running inside a cluster
                 # => assume default kubectl proxy URL
                 cluster = Cluster(generate_cluster_id(DEFAULT_CLUSTERS), DEFAULT_CLUSTERS)
             else:
                 logger.info("in cluster configuration failed")
-                config = kubernetes.client.Configuration()
+                auth = KubernetesConfigAuth(config)
                 cluster = Cluster(
                     generate_cluster_id(config.host),
                     config.host,
                     ssl_ca_cert=config.ssl_ca_cert,
-                    auth=StaticAuthorizationHeaderAuth(config.api_key['authorization']))
+                    auth=auth)
             self._clusters.append(cluster)
         else:
             for api_server_url in api_server_urls:
@@ -110,11 +113,7 @@ class KubeconfigDiscoverer:
                 continue
             config = kubernetes.client.ConfigurationObject()
             kubernetes.config.load_kube_config(config_file, context=context['name'], client_configuration=config)
-            authorization = config.api_key.get('authorization')
-            if authorization:
-                auth = StaticAuthorizationHeaderAuth(authorization)
-            else:
-                auth = None
+            auth = KubernetesConfigAuth(config)
             cluster = Cluster(
                 context['name'],
                 config.host,
