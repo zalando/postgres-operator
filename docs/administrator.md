@@ -22,6 +22,34 @@ By default, the operator will register the CRDs in the `all` category so
 that resources are listed on `kubectl get all` commands. The `crd_categories`
 config option allows for customization of categories.
 
+### Protecting CRDs from accidental deletion
+
+Deleting a CRD in Kubernetes is destructive: the API server also deletes
+every custom resource of that kind across the cluster. A stray
+`kubectl delete crd` therefore wipes out all `postgresql`,
+`operatorconfiguration`, `postgresteam` and `fabriceventstream` objects in
+one go.
+
+To prevent this, the operator ships its CRDs with a `acid.zalan.do/crd-protection`
+finalizer on the `metadata` of each CRD. While the finalizer is present, the
+CRD is stuck in `Terminating` and the custom resources are not removed. On
+startup, the operator also re-applies the finalizer to the `postgresql` and
+`operatorconfiguration` CRDs if they are missing it, so older deployments of
+those two CRDs pick up the safety net after upgrading.
+
+To intentionally delete a CRD, remove the finalizer first:
+
+```bash
+kubectl patch crd postgresqls.acid.zalan.do -p '{"metadata":{"finalizers":[]}}' --type=merge
+kubectl delete crd postgresqls.acid.zalan.do
+```
+
+As noted in the
+[CRD deletion checklist](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#delete-a-customresourcedefinition),
+delete the CRs first when possible, wait for their finalizers to clear, and
+only then drop the CRDs - this avoids `Terminating` CRDs and orphaned
+external state.
+
 ## Upgrading the operator
 
 The Postgres Operator is upgraded by changing the docker image within the

@@ -2470,6 +2470,151 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "All pods are running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_zy_crd_protection_finalizer(self):
+        '''
+           CRDs ship with a 'acid.zalan.do/crd-protection' finalizer so that an
+           accidental 'kubectl delete crd' does not cascade-delete every
+           custom resource of that kind. Exercise the protection against the
+           most critical CRD - the postgresqls one - by attempting to delete
+           it while a live 'postgresql' CR (the e2e cluster) is in place,
+           then verify the cluster survives both the blocked attempt and the
+           cascade once the finalizer is cleared. The test re-creates the
+           CRD and the cluster in a finally block so a failed assertion
+           cannot leave the suite in a broken state.
+        '''
+        k8s = self.k8s
+        crd_api = k8s.api.apiextensions_v1
+        custom_api = k8s.api.custom_objects_api
+
+        target_crd = "postgresqls.acid.zalan.do"
+        cluster_name = "acid-minimal-cluster"
+        cluster_namespace = "default"
+        cluster_group = "acid.zalan.do"
+        cluster_version = "v1"
+        cluster_plural = "postgresqls"
+        cluster_label = "application=spilo,cluster-name=" + cluster_name
+
+        # Step 1: every operator CRD must carry the protection finalizer on
+        # its metadata. This is the assertion that fails before the change
+        # is in place.
+        for name in (
+            "postgresqls.acid.zalan.do",
+            "operatorconfigurations.acid.zalan.do",
+            "postgresteams.acid.zalan.do",
+            "fabriceventstreams.zalando.org",
+        ):
+            crd = crd_api.read_custom_resource_definition(name)
+            finalizers = crd.metadata.finalizers or []
+            self.assertIn(
+                "acid.zalan.do/crd-protection",
+                finalizers,
+                f"CRD {name} is missing the protection finalizer: {finalizers}",
+            )
+
+        # Step 2: snapshot the live 'postgresql' CR so the finally block can
+        # restore the cluster after the test. The cluster is real workload
+        # data - the whole point of the protection - and losing it would
+        # defeat the proof and break the rest of the suite.
+        cluster_snapshot = custom_api.get_namespaced_custom_object(
+            cluster_group, cluster_version, cluster_namespace,
+            cluster_plural, cluster_name)
+
+        try:
+            # Step 3: attempt to delete the postgresqls CRD. With the
+            # protection finalizer in place the CRD must stay around (stuck
+            # in 'Terminating') and the cluster CR must survive. Before the
+            # change, both would be wiped in one shot.
+            crd_api.delete_custom_resource_definition(target_crd)
+
+            def crd_still_protected():
+                crd = crd_api.read_custom_resource_definition(target_crd)
+                return "acid.zalan.do/crd-protection" in (crd.metadata.finalizers or [])
+
+            self.eventuallyTrue(
+                crd_still_protected,
+                f"CRD {target_crd} should still exist with its protection finalizer set",
+            )
+
+            def cluster_still_present():
+                return self._custom_object_exists(
+                    custom_api, cluster_group, cluster_version, cluster_namespace,
+                    cluster_plural, cluster_name)
+
+            self.eventuallyTrue(
+                cluster_still_present,
+                "postgresql CR was cascade-deleted while the CRD was stuck "
+                "in Terminating; the protection finalizer did not hold.",
+            )
+
+            # Step 4: removing the finalizer (the documented manual
+            # intervention) is what actually unblocks the deletion. The CRD
+            # and the cluster CR are then fully gone.
+            clear_finalizers_patch = [
+                {"op": "replace", "path": "/metadata/finalizers", "value": []}
+            ]
+            crd_api.patch_custom_resource_definition(target_crd, clear_finalizers_patch)
+
+            self.eventuallyEqual(
+                lambda: self._crd_exists(crd_api, target_crd),
+                False,
+                f"CRD {target_crd} should be fully removed after finalizer cleared",
+            )
+            self.eventuallyEqual(
+                cluster_still_present,
+                False,
+                "postgresql CR should be cascade-deleted once the CRD is gone",
+            )
+        finally:
+            # Always restore the CRD and the cluster so a failed assertion
+            # does not leave the postgresql API missing for any future test
+            # run on the same kind cluster. The postgresqls CRD is the most
+            # important one in the operator, so getting it back is a hard
+            # prerequisite for the rest of the suite.
+            if not self._crd_exists(crd_api, target_crd):
+                result = k8s.create_with_kubectl("manifests/postgresql.crd.yaml")
+                self.assertEqual(
+                    result.returncode, 0,
+                    f"failed to re-install postgresql.crd.yaml: {result.stderr.decode()}",
+                )
+
+            if cluster_snapshot is not None and not self._custom_object_exists(
+                    custom_api, cluster_group, cluster_version, cluster_namespace,
+                    cluster_plural, cluster_name):
+                # strip server-managed fields that block a plain re-apply
+                cluster_snapshot["metadata"].pop("resourceVersion", None)
+                cluster_snapshot["metadata"].pop("uid", None)
+                cluster_snapshot["metadata"].pop("managedFields", None)
+                cluster_snapshot["metadata"].pop("creationTimestamp", None)
+                cluster_snapshot["status"] = {}
+                custom_api.create_namespaced_custom_object(
+                    cluster_group, cluster_version, cluster_namespace,
+                    cluster_plural, cluster_snapshot)
+                k8s.wait_for_pod_start("spilo-role=master," + cluster_label)
+                k8s.wait_for_pod_start("spilo-role=replica," + cluster_label)
+                self.eventuallyEqual(
+                    lambda: k8s.count_running_pods(), 2, "All pods are running")
+
+    @staticmethod
+    def _crd_exists(crd_api, name):
+        try:
+            crd_api.read_custom_resource_definition(name)
+            return True
+        except ApiException as e:
+            if e.status == 404:
+                return False
+            raise
+
+    @staticmethod
+    def _custom_object_exists(api, group, version, namespace, plural, name):
+        try:
+            api.get_namespaced_custom_object(group, version, namespace, plural, name)
+            return True
+        except ApiException as e:
+            if e.status == 404:
+                return False
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_cluster_deletion(self):
         '''
            Test deletion with configured protection
