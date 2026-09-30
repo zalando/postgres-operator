@@ -539,13 +539,14 @@ func TestCronjobEnvironmentSecretVariables(t *testing.T) {
 
 func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	required := map[string]bool{
-		"PGHOST":                 false,
-		"PGPORT":                 false,
-		"PGUSER":                 false,
-		"PGSCHEMA":               false,
-		"PGPASSWORD":             false,
-		"CONNECTION_POOLER_MODE": false,
-		"CONNECTION_POOLER_PORT": false,
+		"PGHOST":                      false,
+		"PGPORT":                      false,
+		"PGUSER":                      false,
+		"PGSCHEMA":                    false,
+		"PGPASSWORD":                  false,
+		"CONNECTION_POOLER_MODE":      false,
+		"CONNECTION_POOLER_PORT":      false,
+		"CONNECTION_POOLER_AUTH_TYPE": false,
 	}
 
 	container := getPostgresContainer(&podSpec.Spec)
