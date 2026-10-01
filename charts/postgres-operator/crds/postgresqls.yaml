@@ -168,6 +168,8 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
+                  priorityClassName:
+                    type: string
                   resources:
                     description: Resources describes requests and limits for the cluster
                       resouces.
