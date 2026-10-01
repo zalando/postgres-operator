@@ -1101,6 +1101,10 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
+	if c.OpConfig.IRSARoleARN != "" {
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "SPILO_PROVIDER", Value: "aws"})
+	}
+
 	envVars = appendEnvVars(envVars, opConfigEnvVars...)
 
 	return envVars, nil
