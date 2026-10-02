@@ -156,7 +156,8 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 		func() (bool, error) {
 			err := c.attemptToMoveMasterPodsOffNode(node)
 			if err != nil {
-				return false, err
+				c.logger.Warningf("attempt to move master pods off node %q failed, will retry: %v", node.Name, err)
+				return false, nil
 			}
 			return true, nil
 		},
