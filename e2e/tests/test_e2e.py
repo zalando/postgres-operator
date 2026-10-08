@@ -71,6 +71,19 @@ class EndToEndTestCase(unittest.TestCase):
                     raise
                 time.sleep(interval)
 
+    def eventuallyTrueFunc(self, f, xf, m, retries=60, interval=2):
+        while True:
+            try:
+                y = f()
+                x = xf(y)
+                self.assertTrue(xf(y), m)
+                return True
+            except AssertionError:
+                retries = retries - 1
+                if not retries > 0:
+                    raise
+                time.sleep(interval)
+
     @classmethod
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def setUpClass(cls):
@@ -1669,6 +1682,13 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(name=pooler_name), 2,
                              "Operator did not succeed in overwriting labels")
 
+        # status observedGeneration should match metadata.generation
+        self.eventuallyTrueFunc(
+            lambda: k8s.pg_get(),
+            lambda pg: pg.get("metadata", {}).get("generation", 0) == pg.get("status", {}).get("observedGeneration", -1),
+            "Expected generation and status.observedGeneration to match",
+        )
+
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresqls', 'acid-minimal-cluster',
@@ -1681,6 +1701,13 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler="+pooler_name),
                              0, "Pooler pods not scaled down")
+
+        # status observedGeneration should match metadata.generation
+        self.eventuallyTrueFunc(
+            lambda: k8s.pg_get(),
+            lambda pg: pg.get("metadata", {}).get("generation", 0) == pg.get("status", {}).get("observedGeneration", -1),
+            "Expected generation and status.observedGeneration to match",
+        )
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_owner_references(self):
@@ -2021,7 +2048,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # pod_label_wait_timeout should have been exceeded hence the rolling update is continued on next sync
             # check if the cluster state is "SyncFailed"
-            self.eventuallyEqual(lambda: k8s.pg_get_status(), "SyncFailed", "Expected SYNC event to fail")
+            self.eventuallyEqual(lambda: k8s.pg_get_status(), {"PostgresClusterStatus": "SyncFailed"}, "Expected SYNC event to fail")
 
             # wait for next sync, replica should be running normally by now and be ready for switchover
             k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
@@ -2036,7 +2063,13 @@ class EndToEndTestCase(unittest.TestCase):
 
             # status should again be "SyncFailed" but turn into "Running" on the next sync
             time.sleep(30)
-            self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
+            self.eventuallyEqual(lambda: k8s.pg_get_status(), {"PostgresClusterStatus": "Running"}, "Expected running cluster after two syncs")
+            # status observedGeneration should match metadata.generation
+            self.eventuallyTrueFunc(
+                lambda: k8s.pg_get(),
+                lambda pg: pg.get("metadata", {}).get("generation", 0) == pg.get("status", {}).get("observedGeneration", -1),
+                "Expected generation and status.observedGeneration to match",
+            )
 
             # revert config changes
             patch_resync_config = {
