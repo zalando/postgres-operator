@@ -1027,7 +1027,10 @@ class EndToEndTestCase(unittest.TestCase):
         configures stateful sets to use "onDelete" pod update policy.
         The test covers:
         1) enabling lazy upgrade in existing operator deployment
-        2) forcing the normal rolling upgrade by changing the operator
+        2) postponing the lazy upgrade when a maintenance window is defined
+        but the current time is outside of it
+        3) executing the lazy upgrade once the maintenance window is entered
+        4) forcing the normal rolling upgrade by changing the operator
         configmap and restarting its pod
         '''
 
@@ -1086,9 +1089,47 @@ class EndToEndTestCase(unittest.TestCase):
                                  "No two pods running after lazy rolling upgrade")
             self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)),
                                  2, "Postgres status did not enter running")
-            self.assertNotEqual(lambda: k8s.get_effective_pod_image(pod1),
-                                SPILO_CURRENT,
-                                "pod-1 should not have change Docker image to {}".format(SPILO_CURRENT))
+            self.assertEqual(k8s.get_effective_pod_image(pod1), SPILO_CURRENT,
+                             "pod-1 should still run the old Docker image")
+
+            # define a maintenance window in the future - the pending lazy
+            # upgrade of pod-1 must still be postponed
+            current_time = datetime.now()
+            maintenance_window_future = f"{(current_time+timedelta(minutes=60)).strftime('%H:%M')}-{(current_time+timedelta(minutes=120)).strftime('%H:%M')}"
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster",
+                {"spec": {"maintenanceWindows": [maintenance_window_future]}})
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                                 "Operator does not get in sync")
+            self.assertEqual(k8s.get_effective_pod_image(pod1), SPILO_CURRENT,
+                             "pod-1 should not be rotated outside of the maintenance window")
+
+            # move the maintenance window to now - the lazy upgrade of pod-1 must be executed
+            maintenance_window_current = f"{(current_time-timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=30)).strftime('%H:%M')}"
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster",
+                {"spec": {"maintenanceWindows": [maintenance_window_current]}})
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1),
+                                 conf_image, "pod-1 was not rotated during the maintenance window",
+                                 50, 3)
+            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
+                                 "No two pods running after lazy rolling upgrade")
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)),
+                                 2, "Postgres status did not enter running")
+
+            # roll back the image with lazy upgrade still enabled and the
+            # maintenance window moved out of reach again - no pod is rotated
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster",
+                {"spec": {"maintenanceWindows": [maintenance_window_future]}})
+            k8s.update_config({"data": {"docker_image": SPILO_CURRENT}},
+                              step="roll back image with lazy upgrade")
+            self.eventuallyEqual(lambda: k8s.get_statefulset_image(), SPILO_CURRENT,
+                                 "Statefulset not rolled back to previous Docker image")
+            self.assertEqual(k8s.get_effective_pod_image(pod0), conf_image,
+                             "pod-0 should not be rotated outside of the maintenance window")
+            self.assertEqual(k8s.get_effective_pod_image(pod1), conf_image,
+                             "pod-1 should not be rotated outside of the maintenance window")
 
             # clean up
             unpatch_lazy_spilo_upgrade = {
@@ -1099,15 +1140,22 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.update_config(unpatch_lazy_spilo_upgrade, step="patch lazy upgrade")
 
             # at this point operator will complete the normal rolling upgrade
-            # so we additionally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
+            # so we additionally test if disabling the lazy upgrade - forcing the normal rolling upgrade
+            # outside of the maintenance window - works
             self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0),
-                                 conf_image, "Rolling upgrade was not executed",
+                                 SPILO_CURRENT, "Rolling upgrade was not executed",
                                  50, 3)
             self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1),
-                                 conf_image, "Rolling upgrade was not executed",
+                                 SPILO_CURRENT, "Rolling upgrade was not executed",
                                  50, 3)
             self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)),
                                  2, "Postgres status did not enter running")
+
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster",
+                {"spec": {"maintenanceWindows": []}})
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                                 "Operator does not get in sync")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
