@@ -604,7 +604,7 @@ func (c *Cluster) syncStatefulSet() error {
 		c.logger.Debug("syncing statefulsets")
 		// check if there are still pods with a rolling update flag
 		for _, pod := range pods {
-			if c.getRollingUpdateFlagFromPod(&pod) {
+			if c.getRollingUpdateFlagFromPod(&pod) != "" {
 				podsToRecreate = append(podsToRecreate, pod)
 			} else {
 				role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
@@ -654,8 +654,9 @@ func (c *Cluster) syncStatefulSet() error {
 			if cmp.rollingUpdate {
 				podsToRecreate = make([]v1.Pod, 0)
 				switchoverCandidates = make([]spec.NamespacedName, 0)
+				rollingUpdateReason := c.getRollingUpdateReason(cmp)
 				for _, pod := range pods {
-					if err = c.markRollingUpdateFlagForPod(&pod, "pod changes"); err != nil {
+					if err = c.markRollingUpdateFlagForPod(&pod, rollingUpdateReason); err != nil {
 						return fmt.Errorf("updating rolling update flag for pod failed: %v", err)
 					}
 					podsToRecreate = append(podsToRecreate, pod)
@@ -671,31 +672,6 @@ func (c *Cluster) syncStatefulSet() error {
 			} else {
 				if err := c.replaceStatefulSet(desiredSts); err != nil {
 					return fmt.Errorf("could not replace statefulset: %v", err)
-				}
-			}
-		}
-
-		if len(podsToRecreate) == 0 && !c.OpConfig.EnableLazySpiloUpgrade {
-			// even if the desired and the running statefulsets match
-			// there still may be not up-to-date pods on condition
-			//  (a) the lazy update was just disabled
-			// and
-			//  (b) some of the pods were not restarted when the lazy update was still in place
-			for _, pod := range pods {
-				effectivePodImage := getPostgresContainer(&pod.Spec).Image
-				stsImage := getPostgresContainer(&desiredSts.Spec.Template.Spec).Image
-
-				if stsImage != effectivePodImage {
-					if err = c.markRollingUpdateFlagForPod(&pod, "pod not yet restarted due to lazy update"); err != nil {
-						c.logger.Warnf("updating rolling update flag failed for pod %q: %v", pod.Name, err)
-					}
-					podsToRecreate = append(podsToRecreate, pod)
-				} else {
-					role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-					if role == Master {
-						continue
-					}
-					switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
 				}
 			}
 		}
@@ -745,10 +721,11 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 	}
 
-	// if we get here we also need to re-create the pods (either leftovers from the old
-	// statefulset or those that got their configuration from the outdated statefulset)
+	// if we get here, we need to re-create the pods from the outdated statefulset
+	// or leftovers from an old statefulset
 	if len(podsToRecreate) > 0 {
-		if isSafeToRecreatePods {
+		c.checkForLazyRotation(&podsToRecreate)
+		if isSafeToRecreatePods && len(podsToRecreate) > 0 {
 			c.logger.Info("performing rolling update")
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
 			if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
@@ -761,6 +738,24 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) checkForLazyRotation(podsToRecreate *[]v1.Pod) []v1.Pod {
+	podsSafeToRecreate := make([]v1.Pod, 0)
+	for _, podToRecreate := range *podsToRecreate {
+		// check for pods to be rotated lazily if we are in a maintenance window
+		// if windows not are enabled or not defined delay the rotation further
+		// until a K8s update or a rolling update triggered by other pod changes
+		if c.OpConfig.EnableLazySpiloUpgrade && c.getRollingUpdateFlagFromPod(&podToRecreate) == rollingUpdateLazyUpgradeValue {
+			if c.hasMaintenanceWindowsDefined() && c.isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+				c.logger.Infof("lazy upgrade of %q during maintenance window", util.NameFromMeta(podToRecreate.ObjectMeta))
+				podsSafeToRecreate = append(podsSafeToRecreate, podToRecreate)
+			}
+		} else {
+			podsSafeToRecreate = append(podsSafeToRecreate, podToRecreate)
+		}
+	}
+	return podsSafeToRecreate
 }
 
 func (c *Cluster) syncPatroniConfig(pods []v1.Pod, requiredPatroniConfig acidv1.Patroni, requiredPgParameters map[string]string) (bool, bool, uint32, error) {

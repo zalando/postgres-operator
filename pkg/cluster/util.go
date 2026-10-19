@@ -685,10 +685,17 @@ func isStandbyCluster(spec *acidv1.PostgresSpec) bool {
 	return spec.StandbyCluster != nil
 }
 
-func (c *Cluster) isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
+func (c *Cluster) hasMaintenanceWindowsDefined() bool {
 	ignoreMaintenanceWindows := c.OpConfig.EnableMaintenanceWindows != nil && !*c.OpConfig.EnableMaintenanceWindows
-	noWindowsDefined := len(specMaintenanceWindows) == 0 && len(c.OpConfig.MaintenanceWindows) == 0
+	noWindowsDefined := len(c.Spec.MaintenanceWindows) == 0 && len(c.OpConfig.MaintenanceWindows) == 0
 	if noWindowsDefined || ignoreMaintenanceWindows {
+		return false
+	}
+	return true
+}
+
+func (c *Cluster) isInMaintenanceWindow(specMaintenanceWindows []acidv1.MaintenanceWindow) bool {
+	if !c.hasMaintenanceWindowsDefined() {
 		return true
 	}
 	now := time.Now()

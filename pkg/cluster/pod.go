@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -50,17 +51,27 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	return pods.Items, nil
 }
 
+// getRollingUpdateReason returns the reason for the rolling update based on the comparison result.
+func (c *Cluster) getRollingUpdateReason(cmp *compareStatefulsetResult) string {
+	// if the only reason is a Spilo image update and lazy update is enabled
+	// provide a different message so a different pod annotation is used
+	imageDiffOnly := len(cmp.reasons) == 1 && strings.Contains(cmp.reasons[0], "image does not match the current one")
+	if imageDiffOnly && c.OpConfig.EnableLazySpiloUpgrade {
+		return fmt.Sprint(rollingUpdateLazyUpgradeValue)
+	}
+	return "pod changes"
+}
+
 // markRollingUpdateFlagForPod sets the indicator for the rolling update requirement
 // in the Pod annotation.
 func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
-	// no need to patch pod if annotation is already there
-	if c.getRollingUpdateFlagFromPod(pod) {
-		return nil
-	}
-
 	c.logger.Infof("mark rolling update annotation for %s: reason %s", pod.Name, msg)
 	flag := make(map[string]string)
-	flag[rollingUpdatePodAnnotationKey] = strconv.FormatBool(true)
+	annotationValue := strconv.FormatBool(true)
+	if msg == rollingUpdateLazyUpgradeValue {
+		annotationValue = rollingUpdateLazyUpgradeValue
+	}
+	flag[rollingUpdatePodAnnotationKey] = annotationValue
 
 	patchData, err := metaAnnotationsPatch(flag)
 	if err != nil {
@@ -89,20 +100,14 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 }
 
 // getRollingUpdateFlagFromPod returns the value of the rollingUpdate flag from the given pod
-func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod) (flag bool) {
+func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod) (flag string) {
 	anno := pod.GetAnnotations()
-	flag = false
+	flag = ""
 
 	stringFlag, exists := anno[rollingUpdatePodAnnotationKey]
 	if exists {
-		var err error
 		c.logger.Debugf("found rolling update flag on pod %q", pod.Name)
-		if flag, err = strconv.ParseBool(stringFlag); err != nil {
-			c.logger.Warnf("error when parsing %q annotation for the pod %q: expected boolean value, got %q\n",
-				rollingUpdatePodAnnotationKey,
-				types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
-				stringFlag)
-		}
+		flag = stringFlag
 	}
 
 	return flag
