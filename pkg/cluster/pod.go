@@ -13,11 +13,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/patroni"
-	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/patroni"
+	"github.com/zalando/postgres-operator/v2/pkg/util/retryutil"
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
@@ -250,7 +250,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 	// we may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case
 	masterCandidateName := podName
-	masterCandidatePod := oldMaster
+	var masterCandidatePod *v1.Pod
 	if *c.Statefulset.Spec.Replicas > 1 {
 		if masterCandidateName, err = c.getSwitchoverCandidate(oldMaster); err != nil {
 			return fmt.Errorf("could not find suitable replica pod as candidate for failover: %v", err)

@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -184,7 +184,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.1")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.3")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupAzureStorageAccountName = fromCRD.LogicalBackup.AzureStorageAccountName
 	result.LogicalBackupAzureStorageAccountKey = fromCRD.LogicalBackup.AzureStorageAccountKey
@@ -270,7 +270,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	result.ConnectionPooler.Image = util.Coalesce(
 		fromCRD.ConnectionPooler.Image,
-		"ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.1")
+		"ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.3")
 
 	result.ConnectionPooler.Mode = util.Coalesce(
 		fromCRD.ConnectionPooler.Mode,

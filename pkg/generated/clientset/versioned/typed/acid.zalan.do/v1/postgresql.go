@@ -27,8 +27,8 @@ package v1
 import (
 	context "context"
 
-	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
+	acidzalandov1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	scheme "github.com/zalando/postgres-operator/v2/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"

@@ -14,20 +14,20 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	zalandov1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	zalandov1 "github.com/zalando/postgres-operator/v2/pkg/apis/zalando.org/v1"
 
-	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	pgteams "github.com/zalando/postgres-operator/pkg/teams"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando/postgres-operator/pkg/util/patroni"
-	"github.com/zalando/postgres-operator/pkg/util/teams"
-	"github.com/zalando/postgres-operator/pkg/util/users"
-	"github.com/zalando/postgres-operator/pkg/util/volumes"
+	"github.com/zalando/postgres-operator/v2/pkg/generated/clientset/versioned/scheme"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	pgteams "github.com/zalando/postgres-operator/v2/pkg/teams"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/patroni"
+	"github.com/zalando/postgres-operator/v2/pkg/util/teams"
+	"github.com/zalando/postgres-operator/v2/pkg/util/users"
+	"github.com/zalando/postgres-operator/v2/pkg/util/volumes"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -137,10 +137,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	podEventsStore := cache.NewStore(keyFn)
 	podEventsQueue := cache.NewFIFO(keyFn)
 
-	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
-	if !ok {
-		passwordEncryption = "scram-sha-256"
-	}
+	passwordEncryption := passwordEncryptionFromSpec(&pgSpec.Spec)
 
 	cluster := &Cluster{
 		Config:         cfg,
@@ -158,7 +155,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Streams:           make(map[string]*zalandov1.FabricEventStream),
 		},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
-			PasswordEncryption:   passwordEncryption,
+			PasswordEncryption:   string(passwordEncryption),
 			RoleDeletionSuffix:   cfg.OpConfig.RoleDeletionSuffix,
 			AdditionalOwnerRoles: cfg.OpConfig.AdditionalOwnerRoles,
 		},

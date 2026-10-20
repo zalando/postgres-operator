@@ -2,9 +2,9 @@ package volumes
 
 import (
 	"fmt"
-	"testing"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"testing"
 )
 
 func TestGetProviderVolumeID(t *testing.T) {
@@ -88,7 +88,7 @@ func TestVolumeBelongsToProvider(t *testing.T) {
 			name: "AWS EBS volume handle",
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string {
+					Annotations: map[string]string{
 						"pv.kubernetes.io/provisioned-by": "kubernetes.io/aws-ebs",
 					},
 				},

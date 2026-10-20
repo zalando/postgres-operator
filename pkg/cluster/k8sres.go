@@ -24,14 +24,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando/postgres-operator/pkg/util/patroni"
-	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/patroni"
+	"github.com/zalando/postgres-operator/v2/pkg/util/retryutil"
 )
 
 const (
@@ -1101,6 +1101,10 @@ func (c *Cluster) generateSpiloPodEnvVars(
 		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
+	if c.OpConfig.IRSARoleARN != "" {
+		opConfigEnvVars = append(opConfigEnvVars, v1.EnvVar{Name: "SPILO_PROVIDER", Value: "aws"})
+	}
+
 	envVars = appendEnvVars(envVars, opConfigEnvVars...)
 
 	return envVars, nil
@@ -1931,9 +1935,15 @@ func (c *Cluster) generateSingleUserSecret(pgUser spec.PgUser) *v1.Secret {
 		lbls = c.connectionPoolerLabels("", false).MatchLabels
 	}
 
-	// if secret lives in another namespace we cannot set ownerReferences
+	// Skip a controller ownerReference on user-credential secrets when the
+	// operator is configured to keep them (enable_secrets_deletion=false);
+	// otherwise Kubernetes garbage collection would still cascade-delete them
+	// once the owning Postgresql CR is removed, defeating that setting.
+	// Cross-namespace secrets also have no ownerReference because K8s forbids
+	// cross-namespace ownerRefs by design.
 	var ownerReferences []metav1.OwnerReference
-	if c.Config.OpConfig.EnableCrossNamespaceSecret && c.Postgresql.ObjectMeta.Namespace != pgUser.Namespace {
+	secretsDeletionDisabled := c.OpConfig.EnableSecretsDeletion != nil && !*c.OpConfig.EnableSecretsDeletion
+	if secretsDeletionDisabled || (c.Config.OpConfig.EnableCrossNamespaceSecret && c.Postgresql.ObjectMeta.Namespace != pgUser.Namespace) {
 		ownerReferences = nil
 	} else {
 		ownerReferences = c.ownerReferences()
@@ -2220,6 +2230,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 	if c.OpConfig.IRSARoleARN != "" {
 		result = append(result, v1.EnvVar{Name: "CLONE_AWS_ROLE_ARN", Value: c.OpConfig.IRSARoleARN})
 		result = append(result, v1.EnvVar{Name: "CLONE_AWS_WEB_IDENTITY_TOKEN_FILE", Value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"})
+		result = append(result, v1.EnvVar{Name: "CLONE_AWS_REGION", Value: c.OpConfig.AWSRegion})
 	}
 
 	return result
@@ -2270,6 +2281,7 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 	if c.OpConfig.IRSARoleARN != "" {
 		result = append(result, v1.EnvVar{Name: "STANDBY_AWS_ROLE_ARN", Value: c.OpConfig.IRSARoleARN})
 		result = append(result, v1.EnvVar{Name: "STANDBY_AWS_WEB_IDENTITY_TOKEN_FILE", Value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"})
+		result = append(result, v1.EnvVar{Name: "STANDBY_AWS_REGION", Value: c.OpConfig.AWSRegion})
 	}
 
 	return result

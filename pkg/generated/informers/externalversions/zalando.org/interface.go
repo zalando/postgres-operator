@@ -25,8 +25,8 @@ SOFTWARE.
 package zalando
 
 import (
-	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/zalando.org/v1"
+	internalinterfaces "github.com/zalando/postgres-operator/v2/pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "github.com/zalando/postgres-operator/v2/pkg/generated/informers/externalversions/zalando.org/v1"
 )
 
 // Interface provides access to each of this group's versions.

@@ -11,15 +11,15 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando/postgres-operator/pkg/util/patroni"
-	"github.com/zalando/postgres-operator/pkg/util/teams"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	fakeacidv1 "github.com/zalando/postgres-operator/v2/pkg/generated/clientset/versioned/fake"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/patroni"
+	"github.com/zalando/postgres-operator/v2/pkg/util/teams"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1692,8 +1692,8 @@ func newCronJob(image, schedule string, vars []v1.EnvVar, mounts []v1.VolumeMoun
 
 func TestCompareLogicalBackupJob(t *testing.T) {
 
-	img1 := "ghcr.io/zalando/postgres-operator/logical-backup:v1.15.1"
-	img2 := "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.1"
+	img1 := "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.1"
+	img2 := "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.3"
 
 	clientSet := fake.NewSimpleClientset()
 	acidClientSet := fakeacidv1.NewSimpleClientset()

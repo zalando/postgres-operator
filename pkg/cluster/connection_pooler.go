@@ -10,8 +10,8 @@ import (
 
 	"github.com/r3labs/diff"
 	"github.com/sirupsen/logrus"
-	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidzalando "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,11 +19,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/retryutil"
 )
 
 var poolerRunAsUser = int64(100)
@@ -253,6 +253,8 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	minSize := defaultSize / 2
 	reserveSize := minSize
 
+	passwordEncryption := passwordEncryptionFromSpec(spec)
+
 	return []v1.EnvVar{
 		{
 			Name:  "CONNECTION_POOLER_PORT",
@@ -261,6 +263,10 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 		{
 			Name:  "CONNECTION_POOLER_MODE",
 			Value: effectiveMode,
+		},
+		{
+			Name:  "CONNECTION_POOLER_AUTH_TYPE",
+			Value: string(passwordEncryption),
 		},
 		{
 			Name:  "CONNECTION_POOLER_DEFAULT_SIZE",
@@ -912,6 +918,8 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 		return false, reasons
 	}
 
+	authTypeFound := false
+	passwordEncryption := passwordEncryptionFromSpec(&c.Spec)
 	for _, env := range poolerContainer.Env {
 		if spec.User == "" && env.Name == "PGUSER" {
 			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
@@ -935,6 +943,22 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 				env.Value, config.Schema)
 			reasons = append(reasons, msg)
 		}
+
+		if env.Name == "CONNECTION_POOLER_AUTH_TYPE" {
+			authTypeFound = true
+			if string(passwordEncryption) != env.Value {
+				sync = true
+				msg := fmt.Sprintf("pooler auth type is different (having %s, required %s)",
+					env.Value, passwordEncryption)
+				reasons = append(reasons, msg)
+			}
+		}
+	}
+
+	// env var is missing on deployments created before it was introduced
+	if !authTypeFound {
+		sync = true
+		reasons = append(reasons, "pooler auth type env variable is missing")
 	}
 
 	return sync, reasons

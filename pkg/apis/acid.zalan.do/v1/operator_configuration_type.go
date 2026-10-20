@@ -3,9 +3,9 @@ package v1
 // Operator configuration CRD definition, please use snake_case for field names.
 
 import (
-	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
 
-	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -331,7 +331,7 @@ type ConnectionPoolerConfiguration struct {
 	Schema string `json:"connection_pooler_schema,omitempty"`
 	// +kubebuilder:default=pooler
 	User string `json:"connection_pooler_user,omitempty"`
-	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.1"
+	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.3"
 	Image string `json:"connection_pooler_image,omitempty"`
 	// +kubebuilder:validation:Enum=session;transaction
 	// +kubebuilder:default=transaction
@@ -352,7 +352,7 @@ type OperatorLogicalBackupConfiguration struct {
 	// +kubebuilder:validation:Pattern=`^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$`
 	// +kubebuilder:default="30 00 * * *"
 	Schedule string `json:"logical_backup_schedule,omitempty"`
-	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/logical-backup:v2.0.1"
+	// +kubebuilder:default="ghcr.io/zalando/postgres-operator/logical-backup:v2.0.3"
 	DockerImage string `json:"logical_backup_docker_image,omitempty"`
 	// +kubebuilder:validation:Enum=az;gcs;s3
 	// +kubebuilder:default=s3
@@ -430,9 +430,7 @@ type OperatorConfigurationData struct {
 	// +kubebuilder:default=true
 	ShmVolume     *bool             `json:"enable_shm_volume,omitempty"`
 	SidecarImages map[string]string `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
-	// +kubebuilder:validation:XPreserveUnknownFields
-	// +kubebuilder:validation:Type=object
-	// +kubebuilder:validation:Schemaless
+	// +nullable
 	SidecarContainers []v1.Container `json:"sidecars,omitempty"`
 	// +optional
 	PostgresUsersConfiguration PostgresUsersConfiguration `json:"users"`

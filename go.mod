@@ -1,4 +1,4 @@
-module github.com/zalando/postgres-operator
+module github.com/zalando/postgres-operator/v2
 
 go 1.26.4
 

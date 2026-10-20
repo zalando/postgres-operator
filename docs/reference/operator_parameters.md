@@ -289,8 +289,12 @@ configuration they are grouped under the `kubernetes` key.
 * **enable_owner_references**
   The operator can set owner references on its child resources (except PVCs,
   Patroni config service/endpoint, cross-namespace secrets) to improve cluster
-  monitoring and enable cascading deletion. The default is `false`. Warning,
-  enabling this option disables configured delete protection checks (see below).
+  monitoring and enable cascading deletion. User-credential secrets are also
+  excluded from controller owner references whenever
+  [enable_secrets_deletion](#enable_secrets_deletion) is `false`, so that
+  Kubernetes garbage collection does not cascade-delete them when the
+  Postgresql resource is removed. The default is `false`. Warning, enabling
+  this option disables configured delete protection checks (see below).
 
 * **delete_annotation_date_key**
   key name for annotation that compares manifest value with current date in the
@@ -381,7 +385,15 @@ configuration they are grouped under the `kubernetes` key.
 
 * **enable_secrets_deletion**
   By default, the operator deletes secrets when removing the Postgres cluster
-  manifest. To keep secrets, set this option to `false`. The default is `true`.
+  manifest. To keep secrets, set this option to `false`. Note that this only
+  guards the operator's own deletion logic; Kubernetes garbage collection can
+  still remove user-credential secrets when
+  [enable_owner_references](#enable_owner_references) is `true` because the
+  Postgresql resource acts as a controller owner. To prevent that, the
+  operator skips the controller owner reference on user-credential secrets
+  whenever `enable_secrets_deletion` is `false`, so the two settings work
+  together. This protection takes effect on the cluster's next sync after
+  the setting is applied. The default is `true`.
 
 * **enable_persistent_volume_claim_deletion**
   By default, the operator deletes persistent volume claims when removing the
@@ -544,9 +556,11 @@ configuration they are grouped under the `kubernetes` key.
 * **master_pod_move_timeout**
   The period of time to wait for the success of migration of master pods from
   an unschedulable node. The migration includes Patroni switchovers to
-  respective replicas on healthy nodes. The situation where master pods still
-  exist on the old node after this timeout expires has to be fixed manually.
-  The default is 20 minutes.
+  respective replicas on healthy nodes. For a single-pod cluster, the operator
+  instead recreates the master on another node and waits for its role label,
+  without attempting a switchover. This causes downtime until the pod returns.
+  The situation where master pods still exist on the old node after this
+  timeout expires has to be fixed manually. The default is 20 minutes.
 
 * **enable_pod_antiaffinity**
   toggles [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
@@ -839,7 +853,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.1"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.3"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -1080,7 +1094,7 @@ operator being able to provide some reasonable defaults.
 
 * **connection_pooler_image**
   Docker image to use for connection pooler deployment.
-  Default: "ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.1"
+  Default: "ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.3"
 
 * **connection_pooler_max_db_connections**
   How many connections the pooler can max hold. This value is divided among the

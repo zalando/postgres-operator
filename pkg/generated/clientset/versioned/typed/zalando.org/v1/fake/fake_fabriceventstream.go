@@ -25,8 +25,8 @@ SOFTWARE.
 package fake
 
 import (
-	v1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
-	zalandoorgv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/zalando.org/v1"
+	v1 "github.com/zalando/postgres-operator/v2/pkg/apis/zalando.org/v1"
+	zalandoorgv1 "github.com/zalando/postgres-operator/v2/pkg/generated/clientset/versioned/typed/zalando.org/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 

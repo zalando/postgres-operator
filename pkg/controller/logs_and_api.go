@@ -7,10 +7,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/zalando/postgres-operator/pkg/cluster"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/v2/pkg/cluster"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/config"
 	"k8s.io/apimachinery/pkg/types"
 )
 

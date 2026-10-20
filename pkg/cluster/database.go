@@ -11,10 +11,10 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/retryutil"
-	"github.com/zalando/postgres-operator/pkg/util/users"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/retryutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/users"
 )
 
 const (

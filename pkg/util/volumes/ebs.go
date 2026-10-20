@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/retryutil"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/retryutil"
 )
 
 // EBSVolumeResizer implements volume resizing interface for AWS EBS volumes.
