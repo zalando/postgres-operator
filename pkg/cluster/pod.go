@@ -96,6 +96,12 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 		return fmt.Errorf("could not patch pod rolling update flag %q: %v", patchData, err)
 	}
 
+	// reflect the patch locally, so callers inspecting the flag right after marking see it
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[rollingUpdatePodAnnotationKey] = annotationValue
+
 	return nil
 }
 
