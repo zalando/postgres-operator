@@ -1092,6 +1092,11 @@ class EndToEndTestCase(unittest.TestCase):
             self.assertEqual(k8s.get_effective_pod_image(pod1), SPILO_CURRENT,
                              "pod-1 should still run the old Docker image")
 
+            # the pending rotation of pod-1 must be flagged as lazy, otherwise
+            # the maintenance window has no effect on it
+            self.eventuallyEqual(lambda: k8s.get_rolling_update_flag(pod1), "lazy upgrade",
+                                 "pod-1 is not flagged for a lazy rotation, got {}")
+
             # define a maintenance window in the future - the pending lazy
             # upgrade of pod-1 must still be postponed
             current_time = datetime.now()
@@ -1157,7 +1162,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                                  "Operator does not get in sync")
 
-        except timeout_decorator.TimeoutError:
+        except (timeout_decorator.TimeoutError, AssertionError):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 

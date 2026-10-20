@@ -341,6 +341,18 @@ class K8s:
             return None
         return pod.items[0].spec.containers[0].image
 
+    def get_rolling_update_flag(self, pod_name, namespace='default'):
+        '''
+        Get the value of the operator's rolling update annotation on a pod.
+        '''
+        pod = self.api.core_v1.list_namespaced_pod(
+            namespace, label_selector="statefulset.kubernetes.io/pod-name=" + pod_name)
+
+        if len(pod.items) == 0:
+            return None
+        return (pod.items[0].metadata.annotations or {}).get(
+            "zalando-postgres-operator-rolling-update-required")
+
     def get_cluster_pod(self, role, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         labels = labels + ',spilo-role=' + role
 
