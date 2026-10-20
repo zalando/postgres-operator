@@ -724,7 +724,7 @@ func (c *Cluster) syncStatefulSet() error {
 	// if we get here, we need to re-create the pods from the outdated statefulset
 	// or leftovers from an old statefulset
 	if len(podsToRecreate) > 0 {
-		c.checkForLazyRotation(&podsToRecreate)
+		podsToRecreate = c.checkForLazyRotation(podsToRecreate)
 		if isSafeToRecreatePods && len(podsToRecreate) > 0 {
 			c.logger.Info("performing rolling update")
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
@@ -740,9 +740,9 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) checkForLazyRotation(podsToRecreate *[]v1.Pod) []v1.Pod {
+func (c *Cluster) checkForLazyRotation(podsToRecreate []v1.Pod) []v1.Pod {
 	podsSafeToRecreate := make([]v1.Pod, 0)
-	for _, podToRecreate := range *podsToRecreate {
+	for _, podToRecreate := range podsToRecreate {
 		// check for pods to be rotated lazily if we are in a maintenance window
 		// if windows not are enabled or not defined delay the rotation further
 		// until a K8s update or a rolling update triggered by other pod changes
