@@ -137,10 +137,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	podEventsStore := cache.NewStore(keyFn)
 	podEventsQueue := cache.NewFIFO(keyFn)
 
-	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
-	if !ok {
-		passwordEncryption = "scram-sha-256"
-	}
+	passwordEncryption := passwordEncryptionFromSpec(&pgSpec.Spec)
 
 	cluster := &Cluster{
 		Config:         cfg,
@@ -158,7 +155,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Streams:           make(map[string]*zalandov1.FabricEventStream),
 		},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
-			PasswordEncryption:   passwordEncryption,
+			PasswordEncryption:   string(passwordEncryption),
 			RoleDeletionSuffix:   cfg.OpConfig.RoleDeletionSuffix,
 			AdditionalOwnerRoles: cfg.OpConfig.AdditionalOwnerRoles,
 		},

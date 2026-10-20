@@ -82,5 +82,23 @@ type InstallFunction func(schema string, user string) error
 
 type SyncReason []string
 
+// PasswordEncryption is the password hashing method used by Postgres and the pooler
+type PasswordEncryption string
+
+const (
+	PasswordEncryptionMD5         PasswordEncryption = "md5"
+	PasswordEncryptionScramSHA256 PasswordEncryption = "scram-sha-256"
+)
+
+// passwordEncryptionFromSpec returns the password_encryption parameter, falling back to scram-sha-256 for unset or unsupported values
+func passwordEncryptionFromSpec(spec *acidv1.PostgresSpec) PasswordEncryption {
+	switch pe := PasswordEncryption(spec.PostgresqlParam.Parameters["password_encryption"]); pe {
+	case PasswordEncryptionMD5, PasswordEncryptionScramSHA256:
+		return pe
+	default:
+		return PasswordEncryptionScramSHA256
+	}
+}
+
 // no sync happened, empty value
 var NoSync SyncReason = []string{}
