@@ -587,8 +587,16 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
+        # turn synchronous_mode off again - it makes the operator require a sync
+        # standby for every switchover which other tests do not account for
+        pg_patch_config["spec"]["patroni"]["synchronous_mode"] = False
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster",
+            {"spec": {"patroni": {"synchronous_mode": False}}})
+
         # make sure cluster is in a good state for further tests
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyTrue(compare_config, "Postgres config not applied")
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
                              "No 2 pods running")
 
