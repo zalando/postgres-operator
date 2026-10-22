@@ -727,10 +727,13 @@ func (c *Cluster) syncStatefulSet() error {
 		podsToRecreate, deferredPods = c.checkForLazyRotation(podsToRecreate)
 		if len(deferredPods) > 0 {
 			postponeReasons = append(postponeReasons, "lazy upgrade enabled")
-			for _, deferredPod := range deferredPods {
-				// pods we do not touch keep running and stay eligible for a switchover
-				if PostgresRole(deferredPod.Labels[c.OpConfig.PodRoleLabel]) != Master {
-					switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(deferredPod.ObjectMeta))
+			// if the primary will be rotated and replicas are deferred
+			// they stay eligible for a switchover - unless we know better candidates already
+			if len(switchoverCandidates) == 0 {
+				for _, deferredPod := range deferredPods {
+					if PostgresRole(deferredPod.Labels[c.OpConfig.PodRoleLabel]) != Master {
+						switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(deferredPod.ObjectMeta))
+					}
 				}
 			}
 		}
