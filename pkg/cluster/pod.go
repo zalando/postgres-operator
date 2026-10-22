@@ -65,6 +65,11 @@ func (c *Cluster) getRollingUpdateReason(cmp *compareStatefulsetResult) string {
 // markRollingUpdateFlagForPod sets the indicator for the rolling update requirement
 // in the Pod annotation.
 func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
+	// exit early if rolling update flag is already set to true
+	if c.getRollingUpdateFlagFromPod(pod) == "true" {
+		return nil
+	}
+
 	c.logger.Infof("mark rolling update annotation for %s: reason %s", pod.Name, msg)
 	flag := make(map[string]string)
 	annotationValue := strconv.FormatBool(true)
