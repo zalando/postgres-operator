@@ -1108,7 +1108,8 @@ class EndToEndTestCase(unittest.TestCase):
             # define a maintenance window in the future - the pending lazy
             # upgrade of pod-1 must still be postponed
             current_time = datetime.now()
-            maintenance_window_future = f"{(current_time+timedelta(minutes=60)).strftime('%H:%M')}-{(current_time+timedelta(minutes=120)).strftime('%H:%M')}"
+            future_hour = (current_time + timedelta(hours=2)).strftime('%H')
+            maintenance_window_future = f"{future_hour}:00-{future_hour}:59"
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster",
                 {"spec": {"maintenanceWindows": [maintenance_window_future]}})
@@ -1118,7 +1119,7 @@ class EndToEndTestCase(unittest.TestCase):
                              "pod-1 should not be rotated outside of the maintenance window")
 
             # move the maintenance window to now - the lazy upgrade of pod-1 must be executed
-            maintenance_window_current = f"{(current_time-timedelta(minutes=30)).strftime('%H:%M')}-{(current_time+timedelta(minutes=30)).strftime('%H:%M')}"
+            maintenance_window_current = "00:00-23:59"
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster",
                 {"spec": {"maintenanceWindows": [maintenance_window_current]}})
