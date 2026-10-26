@@ -759,7 +759,7 @@ func (c *Cluster) checkForLazyRotation(podsToRecreate []v1.Pod) ([]v1.Pod, []v1.
 	podsDeferred := make([]v1.Pod, 0)
 	for _, podToRecreate := range podsToRecreate {
 		// check for pods to be rotated lazily if we are in a maintenance window
-		// if windows not are enabled or not defined delay the rotation further
+		// if windows are not enabled or not defined, delay the rotation further
 		// until a K8s update or a rolling update triggered by other pod changes
 		if c.OpConfig.EnableLazySpiloUpgrade && c.getRollingUpdateFlagFromPod(&podToRecreate) == rollingUpdateLazyUpgradeValue {
 			if c.hasMaintenanceWindowsDefined(c.Spec.MaintenanceWindows) && c.isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
