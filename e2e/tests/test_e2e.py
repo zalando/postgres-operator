@@ -1978,9 +1978,9 @@ class EndToEndTestCase(unittest.TestCase):
             "Found incorrect number of rotation users after disabling password rotation", 10, 5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_rolling_update_flag(self):
+    def test_rolling_update_annotation(self):
         '''
-            Add rolling update flag to only the master and see it failing over
+            Add rolling update annotation to only the master and see it failing over
         '''
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
@@ -2020,7 +2020,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # check if the former replica is now the new master
             leader = k8s.get_cluster_leader_pod()
-            self.eventuallyEqual(lambda: leader.metadata.name, switchover_target, "Rolling update flag did not trigger switchover")
+            self.eventuallyEqual(lambda: leader.metadata.name, switchover_target, "Rolling update annotation did not trigger switchover")
 
             # check that the old master has been recreated
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
@@ -2091,7 +2091,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # check if the former replica is now the new master
             leader = k8s.get_cluster_leader_pod()
-            self.eventuallyEqual(lambda: leader.metadata.name, switchover_target, "Rolling update flag did not trigger switchover")
+            self.eventuallyEqual(lambda: leader.metadata.name, switchover_target, "Rolling update annotation did not trigger switchover")
 
             # wait for the old master to get restarted
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
