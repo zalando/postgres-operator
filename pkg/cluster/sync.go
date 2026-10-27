@@ -588,7 +588,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 		if len(pods) > 0 {
 			for _, pod := range pods {
-				if err = c.markRollingUpdateFlagForPod(&pod, "pod from previous statefulset"); err != nil {
+				if err = c.markRollingUpdateForPod(&pod, "pod from previous statefulset"); err != nil {
 					c.logger.Warnf("marking old pod for rolling update failed: %v", err)
 				}
 				podsToRecreate = append(podsToRecreate, pod)
@@ -602,9 +602,10 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
 		c.logger.Debug("syncing statefulsets")
-		// check if there are still pods with a rolling update flag
+		// check if there are still pods with a rolling update annotation
 		for _, pod := range pods {
-			if c.getRollingUpdateFlagFromPod(&pod) {
+			if rollingUpdateRequired := c.getRollingUpdateAnnotationFromPod(&pod); rollingUpdateRequired != "" {
+				c.logger.Debugf("found rolling update annotation %q on pod %q", rollingUpdateRequired, pod.Name)
 				podsToRecreate = append(podsToRecreate, pod)
 			} else {
 				role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
@@ -655,8 +656,8 @@ func (c *Cluster) syncStatefulSet() error {
 				podsToRecreate = make([]v1.Pod, 0)
 				switchoverCandidates = make([]spec.NamespacedName, 0)
 				for _, pod := range pods {
-					if err = c.markRollingUpdateFlagForPod(&pod, "pod changes"); err != nil {
-						return fmt.Errorf("updating rolling update flag for pod failed: %v", err)
+					if err = c.markRollingUpdateForPod(&pod, c.getRollingUpdateReason(cmp)); err != nil {
+						return fmt.Errorf("updating rolling update annotation for pod %q failed: %v", pod.Name, err)
 					}
 					podsToRecreate = append(podsToRecreate, pod)
 				}
@@ -671,31 +672,6 @@ func (c *Cluster) syncStatefulSet() error {
 			} else {
 				if err := c.replaceStatefulSet(desiredSts); err != nil {
 					return fmt.Errorf("could not replace statefulset: %v", err)
-				}
-			}
-		}
-
-		if len(podsToRecreate) == 0 && !c.OpConfig.EnableLazySpiloUpgrade {
-			// even if the desired and the running statefulsets match
-			// there still may be not up-to-date pods on condition
-			//  (a) the lazy update was just disabled
-			// and
-			//  (b) some of the pods were not restarted when the lazy update was still in place
-			for _, pod := range pods {
-				effectivePodImage := getPostgresContainer(&pod.Spec).Image
-				stsImage := getPostgresContainer(&desiredSts.Spec.Template.Spec).Image
-
-				if stsImage != effectivePodImage {
-					if err = c.markRollingUpdateFlagForPod(&pod, "pod not yet restarted due to lazy update"); err != nil {
-						c.logger.Warnf("updating rolling update flag failed for pod %q: %v", pod.Name, err)
-					}
-					podsToRecreate = append(podsToRecreate, pod)
-				} else {
-					role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-					if role == Master {
-						continue
-					}
-					switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
 				}
 			}
 		}
@@ -745,10 +721,24 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 	}
 
-	// if we get here we also need to re-create the pods (either leftovers from the old
-	// statefulset or those that got their configuration from the outdated statefulset)
+	// if we get here, we need to re-create the pods from the outdated statefulset
+	// or leftovers from an old statefulset
 	if len(podsToRecreate) > 0 {
-		if isSafeToRecreatePods {
+		var deferredPods []v1.Pod
+		podsToRecreate, deferredPods = c.checkForLazyRotation(podsToRecreate)
+		if len(deferredPods) > 0 {
+			postponeReasons = append(postponeReasons, "lazy upgrade enabled")
+			// if the primary will be rotated and replicas are deferred
+			// they stay eligible for a switchover - unless we know better candidates already
+			if len(switchoverCandidates) == 0 {
+				for _, deferredPod := range deferredPods {
+					if PostgresRole(deferredPod.Labels[c.OpConfig.PodRoleLabel]) != Master {
+						switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(deferredPod.ObjectMeta))
+					}
+				}
+			}
+		}
+		if isSafeToRecreatePods && len(podsToRecreate) > 0 {
 			c.logger.Info("performing rolling update")
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
 			if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
@@ -761,6 +751,29 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	return nil
+}
+
+// checkForLazyRotation splits the pods into those that can be recreated now and
+// those whose lazy upgrade is postponed.
+func (c *Cluster) checkForLazyRotation(podsToRecreate []v1.Pod) ([]v1.Pod, []v1.Pod) {
+	podsSafeToRecreate := make([]v1.Pod, 0)
+	podsDeferred := make([]v1.Pod, 0)
+	for _, podToRecreate := range podsToRecreate {
+		// check for pods to be rotated lazily if we are in a maintenance window
+		// if windows are not enabled or not defined, delay the rotation further
+		// until a K8s update or a rolling update triggered by other pod changes
+		if c.OpConfig.EnableLazySpiloUpgrade && c.getRollingUpdateAnnotationFromPod(&podToRecreate) == rollingUpdateLazyUpgradeValue {
+			if c.hasMaintenanceWindowsDefined(c.Spec.MaintenanceWindows) && c.isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+				c.logger.Infof("lazy upgrade of %q during maintenance window", util.NameFromMeta(podToRecreate.ObjectMeta))
+				podsSafeToRecreate = append(podsSafeToRecreate, podToRecreate)
+			} else {
+				podsDeferred = append(podsDeferred, podToRecreate)
+			}
+		} else {
+			podsSafeToRecreate = append(podsSafeToRecreate, podToRecreate)
+		}
+	}
+	return podsSafeToRecreate, podsDeferred
 }
 
 func (c *Cluster) syncPatroniConfig(pods []v1.Pod, requiredPatroniConfig acidv1.Patroni, requiredPgParameters map[string]string) (bool, bool, uint32, error) {
@@ -1359,7 +1372,7 @@ func (c *Cluster) rotatePasswordInSecret(
 					return "", fmt.Errorf("could not list pods of the statefulset: %v", err)
 				}
 				for _, pod := range pods {
-					if err = c.markRollingUpdateFlagForPod(&pod,
+					if err = c.markRollingUpdateForPod(&pod,
 						fmt.Sprintf("replace pod due to password rotation of system user %s", secretUsername)); err != nil {
 						c.logger.Warnf("marking pod for rolling update due to password rotation failed: %v", err)
 					}
@@ -1376,7 +1389,7 @@ func (c *Cluster) rotatePasswordInSecret(
 					return "", fmt.Errorf("could not list pods of the pooler deployment: %v", err)
 				}
 				for _, poolerPod := range poolerPods {
-					if err = c.markRollingUpdateFlagForPod(&poolerPod,
+					if err = c.markRollingUpdateForPod(&poolerPod,
 						fmt.Sprintf("replace pooler pod due to password rotation of pooler user %s", secretUsername)); err != nil {
 						c.logger.Warnf("marking pooler pod for rolling update due to password rotation failed: %v", err)
 					}

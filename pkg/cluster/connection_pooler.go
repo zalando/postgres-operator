@@ -1270,7 +1270,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		return nil, err
 	}
 	for i, pod := range pods {
-		if c.getRollingUpdateFlagFromPod(&pod) {
+		if c.getRollingUpdateAnnotationFromPod(&pod) == "true" {
 			podName := util.NameFromMeta(pods[i].ObjectMeta)
 			err := retryutil.Retry(1*time.Second, 5*time.Second,
 				func() (bool, error) {
