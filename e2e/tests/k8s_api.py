@@ -28,6 +28,7 @@ class K8sApi:
         self.custom_objects_api = client.CustomObjectsApi()
         self.policy_v1 = client.PolicyV1Api()
         self.storage_v1_api = client.StorageV1Api()
+        self.apiextensions_v1 = client.ApiextensionsV1Api()
 
 
 class K8s:

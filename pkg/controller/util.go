@@ -51,6 +51,26 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 	return c.clusterWorkers[clusterName]
 }
 
+// ensureCRDProtectionFinalizer adds the protection finalizer to an existing
+// CRD if it is missing. Existing CRs that do not yet carry the finalizer
+// (e.g. clusters upgraded from a previous operator version) are back-filled
+// here on operator startup. A missing finalizer on a CRD is logged but does
+// not fail the startup.
+func (c *Controller) ensureCRDProtectionFinalizer(name string) error {
+	crd, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	for _, f := range crd.Finalizers {
+		if f == acidv1.CRDProtectionFinalizer {
+			return nil
+		}
+	}
+	crd.Finalizers = append(crd.Finalizers, acidv1.CRDProtectionFinalizer)
+	_, err = c.KubeClient.CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
+	return err
+}
+
 func (c *Controller) createOperatorCRD(desiredCrd *apiextv1.CustomResourceDefinition) error {
 	crd, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), desiredCrd.Name, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
@@ -67,6 +87,9 @@ func (c *Controller) createOperatorCRD(desiredCrd *apiextv1.CustomResourceDefini
 		_, err := c.KubeClient.CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("could not update customResourceDefinition %q: %v", crd.Name, err)
+		}
+		if err := c.ensureCRDProtectionFinalizer(desiredCrd.Name); err != nil {
+			c.logger.Warnf("could not ensure protection finalizer on customResourceDefinition %q: %v", desiredCrd.Name, err)
 		}
 	}
 	c.logger.Infof("customResourceDefinition %q is registered", crd.Name)
