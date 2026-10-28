@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMain(m *testing.M) {
@@ -41,10 +43,6 @@ func TestGetMapPairsFromString(t *testing.T) {
 
 func int32Ptr(i int32) *int32 {
 	return &i
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }
 
 var validateTests = []struct {
@@ -334,4 +332,28 @@ func TestNewFromMap(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConnectionPoolerGenerateConfigDefaults(t *testing.T) {
+	cfg := NewFromMap(map[string]string{})
+
+	assert.Equal(t, false, cfg.ConnectionPooler.GenerateConfig, "expected GenerateConfig default false")
+	assert.Equal(t, "scram-sha-256", cfg.ConnectionPooler.AuthType, "expected AuthType scram-sha-256")
+	assert.Equal(t, "/etc/pgbouncer/pgbouncer.ini", cfg.ConnectionPooler.ConfigPath, "expected ConfigPath /etc/pgbouncer/pgbouncer.ini")
+	assert.Equal(t, []string{"/etc/pgbouncer/pgbouncer.ini"}, cfg.ConnectionPooler.Args, "expected Args [/etc/pgbouncer/pgbouncer.ini]")
+
+	cfg2 := NewFromMap(map[string]string{
+		"connection_pooler_generate_config": "true",
+		"connection_pooler_auth_type":       "md5",
+		"connection_pooler_args":            "/custom/pgbouncer.ini",
+		"connection_pooler_config_path":     "/custom/pgbouncer.ini",
+		"connection_pooler_command":         "/usr/bin/pgbouncer",
+	})
+	if !cfg2.ConnectionPooler.GenerateConfig {
+		assert.Equal(t, true, cfg2.ConnectionPooler.GenerateConfig, "expected GenerateConfig true")
+	}
+	assert.Equal(t, "md5", cfg2.ConnectionPooler.AuthType, "expected AuthType md5")
+	assert.Equal(t, []string{"/custom/pgbouncer.ini"}, cfg2.ConnectionPooler.Args, "expected Args [/custom/pgbouncer.ini]")
+	assert.Equal(t, "/custom/pgbouncer.ini", cfg2.ConnectionPooler.ConfigPath, "expected ConfigPath /custom/pgbouncer.ini")
+	assert.Equal(t, []string{"/usr/bin/pgbouncer"}, cfg2.ConnectionPooler.Command, "expected Command [/usr/bin/pgbouncer]")
 }
