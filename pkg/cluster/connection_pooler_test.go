@@ -1064,6 +1064,137 @@ func TestPoolerTLS(t *testing.T) {
 	assert.Contains(t, poolerContainer.Env, v1.EnvVar{Name: "CONNECTION_POOLER_CLIENT_CA_FILE", Value: "/tls/ca.crt"})
 }
 
+// poolerSecurityContextOpConfig builds a minimal OpConfig usable for exercising the
+// connection pooler securityContext behavior. Callers tweak the returned config's
+// ConnectionPooler / Resources before passing it to syncedPoolerDeployment.
+func poolerSecurityContextOpConfig() config.Config {
+	return config.Config{
+		PodManagementPolicy: "ordered_ready",
+		ProtectedRoles:      []string{"admin"},
+		Auth: config.Auth{
+			SuperUsername:       superUserName,
+			ReplicationUsername: replicationUserName,
+		},
+		Resources: config.Resources{
+			ClusterLabels:        map[string]string{"application": "spilo"},
+			ClusterNameLabel:     "cluster-name",
+			DefaultCPURequest:    "300m",
+			DefaultCPULimit:      "300m",
+			DefaultMemoryRequest: "300Mi",
+			DefaultMemoryLimit:   "300Mi",
+			PodRoleLabel:         "spilo-role",
+		},
+		ConnectionPooler: config.ConnectionPooler{
+			ConnectionPoolerDefaultCPURequest:    "100m",
+			ConnectionPoolerDefaultCPULimit:      "100m",
+			ConnectionPoolerDefaultMemoryRequest: "100Mi",
+			ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+		},
+		PodServiceAccountName: "postgres-pod",
+	}
+}
+
+// syncedPoolerDeployment provisions a pooler with the given OpConfig and returns the
+// resulting master pooler Deployment.
+func syncedPoolerDeployment(t *testing.T, opConfig config.Config) *appsv1.Deployment {
+	t.Helper()
+	client, _ := newFakeK8sPoolerTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+		Spec: acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			EnableConnectionPooler: util.True(),
+			Resources: &acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: k8sutil.StringToPointer("1"), Memory: k8sutil.StringToPointer("10")},
+			},
+			Volume: acidv1.Volume{Size: "1G"},
+		},
+	}
+
+	cluster := New(Config{OpConfig: opConfig}, client, pg, logger, eventRecorder)
+
+	_, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
+
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+		Master: {
+			Name:        cluster.connectionPoolerName(Master),
+			ClusterName: clusterName,
+			Namespace:   namespace,
+			Role:        Master,
+		},
+	}
+
+	_, err = cluster.syncConnectionPoolerWorker(nil, &pg, Master)
+	assert.NoError(t, err)
+
+	deploy, err := client.Deployments(namespace).Get(context.TODO(), cluster.connectionPoolerName(Master), metav1.GetOptions{})
+	assert.NoError(t, err)
+	return deploy
+}
+
+func TestConnectionPoolerDefaultSecurityContext(t *testing.T) {
+	deploy := syncedPoolerDeployment(t, poolerSecurityContextOpConfig())
+
+	podSc := deploy.Spec.Template.Spec.SecurityContext
+	assert.NotNil(t, podSc, "pod securityContext should be set")
+	assert.Equal(t, int64(100), *podSc.RunAsUser, "defaults to RunAsUser 100 for backward compatibility")
+	assert.Equal(t, int64(101), *podSc.RunAsGroup, "defaults to RunAsGroup 101 for backward compatibility")
+
+	containerSc := deploy.Spec.Template.Spec.Containers[constants.ConnectionPoolerContainer].SecurityContext
+	assert.NotNil(t, containerSc, "container securityContext should be set")
+	assert.Equal(t, false, *containerSc.AllowPrivilegeEscalation, "defaults AllowPrivilegeEscalation to false")
+}
+
+func TestConnectionPoolerPodSecurityContextOverride(t *testing.T) {
+	runAsUser := int64(1000001)
+	runAsGroup := int64(1000001)
+	spiloFSGroup := int64(103)
+
+	opConfig := poolerSecurityContextOpConfig()
+	// FSGroup comes from the spilo config and must still apply when the override leaves it nil.
+	opConfig.Resources.SpiloFSGroup = &spiloFSGroup
+	opConfig.ConnectionPooler.PodSecurityContext = &v1.PodSecurityContext{
+		RunAsUser:    &runAsUser,
+		RunAsGroup:   &runAsGroup,
+		RunAsNonRoot: util.True(),
+		SeccompProfile: &v1.SeccompProfile{
+			Type: v1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+
+	deploy := syncedPoolerDeployment(t, opConfig)
+	podSc := deploy.Spec.Template.Spec.SecurityContext
+
+	assert.Equal(t, runAsUser, *podSc.RunAsUser, "honors configured RunAsUser")
+	assert.Equal(t, runAsGroup, *podSc.RunAsGroup, "honors configured RunAsGroup")
+	assert.Equal(t, true, *podSc.RunAsNonRoot, "honors configured RunAsNonRoot")
+	assert.Equal(t, v1.SeccompProfileTypeRuntimeDefault, podSc.SeccompProfile.Type, "honors configured SeccompProfile")
+	assert.Equal(t, spiloFSGroup, *podSc.FSGroup, "still applies spilo FSGroup when override leaves it nil")
+}
+
+func TestConnectionPoolerContainerSecurityContextOverride(t *testing.T) {
+	opConfig := poolerSecurityContextOpConfig()
+	opConfig.ConnectionPooler.SecurityContext = &v1.SecurityContext{
+		AllowPrivilegeEscalation: util.False(),
+		ReadOnlyRootFilesystem:   util.True(),
+		Capabilities: &v1.Capabilities{
+			Drop: []v1.Capability{"ALL"},
+		},
+	}
+
+	deploy := syncedPoolerDeployment(t, opConfig)
+	containerSc := deploy.Spec.Template.Spec.Containers[constants.ConnectionPoolerContainer].SecurityContext
+
+	assert.Equal(t, true, *containerSc.ReadOnlyRootFilesystem, "honors configured ReadOnlyRootFilesystem")
+	assert.Equal(t, false, *containerSc.AllowPrivilegeEscalation, "keeps AllowPrivilegeEscalation false")
+	assert.Equal(t, []v1.Capability{"ALL"}, containerSc.Capabilities.Drop, "honors dropped capabilities")
+}
+
 func TestConnectionPoolerServiceSpec(t *testing.T) {
 	testName := "Test connection pooler service spec generation"
 	var cluster = New(
