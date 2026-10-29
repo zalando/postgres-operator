@@ -591,7 +591,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	desiredImage := getPostgresContainer(&statefulSet.Spec.Template.Spec).Image
 	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(effectivePodImage, desiredImage) {
 		needsReplace = true
-		reasons = append(reasons, "lazy Spilo update: new statefulset's pod image does not match the current one")
+		reasons = append(reasons, lazySpiloUpdateReason)
 	}
 
 	if needsRollUpdate || needsReplace {
