@@ -20,7 +20,6 @@ import (
 
 const (
 	rollingUpdatePodAnnotationKey = "zalando-postgres-operator-rolling-update-required"
-	rollingUpdateLazyUpgradeValue = "lazy upgrade"
 )
 
 func (c *Cluster) listResources() error {

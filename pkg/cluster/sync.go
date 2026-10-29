@@ -651,12 +651,12 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-		if !cmp.match {
+		if !cmp.match && !c.deferUpdate(cmp) {
 			if cmp.rollingUpdate {
 				podsToRecreate = make([]v1.Pod, 0)
 				switchoverCandidates = make([]spec.NamespacedName, 0)
 				for _, pod := range pods {
-					if err = c.markRollingUpdateForPod(&pod, c.getRollingUpdateReason(cmp)); err != nil {
+					if err = c.markRollingUpdateForPod(&pod, "pod changes"); err != nil {
 						return fmt.Errorf("updating rolling update annotation for pod %q failed: %v", pod.Name, err)
 					}
 					podsToRecreate = append(podsToRecreate, pod)
@@ -724,20 +724,6 @@ func (c *Cluster) syncStatefulSet() error {
 	// if we get here, we need to re-create the pods from the outdated statefulset
 	// or leftovers from an old statefulset
 	if len(podsToRecreate) > 0 {
-		var deferredPods []v1.Pod
-		podsToRecreate, deferredPods = c.checkForLazyRotation(podsToRecreate)
-		if len(deferredPods) > 0 {
-			postponeReasons = append(postponeReasons, "lazy upgrade enabled")
-			// if the primary will be rotated and replicas are deferred
-			// they stay eligible for a switchover - unless we know better candidates already
-			if len(switchoverCandidates) == 0 {
-				for _, deferredPod := range deferredPods {
-					if PostgresRole(deferredPod.Labels[c.OpConfig.PodRoleLabel]) != Master {
-						switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(deferredPod.ObjectMeta))
-					}
-				}
-			}
-		}
 		if isSafeToRecreatePods && len(podsToRecreate) > 0 {
 			c.logger.Info("performing rolling update")
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
@@ -751,29 +737,6 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	return nil
-}
-
-// checkForLazyRotation splits the pods into those that can be recreated now and
-// those whose lazy upgrade is postponed.
-func (c *Cluster) checkForLazyRotation(podsToRecreate []v1.Pod) ([]v1.Pod, []v1.Pod) {
-	podsSafeToRecreate := make([]v1.Pod, 0)
-	podsDeferred := make([]v1.Pod, 0)
-	for _, podToRecreate := range podsToRecreate {
-		// check for pods to be rotated lazily if we are in a maintenance window
-		// if windows are not enabled or not defined, delay the rotation further
-		// until a K8s update or a rolling update triggered by other pod changes
-		if c.OpConfig.EnableLazySpiloUpgrade && c.getRollingUpdateAnnotationFromPod(&podToRecreate) == rollingUpdateLazyUpgradeValue {
-			if c.hasMaintenanceWindowsDefined(c.Spec.MaintenanceWindows) && c.isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
-				c.logger.Infof("lazy upgrade of %q during maintenance window", util.NameFromMeta(podToRecreate.ObjectMeta))
-				podsSafeToRecreate = append(podsSafeToRecreate, podToRecreate)
-			} else {
-				podsDeferred = append(podsDeferred, podToRecreate)
-			}
-		} else {
-			podsSafeToRecreate = append(podsSafeToRecreate, podToRecreate)
-		}
-	}
-	return podsSafeToRecreate, podsDeferred
 }
 
 func (c *Cluster) syncPatroniConfig(pods []v1.Pod, requiredPatroniConfig acidv1.Patroni, requiredPgParameters map[string]string) (bool, bool, uint32, error) {

@@ -51,15 +51,17 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	return pods.Items, nil
 }
 
-// getRollingUpdateReason returns the reason for the rolling update based on the comparison result.
-func (c *Cluster) getRollingUpdateReason(cmp *compareStatefulsetResult) string {
-	// if the only reason is a Spilo image update and lazy update is enabled
-	// provide a different message so a different pod annotation is used
-	imageDiffOnly := len(cmp.reasons) == 1 && strings.Contains(cmp.reasons[0], "image does not match the current one")
-	if imageDiffOnly && c.OpConfig.EnableLazySpiloUpgrade {
-		return fmt.Sprint(rollingUpdateLazyUpgradeValue)
+// deferUpdate determines whether the rolling update should be deferred based on the comparison result.
+func (c *Cluster) deferUpdate(cmp *compareStatefulsetResult) bool {
+	// defer when lazy update is enabled and the only reason is a Spilo image update
+	imageDiffOnly := cmp.rollingUpdate && len(cmp.reasons) == 1 && strings.Contains(cmp.reasons[0], "image does not match the current one")
+	// allow update if maintenance windows are defined and we are currently within one
+	isInMaintenanceWindow := c.hasMaintenanceWindowsDefined(c.Spec.MaintenanceWindows) && c.isInMaintenanceWindow(c.Spec.MaintenanceWindows)
+	if imageDiffOnly && c.OpConfig.EnableLazySpiloUpgrade && !isInMaintenanceWindow {
+		c.logger.Debug("deferring rolling update until next maintenance window or K8s node rotation")
+		return true
 	}
-	return "pod changes"
+	return false
 }
 
 // getRollingUpdateAnnotationFromPod returns the value of the rollingUpdate annotation from the given pod
@@ -78,9 +80,6 @@ func (c *Cluster) markRollingUpdateForPod(pod *v1.Pod, msg string) error {
 	c.logger.Infof("mark rolling update annotation for %s: reason %s", pod.Name, msg)
 	annotations := make(map[string]string)
 	annotationValue := strconv.FormatBool(true)
-	if msg == rollingUpdateLazyUpgradeValue {
-		annotationValue = rollingUpdateLazyUpgradeValue
-	}
 	annotations[rollingUpdatePodAnnotationKey] = annotationValue
 
 	patchData, err := metaAnnotationsPatch(annotations)
