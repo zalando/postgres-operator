@@ -6,7 +6,6 @@ import (
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -49,19 +48,6 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	}
 
 	return pods.Items, nil
-}
-
-// deferUpdate determines whether the rolling update should be deferred based on the comparison result.
-func (c *Cluster) deferUpdate(cmp *compareStatefulsetResult) bool {
-	// defer when lazy update is enabled and the only reason is a Spilo image update
-	imageDiffOnly := cmp.rollingUpdate && len(cmp.reasons) == 1 && strings.Contains(cmp.reasons[0], "image does not match the current one")
-	// allow update if maintenance windows are defined and we are currently within one
-	isInMaintenanceWindow := c.hasMaintenanceWindowsDefined(c.Spec.MaintenanceWindows) && c.isInMaintenanceWindow(c.Spec.MaintenanceWindows)
-	if imageDiffOnly && c.OpConfig.EnableLazySpiloUpgrade && !isInMaintenanceWindow {
-		c.logger.Debug("deferring rolling update until next maintenance window or K8s node rotation")
-		return true
-	}
-	return false
 }
 
 // getRollingUpdateAnnotationFromPod returns the value of the rollingUpdate annotation from the given pod
