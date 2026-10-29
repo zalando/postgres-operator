@@ -651,27 +651,72 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-		if !cmp.match && !c.deferUpdate(cmp) {
-			if cmp.rollingUpdate {
-				podsToRecreate = make([]v1.Pod, 0)
-				switchoverCandidates = make([]spec.NamespacedName, 0)
-				for _, pod := range pods {
-					if err = c.markRollingUpdateForPod(&pod, "pod changes"); err != nil {
-						return fmt.Errorf("updating rolling update annotation for pod %q failed: %v", pod.Name, err)
+
+		if !cmp.match {
+			isImageDiffOnly := len(cmp.reasons) == 1 && strings.Contains(cmp.reasons[0], "image does not match the current one")
+			lazyUpdate := isImageDiffOnly && c.OpConfig.EnableLazySpiloUpgrade
+			shouldDeferUpdate := isImageDiffOnly && !c.isInMaintenanceWindow(c.Spec.MaintenanceWindows)
+
+			if lazyUpdate {
+				c.logger.Debug("lazy Spilo update: new statefulset's pod image does not match the current one")
+				cmp.replace = true
+			}
+
+			if cmp.rollingUpdate && !lazyUpdate {
+				// mark pods for rolling update if we are in a maintenance window
+				if !shouldDeferUpdate {
+					podsToRecreate = make([]v1.Pod, 0)
+					switchoverCandidates = make([]spec.NamespacedName, 0)
+					for _, pod := range pods {
+						if err = c.markRollingUpdateForPod(&pod, "pod changes"); err != nil {
+							return fmt.Errorf("updating rolling update annotation for pod %q failed: %v", pod.Name, err)
+						}
+						podsToRecreate = append(podsToRecreate, pod)
 					}
-					podsToRecreate = append(podsToRecreate, pod)
+				} else {
+					c.logger.Debug("deferring rolling update of pods until next maintenance window")
 				}
 			}
 
-			c.logStatefulSetChanges(c.Statefulset, desiredSts, false, cmp.reasons)
+			if !shouldDeferUpdate || lazyUpdate {
+				c.logStatefulSetChanges(c.Statefulset, desiredSts, false, cmp.reasons)
 
-			if !cmp.replace {
-				if err := c.updateStatefulSet(desiredSts); err != nil {
-					return fmt.Errorf("could not update statefulset: %v", err)
+				if !cmp.replace {
+					if err := c.updateStatefulSet(desiredSts); err != nil {
+						return fmt.Errorf("could not update statefulset: %v", err)
+					}
+				} else {
+					if err := c.replaceStatefulSet(desiredSts); err != nil {
+						return fmt.Errorf("could not replace statefulset: %v", err)
+					}
 				}
 			} else {
-				if err := c.replaceStatefulSet(desiredSts); err != nil {
-					return fmt.Errorf("could not replace statefulset: %v", err)
+				c.logger.Debug("deferring statefulset update until next maintenance window")
+			}
+		}
+
+		// even if the desired and the running statefulsets match
+		// there still may be not up-to-date pods on condition
+		//  (a) the lazy update was just disabled
+		// and
+		//  (b) some of the pods were not restarted when the lazy update was still in place
+		// catching up on those pods is a rolling update, hence it waits for the maintenance window
+		if len(podsToRecreate) == 0 && !c.OpConfig.EnableLazySpiloUpgrade && c.isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+			for _, pod := range pods {
+				effectivePodImage := getPostgresContainer(&pod.Spec).Image
+				stsImage := getPostgresContainer(&desiredSts.Spec.Template.Spec).Image
+
+				if stsImage != effectivePodImage {
+					if err = c.markRollingUpdateForPod(&pod, "pod not yet restarted due to lazy update"); err != nil {
+						c.logger.Warnf("updating rolling update flag failed for pod %q: %v", pod.Name, err)
+					}
+					podsToRecreate = append(podsToRecreate, pod)
+				} else {
+					role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+					if role == Master {
+						continue
+					}
+					switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
 				}
 			}
 		}
@@ -737,19 +782,6 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	return nil
-}
-
-// deferUpdate determines whether the rolling update should be deferred based on the comparison result.
-func (c *Cluster) deferUpdate(cmp *compareStatefulsetResult) bool {
-	// defer when lazy update is enabled and the only reason is a Spilo image update
-	imageDiffOnly := cmp.rollingUpdate && len(cmp.reasons) == 1 && strings.Contains(cmp.reasons[0], "image does not match the current one")
-	// allow update if maintenance windows are defined and we are currently within one
-	isInMaintenanceWindow := c.hasMaintenanceWindowsDefined(c.Spec.MaintenanceWindows) && c.isInMaintenanceWindow(c.Spec.MaintenanceWindows)
-	if imageDiffOnly && c.OpConfig.EnableLazySpiloUpgrade && !isInMaintenanceWindow {
-		c.logger.Debug("deferring rolling update until next maintenance window or K8s node rotation")
-		return true
-	}
-	return false
 }
 
 func (c *Cluster) syncPatroniConfig(pods []v1.Pod, requiredPatroniConfig acidv1.Patroni, requiredPgParameters map[string]string) (bool, bool, uint32, error) {
