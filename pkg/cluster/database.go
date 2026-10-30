@@ -352,12 +352,17 @@ func (c *Cluster) getDatabases() (dbs map[string]string, err error) {
 	dbs = make(map[string]string)
 
 	for rows.Next() {
+
 		var datname, owner string
 
 		if err = rows.Scan(&datname, &owner); err != nil {
 			return nil, fmt.Errorf("error when processing row: %v", err)
 		}
 		dbs[datname] = owner
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error when iterating database rows: %v", err)
 	}
 
 	return dbs, err
