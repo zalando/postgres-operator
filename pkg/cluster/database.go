@@ -34,6 +34,8 @@ const (
 			AND right(r.rolname, 6) ~ '^[0-9\.]+$'
 			ORDER BY 1;`
 
+	isInRecoverySQL = `SELECT pg_catalog.pg_is_in_recovery();`
+
 	getDatabasesSQL = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
 	getSchemasSQL   = `SELECT n.nspname AS dbschema FROM pg_catalog.pg_namespace n
 			WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' ORDER BY 1`
@@ -197,6 +199,14 @@ func (c *Cluster) closeDbConn() (err error) {
 	}
 	c.logger.Warning("attempted to close an empty db connection object")
 	return nil
+}
+
+func (c *Cluster) isInRecovery() (bool, error) {
+	var inRecovery bool
+	if err := c.pgDb.QueryRow(isInRecoverySQL).Scan(&inRecovery); err != nil {
+		return false, fmt.Errorf("could not check if database is in recovery: %v", err)
+	}
+	return inRecovery, nil
 }
 
 func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUserMap, err error) {
