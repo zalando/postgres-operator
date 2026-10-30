@@ -55,11 +55,28 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 func (c *Cluster) getRollingUpdateReason(cmp *compareStatefulsetResult) string {
 	// if the only reason is a Spilo image update and lazy update is enabled
 	// provide a different message so a different pod annotation is used
-	imageDiffOnly := len(cmp.reasons) == 1 && strings.Contains(cmp.reasons[0], "image does not match the current one")
-	if imageDiffOnly && c.OpConfig.EnableLazySpiloUpgrade {
-		return fmt.Sprint(rollingUpdateLazyUpgradeValue)
+	if c.OpConfig.EnableLazySpiloUpgrade && isImageDiffOnly(cmp.reasons) {
+		return rollingUpdateLazyUpgradeValue
 	}
 	return "pod changes"
+}
+
+// isImageDiffOnly tells if a changed Spilo image is the only semantic difference.
+// It is reported twice - once for the statefulset and once for the container diff.
+func isImageDiffOnly(reasons []string) bool {
+	if len(reasons) != 2 {
+		return false
+	}
+	statefulsetDiff, containerDiff := false, false
+	for _, reason := range reasons {
+		switch {
+		case reason == lazySpiloUpdateReason:
+			statefulsetDiff = true
+		case strings.Contains(reason, containerImageDiffReason):
+			containerDiff = true
+		}
+	}
+	return statefulsetDiff && containerDiff
 }
 
 // getRollingUpdateAnnotationFromPod returns the value of the rollingUpdate annotation from the given pod
