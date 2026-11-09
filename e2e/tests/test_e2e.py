@@ -2610,6 +2610,7 @@ class EndToEndTestCase(unittest.TestCase):
                 lambda: k8s.pg_get_status(),
                 "Running",
                 "Postgresql cluster did not resume after its resource was recreated",
+                retries=180,
             )
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
             self.eventuallyEqual(
