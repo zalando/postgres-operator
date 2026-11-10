@@ -60,6 +60,18 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
+Render an extra object, given as a map or as a string, with Helm templating support.
+Expects a dict with "value" (the object) and "context" (the root context).
+*/}}
+{{- define "postgres-operator.renderObject" -}}
+{{- if typeIs "string" .value -}}
+{{- tpl .value .context -}}
+{{- else -}}
+{{- tpl (toYaml .value) .context -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Flatten nested config options when ConfigMap is used as ConfigTarget
 */}}
 {{- define "flattenValuesForConfigMap" }}
