@@ -11,6 +11,12 @@ import (
 const (
 	PostgresCRDResourceKind       = "postgresql"
 	OperatorConfigCRDResourceKind = "OperatorConfiguration"
+	// CRDProtectionFinalizer blocks accidental deletion of the operator's
+	// CRDs. Deleting a CRD cascades to all of its custom resources, so
+	// removing it must be a deliberate, manual step. controller-gen does
+	// not emit finalizers, so the value is set here on the Go side rather
+	// than in the generated YAML.
+	CRDProtectionFinalizer = "acid.zalan.do/crd-protection"
 )
 
 //go:embed postgresql.crd.yaml
@@ -25,6 +31,7 @@ func PostgresCRD(crdCategories []string) (*apiextv1.CustomResourceDefinition, er
 	}
 
 	crd.Spec.Names.Categories = crdCategories
+	crd.Finalizers = []string{CRDProtectionFinalizer}
 
 	return &crd, nil
 }
@@ -41,6 +48,7 @@ func OperatorConfigurationCRD(crdCategories []string) (*apiextv1.CustomResourceD
 	}
 
 	crd.Spec.Names.Categories = crdCategories
+	crd.Finalizers = []string{CRDProtectionFinalizer}
 
 	return &crd, nil
 }
