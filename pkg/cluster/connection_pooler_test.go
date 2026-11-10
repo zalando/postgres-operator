@@ -31,6 +31,7 @@ func newFakeK8sPoolerTestClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 		DeploymentsGetter:  clientSet.AppsV1(),
 		ServicesGetter:     clientSet.CoreV1(),
 		SecretsGetter:      clientSet.CoreV1(),
+		ConfigMapsGetter:   clientSet.CoreV1(),
 	}, clientSet
 }
 
@@ -1152,6 +1153,34 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 					testName, tt.subTest, err)
 			}
 		}
+	}
+}
+
+func TestConnectionPoolerSizes(t *testing.T) {
+	maxDB := int32(60)
+	instances := int32(2)
+	cluster := New(
+		Config{OpConfig: config.Config{
+			ConnectionPooler: config.ConnectionPooler{
+				MaxDBConnections:  &maxDB,
+				NumberOfInstances: &instances,
+			},
+		}},
+		k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
+	cluster.Spec = acidv1.PostgresSpec{ConnectionPooler: &acidv1.ConnectionPooler{}}
+
+	sizes := cluster.connectionPoolerSizes()
+	if sizes.maxDBConn != 30 {
+		t.Errorf("expected maxDBConn 30, got %d", sizes.maxDBConn)
+	}
+	if sizes.defaultSize != 15 {
+		t.Errorf("expected defaultSize 15, got %d", sizes.defaultSize)
+	}
+	if sizes.reserveSize != 7 {
+		t.Errorf("expected reserveSize 7, got %d", sizes.reserveSize)
+	}
+	if sizes.minSize != 7 {
+		t.Errorf("expected minSize 7, got %d", sizes.minSize)
 	}
 }
 
