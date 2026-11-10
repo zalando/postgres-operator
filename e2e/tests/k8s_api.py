@@ -11,6 +11,10 @@ def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
 
 
+def is_running_pod(pod):
+    return pod.status.phase == 'Running' and pod.metadata.deletion_timestamp is None
+
+
 class K8sApi:
 
     def __init__(self):
@@ -47,6 +51,8 @@ class K8s:
         replica_pod_nodes = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pg_cluster_name)
         for pod in podsList.items:
+            if not is_running_pod(pod):
+                continue
             if pod.metadata.labels.get('spilo-role') == 'master':
                 master_pod_node = pod.spec.node_name
             elif pod.metadata.labels.get('spilo-role') == 'replica':
@@ -59,9 +65,9 @@ class K8s:
         r = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=cluster_labels)
         for pod in podsList.items:
-            if pod.metadata.labels.get('spilo-role') == 'master' and pod.status.phase == 'Running':
+            if pod.metadata.labels.get('spilo-role') == 'master' and is_running_pod(pod):
                 m.append(pod.spec.node_name)
-            elif pod.metadata.labels.get('spilo-role') == 'replica' and pod.status.phase == 'Running':
+            elif pod.metadata.labels.get('spilo-role') == 'replica' and is_running_pod(pod):
                 r.append(pod.spec.node_name)
 
         return m, r
@@ -72,7 +78,9 @@ class K8s:
                 'default', label_selector='name=postgres-operator'
             ).items
             if any(
-                pod.status.phase == 'Running' and pod.metadata.uid != previous_pod_uid
+                is_running_pod(pod) and pod.metadata.uid != previous_pod_uid
+                and any(condition.type == 'Ready' and condition.status == 'True'
+                    for condition in (pod.status.conditions or []))
                 for pod in pods
             ):
                 break
@@ -86,7 +94,7 @@ class K8s:
             'default', label_selector='name=postgres-operator'
         ).items
 
-        pods = list(filter(lambda x: x.status.phase == 'Running', pods))
+        pods = list(filter(is_running_pod, pods))
 
         if len(pods):
             return pods[0]
@@ -107,12 +115,10 @@ class K8s:
         return pg.get("status", {}).get("PostgresClusterStatus", None)
 
     def wait_for_pod_start(self, pod_labels, namespace='default'):
-        pod_phase = 'No pod running'
-        while pod_phase != 'Running':
+        while True:
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels).items
-            if pods:
-                pod_phase = pods[0].status.phase
-
+            if any(is_running_pod(pod) for pod in pods):
+                return
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def get_service_type(self, svc_labels, namespace='default'):
@@ -135,7 +141,7 @@ class K8s:
         ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=sset_labels, limit=1).items
         for sset in ssets:
             for key, value in annotations.items():
-                if key not in sset.metadata.annotations or sset.metadata.annotations[key] != value:
+                if not sset.metadata.annotations or key not in sset.metadata.annotations or sset.metadata.annotations[key] != value:
                     print("Expected key {} not found in statefulset annotations {}".format(key, sset.metadata.annotations))
                     return False
         return True
@@ -149,12 +155,12 @@ class K8s:
         self.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", namespace, "postgresqls", name, body)
 
-    def wait_for_running_pods(self, labels, number, namespace=''):
-        while self.count_pods_with_label(labels) != number:
+    def wait_for_running_pods(self, labels, number, namespace='default'):
+        while self.count_running_pods(labels, namespace) != number:
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
-    def wait_for_pods_to_stop(self, labels, namespace=''):
-        while self.count_pods_with_label(labels) != 0:
+    def wait_for_pods_to_stop(self, labels, namespace='default'):
+        while self.count_pods_with_label(labels, namespace) != 0:
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def wait_for_service(self, labels, namespace='default'):
@@ -188,7 +194,7 @@ class K8s:
 
     def count_pods_with_rolling_update_annotation(self, labels, namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
-        return len(list(filter(lambda x: "zalando-postgres-operator-rolling-update-required" in x.metadata.annotations, pods)))
+        return len(list(filter(lambda x: "zalando-postgres-operator-rolling-update-required" in (x.metadata.annotations or {}), pods)))
 
     def count_pods_with_label(self, labels, namespace='default'):
         return len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items)
@@ -217,25 +223,20 @@ class K8s:
 
     def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
-        return len(list(filter(lambda x: x.status.phase == 'Running', pods)))
+        return len(list(filter(is_running_pod, pods)))
 
     def count_pods_with_container_capabilities(self, capabilities, labels, namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: x.spec.containers[0].security_context.capabilities.add == capabilities, pods)))
 
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
-        pod_phase = 'Failing over'
-        new_pod_node = ''
-        pods_with_update_flag = self.count_pods_with_rolling_update_annotation(labels, namespace)
-        while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
+        while True:
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
-            if pods:
-                new_pod_node = pods[0].spec.node_name
-                pod_phase = pods[0].status.phase
-            time.sleep(self.RETRY_TIMEOUT_SEC)
-        
-        while pods_with_update_flag != 0:
-            pods_with_update_flag = self.count_pods_with_rolling_update_annotation(labels, namespace)
+            if any(is_running_pod(pod) and pod.spec.node_name in failover_targets for pod in pods) and not any(
+                "zalando-postgres-operator-rolling-update-required" in (pod.metadata.annotations or {})
+                for pod in pods
+            ):
+                return
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def wait_for_namespace_creation(self, namespace='default'):
@@ -370,6 +371,7 @@ class K8s:
         pods = self.api.core_v1.list_namespaced_pod(
                 namespace, label_selector=labels).items
 
+        pods = [pod for pod in pods if pod.metadata.deletion_timestamp is None]
         if pods:
             return pods[0]
 
