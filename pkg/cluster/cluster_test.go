@@ -2323,3 +2323,40 @@ func TestGetSwitchoverSchedule(t *testing.T) {
 		})
 	}
 }
+
+func TestPgUsersCacheKeepsRemovedTeamMembersUntilDeprecated(t *testing.T) {
+	var mockTeamsAPI mockTeamsAPIClient
+	cl.oauthTokenGetter = &mockOAuthTokenGetter{}
+	cl.teamsAPIClient = &mockTeamsAPI
+	cl.OpConfig.EnableTeamsAPI = true
+	cl.OpConfig.EnableTeamMemberDeprecation = true
+	cl.OpConfig.PamRoleName = "zalandos"
+	cl.Spec.TeamID = "test"
+	cl.Spec.Users = map[string]acidv1.UserFlags{}
+
+	// "foo" was a team member and got removed from the team, "bar" remains
+	// (the mock teams API returns an error for an empty member list)
+	mockTeamsAPI.setMembers([]string{"bar"})
+	cl.pgUsers = map[string]spec.PgUser{"foo": {Name: "foo", Origin: spec.RoleOriginTeamsAPI, Flags: []string{"LOGIN"}}}
+	cl.pgUsersCache = nil
+
+	// several syncs follow while the deprecation keeps failing (e.g. read-only connection)
+	for i := 0; i < 3; i++ {
+		if err := cl.initUsers(); err != nil {
+			t.Fatalf("unexpected error from initUsers: %v", err)
+		}
+		if _, ok := cl.pgUsers["foo"]; ok {
+			t.Fatalf("removed team member must not be part of pgUsers")
+		}
+		if _, ok := cl.pgUsersCache["foo"]; !ok {
+			t.Fatalf("removed team member must stay in pgUsersCache until deprecated, sync run %d", i+1)
+		}
+	}
+
+	// after a successful deprecation the user is forgotten
+	cl.pruneDeprecatedUsersCache()
+	if _, ok := cl.pgUsersCache["foo"]; ok {
+		t.Errorf("deprecated team member should be removed from pgUsersCache")
+	}
+	cl.OpConfig.EnableTeamMemberDeprecation = false
+}
