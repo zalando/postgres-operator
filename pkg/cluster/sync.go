@@ -1659,29 +1659,18 @@ func (c *Cluster) syncPreparedSchemas(databaseName string, preparedSchemas map[s
 	c.setProcessName("syncing prepared schemas")
 	errors := make([]string, 0)
 
-	currentSchemas, err := c.getSchemas()
-	if err != nil {
-		return fmt.Errorf("could not get current schemas: %v", err)
-	}
-
-	var schemas []string
-
-	for schema := range preparedSchemas {
-		schemas = append(schemas, schema)
-	}
-
-	if createPreparedSchemas, equal := util.SubstractStringSlices(schemas, currentSchemas); !equal {
-		for _, schemaName := range createPreparedSchemas {
-			owner := constants.OwnerRoleNameSuffix
-			dbOwner := fmt.Sprintf("%s%s", databaseName, owner)
-			if preparedSchemas[schemaName].DefaultRoles == nil || *preparedSchemas[schemaName].DefaultRoles {
-				owner = fmt.Sprintf("%s_%s%s", databaseName, schemaName, owner)
-			} else {
-				owner = dbOwner
-			}
-			if err = c.executeCreateDatabaseSchema(databaseName, schemaName, dbOwner, owner); err != nil {
-				errors = append(errors, err.Error())
-			}
+	// CREATE SCHEMA IF NOT EXISTS and ALTER DEFAULT PRIVILEGES are idempotent, so handle
+	// existing schemas, too. This retries privileges that could not be set earlier.
+	for schemaName := range preparedSchemas {
+		owner := constants.OwnerRoleNameSuffix
+		dbOwner := fmt.Sprintf("%s%s", databaseName, owner)
+		if preparedSchemas[schemaName].DefaultRoles == nil || *preparedSchemas[schemaName].DefaultRoles {
+			owner = fmt.Sprintf("%s_%s%s", databaseName, schemaName, owner)
+		} else {
+			owner = dbOwner
+		}
+		if err := c.executeCreateDatabaseSchema(databaseName, schemaName, dbOwner, owner); err != nil {
+			errors = append(errors, err.Error())
 		}
 	}
 

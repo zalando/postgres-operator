@@ -472,9 +472,12 @@ func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, sc
 		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}
 
-	// set default privileges for schema
+	// set default privileges for schema, collect errors so that they get reported and retried
+	var errs []string
 	// the schemaOwner defines them for global database roles
-	c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, databaseName)
+	if err := c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, databaseName); err != nil {
+		errs = append(errs, err.Error())
+	}
 
 	// if schemaOwner and dbOwner differ we know that <databaseName>_<schemaName> default roles were created
 	if schemaOwner != dbOwner {
@@ -482,7 +485,9 @@ func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, sc
 
 		// define schema privileges of <databaseName>_<schemaName>_owner_user for global roles, too
 		if defaultUsers {
-			c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName)
+			if err := c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName); err != nil {
+				errs = append(errs, err.Error())
+			}
 		}
 
 		// collect all possible owner roles and define default schema privileges
@@ -490,13 +495,21 @@ func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, sc
 		owners := c.getOwnerRoles(databaseName, c.Spec.PreparedDatabases[databaseName].DefaultUsers)
 		owners = append(owners, c.getOwnerRoles(databaseName+"_"+schemaName, defaultUsers)...)
 		for _, owner := range owners {
-			c.execAlterSchemaDefaultPrivileges(schemaName, owner, databaseName+"_"+schemaName)
+			if err := c.execAlterSchemaDefaultPrivileges(schemaName, owner, databaseName+"_"+schemaName); err != nil {
+				errs = append(errs, err.Error())
+			}
 		}
 	} else {
 		// define schema privileges of <databaseName>_owner_user for global roles, too
 		if c.Spec.PreparedDatabases[databaseName].DefaultUsers {
-			c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName)
+			if err := c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName); err != nil {
+				errs = append(errs, err.Error())
+			}
 		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("could not set default privileges for database schema %s: %s", schemaName, strings.Join(errs, `', '`))
 	}
 
 	return nil
