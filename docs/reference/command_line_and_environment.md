@@ -15,13 +15,12 @@ The following command-line options are supported for the operator:
 
 * **-nodatabaseaccess**
   disable database access from the operator. Equivalent to the
-  `enable_database_access` set to off and can be overridden by the
-  aforementioned operator configuration option.
+  `enable_database_access` set to off. The flag takes precedence over the
+  operator configuration option.
 
 * **-noteamsapi**
   disable access to the teams API. Equivalent to the `enable_teams_api` set to
-  off can can be overridden by the aforementioned operator configuration
-  option.
+  off. The flag takes precedence over the operator configuration option.
 
 * **-kubeqps**
   set the maximum number of Kubernetes API requests per second. Default is 10.
@@ -29,18 +28,20 @@ The following command-line options are supported for the operator:
 * **-kubeburst**
   set the burst limit for Kubernetes API requests, allowing temporary spikes beyond the configured QPS. Default is 20.
 
-In addition to that, standard [glog
-flags](https://godoc.org/github.com/golang/glog) are also supported. For
-instance, one may want to add `-alsologtostderr` and `-v=8` to debug the
-operator REST calls.
-
 # Environment variables
 
 The following environment variables are accepted by the operator:
 
 * **CONFIG_MAP_NAME**
   name of the config map where the operator should look for its configuration.
-  Must be present.
+  Optional. When not set the operator starts with default values.
+
+* **POSTGRES_OPERATOR_CONFIGURATION_OBJECT**
+  name of the `OperatorConfiguration` custom resource (in the operator
+  namespace) where the operator should look for its configuration. When it is
+  set, the operator reads its configuration from this object and does not read
+  the config map named by `CONFIG_MAP_NAME`. When it is not set, the operator
+  uses the config map settings (see `CONFIG_MAP_NAME`).
 
 * **OPERATOR_NAMESPACE**
   name of the namespace the operator runs it. Overrides autodetection by the
@@ -61,7 +62,7 @@ The following environment variables are accepted by the operator:
 
 * **CRD_READY_WAIT_INTERVAL**
   defines the  interval between consecutive attempts waiting for the
-  `postgresql` CRD to be created. The default is 5s.
+  `postgresql` CRD to be created. The default is 4s.
   
 * **ENABLE_JSON_LOGGING**
   Set to `true` for JSON formatted logging output.
