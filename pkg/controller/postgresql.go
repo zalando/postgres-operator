@@ -222,7 +222,11 @@ func (c *Controller) processEvent(event ClusterEvent, isInInitialList bool) {
 	switch event.EventType {
 	case EventAdd:
 		if clusterFound {
-			lg.Infof("received add event for already existing Postgres cluster, syncing it")
+			if event.NewSpec.ObjectMeta.UID == cl.ObjectMeta.UID {
+				lg.Infof("received add event for already existing Postgres cluster")
+				return
+			}
+			lg.Infof("received add event for recreated Postgres cluster, syncing it")
 			c.curWorkerCluster.Store(event.WorkerID, cl)
 			if err = cl.Sync(event.NewSpec); err != nil {
 				cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
