@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -50,21 +51,58 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	return pods.Items, nil
 }
 
-// markRollingUpdateFlagForPod sets the indicator for the rolling update requirement
+// getRollingUpdateReason returns the reason for the rolling update based on the comparison result.
+func (c *Cluster) getRollingUpdateReason(cmp *compareStatefulsetResult) string {
+	// if the only reason is a Spilo image update and lazy update is enabled
+	// provide a different message so a different pod annotation is used
+	if c.OpConfig.EnableLazySpiloUpgrade && isImageDiffOnly(cmp.reasons) {
+		return rollingUpdateLazyUpgradeValue
+	}
+	return "pod changes"
+}
+
+// isImageDiffOnly tells if a changed Spilo image is the only semantic difference.
+// It is reported twice - once for the statefulset and once for the container diff.
+func isImageDiffOnly(reasons []string) bool {
+	if len(reasons) != 2 {
+		return false
+	}
+	statefulsetDiff, containerDiff := false, false
+	for _, reason := range reasons {
+		switch {
+		case reason == lazySpiloUpdateReason:
+			statefulsetDiff = true
+		case strings.Contains(reason, containerImageDiffReason):
+			containerDiff = true
+		}
+	}
+	return statefulsetDiff && containerDiff
+}
+
+// getRollingUpdateAnnotationFromPod returns the value of the rollingUpdate annotation from the given pod
+func (c *Cluster) getRollingUpdateAnnotationFromPod(pod *v1.Pod) string {
+	return pod.GetAnnotations()[rollingUpdatePodAnnotationKey]
+}
+
+// markRollingUpdateForPod sets the indicator for the rolling update requirement
 // in the Pod annotation.
-func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
-	// no need to patch pod if annotation is already there
-	if c.getRollingUpdateFlagFromPod(pod) {
+func (c *Cluster) markRollingUpdateForPod(pod *v1.Pod, msg string) error {
+	// exit early if rolling update annotation is already set to true
+	if c.getRollingUpdateAnnotationFromPod(pod) == "true" {
 		return nil
 	}
 
 	c.logger.Infof("mark rolling update annotation for %s: reason %s", pod.Name, msg)
-	flag := make(map[string]string)
-	flag[rollingUpdatePodAnnotationKey] = strconv.FormatBool(true)
+	annotations := make(map[string]string)
+	annotationValue := strconv.FormatBool(true)
+	if msg == rollingUpdateLazyUpgradeValue {
+		annotationValue = rollingUpdateLazyUpgradeValue
+	}
+	annotations[rollingUpdatePodAnnotationKey] = annotationValue
 
-	patchData, err := metaAnnotationsPatch(flag)
+	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
-		return fmt.Errorf("could not form patch for pod's rolling update flag: %v", err)
+		return fmt.Errorf("could not form patch for pod's rolling update annotation: %v", err)
 	}
 
 	err = retryutil.Retry(1*time.Second, 5*time.Second,
@@ -82,30 +120,16 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 			return true, nil
 		})
 	if err != nil {
-		return fmt.Errorf("could not patch pod rolling update flag %q: %v", patchData, err)
+		return fmt.Errorf("could not patch pod rolling update annotation %q: %v", patchData, err)
 	}
+
+	// reflect the patch locally, so callers inspecting the annotation right after marking see it
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[rollingUpdatePodAnnotationKey] = annotationValue
 
 	return nil
-}
-
-// getRollingUpdateFlagFromPod returns the value of the rollingUpdate flag from the given pod
-func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod) (flag bool) {
-	anno := pod.GetAnnotations()
-	flag = false
-
-	stringFlag, exists := anno[rollingUpdatePodAnnotationKey]
-	if exists {
-		var err error
-		c.logger.Debugf("found rolling update flag on pod %q", pod.Name)
-		if flag, err = strconv.ParseBool(stringFlag); err != nil {
-			c.logger.Warnf("error when parsing %q annotation for the pod %q: expected boolean value, got %q\n",
-				rollingUpdatePodAnnotationKey,
-				types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
-				stringFlag)
-		}
-	}
-
-	return flag
 }
 
 func (c *Cluster) deletePods() error {
@@ -478,7 +502,7 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 		if newMasterPod == nil && len(replicas) > 0 && !podIsNotRunning(masterPod) {
 			masterCandidate, err := c.getSwitchoverCandidate(masterPod)
 			if err != nil {
-				// do not recreate master now so it will keep the update flag and switchover will be retried on next sync
+				// do not recreate master now so it will keep the update annotation and switchover will be retried on next sync
 				return fmt.Errorf("skipping switchover: %v", err)
 			}
 			if err := c.Switchover(masterPod, masterCandidate, false); err != nil {

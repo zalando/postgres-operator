@@ -66,8 +66,17 @@ class K8s:
 
         return m, r
 
-    def wait_for_operator_pod_start(self):
-        self.wait_for_pod_start("name=postgres-operator")
+    def wait_for_operator_pod_start(self, previous_pod_uid=None):
+        while True:
+            pods = self.api.core_v1.list_namespaced_pod(
+                'default', label_selector='name=postgres-operator'
+            ).items
+            if any(
+                pod.status.phase == 'Running' and pod.metadata.uid != previous_pod_uid
+                for pod in pods
+            ):
+                break
+            time.sleep(self.RETRY_TIMEOUT_SEC)
         # give operator time to subscribe to objects
         time.sleep(1)
         return True
@@ -177,7 +186,7 @@ class K8s:
 
         return pod_count
 
-    def count_pods_with_rolling_update_flag(self, labels, namespace='default'):
+    def count_pods_with_rolling_update_annotation(self, labels, namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: "zalando-postgres-operator-rolling-update-required" in x.metadata.annotations, pods)))
 
@@ -217,7 +226,7 @@ class K8s:
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
         new_pod_node = ''
-        pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
+        pods_with_update_flag = self.count_pods_with_rolling_update_annotation(labels, namespace)
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
@@ -226,7 +235,7 @@ class K8s:
             time.sleep(self.RETRY_TIMEOUT_SEC)
         
         while pods_with_update_flag != 0:
-            pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
+            pods_with_update_flag = self.count_pods_with_rolling_update_annotation(labels, namespace)
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def wait_for_namespace_creation(self, namespace='default'):
@@ -254,8 +263,10 @@ class K8s:
 
     def delete_operator_pod(self, step="Delete operator pod"):
         # patching the pod template in the deployment restarts the operator pod
+        operator_pod = self.get_operator_pod()
         self.api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", {"spec": {"template": {"metadata": {"annotations": {"step": "{}-{}".format(step, time.time())}}}}})
-        self.wait_for_operator_pod_start()
+        previous_pod_uid = operator_pod.metadata.uid if operator_pod else None
+        self.wait_for_operator_pod_start(previous_pod_uid)
 
     def update_config(self, config_map_patch, step="Updating operator deployment"):
         self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
@@ -340,6 +351,18 @@ class K8s:
         if len(pod.items) == 0:
             return None
         return pod.items[0].spec.containers[0].image
+
+    def get_rolling_update_flag(self, pod_name, namespace='default'):
+        '''
+        Get the value of the operator's rolling update annotation on a pod.
+        '''
+        pod = self.api.core_v1.list_namespaced_pod(
+            namespace, label_selector="statefulset.kubernetes.io/pod-name=" + pod_name)
+
+        if len(pod.items) == 0:
+            return None
+        return (pod.items[0].metadata.annotations or {}).get(
+            "zalando-postgres-operator-rolling-update-required")
 
     def get_cluster_pod(self, role, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         labels = labels + ',spilo-role=' + role
@@ -483,7 +506,7 @@ class K8sBase:
         while not get_services():
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
-    def count_pods_with_rolling_update_flag(self, labels, namespace='default'):
+    def count_pods_with_rolling_update_annotation(self, labels, namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: "zalando-postgres-operator-rolling-update-required" in x.metadata.annotations, pods)))
 
@@ -523,7 +546,7 @@ class K8sBase:
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
         new_pod_node = ''
-        pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
+        pods_with_update_flag = self.count_pods_with_rolling_update_annotation(labels, namespace)
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
@@ -532,7 +555,7 @@ class K8sBase:
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
         while pods_with_update_flag != 0:
-            pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
+            pods_with_update_flag = self.count_pods_with_rolling_update_annotation(labels, namespace)
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def get_logical_backup_job(self, namespace='default'):
