@@ -222,7 +222,11 @@ func (c *Cluster) initUsers() error {
 
 	// if team member deprecation is enabled save current state of pgUsers
 	// to check for deleted roles
-	c.pgUsersCache = map[string]spec.PgUser{}
+	// cached users stay until their deprecation succeeded (see syncRoles), so
+	// a failed revoke/rename of a removed team member is retried on the next sync
+	if c.pgUsersCache == nil || !c.OpConfig.EnableTeamMemberDeprecation {
+		c.pgUsersCache = map[string]spec.PgUser{}
+	}
 	if c.OpConfig.EnableTeamMemberDeprecation {
 		for k, v := range c.pgUsers {
 			if v.Origin == spec.RoleOriginTeamsAPI {

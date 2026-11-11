@@ -1428,6 +1428,16 @@ func (c *Cluster) updatePgUser(secretUsername string, degraded bool) {
 	}
 }
 
+// pruneDeprecatedUsersCache forgets removed team members once their roles were
+// successfully deprecated. Until then they stay cached and are retried on every sync.
+func (c *Cluster) pruneDeprecatedUsersCache() {
+	for name := range c.pgUsersCache {
+		if _, exists := c.pgUsers[name]; !exists {
+			delete(c.pgUsersCache, name)
+		}
+	}
+}
+
 func (c *Cluster) syncRoles() (err error) {
 	c.setProcessName("syncing roles")
 
@@ -1526,6 +1536,8 @@ DBUSERS:
 	if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
 		return fmt.Errorf("error executing sync statements: %v", err)
 	}
+
+	c.pruneDeprecatedUsersCache()
 
 	return nil
 }
