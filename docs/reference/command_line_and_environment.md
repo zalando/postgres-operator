@@ -36,6 +36,13 @@ The following environment variables are accepted by the operator:
   name of the config map where the operator should look for its configuration.
   Optional. When not set the operator starts with default values.
 
+* **POSTGRES_OPERATOR_CONFIGURATION_OBJECT**
+  name of the `OperatorConfiguration` custom resource (in the operator
+  namespace) where the operator should look for its configuration. When it is
+  set, the operator reads its configuration from this object and does not read
+  the config map named by `CONFIG_MAP_NAME`. When it is not set, the operator
+  uses the config map settings (see `CONFIG_MAP_NAME`).
+
 * **OPERATOR_NAMESPACE**
   name of the namespace the operator runs it. Overrides autodetection by the
   operator itself.
