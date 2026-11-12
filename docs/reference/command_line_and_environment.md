@@ -23,6 +23,12 @@ The following command-line options are supported for the operator:
   off can can be overridden by the aforementioned operator configuration
   option.
 
+* **-kubeqps**
+  set the maximum number of Kubernetes API requests per second. Default is 10.
+
+* **-kubeburst**
+  set the burst limit for Kubernetes API requests, allowing temporary spikes beyond the configured QPS. Default is 20.
+
 In addition to that, standard [glog
 flags](https://godoc.org/github.com/golang/glog) are also supported. For
 instance, one may want to add `-alsologtostderr` and `-v=8` to debug the

@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Compose, Zalando SE
+Copyright 2026 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,11 +25,13 @@ SOFTWARE.
 package v1
 
 import (
-	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	internalinterfaces "github.com/zalando/postgres-operator/v2/pkg/generated/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// OperatorConfigurations returns a OperatorConfigurationInformer.
+	OperatorConfigurations() OperatorConfigurationInformer
 	// PostgresTeams returns a PostgresTeamInformer.
 	PostgresTeams() PostgresTeamInformer
 	// Postgresqls returns a PostgresqlInformer.
@@ -45,6 +47,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// OperatorConfigurations returns a OperatorConfigurationInformer.
+func (v *version) OperatorConfigurations() OperatorConfigurationInformer {
+	return &operatorConfigurationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // PostgresTeams returns a PostgresTeamInformer.

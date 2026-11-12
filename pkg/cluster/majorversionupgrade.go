@@ -4,47 +4,42 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/Masterminds/semver"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/Masterminds/semver/v3"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// VersionMap Map of version numbers
-var VersionMap = map[string]int{
-	"13": 130000,
-	"14": 140000,
-	"15": 150000,
-	"16": 160000,
-	"17": 170000,
-}
-
 const (
-	majorVersionUpgradeSuccessAnnotation = "last-major-upgrade-success"
-	majorVersionUpgradeFailureAnnotation = "last-major-upgrade-failure"
+	majorVersionUpgradeSuccessAnnotation     = "last-major-upgrade-success"
+	majorVersionUpgradeFailureAnnotation     = "last-major-upgrade-failure"
+	logicalReplicationSlotLagThreshold       = 2 * 16 * 1024 * 1024
+	logicalReplicationSlotLagCheckMinVersion = 17 * 10000
 )
 
 // IsBiggerPostgresVersion Compare two Postgres version numbers
 func IsBiggerPostgresVersion(old string, new string) bool {
-	oldN := VersionMap[old]
-	newN := VersionMap[new]
+	oldN, _ := strconv.Atoi(old)
+	newN, _ := strconv.Atoi(new)
 	return newN > oldN
 }
 
 // GetDesiredMajorVersionAsInt Convert string to comparable integer of PG version
 func (c *Cluster) GetDesiredMajorVersionAsInt() int {
-	return VersionMap[c.GetDesiredMajorVersion()]
+	version, _ := strconv.Atoi(c.GetDesiredMajorVersion())
+	return version * 10000
 }
 
 // GetDesiredMajorVersion returns major version to use, incl. potential auto upgrade
 func (c *Cluster) GetDesiredMajorVersion() string {
 
 	if c.Config.OpConfig.MajorVersionUpgradeMode == "full" {
-		// e.g. current is 13, minimal is 13 allowing 13 to 17 clusters, everything below is upgraded
+		// e.g. current is 14, minimal is 14 allowing 14 to 18 clusters, everything below is upgraded
 		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.MinimalMajorVersion) {
 			c.logger.Infof("overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
 			return c.Config.OpConfig.TargetMajorVersion
@@ -197,7 +192,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
-	if !isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+	if !c.isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
 		c.logger.Infof("skipping major version upgrade, not in maintenance window")
 		return nil
 	}
@@ -237,6 +232,18 @@ func (c *Cluster) majorVersionUpgrade() error {
 	isUpgradeSuccess := true
 	numberOfPods := len(pods)
 	if allRunning {
+		podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
+		if c.currentMajorVersion >= logicalReplicationSlotLagCheckMinVersion {
+			laggingSlots, err := c.getLaggingLogicalReplicationSlots(podName, logicalReplicationSlotLagThreshold)
+			if err != nil {
+				return fmt.Errorf("could not check logical replication slot lag: %w", err)
+			}
+			if laggingSlots != "" {
+				c.logger.Errorf("skipping major version upgrade, logical replication slot lag exceeds %d bytes (slot_name|lag_bytes): %s", logicalReplicationSlotLagThreshold, laggingSlots)
+				return nil
+			}
+		}
+
 		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
 			defer func() error {
@@ -250,7 +257,6 @@ func (c *Cluster) majorVersionUpgrade() error {
 				return fmt.Errorf("failed to assign critical-operation label: %s", err)
 			}
 
-			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "starting major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
 			upgradeCommand := fmt.Sprintf("set -o pipefail && /usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
@@ -275,6 +281,10 @@ func (c *Cluster) majorVersionUpgrade() error {
 			if err != nil {
 				isUpgradeSuccess = false
 				c.annotatePostgresResource(isUpgradeSuccess)
+				c.logger.Errorf("upgrade action triggered but command failed: %v", err)
+				if strings.TrimSpace(scriptErrMsg) == "" {
+					scriptErrMsg = err.Error()
+				}
 				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Major Version Upgrade", "upgrade from %d to %d FAILED: %v", c.currentMajorVersion, desiredVersion, scriptErrMsg)
 				return fmt.Errorf("%s", scriptErrMsg)
 			}

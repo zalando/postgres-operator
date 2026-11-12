@@ -1,6 +1,6 @@
 package httpclient
 
-//go:generate mockgen -package mocks -destination=../../../mocks/$GOFILE -source=$GOFILE -build_flags=-mod=vendor
+//go:generate go tool mockgen -package mocks -destination=../../../mocks/$GOFILE -source=$GOFILE
 
 import "net/http"
 

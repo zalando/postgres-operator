@@ -234,6 +234,7 @@ rules:
   verbs:
   - get
   - create
+  - update
 # to create role bindings to the postgres-pod service account
 - apiGroups:
   - rbac.authorization.k8s.io

@@ -12,14 +12,15 @@ import (
 	"strings"
 	"time"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	acidv1 "github.com/zalando/postgres-operator/v2/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/v2/pkg/spec"
+	"github.com/zalando/postgres-operator/v2/pkg/util"
+	"github.com/zalando/postgres-operator/v2/pkg/util/constants"
+	"github.com/zalando/postgres-operator/v2/pkg/util/k8sutil"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -40,26 +41,35 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	defer c.mu.Unlock()
 
 	oldSpec := c.Postgresql
+
+	if !c.isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
+		// do not apply any major version related changes yet
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	}
+
 	c.setSpec(newSpec)
 
 	defer func() {
-		var (
-			pgUpdatedStatus *acidv1.Postgresql
-			errStatus       error
-		)
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusSyncFailed)
+			newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusSyncFailed
 		} else if !c.Status.Running() {
-			pgUpdatedStatus, errStatus = c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
+			newSpec.Status.PostgresClusterStatus = acidv1.ClusterStatusRunning
 		}
-		if errStatus != nil {
-			c.logger.Warningf("could not set cluster status: %v", errStatus)
-		}
-		if pgUpdatedStatus != nil {
+
+		if !equality.Semantic.DeepEqual(oldSpec.Status, newSpec.Status) {
+			pgUpdatedStatus, err := c.KubeClient.SetPostgresCRDStatus(c.clusterName(), newSpec)
+			if err != nil {
+				c.logger.Warningf("could not set cluster status: %v", err)
+				return
+			}
 			c.setSpec(pgUpdatedStatus)
 		}
 	}()
+
+	if !c.patroniKubernetesUseConfigMaps() {
+		c.logger.Warning("K8s endpoints are deprecated. Please, enable kubernetes_use_configmaps. Requires scale-in to a single primary, see v1 -> v2 migration docs!")
+	}
 
 	if err = c.syncFinalizer(); err != nil {
 		c.logger.Debugf("could not sync finalizers: %v", err)
@@ -85,21 +95,12 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		c.logger.Errorf("could not sync Patroni resources: %v", err)
 	}
 
-	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
 	if err = c.syncVolumes(); err != nil {
 		return err
 	}
 
-	if c.OpConfig.EnableEBSGp3Migration && len(c.EBSVolumes) > 0 {
-		err = c.executeEBSMigration()
-		if nil != err {
-			return err
-		}
-	}
-
-	if !isInMaintenanceWindow(newSpec.Spec.MaintenanceWindows) {
-		// do not apply any major version related changes yet
-		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	if err = c.syncPodServiceAccount(); err != nil {
+		c.logger.Errorf("could not sync pod service account: %v", err)
 	}
 
 	if err = c.syncStatefulSet(); err != nil {
@@ -587,7 +588,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 		if len(pods) > 0 {
 			for _, pod := range pods {
-				if err = c.markRollingUpdateFlagForPod(&pod, "pod from previous statefulset"); err != nil {
+				if err = c.markRollingUpdateForPod(&pod, "pod from previous statefulset"); err != nil {
 					c.logger.Warnf("marking old pod for rolling update failed: %v", err)
 				}
 				podsToRecreate = append(podsToRecreate, pod)
@@ -601,9 +602,10 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
 		c.logger.Debug("syncing statefulsets")
-		// check if there are still pods with a rolling update flag
+		// check if there are still pods with a rolling update annotation
 		for _, pod := range pods {
-			if c.getRollingUpdateFlagFromPod(&pod) {
+			if rollingUpdateRequired := c.getRollingUpdateAnnotationFromPod(&pod); rollingUpdateRequired != "" {
+				c.logger.Debugf("found rolling update annotation %q on pod %q", rollingUpdateRequired, pod.Name)
 				podsToRecreate = append(podsToRecreate, pod)
 			} else {
 				role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
@@ -625,6 +627,10 @@ func (c *Cluster) syncStatefulSet() error {
 		if !cmp.rollingUpdate {
 			updatedPodAnnotations := map[string]*string{}
 			for _, anno := range cmp.deletedPodAnnotations {
+				// during IRSA migration let kube2iam annotation drain naturally via pod rotation
+				if c.OpConfig.IRSARoleARN != "" && anno == constants.KubeIAmAnnotation {
+					continue
+				}
 				updatedPodAnnotations[anno] = nil
 			}
 			for anno, val := range desiredSts.Spec.Template.Annotations {
@@ -650,8 +656,8 @@ func (c *Cluster) syncStatefulSet() error {
 				podsToRecreate = make([]v1.Pod, 0)
 				switchoverCandidates = make([]spec.NamespacedName, 0)
 				for _, pod := range pods {
-					if err = c.markRollingUpdateFlagForPod(&pod, "pod changes"); err != nil {
-						return fmt.Errorf("updating rolling update flag for pod failed: %v", err)
+					if err = c.markRollingUpdateForPod(&pod, c.getRollingUpdateReason(cmp)); err != nil {
+						return fmt.Errorf("updating rolling update annotation for pod %q failed: %v", pod.Name, err)
 					}
 					podsToRecreate = append(podsToRecreate, pod)
 				}
@@ -666,31 +672,6 @@ func (c *Cluster) syncStatefulSet() error {
 			} else {
 				if err := c.replaceStatefulSet(desiredSts); err != nil {
 					return fmt.Errorf("could not replace statefulset: %v", err)
-				}
-			}
-		}
-
-		if len(podsToRecreate) == 0 && !c.OpConfig.EnableLazySpiloUpgrade {
-			// even if the desired and the running statefulsets match
-			// there still may be not up-to-date pods on condition
-			//  (a) the lazy update was just disabled
-			// and
-			//  (b) some of the pods were not restarted when the lazy update was still in place
-			for _, pod := range pods {
-				effectivePodImage := getPostgresContainer(&pod.Spec).Image
-				stsImage := getPostgresContainer(&desiredSts.Spec.Template.Spec).Image
-
-				if stsImage != effectivePodImage {
-					if err = c.markRollingUpdateFlagForPod(&pod, "pod not yet restarted due to lazy update"); err != nil {
-						c.logger.Warnf("updating rolling update flag failed for pod %q: %v", pod.Name, err)
-					}
-					podsToRecreate = append(podsToRecreate, pod)
-				} else {
-					role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-					if role == Master {
-						continue
-					}
-					switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
 				}
 			}
 		}
@@ -718,20 +699,46 @@ func (c *Cluster) syncStatefulSet() error {
 	if configPatched, restartPrimaryFirst, restartWait, err = c.syncPatroniConfig(pods, c.Spec.Patroni, requiredPgParameters); err != nil {
 		c.logger.Warningf("Patroni config updated? %v - errors during config sync: %v", configPatched, err)
 		postponeReasons = append(postponeReasons, "errors during Patroni config sync")
-		isSafeToRecreatePods = false
+		// Only mark unsafe if all pods are running. If some pods are not running,
+		// Patroni API errors are expected and should not block pod recreation,
+		// which is the only way to fix non-running pods.
+		if c.allPodsRunning(pods) {
+			isSafeToRecreatePods = false
+		} else {
+			c.logger.Warningf("ignoring Patroni config sync errors because some pods are not running")
+		}
 	}
 
 	// restart Postgres where it is still pending
 	if err = c.restartInstances(pods, restartWait, restartPrimaryFirst); err != nil {
 		c.logger.Errorf("errors while restarting Postgres in pods via Patroni API: %v", err)
 		postponeReasons = append(postponeReasons, "errors while restarting Postgres via Patroni API")
-		isSafeToRecreatePods = false
+		// Same logic: don't let unreachable non-running pods block recreation.
+		if c.allPodsRunning(pods) {
+			isSafeToRecreatePods = false
+		} else {
+			c.logger.Warningf("ignoring Patroni restart errors because some pods are not running")
+		}
 	}
 
-	// if we get here we also need to re-create the pods (either leftovers from the old
-	// statefulset or those that got their configuration from the outdated statefulset)
+	// if we get here, we need to re-create the pods from the outdated statefulset
+	// or leftovers from an old statefulset
 	if len(podsToRecreate) > 0 {
-		if isSafeToRecreatePods {
+		var deferredPods []v1.Pod
+		podsToRecreate, deferredPods = c.checkForLazyRotation(podsToRecreate)
+		if len(deferredPods) > 0 {
+			postponeReasons = append(postponeReasons, "lazy upgrade enabled")
+			// if the primary will be rotated and replicas are deferred
+			// they stay eligible for a switchover - unless we know better candidates already
+			if len(switchoverCandidates) == 0 {
+				for _, deferredPod := range deferredPods {
+					if PostgresRole(deferredPod.Labels[c.OpConfig.PodRoleLabel]) != Master {
+						switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(deferredPod.ObjectMeta))
+					}
+				}
+			}
+		}
+		if isSafeToRecreatePods && len(podsToRecreate) > 0 {
 			c.logger.Info("performing rolling update")
 			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
 			if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
@@ -744,6 +751,29 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	return nil
+}
+
+// checkForLazyRotation splits the pods into those that can be recreated now and
+// those whose lazy upgrade is postponed.
+func (c *Cluster) checkForLazyRotation(podsToRecreate []v1.Pod) ([]v1.Pod, []v1.Pod) {
+	podsSafeToRecreate := make([]v1.Pod, 0)
+	podsDeferred := make([]v1.Pod, 0)
+	for _, podToRecreate := range podsToRecreate {
+		// check for pods to be rotated lazily if we are in a maintenance window
+		// if windows are not enabled or not defined, delay the rotation further
+		// until a K8s update or a rolling update triggered by other pod changes
+		if c.OpConfig.EnableLazySpiloUpgrade && c.getRollingUpdateAnnotationFromPod(&podToRecreate) == rollingUpdateLazyUpgradeValue {
+			if c.hasMaintenanceWindowsDefined(c.Spec.MaintenanceWindows) && c.isInMaintenanceWindow(c.Spec.MaintenanceWindows) {
+				c.logger.Infof("lazy upgrade of %q during maintenance window", util.NameFromMeta(podToRecreate.ObjectMeta))
+				podsSafeToRecreate = append(podsSafeToRecreate, podToRecreate)
+			} else {
+				podsDeferred = append(podsDeferred, podToRecreate)
+			}
+		} else {
+			podsSafeToRecreate = append(podsSafeToRecreate, podToRecreate)
+		}
+	}
+	return podsSafeToRecreate, podsDeferred
 }
 
 func (c *Cluster) syncPatroniConfig(pods []v1.Pod, requiredPatroniConfig acidv1.Patroni, requiredPgParameters map[string]string) (bool, bool, uint32, error) {
@@ -1030,6 +1060,23 @@ func (c *Cluster) syncStandbyClusterConfiguration() error {
 		standbyOptionsToSet["create_replica_methods"] = []string{"bootstrap_standby_with_wale", "basebackup_fast_xlog"}
 		standbyOptionsToSet["restore_command"] = "envdir \"/run/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""
 
+		if c.Spec.StandbyCluster.StandbyHost != "" {
+			standbyOptionsToSet["host"] = c.Spec.StandbyCluster.StandbyHost
+		} else {
+			standbyOptionsToSet["host"] = nil
+		}
+
+		if c.Spec.StandbyCluster.StandbyPort != "" {
+			standbyOptionsToSet["port"] = c.Spec.StandbyCluster.StandbyPort
+		} else {
+			standbyOptionsToSet["port"] = nil
+		}
+
+		if c.Spec.StandbyCluster.StandbyPrimarySlotName != "" {
+			standbyOptionsToSet["primary_slot_name"] = c.Spec.StandbyCluster.StandbyPrimarySlotName
+		} else {
+			standbyOptionsToSet["primary_slot_name"] = nil
+		}
 	} else {
 		c.logger.Infof("promoting standby cluster and detach from source")
 		standbyOptionsToSet = nil
@@ -1078,7 +1125,7 @@ func (c *Cluster) syncSecrets() error {
 				c.Secrets[updatedSecret.UID] = updatedSecret
 				continue
 			}
-			errors = append(errors, fmt.Sprintf("syncing secret %s failed: %v", util.NameFromMeta(updatedSecret.ObjectMeta), err))
+			errors = append(errors, fmt.Sprintf("syncing secret %s failed: %v", util.NameFromMeta(generatedSecret.ObjectMeta), err))
 			pgUserDegraded = true
 		} else {
 			errors = append(errors, fmt.Sprintf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err))
@@ -1089,15 +1136,8 @@ func (c *Cluster) syncSecrets() error {
 
 	// remove rotation users that exceed the retention interval
 	if len(retentionUsers) > 0 {
-		err := c.initDbConn()
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("could not init db connection: %v", err))
-		}
-		if err = c.cleanupRotatedUsers(retentionUsers, c.pgDb); err != nil {
+		if err := c.cleanupRotatedUsers(retentionUsers); err != nil {
 			errors = append(errors, fmt.Sprintf("error removing users exceeding configured retention interval: %v", err))
-		}
-		if err := c.closeDbConn(); err != nil {
-			errors = append(errors, fmt.Sprintf("could not close database connection after removing users exceeding configured retention interval: %v", err))
 		}
 	}
 
@@ -1164,36 +1204,14 @@ func (c *Cluster) updateSecret(
 	pwdUser := userMap[userKey]
 	secretName := util.NameFromMeta(secret.ObjectMeta)
 
-	// if password rotation is enabled update password and username if rotation interval has been passed
-	// rotation can be enabled globally or via the manifest (excluding the Postgres superuser)
-	rotationEnabledInManifest := secretUsername != constants.SuperuserKeyName &&
-		(slices.Contains(c.Spec.UsersWithSecretRotation, secretUsername) ||
-			slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
-
-	// globally enabled rotation is only allowed for manifest and bootstrapped roles
-	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
-	rotationAllowed := !pwdUser.IsDbOwner && slices.Contains(allowedRoleTypes, pwdUser.Origin) && c.Spec.StandbyCluster == nil
-
-	// users can ignore any kind of rotation
-	isIgnoringRotation := slices.Contains(c.Spec.UsersIgnoringSecretRotation, secretUsername)
-
-	if ((c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest) && !isIgnoringRotation {
-		updateSecretMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
+	// do not perform any rotation of reset for standby clusters
+	if !isStandbyCluster(&c.Spec) {
+		updateSecretMsg, err = c.checkForPasswordRotation(secret, secretUsername, pwdUser, retentionUsers, currentTime)
 		if err != nil {
-			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
+			return nil, fmt.Errorf("error while checking for password rotation: %v", err)
 		}
 		if updateSecretMsg != "" {
 			updateSecret = true
-		}
-	} else {
-		// username might not match if password rotation has been disabled again
-		if secretUsername != string(secret.Data["username"]) {
-			*retentionUsers = append(*retentionUsers, secretUsername)
-			secret.Data["username"] = []byte(secretUsername)
-			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
-			secret.Data["nextRotation"] = []byte{}
-			updateSecret = true
-			updateSecretMsg = fmt.Sprintf("secret %s does not contain the role %s - updating username and resetting password", secretName, secretUsername)
 		}
 	}
 
@@ -1223,22 +1241,71 @@ func (c *Cluster) updateSecret(
 	if updateSecret {
 		c.logger.Infof("%s", updateSecretMsg)
 		if secret, err = c.KubeClient.Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
-			return secret, fmt.Errorf("could not update secret %s: %v", secretName, err)
+			return nil, fmt.Errorf("could not update secret: %v", err)
 		}
 	}
 
 	if changed, _ := c.compareAnnotations(secret.Annotations, generatedSecret.Annotations, nil); changed {
 		patchData, err := metaAnnotationsPatch(generatedSecret.Annotations)
 		if err != nil {
-			return secret, fmt.Errorf("could not form patch for secret %q annotations: %v", secret.Name, err)
+			return nil, fmt.Errorf("could not form patch for secret annotations: %v", err)
 		}
 		secret, err = c.KubeClient.Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if err != nil {
-			return secret, fmt.Errorf("could not patch annotations for secret %q: %v", secret.Name, err)
+			return nil, fmt.Errorf("could not patch annotations for secret: %v", err)
 		}
 	}
 
 	return secret, nil
+}
+
+func (c *Cluster) checkForPasswordRotation(
+	secret *v1.Secret,
+	secretUsername string,
+	pwdUser spec.PgUser,
+	retentionUsers *[]string,
+	currentTime time.Time) (string, error) {
+
+	var (
+		passwordRotationMsg string
+		err                 error
+	)
+
+	// if password rotation is enabled update password and username if rotation interval has been passed
+	// rotation can be enabled globally or via the manifest (excluding the Postgres superuser)
+	rotationEnabledInManifest := secretUsername != constants.SuperuserKeyName &&
+		(slices.Contains(c.Spec.UsersWithSecretRotation, secretUsername) ||
+			slices.Contains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername))
+
+	// globally enabled rotation is only allowed for manifest and bootstrapped roles
+	allowedRoleTypes := []spec.RoleOrigin{spec.RoleOriginManifest, spec.RoleOriginBootstrap}
+	rotationAllowed := !pwdUser.IsDbOwner && slices.Contains(allowedRoleTypes, pwdUser.Origin)
+
+	// users can ignore any kind of rotation
+	isIgnoringRotation := slices.Contains(c.Spec.UsersIgnoringSecretRotation, secretUsername)
+
+	if ((c.OpConfig.EnablePasswordRotation && rotationAllowed) || rotationEnabledInManifest) && !isIgnoringRotation {
+		passwordRotationMsg, err = c.rotatePasswordInSecret(secret, secretUsername, pwdUser.Origin, currentTime, retentionUsers)
+		if err != nil {
+			c.logger.Warnf("password rotation failed for user %s: %v", secretUsername, err)
+		}
+	} else {
+		// username might not match if password rotation has been disabled again
+		usernameFromSecret := string(secret.Data["username"])
+		if secretUsername != usernameFromSecret {
+			// handle edge case when manifest user conflicts with a user from prepared databases
+			if strings.Replace(usernameFromSecret, "-", "_", -1) == strings.Replace(secretUsername, "-", "_", -1) {
+				return "", fmt.Errorf("could not update secret because of user name mismatch: expected: %s, got: %s", secretUsername, usernameFromSecret)
+			}
+			*retentionUsers = append(*retentionUsers, secretUsername)
+			secret.Data["username"] = []byte(secretUsername)
+			secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+			secret.Data["nextRotation"] = []byte{}
+			passwordRotationMsg = fmt.Sprintf("secret does not contain the role %s - updating username and resetting password", secretUsername)
+		}
+	}
+
+	return passwordRotationMsg, nil
 }
 
 func (c *Cluster) rotatePasswordInSecret(
@@ -1305,7 +1372,7 @@ func (c *Cluster) rotatePasswordInSecret(
 					return "", fmt.Errorf("could not list pods of the statefulset: %v", err)
 				}
 				for _, pod := range pods {
-					if err = c.markRollingUpdateFlagForPod(&pod,
+					if err = c.markRollingUpdateForPod(&pod,
 						fmt.Sprintf("replace pod due to password rotation of system user %s", secretUsername)); err != nil {
 						c.logger.Warnf("marking pod for rolling update due to password rotation failed: %v", err)
 					}
@@ -1322,7 +1389,7 @@ func (c *Cluster) rotatePasswordInSecret(
 					return "", fmt.Errorf("could not list pods of the pooler deployment: %v", err)
 				}
 				for _, poolerPod := range poolerPods {
-					if err = c.markRollingUpdateFlagForPod(&poolerPod,
+					if err = c.markRollingUpdateForPod(&poolerPod,
 						fmt.Sprintf("replace pooler pod due to password rotation of pooler user %s", secretUsername)); err != nil {
 						c.logger.Warnf("marking pooler pod for rolling update due to password rotation failed: %v", err)
 					}
@@ -1719,6 +1786,16 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			}
 			c.logger.Info("the logical backup job is synced")
 		}
+		if !reflect.DeepEqual(job.Labels, desiredJob.Labels) {
+			patchData, err := metaLabelsPatch(desiredJob.Labels)
+			if err != nil {
+				return fmt.Errorf("could not form patch for the logical backup job %q labels: %v", jobName, err)
+			}
+			_, err = c.KubeClient.CronJobs(c.Namespace).Patch(context.TODO(), jobName, types.MergePatchType, []byte(patchData), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch labels of the logical backup job %q: %v", jobName, err)
+			}
+		}
 		if changed, _ := c.compareAnnotations(job.Annotations, desiredJob.Annotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(desiredJob.Annotations)
 			if err != nil {
@@ -1752,4 +1829,63 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) syncPodServiceAccount() error {
+	sa, err := c.KubeClient.ServiceAccounts(c.Namespace).Get(context.TODO(), c.OpConfig.PodServiceAccountName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("could not get pod service account %q: %v", c.OpConfig.PodServiceAccountName, err)
+	}
+
+	changed := false
+
+	if c.OpConfig.IRSARoleARN != "" {
+		if val, ok := sa.Annotations[constants.IRSAAnnotation]; !ok || val != c.OpConfig.IRSARoleARN {
+			if sa.Annotations == nil {
+				sa.Annotations = make(map[string]string)
+			}
+			sa.Annotations[constants.IRSAAnnotation] = c.OpConfig.IRSARoleARN
+			changed = true
+		}
+	} else {
+		if _, ok := sa.Annotations[constants.IRSAAnnotation]; ok {
+			delete(sa.Annotations, constants.IRSAAnnotation)
+			changed = true
+		}
+	}
+
+	if changed {
+		if _, err = c.KubeClient.ServiceAccounts(c.Namespace).Update(context.TODO(), sa, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("could not update pod service account %q: %v", sa.Name, err)
+		}
+		c.logger.Infof("synced annotations on pod service account %q", sa.Name)
+	}
+
+	if c.OpConfig.IRSARoleARN != "" {
+		c.logIRSAMigrationProgress()
+	}
+
+	return nil
+}
+
+func (c *Cluster) logIRSAMigrationProgress() {
+	pods, err := c.listPods()
+	if err != nil {
+		c.logger.Warnf("IRSA migration: could not list pods: %v", err)
+		return
+	}
+
+	total := len(pods)
+	remaining := 0
+	for _, pod := range pods {
+		if _, ok := pod.Annotations[constants.KubeIAmAnnotation]; ok {
+			remaining++
+		}
+	}
+
+	if remaining > 0 {
+		c.logger.Infof("IRSA migration in progress: %d/%d pods still carry kube2iam annotation, will be removed on next rotation", remaining, total)
+	} else {
+		c.logger.Infof("IRSA migration complete: all %d pods have rotated, kube2iam annotation fully drained", total)
+	}
 }

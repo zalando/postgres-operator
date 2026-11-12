@@ -10,6 +10,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
+  strategy:
+    type: "Recreate"
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
@@ -37,6 +39,10 @@ spec:
       - name: {{ .Chart.Name }}
         image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.extraArgs }}
+        args:
+{{ toYaml .Values.extraArgs | indent 8 }}
+        {{- end }}
         env:
       {{- if .Values.enableJsonLogging }}
         - name: ENABLE_JSON_LOGGING
