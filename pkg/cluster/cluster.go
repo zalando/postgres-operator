@@ -137,10 +137,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	podEventsStore := cache.NewStore(keyFn)
 	podEventsQueue := cache.NewFIFO(keyFn)
 
-	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
-	if !ok {
-		passwordEncryption = "scram-sha-256"
-	}
+	passwordEncryption := passwordEncryptionFromSpec(&pgSpec.Spec)
 
 	cluster := &Cluster{
 		Config:         cfg,
@@ -158,7 +155,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Streams:           make(map[string]*zalandov1.FabricEventStream),
 		},
 		userSyncStrategy: users.DefaultUserSyncStrategy{
-			PasswordEncryption:   passwordEncryption,
+			PasswordEncryption:   string(passwordEncryption),
 			RoleDeletionSuffix:   cfg.OpConfig.RoleDeletionSuffix,
 			AdditionalOwnerRoles: cfg.OpConfig.AdditionalOwnerRoles,
 		},
@@ -589,12 +586,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	}
 
 	// lazy Spilo update: modify the image in the statefulset itself but let its pods run with the old image
-	// until they are re-created for other reasons, for example node rotation
+	// until they are re-created for other reasons, for example during maintenance window or node rotation
 	effectivePodImage := getPostgresContainer(&c.Statefulset.Spec.Template.Spec).Image
 	desiredImage := getPostgresContainer(&statefulSet.Spec.Template.Spec).Image
 	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(effectivePodImage, desiredImage) {
 		needsReplace = true
-		reasons = append(reasons, "lazy Spilo update: new statefulset's pod image does not match the current one")
+		reasons = append(reasons, lazySpiloUpdateReason)
 	}
 
 	if needsRollUpdate || needsReplace {
@@ -628,6 +625,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 	checks := []containerCheck{
 		newCheck("new %s's %s (index %d) name does not match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
+		newCheck("new %s's %s (index %d) image does not match the current one",
+			func(a, b v1.Container) bool { return a.Image != b.Image }),
 		newCheck("new %s's %s (index %d) readiness probe does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.ReadinessProbe, b.ReadinessProbe) }),
 		newCheck("new %s's %s (index %d) liveness probe does not match the current one",
@@ -644,11 +643,6 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
 		newCheck("new %s's %s (index %d) volume mounts do not match the current one",
 			func(a, b v1.Container) bool { return !compareVolumeMounts(a.VolumeMounts, b.VolumeMounts) }),
-	}
-
-	if !c.OpConfig.EnableLazySpiloUpgrade {
-		checks = append(checks, newCheck("new %s's %s (index %d) image does not match the current one",
-			func(a, b v1.Container) bool { return a.Image != b.Image }))
 	}
 
 	for index, containerA := range setA {

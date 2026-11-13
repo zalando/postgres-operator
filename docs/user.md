@@ -96,7 +96,7 @@ psql -U postgres -h localhost -p 6432
 
 ## Password encryption
 
-Passwords are encrypted using the `scram-sha-256` hashing method by default. Other methods can be configured by changing the `password_encryption` parameter in the cluster manifest:
+Passwords are encrypted using the `scram-sha-256` hashing method by default. Other methods can be configured by changing the `password_encryption` parameter in the cluster manifest (requires an operator restart):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -288,6 +288,33 @@ definitions will be ignored with a prior warning.
 See [infrastructure roles secret](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
 and [infrastructure roles configmap](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml)
 for the examples.
+
+#### Good to know
+
+* Infrastructure roles are read when the operator starts. Restart the operator
+  after creating or changing the referenced secrets, e.g. to rotate a password.
+* A `secretname` without namespace refers to the operator namespace in the CRD
+  configuration, but to the `default` namespace in the ConfigMap. Use the
+  `namespace/name` format to be explicit.
+* `defaultuservalue` and `defaultrolevalue` set the user name and role
+  membership when the secret does not contain them, so the secret only needs
+  the password.
+* For each cluster, the operator stores the role credentials in a secret in
+  the cluster namespace, named after `secret_name_template`, and updates it
+  when the password changes. Sidecars or exporters running next to the cluster
+  can read it.
+
+Example of a monitoring role for the [postgres_exporter](https://github.com/prometheus-community/postgres_exporter),
+whose password is the only key of the secret:
+
+```yaml
+# ConfigMap
+infrastructure_roles_secrets: "secretname:postgres-operator/monitoring-role,passwordkey:password,defaultuservalue:postgres_exporter,defaultrolevalue:pg_monitor"
+```
+
+The exporter of the cluster `acid-minimal-cluster` then reads the user name
+and password from the `postgres-exporter.acid-minimal-cluster.credentials.postgresql.acid.zalan.do`
+secret, with the default `secret_name_template`.
 
 ### Teams API roles
 

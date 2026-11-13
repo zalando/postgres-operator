@@ -455,7 +455,10 @@ configuration they are grouped under the `kubernetes` key.
   array of infrastructure role definitions which reference existing secrets
   and specify the key names from which user name, password and role membership
   are extracted. For the ConfigMap this has to be a string which allows
-  referencing only one infrastructure roles secret. The default is empty.
+  referencing only one infrastructure roles secret, e.g.
+  `secretname:namespace/name,userkey:user,passwordkey:password,rolekey:inrole`.
+  Read at operator start only, see [infrastructure roles](../user.md#infrastructure-roles).
+  The default is empty.
 
 * **inherited_annotations**
   list of annotation keys that can be inherited from the cluster manifest, and
@@ -556,9 +559,11 @@ configuration they are grouped under the `kubernetes` key.
 * **master_pod_move_timeout**
   The period of time to wait for the success of migration of master pods from
   an unschedulable node. The migration includes Patroni switchovers to
-  respective replicas on healthy nodes. The situation where master pods still
-  exist on the old node after this timeout expires has to be fixed manually.
-  The default is 20 minutes.
+  respective replicas on healthy nodes. For a single-pod cluster, the operator
+  instead recreates the master on another node and waits for its role label,
+  without attempting a switchover. This causes downtime until the pod returns.
+  The situation where master pods still exist on the old node after this
+  timeout expires has to be fixed manually. The default is 20 minutes.
 
 * **enable_pod_antiaffinity**
   toggles [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
@@ -851,7 +856,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/<configured-s3-bucket-prefix>/<pg_cluster_name>/<cluster_k8s_uuid>/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.2"
+  pipeline. Default: "ghcr.io/zalando/postgres-operator/logical-backup:v2.0.3"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -1092,7 +1097,7 @@ operator being able to provide some reasonable defaults.
 
 * **connection_pooler_image**
   Docker image to use for connection pooler deployment.
-  Default: "ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.2"
+  Default: "ghcr.io/zalando/postgres-operator/pgbouncer:v2.0.3"
 
 * **connection_pooler_max_db_connections**
   How many connections the pooler can max hold. This value is divided among the
