@@ -214,12 +214,14 @@ Note that, changes in `SPILO_CONFIGURATION` env variable under `bootstrap.dcs`
 path are ignored for the diff. They will be applied through Patroni's rest api
 interface, following a restart of all instances.
 
-The operator also support lazy updates of the Spilo image. In this case the
-StatefulSet is only updated, but no rolling update follows. This feature saves
-you a switchover - and hence downtime - when you know pods are re-started later
-anyway, for instance due to the node rotation. To force a rolling update,
-disable this mode by setting the `enable_lazy_spilo_upgrade` to `false` in the
-operator configuration and restart the operator pod.
+The operator also supports lazy updates of the Spilo image. In this case the
+StatefulSet is updated without immediately restarting its pods. When maintenance
+windows are enabled and defined, the rolling update is delayed until the next
+maintenance window. If maintenance windows are disabled or none are defined,
+the pods continue running the old image until they are recreated for another
+reason, such as a Kubernetes node rotation. To force an immediate rolling
+update, disable this mode by setting `enable_lazy_spilo_upgrade` to `false` in
+the operator configuration and restart the operator pod.
 
 ## Delete protection via annotations
 
