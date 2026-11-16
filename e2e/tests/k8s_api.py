@@ -147,6 +147,24 @@ class K8s:
                         )
                     )
 
+        try:
+            stateful_sets = self.api.apps_v1.list_stateful_set_for_all_namespaces(
+                label_selector='application=spilo'
+            ).items
+            for stateful_set in stateful_sets:
+                status = stateful_set.status
+                lines.append(
+                    "StatefulSet {}/{}: desired={}, current={}, ready={}, updated={}".format(
+                        stateful_set.metadata.namespace, stateful_set.metadata.name,
+                        stateful_set.spec.replicas,
+                        status.current_replicas if status else None,
+                        status.ready_replicas if status else None,
+                        status.updated_replicas if status else None
+                    )
+                )
+        except Exception as e:
+            lines.append("Could not list Postgres StatefulSets: {}".format(e))
+
         for pod in operator_pods:
             try:
                 log = self.api.core_v1.read_namespaced_pod_log(
