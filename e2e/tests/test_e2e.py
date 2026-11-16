@@ -41,11 +41,15 @@ class EndToEndTestCase(unittest.TestCase):
             result = self.defaultTestResult()
         result = super().run(result)
         if any(test is self for test, _ in result.failures + result.errors):
-            try:
-                print(self.k8s.get_failure_diagnostics())
-            except Exception as e:
-                print("Could not collect Kubernetes failure diagnostics: {}".format(e))
+            self.print_failure_diagnostics()
         return result
+
+    @classmethod
+    def print_failure_diagnostics(cls):
+        try:
+            print(cls.k8s.get_failure_diagnostics())
+        except Exception as e:
+            print("Could not collect Kubernetes failure diagnostics: {}".format(e))
 
     def eventuallyEqual(self, f, x, m, retries=60, interval=2):
         while True:
@@ -83,8 +87,16 @@ class EndToEndTestCase(unittest.TestCase):
                 time.sleep(interval)
 
     @classmethod
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def setUpClass(cls):
+        try:
+            cls.set_up_cluster()
+        except Exception:
+            cls.print_failure_diagnostics()
+            raise
+
+    @classmethod
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def set_up_cluster(cls):
         '''
         Deploy operator to a "kind" cluster created by run.sh using examples from /manifests.
         This operator deployment is to be shared among all tests.
