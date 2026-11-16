@@ -36,6 +36,17 @@ class EndToEndTestCase(unittest.TestCase):
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
 
+    def run(self, result=None):
+        if result is None:
+            result = self.defaultTestResult()
+        result = super().run(result)
+        if any(test is self for test, _ in result.failures + result.errors):
+            try:
+                print(self.k8s.get_failure_diagnostics())
+            except Exception as e:
+                print("Could not collect Kubernetes failure diagnostics: {}".format(e))
+        return result
+
     def eventuallyEqual(self, f, x, m, retries=60, interval=2):
         while True:
             try:

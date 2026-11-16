@@ -39,6 +39,10 @@ In the e2e folder you can invoke tests either with `make test` or with:
 To run both the build and test step you can invoke `make e2e` from the parent
 directory.
 
+When an E2E test fails, the runner prints Postgres and operator pod status,
+recent Kubernetes warning and pod events, and the latest operator logs to help
+identify the cause.
+
 To run the end 2 end test and keep the kind state execute:
 ```bash
 NOCLEANUP=True ./run.sh main
