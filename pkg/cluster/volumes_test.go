@@ -116,6 +116,74 @@ func TestResizeVolumeClaim(t *testing.T) {
 	}
 }
 
+func TestVolumeClaimAnnotations(t *testing.T) {
+	client, _ := newFakeK8sPVCclient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					InheritedAnnotations: []string{"owned-by"},
+				},
+				StorageResizeMode: "pvc",
+			},
+		}, client, acidv1.Postgresql{}, logger, eventRecorder)
+
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+	cluster.ObjectMeta.Annotations = map[string]string{"owned-by": "acid", "not-inherited": "true"}
+	cluster.Spec.Volume.Size = "1Gi"
+	cluster.Spec.Volume.Annotations = map[string]string{
+		"ebs.csi.aws.com/iops":       "4000",
+		"ebs.csi.aws.com/throughput": "250",
+	}
+	expected := map[string]string{
+		"ebs.csi.aws.com/iops":       "4000",
+		"ebs.csi.aws.com/throughput": "250",
+		"owned-by":                   "acid",
+	}
+
+	// the volume claim template carries the volume annotations and the inherited ones
+	template, err := cluster.generatePersistentVolumeClaimTemplate(cluster.Spec.Volume.Size, "", nil, cluster.Spec.Volume.Annotations)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, template.Annotations)
+	assert.Equal(t, "4000", cluster.Spec.Volume.Annotations["ebs.csi.aws.com/iops"], "manifest annotations must not be modified")
+	assert.Len(t, cluster.Spec.Volume.Annotations, 2, "inherited annotations must not leak into the manifest")
+
+	// existing claims get the annotations patched in on sync
+	filterLabels := cluster.labelsSet(false)
+	pvcList := CreatePVCs(namespace, clusterName, filterLabels, 2, "1Gi")
+	pvcList.Items[0].Annotations = map[string]string{"pv.kubernetes.io/bind-completed": "yes"}
+	for _, pvc := range pvcList.Items {
+		_, err := cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
+		assert.NoError(t, err)
+	}
+
+	assert.NoError(t, cluster.syncVolumeClaims())
+
+	pvcs, err := cluster.listPersistentVolumeClaims()
+	assert.NoError(t, err)
+	assert.Len(t, pvcs, 2)
+	for _, pvc := range pvcs {
+		for k, v := range expected {
+			assert.Equal(t, v, pvc.Annotations[k], "annotation %q on %s", k, pvc.Name)
+		}
+		assert.NotContains(t, pvc.Annotations, "not-inherited")
+	}
+	pvc0, err := cluster.KubeClient.PersistentVolumeClaims(namespace).Get(context.TODO(), pvcList.Items[0].Name, metav1.GetOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, "yes", pvc0.Annotations["pv.kubernetes.io/bind-completed"], "annotations set by Kubernetes are kept")
+
+	// without volume annotations the template only has the inherited ones
+	template, err = cluster.generatePersistentVolumeClaimTemplate("1Gi", "", nil, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"owned-by": "acid"}, template.Annotations)
+}
+
 func TestQuantityToGigabyte(t *testing.T) {
 	tests := []struct {
 		name        string

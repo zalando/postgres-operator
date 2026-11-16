@@ -3257,6 +3257,12 @@ spec:
               volume:
                 description: Volume describes a single volume in the manifest.
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations are added to the persistent volume
+                      claims of the data volume
+                    type: object
                   iops:
                     format: int32
                     maximum: 80000

@@ -565,6 +565,13 @@ properties of the persistent storage that stores Postgres data.
   documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
   for details on using `matchLabels` and `matchExpressions`. Optional
 
+* **annotations**
+  A map of annotations added to the persistent volume claims of the data
+  volume, e.g. to tune volumes through a CSI driver that reads PVC
+  annotations. The operator also patches them onto existing claims during
+  sync. Inherited annotations of the postgresql object are added on top.
+  Optional.
+
 ## Sidecar definitions
 
 Those parameters are defined under the `sidecars` key. They consist of a list

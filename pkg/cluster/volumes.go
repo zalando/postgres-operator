@@ -211,7 +211,7 @@ func (c *Cluster) syncVolumeClaims() error {
 			c.logger.Debugf("volume claim for volume %q do not require updates", pvc.Name)
 		}
 
-		newAnnotations := c.annotationsSet(nil)
+		newAnnotations := c.volumeAnnotations(c.Spec.Volume.Annotations)
 		if changed, _ := c.compareAnnotations(pvc.Annotations, newAnnotations, nil); changed {
 			patchData, err := metaAnnotationsPatch(newAnnotations)
 			if err != nil {

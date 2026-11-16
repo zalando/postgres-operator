@@ -341,6 +341,16 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 	return nil
 }
 
+// volumeAnnotations returns the annotations for the data volume claims: the ones set under
+// volume.annotations in the manifest plus the inherited annotations of the postgresql object.
+func (c *Cluster) volumeAnnotations(volumeAnnotations map[string]string) map[string]string {
+	annotations := make(map[string]string, len(volumeAnnotations))
+	for k, v := range volumeAnnotations {
+		annotations[k] = v
+	}
+	return c.annotationsSet(annotations)
+}
+
 func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopCh chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout.Duration)
 	for {

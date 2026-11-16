@@ -172,6 +172,8 @@ type Volume struct {
 	// +kubebuilder:validation:Maximum=2000
 	Throughput *int32 `json:"throughput,omitempty"`
 	VolumeType string `json:"type,omitempty"`
+	// Annotations are added to the persistent volume claims of the data volume
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // AdditionalVolume specs additional optional volumes for statefulset
