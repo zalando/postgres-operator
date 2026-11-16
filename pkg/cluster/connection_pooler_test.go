@@ -666,6 +666,74 @@ func TestConnectionPoolerSync(t *testing.T) {
 	}
 }
 
+func TestConnectionPoolerPodAntiAffinity(t *testing.T) {
+	tests := []struct {
+		subTest          string
+		clusterPreferred bool
+		poolerPreferred  *bool
+		wantPreferred    bool
+	}{
+		{
+			subTest:          "follows the cluster setting when unset",
+			clusterPreferred: true,
+			wantPreferred:    true,
+		},
+		{
+			subTest:          "required for the cluster when unset",
+			clusterPreferred: false,
+			wantPreferred:    false,
+		},
+		{
+			subTest:          "preferred for the pooler only",
+			clusterPreferred: false,
+			poolerPreferred:  boolToPointer(true),
+			wantPreferred:    true,
+		},
+		{
+			subTest:          "required for the pooler only",
+			clusterPreferred: true,
+			poolerPreferred:  boolToPointer(false),
+			wantPreferred:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.subTest, func(t *testing.T) {
+			cluster := New(
+				Config{
+					OpConfig: config.Config{
+						ProtectedRoles: []string{"admin"},
+						Auth: config.Auth{
+							SuperUsername:       superUserName,
+							ReplicationUsername: replicationUserName,
+						},
+						EnablePodAntiAffinity:                    true,
+						PodAntiAffinityTopologyKey:               "topology.kubernetes.io/zone",
+						PodAntiAffinityPreferredDuringScheduling: tt.clusterPreferred,
+						ConnectionPooler: config.ConnectionPooler{
+							MaxDBConnections:                         k8sutil.Int32ToPointer(60),
+							PodAntiAffinityPreferredDuringScheduling: tt.poolerPreferred,
+						},
+					},
+				}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+			cluster.Spec = acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			}
+
+			podTemplate, err := cluster.generateConnectionPoolerPodTemplate(Master)
+			assert.NoError(t, err)
+			antiAffinity := podTemplate.Spec.Affinity.PodAntiAffinity
+			if tt.wantPreferred {
+				assert.NotEmpty(t, antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+				assert.Empty(t, antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+			} else {
+				assert.Empty(t, antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+				assert.NotEmpty(t, antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+			}
+		})
+	}
+}
+
 func TestConnectionPoolerPodSpec(t *testing.T) {
 	testName := "Test connection pooler pod template generation"
 	var cluster = New(

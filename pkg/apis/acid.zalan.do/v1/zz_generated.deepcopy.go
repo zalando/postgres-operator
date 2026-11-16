@@ -142,6 +142,11 @@ func (in *ConnectionPoolerConfiguration) DeepCopyInto(out *ConnectionPoolerConfi
 		*out = new(int32)
 		**out = **in
 	}
+	if in.PodAntiAffinityPreferredDuringScheduling != nil {
+		in, out := &in.PodAntiAffinityPreferredDuringScheduling, &out.PodAntiAffinityPreferredDuringScheduling
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

@@ -165,6 +165,9 @@ type ConnectionPooler struct {
 	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request"`
 	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit"`
 	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit"`
+	// PodAntiAffinityPreferredDuringScheduling overrides pod_antiaffinity_preferred_during_scheduling
+	// for the pooler pods when set
+	PodAntiAffinityPreferredDuringScheduling *bool `name:"connection_pooler_pod_antiaffinity_preferred_during_scheduling"`
 }
 
 // Config describes operator config
