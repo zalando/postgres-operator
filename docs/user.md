@@ -776,6 +776,9 @@ spec:
           - pci
 ```
 
+The logical backup job, if enabled, uses the same `nodeAffinity` and
+`tolerations` as the database pods.
+
 If you need to define a `nodeAffinity` for all your Postgres clusters use the
 `node_readiness_label` [configuration](administrator.md#node-readiness-labels).
 
