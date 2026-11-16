@@ -86,7 +86,10 @@ class K8s:
             'default', label_selector='name=postgres-operator'
         ).items
 
-        pods = list(filter(lambda x: x.status.phase == 'Running', pods))
+        pods = list(filter(
+            lambda x: x.status.phase == 'Running' and x.metadata.deletion_timestamp is None,
+            pods
+        ))
 
         if len(pods):
             return pods[0]
