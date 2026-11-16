@@ -202,18 +202,12 @@ func (c *Cluster) majorVersionUpgrade() error {
 		c.logger.Error("could not get cluster members data from Patroni API, skipping major version upgrade")
 		return err
 	}
-	patroniData, err := c.patroni.GetMemberData(masterPod)
+	patroniVer, err := c.getPatroniVersion(masterPod)
 	if err != nil {
-		c.logger.Error("could not get members data from Patroni API, skipping major version upgrade")
+		c.logger.Error("could not get Patroni version, skipping major version upgrade")
 		return err
 	}
-	patroniVer, err := semver.NewVersion(patroniData.Patroni.Version)
-	if err != nil {
-		c.logger.Error("error parsing Patroni version")
-		patroniVer, _ = semver.NewVersion("3.0.4")
-	}
-	verConstraint, _ := semver.NewConstraint(">= 3.0.4")
-	checkStreaming, _ := verConstraint.Validate(patroniVer)
+	checkStreaming := patroniVer.GreaterThanEqual(semver.MustParse(minPatroniVersionWithReplicationState))
 
 	for _, member := range members {
 		if PostgresRole(member.Role) == Leader {

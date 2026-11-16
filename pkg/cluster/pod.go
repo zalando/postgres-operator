@@ -3,11 +3,13 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"slices"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Masterminds/semver/v3"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -400,6 +402,20 @@ func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) 
 	return memberData, nil
 }
 
+const minPatroniVersionWithReplicationState = "3.0.4"
+
+func (c *Cluster) getPatroniVersion(pod *v1.Pod) (*semver.Version, error) {
+	memberData, err := c.patroni.GetMemberData(pod)
+	if err != nil {
+		return nil, fmt.Errorf("could not get Patroni version: %v", err)
+	}
+	version, err := semver.NewVersion(memberData.Patroni.Version)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse Patroni version %q: %v", memberData.Patroni.Version, err)
+	}
+	return version, nil
+}
+
 // podIsNotRunning returns true if a pod is known to be in a non-running state,
 // e.g. stuck in CreateContainerConfigError, CrashLoopBackOff, ImagePullBackOff, etc.
 // Pods with no status information are not considered non-running, as they may
@@ -529,8 +545,13 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 	var members []patroni.ClusterMember
 	candidates := make([]patroni.ClusterMember, 0)
 	syncCandidates := make([]patroni.ClusterMember, 0)
+	patroniVersion, err := c.getPatroniVersion(master)
+	if err != nil {
+		return spec.NamespacedName{}, err
+	}
+	streamingStateAvailable := patroniVersion.GreaterThanEqual(semver.MustParse(minPatroniVersionWithReplicationState))
 
-	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval.Duration, c.OpConfig.PatroniAPICheckTimeout.Duration,
+	err = retryutil.Retry(c.OpConfig.PatroniAPICheckInterval.Duration, c.OpConfig.PatroniAPICheckTimeout.Duration,
 		func() (bool, error) {
 			var err error
 			members, err = c.patroni.GetClusterMembers(master)
@@ -538,12 +559,17 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 				return false, err
 			}
 
-			// look for SyncStandby candidates (which also implies pod is in running state)
+			// Promoting a replica in archive recovery can lose WAL not yet archived by the primary.
+			// Patroni 3.0.4 introduced detailed state; older versions report both cases as running.
 			for _, member := range members {
+				if streamingStateAvailable && member.State != "streaming" ||
+					!streamingStateAvailable && member.State != "running" {
+					continue
+				}
 				if PostgresRole(member.Role) == SyncStandby {
 					syncCandidates = append(syncCandidates, member)
 				}
-				if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && slices.Contains([]string{"running", "streaming", "in archive recovery"}, member.State) {
+				if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader {
 					candidates = append(candidates, member)
 				}
 			}
@@ -570,19 +596,38 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 
 	// pick candidate with lowest lag
 	if len(syncCandidates) > 0 {
-		sort.Slice(syncCandidates, func(i, j int) bool {
-			return syncCandidates[i].Lag < syncCandidates[j].Lag
-		})
+		if !sortSwitchoverCandidates(syncCandidates) {
+			c.logger.Infof("replay lag unavailable for one or more switchover candidates; falling back to legacy lag")
+		}
 		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
 	}
 	if len(candidates) > 0 {
-		sort.Slice(candidates, func(i, j int) bool {
-			return candidates[i].Lag < candidates[j].Lag
-		})
+		if !sortSwitchoverCandidates(candidates) {
+			c.logger.Infof("replay lag unavailable for one or more switchover candidates; falling back to legacy lag")
+		}
 		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
 	}
 
 	return spec.NamespacedName{}, fmt.Errorf("no switchover candidate found")
+}
+
+func sortSwitchoverCandidates(candidates []patroni.ClusterMember) bool {
+	useReplayLag := true
+	for _, candidate := range candidates {
+		// Patroni may report replay lag as "unknown", represented by the max uint64 sentinel.
+		if candidate.ReplayLag == nil || *candidate.ReplayLag == patroni.ReplicationLag(math.MaxUint64) {
+			useReplayLag = false
+			break
+		}
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		if useReplayLag {
+			return *candidates[i].ReplayLag < *candidates[j].ReplayLag
+		}
+		return candidates[i].Lag < candidates[j].Lag
+	})
+	return useReplayLag
 }
 
 func (c *Cluster) podIsEndOfLife(pod *v1.Pod) (bool, error) {

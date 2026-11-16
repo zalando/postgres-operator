@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -119,6 +118,10 @@ func TestMigrateMasterPodWithReplica(t *testing.T) {
 	c.Statefulset = &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{Replicas: &replicas}}
 	mockClient := mocks.NewMockHTTPClient(gomock.NewController(t))
 	c.patroni = patroni.New(patroniLogger, mockClient)
+	mockClient.EXPECT().Get("http://192.0.2.1:8008/patroni").Return(&http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"patroni":{"version":"4.1.0"}}`)),
+	}, nil)
 	mockClient.EXPECT().Get("http://192.0.2.1:8008/cluster").Return(&http.Response{
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(strings.NewReader(`{"members":[{"name":"acid-test-cluster-1","role":"replica","state":"streaming","lag":0}]}`)),
@@ -166,6 +169,7 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 	tests := []struct {
 		subtest           string
 		clusterJson       string
+		patroniVersion    string
 		syncModeEnabled   bool
 		expectedCandidate spec.NamespacedName
 		expectedError     error
@@ -192,6 +196,34 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 			expectedError:     nil,
 		},
 		{
+			subtest:           "choose replica with lowest replay lag",
+			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 2, "replay_lag": 5}, {"name": "acid-test-cluster-2", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 1, "replay_lag": 10}]}`,
+			syncModeEnabled:   false,
+			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-1"},
+			expectedError:     nil,
+		},
+		{
+			subtest:           "fall back to legacy lag when replay lag is unknown",
+			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 5, "replay_lag": "unknown"}, {"name": "acid-test-cluster-2", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 2, "replay_lag": "unknown"}]}`,
+			syncModeEnabled:   false,
+			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-2"},
+			expectedError:     nil,
+		},
+		{
+			subtest:           "use legacy lag consistently when replay lag is mixed",
+			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 1, "replay_lag": 100}, {"name": "acid-test-cluster-2", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 2, "replay_lag": "unknown"}]}`,
+			syncModeEnabled:   false,
+			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-1"},
+			expectedError:     nil,
+		},
+		{
+			subtest:           "choose sync standby with lowest replay lag",
+			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "sync_standby", "state": "streaming", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 2, "replay_lag": 5}, {"name": "acid-test-cluster-2", "role": "sync_standby", "state": "streaming", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 1, "replay_lag": 10}, {"name": "acid-test-cluster-3", "role": "sync_standby", "state": "running", "api_url": "http://192.168.100.4:8008/patroni", "host": "192.168.100.4", "port": 5432, "timeline": 1, "lag": 0, "replay_lag": 1}]}`,
+			syncModeEnabled:   true,
+			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-1"},
+			expectedError:     nil,
+		},
+		{
 			subtest:           "choose first replica when lag is equal everywhere",
 			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 5}, {"name": "acid-test-cluster-2", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 5}]}`,
 			syncModeEnabled:   false,
@@ -206,25 +238,46 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 			expectedError:     fmt.Errorf("failed to get Patroni cluster members: unexpected end of JSON input"),
 		},
 		{
-			subtest:           "replicas with different status",
-			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 5}, {"name": "acid-test-cluster-2", "role": "replica", "state": "in archive recovery", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 2}]}`,
+			subtest:           "only streaming replicas are eligible",
+			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 5}, {"name": "acid-test-cluster-2", "role": "replica", "state": "in archive recovery", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 0}, {"name": "acid-test-cluster-3", "role": "replica", "state": "running", "api_url": "http://192.168.100.4:8008/patroni", "host": "192.168.100.4", "port": 5432, "timeline": 1, "lag": 1}]}`,
+			patroniVersion:    "3.0.4",
 			syncModeEnabled:   false,
-			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-2"},
+			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-1"},
+			expectedError:     nil,
+		},
+		{
+			subtest:           "legacy Patroni may select a running replica",
+			clusterJson:       `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "replica", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 1}, {"name": "acid-test-cluster-2", "role": "replica", "state": "streaming", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 5}]}`,
+			patroniVersion:    "3.0.3",
+			syncModeEnabled:   false,
+			expectedCandidate: spec.NamespacedName{Namespace: namespace, Name: "acid-test-cluster-1"},
 			expectedError:     nil,
 		},
 	}
 
 	for _, tt := range tests {
-		// mocking cluster members
-		r := io.NopCloser(bytes.NewReader([]byte(tt.clusterJson)))
-
-		response := http.Response{
-			StatusCode: 200,
-			Body:       r,
-		}
-
 		mockClient := mocks.NewMockHTTPClient(ctrl)
-		mockClient.EXPECT().Get(gomock.Any()).Return(&response, nil).AnyTimes()
+		clusterResponses := 0
+		mockClient.EXPECT().Get(gomock.Any()).DoAndReturn(func(url string) (*http.Response, error) {
+			var body string
+			if strings.HasSuffix(url, "/patroni") {
+				version := tt.patroniVersion
+				if version == "" {
+					version = "4.1.0"
+				}
+				body = fmt.Sprintf(`{"patroni":{"version":%q}}`, version)
+			} else {
+				clusterResponses++
+				body = tt.clusterJson
+				if clusterResponses > 1 {
+					body = ""
+				}
+			}
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(body)),
+			}, nil
+		}).AnyTimes()
 
 		p := patroni.New(patroniLogger, mockClient)
 		cluster.patroni = p
