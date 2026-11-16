@@ -2442,6 +2442,26 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              podDisruptionBudget:
+                description: |-
+                  PodDisruptionBudget overrides the budget of the primary pod disruption budget.
+                  Set either MinAvailable or MaxUnavailable. When both are set, MinAvailable is used.
+                properties:
+                  maxUnavailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: MaxUnavailable is the number or percentage of selected
+                      pods that may be unavailable
+                    x-kubernetes-int-or-string: true
+                  minAvailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: MinAvailable is the number or percentage of selected
+                      pods that must stay available
+                    x-kubernetes-int-or-string: true
+                type: object
               podPriorityClassName:
                 type: string
               postgresql:

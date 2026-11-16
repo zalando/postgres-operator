@@ -226,6 +226,13 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   then the default priority class is taken. The priority class itself must be
   defined in advance. Optional.
 
+* **podDisruptionBudget**
+  overrides the budget of the primary PodDisruptionBudget. Set either
+  `minAvailable` or `maxUnavailable` to a number or a percentage of the
+  selected pods. If both are set, `minAvailable` is used. Ignored when the PDB
+  is disabled or the cluster has no instances. See the [administrator
+  docs](../administrator.md#pod-disruption-budgets) for details. Optional.
+
 * **podAnnotations**
   A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
   to each pod created for the database.

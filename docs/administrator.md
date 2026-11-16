@@ -641,6 +641,23 @@ is enabled, label selector includes `spilo-role=master` condition, which prevent
 masters in single-node clusters and/or the last remaining running instance in a multi-node
 cluster.
 
+The budget can be set per cluster with `podDisruptionBudget` in the manifest. This is mostly
+useful together with `pdb_master_label_selector: false`, where the default PDB covers all
+pods of the cluster but still only keeps one of them, e.g. to keep a replica around during
+node upgrades:
+
+```yaml
+spec:
+  numberOfInstances: 3
+  podDisruptionBudget:
+    maxUnavailable: 1
+```
+
+Set either `minAvailable` or `maxUnavailable`, as a number or a percentage. With the master
+label selector enabled the PDB only selects the primary, so `minAvailable` above `1` blocks
+every voluntary eviction of it. The value from the manifest is ignored when the PDB is
+relaxed (see below).
+
 ## PDB for critical operations
 The `MaxUnavailable` parameter of this PDB is set to `0`, while label selector includes
 `critical-operation=true` condition. This blocks voluntary disruptions for all pods of a

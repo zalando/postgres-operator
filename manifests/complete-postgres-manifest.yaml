@@ -113,6 +113,8 @@ spec:
 #  serviceAnnotations:
 #    annotation.key: value
 #  podPriorityClassName: "spilo-pod-priority"
+#  podDisruptionBudget:
+#    maxUnavailable: 1
 #  tolerations:
 #  - key: postgres
 #    operator: Exists
