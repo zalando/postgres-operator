@@ -570,3 +570,8 @@ controllerID:
   # The name of the controller ID to use.
   # If not set and create is true, a name is generated using the fullname template
   name:
+
+# Extra Kubernetes manifests to deploy alongside the operator.
+# Each entry is a full manifest, either as a map or as a string (templated with tpl,
+# so Helm templating like {{ .Release.Namespace }} can be used).
+extraObjects: []
