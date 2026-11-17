@@ -36,6 +36,21 @@ class EndToEndTestCase(unittest.TestCase):
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
 
+    def run(self, result=None):
+        if result is None:
+            result = self.defaultTestResult()
+        result = super().run(result)
+        if any(test is self for test, _ in result.failures + result.errors):
+            self.print_failure_diagnostics()
+        return result
+
+    @classmethod
+    def print_failure_diagnostics(cls):
+        try:
+            print(cls.k8s.get_failure_diagnostics())
+        except Exception as e:
+            print("Could not collect Kubernetes failure diagnostics: {}".format(e))
+
     def eventuallyEqual(self, f, x, m, retries=60, interval=2):
         while True:
             try:
@@ -72,8 +87,16 @@ class EndToEndTestCase(unittest.TestCase):
                 time.sleep(interval)
 
     @classmethod
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def setUpClass(cls):
+        try:
+            cls.set_up_cluster()
+        except Exception:
+            cls.print_failure_diagnostics()
+            raise
+
+    @classmethod
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def set_up_cluster(cls):
         '''
         Deploy operator to a "kind" cluster created by run.sh using examples from /manifests.
         This operator deployment is to be shared among all tests.
@@ -2038,9 +2061,12 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: leader.metadata.name, switchover_target, "Rolling update annotation did not trigger switchover")
 
             # check that the old master has been recreated
+            def old_master_was_recreated():
+                replica = k8s.get_cluster_replica_pod()
+                return replica is not None and replica.metadata.creation_timestamp > old_creation_timestamp
+
+            self.eventuallyEqual(old_master_was_recreated, True, "Old master pod was not recreated")
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-            replica = k8s.get_cluster_replica_pod()
-            self.assertTrue(replica.metadata.creation_timestamp > old_creation_timestamp, "Old master pod was not recreated")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
