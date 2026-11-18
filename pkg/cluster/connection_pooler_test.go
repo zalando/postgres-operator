@@ -1332,3 +1332,93 @@ func TestConnectionPoolerServiceType(t *testing.T) {
 		}
 	}
 }
+
+func TestNeedSyncConnectionPoolerAffinity(t *testing.T) {
+	newCluster := func(antiAffinity bool) *Cluster {
+		cl := New(
+			Config{
+				OpConfig: config.Config{
+					ProtectedRoles: []string{"admin"},
+					Auth: config.Auth{
+						SuperUsername:       superUserName,
+						ReplicationUsername: replicationUserName,
+					},
+					EnablePodAntiAffinity:      antiAffinity,
+					PodAntiAffinityTopologyKey: "kubernetes.io/hostname",
+					ConnectionPooler: config.ConnectionPooler{
+						ConnectionPoolerDefaultCPURequest:    "100m",
+						ConnectionPoolerDefaultCPULimit:      "100m",
+						ConnectionPoolerDefaultMemoryRequest: "100Mi",
+						ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+						NumberOfInstances:                    k8sutil.Int32ToPointer(2),
+					},
+				},
+			}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+		cl.Statefulset = &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "test-sts"}}
+		cl.Spec = acidv1.PostgresSpec{ConnectionPooler: &acidv1.ConnectionPooler{}}
+		return cl
+	}
+
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		// deployment as created while pod anti affinity was enabled
+		oldCluster := newCluster(true)
+		deployment, err := oldCluster.generateConnectionPoolerDeployment(
+			&ConnectionPoolerObjects{Role: role})
+		assert.NoError(t, err)
+		assert.NotNil(t, deployment.Spec.Template.Spec.Affinity)
+
+		// unchanged configuration must not trigger a sync because of affinity
+		sync, reasons := oldCluster.needSyncConnectionPoolerDefaults(
+			&oldCluster.Config, &acidv1.ConnectionPooler{}, deployment, role)
+		for _, reason := range reasons {
+			assert.NotContains(t, reason, "affinity", "role %s, sync=%v", role, sync)
+		}
+
+		// enable_pod_antiaffinity switched off: deployment must be synced
+		newCl := newCluster(false)
+		sync, reasons = newCl.needSyncConnectionPoolerDefaults(
+			&newCl.Config, &acidv1.ConnectionPooler{}, deployment, role)
+		assert.True(t, sync, "role %s: sync expected after disabling pod anti affinity", role)
+		assert.Contains(t, strings.Join(reasons, ";"), "affinity", "role %s", role)
+	}
+}
+
+func TestNodeAffinityOrderAndPoolerSync(t *testing.T) {
+	cl := New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					NodeReadinessLabel: map[string]string{
+						"lbl-a": "1", "lbl-b": "2", "lbl-c": "3", "lbl-d": "4", "lbl-e": "5",
+					},
+				},
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    k8sutil.Int32ToPointer(2),
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+	cl.Statefulset = &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "test-sts"}}
+	cl.Spec = acidv1.PostgresSpec{ConnectionPooler: &acidv1.ConnectionPooler{}}
+
+	first := cl.nodeAffinity(cl.OpConfig.NodeReadinessLabel, nil)
+	for i := 0; i < 50; i++ {
+		assert.Equal(t, first, cl.nodeAffinity(cl.OpConfig.NodeReadinessLabel, nil))
+	}
+
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		deployment, err := cl.generateConnectionPoolerDeployment(&ConnectionPoolerObjects{Role: role})
+		assert.NoError(t, err)
+		sync, reasons := cl.needSyncConnectionPoolerDefaults(
+			&cl.Config, &acidv1.ConnectionPooler{}, deployment, role)
+		assert.False(t, sync, "role %s: unexpected sync: %v", role, reasons)
+	}
+}

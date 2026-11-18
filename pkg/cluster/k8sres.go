@@ -516,11 +516,17 @@ func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinit
 	}
 	if len(nodeReadinessLabel) > 0 {
 		matchExpressions := make([]v1.NodeSelectorRequirement, 0)
-		for k, v := range nodeReadinessLabel {
+		// sort keys so the generated expressions are deterministic
+		keys := make([]string, 0, len(nodeReadinessLabel))
+		for k := range nodeReadinessLabel {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
 			matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
 				Key:      k,
 				Operator: v1.NodeSelectorOpIn,
-				Values:   []string{v},
+				Values:   []string{nodeReadinessLabel[k]},
 			})
 		}
 		nodeReadinessSelectorTerm := v1.NodeSelectorTerm{MatchExpressions: matchExpressions}

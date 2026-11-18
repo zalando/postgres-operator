@@ -480,21 +480,26 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 	}
 
-	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity)
+	podTemplate.Spec.Affinity = c.connectionPoolerAffinity(role)
+
+	return podTemplate, nil
+}
+
+// connectionPoolerAffinity returns the affinity the pooler pods of the given
+// role are expected to have, based on the current operator configuration.
+func (c *Cluster) connectionPoolerAffinity(role PostgresRole) *v1.Affinity {
+	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, c.Spec.NodeAffinity)
 	if c.OpConfig.EnablePodAntiAffinity {
 		labelsSet := labels.Set(c.connectionPoolerLabels(role, false).MatchLabels)
-		podTemplate.Spec.Affinity = podAffinity(
+		return podAffinity(
 			labelsSet,
 			c.OpConfig.PodAntiAffinityTopologyKey,
 			nodeAffinity,
 			c.OpConfig.PodAntiAffinityPreferredDuringScheduling,
 			true,
 		)
-	} else if nodeAffinity != nil {
-		podTemplate.Spec.Affinity = nodeAffinity
 	}
-
-	return podTemplate, nil
+	return nodeAffinity
 }
 
 func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *ConnectionPoolerObjects) (
@@ -868,7 +873,7 @@ func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler, lo
 
 // Check if we need to synchronize connection pooler deployment due to new
 // defaults, that are different from what we see in the DeploymentSpec
-func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.ConnectionPooler, deployment *appsv1.Deployment) (sync bool, reasons []string) {
+func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.ConnectionPooler, deployment *appsv1.Deployment, role PostgresRole) (sync bool, reasons []string) {
 
 	reasons = []string{}
 	sync = false
@@ -916,6 +921,13 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.
 
 	if err != nil {
 		return false, reasons
+	}
+
+	// affinity depends on operator configuration (e.g. enable_pod_antiaffinity)
+	// and not on the manifest, so a config change must be detected here
+	if !reflect.DeepEqual(podTemplate.Spec.Affinity, c.connectionPoolerAffinity(role)) {
+		sync = true
+		reasons = append(reasons, "pooler pod affinity is different from the expected one")
 	}
 
 	authTypeFound := false
@@ -1232,7 +1244,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			deployment.Spec.Template.Annotations = newPodAnnotations
 		}
 
-		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
+		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment, role)
 		syncReason = append(syncReason, defaultsReason...)
 
 		if specSync || defaultsSync || updateDeployment {
