@@ -62,6 +62,8 @@ spec:
 #    storageClass: my-sc
 #    iops: 1000
 #    throughput: 250  # in MB/s
+#    annotations:
+#      ebs.csi.aws.com/iops: "4000"
 #    selector:
 #      matchExpressions:
 #        - { key: flavour, operator: In, values: [ "banana", "chocolate" ] }
