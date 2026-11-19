@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -381,19 +382,18 @@ func (c *Cluster) getPatroniConfig(pod *v1.Pod) (acidv1.Patroni, map[string]stri
 
 func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) {
 	var memberData patroni.MemberData
+	var requestErr error
 	err := retryutil.Retry(c.OpConfig.PatroniAPICheckInterval.Duration, c.OpConfig.PatroniAPICheckTimeout.Duration,
 		func() (bool, error) {
-			var err error
-			memberData, err = c.patroni.GetMemberData(pod)
-
-			if err != nil {
-				return false, err
-			}
-			return true, nil
+			memberData, requestErr = c.patroni.GetMemberData(pod)
+			return requestErr == nil, nil
 		},
 	)
 	if err != nil {
-		return patroni.MemberData{}, fmt.Errorf("could not get member data: %v", err)
+		if requestErr != nil {
+			return patroni.MemberData{}, fmt.Errorf("could not get member data: %w", errors.Join(err, requestErr))
+		}
+		return patroni.MemberData{}, fmt.Errorf("could not get member data: %w", err)
 	}
 	if memberData.State == "creating replica" {
 		return patroni.MemberData{}, fmt.Errorf("replica currently being initialized")
@@ -405,13 +405,13 @@ func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) 
 const minPatroniVersionWithReplicationState = "3.0.4"
 
 func (c *Cluster) getPatroniVersion(pod *v1.Pod) (*semver.Version, error) {
-	memberData, err := c.patroni.GetMemberData(pod)
+	memberData, err := c.getPatroniMemberData(pod)
 	if err != nil {
-		return nil, fmt.Errorf("could not get Patroni version: %v", err)
+		return nil, fmt.Errorf("could not get Patroni version: %w", err)
 	}
 	version, err := semver.NewVersion(memberData.Patroni.Version)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse Patroni version %q: %v", memberData.Patroni.Version, err)
+		return nil, fmt.Errorf("could not parse Patroni version %q: %w", memberData.Patroni.Version, err)
 	}
 	return version, nil
 }

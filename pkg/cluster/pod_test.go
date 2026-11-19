@@ -296,6 +296,46 @@ func TestGetSwitchoverCandidate(t *testing.T) {
 	}
 }
 
+func TestGetPatroniVersionRetriesRequestFailure(t *testing.T) {
+	cluster := New(
+		Config{OpConfig: config.Config{
+			PatroniAPICheckInterval: &metav1.Duration{Duration: time.Millisecond},
+			PatroniAPICheckTimeout:  &metav1.Duration{Duration: 10 * time.Millisecond},
+		}},
+		k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+	mockClient := mocks.NewMockHTTPClient(gomock.NewController(t))
+	cluster.patroni = patroni.New(patroniLogger, mockClient)
+	requests := 0
+	mockClient.EXPECT().Get("http://192.168.100.1:8008/patroni").DoAndReturn(func(string) (*http.Response, error) {
+		requests++
+		if requests == 1 {
+			return nil, fmt.Errorf("temporary connection failure")
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"patroni":{"version":"4.1.0"}}`)),
+		}, nil
+	}).Times(2)
+
+	version, err := cluster.getPatroniVersion(newMockPod("192.168.100.1"))
+	if err != nil {
+		t.Fatalf("getPatroniVersion() returned an error: %v", err)
+	}
+	if version.String() != "4.1.0" {
+		t.Fatalf("getPatroniVersion() = %s, want 4.1.0", version)
+	}
+
+	cluster.OpConfig.PatroniAPICheckTimeout.Duration = 2 * time.Millisecond
+	exhaustedClient := mocks.NewMockHTTPClient(gomock.NewController(t))
+	cluster.patroni = patroni.New(patroniLogger, exhaustedClient)
+	exhaustedClient.EXPECT().Get("http://192.168.100.1:8008/patroni").Return(nil, fmt.Errorf("temporary connection failure")).Times(2)
+	_, err = cluster.getPatroniVersion(newMockPod("192.168.100.1"))
+	if err == nil || !strings.Contains(err.Error(), "still failing after 2 retries") ||
+		!strings.Contains(err.Error(), "temporary connection failure") {
+		t.Fatalf("expected retry and request errors to be preserved, got %v", err)
+	}
+}
+
 func TestPodIsNotRunning(t *testing.T) {
 	tests := []struct {
 		subtest  string
