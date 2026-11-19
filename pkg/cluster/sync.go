@@ -1535,7 +1535,6 @@ func (c *Cluster) syncDatabases() error {
 	errors := make([]string, 0)
 	createDatabases := make(map[string]string)
 	alterOwnerDatabases := make(map[string]string)
-	preparedDatabases := make([]string, 0)
 
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
@@ -1559,7 +1558,6 @@ func (c *Cluster) syncDatabases() error {
 		_, exists := currentDatabases[preparedDatabaseName]
 		if !exists {
 			createDatabases[preparedDatabaseName] = fmt.Sprintf("%s%s", preparedDatabaseName, constants.OwnerRoleNameSuffix)
-			preparedDatabases = append(preparedDatabases, preparedDatabaseName)
 		}
 	}
 
@@ -1596,25 +1594,22 @@ func (c *Cluster) syncDatabases() error {
 		}
 	}
 
-	// set default privileges for prepared database
-	for _, preparedDatabase := range preparedDatabases {
-		if err := c.initDbConnWithName(preparedDatabase); err != nil {
-			errors = append(errors, fmt.Sprintf("could not init database connection to %s", preparedDatabase))
-			continue
-		}
-
-		for _, owner := range c.getOwnerRoles(preparedDatabase, c.Spec.PreparedDatabases[preparedDatabase].DefaultUsers) {
-			if err = c.execAlterGlobalDefaultPrivileges(owner, preparedDatabase); err != nil {
-				errors = append(errors, err.Error())
-			}
-		}
-	}
-
 	if len(errors) > 0 {
 		return fmt.Errorf("error(s) while syncing databases: %v", strings.Join(errors, `', '`))
 	}
 
 	return nil
+}
+
+// syncGlobalDefaultPrivileges sets the global default privileges of a prepared database.
+// The caller is responsible for opening and closing the connection to that database.
+func (c *Cluster) syncGlobalDefaultPrivileges(databaseName string, defaultUsers bool) (errors []string) {
+	for _, owner := range c.getOwnerRoles(databaseName, defaultUsers) {
+		if err := c.execAlterGlobalDefaultPrivileges(owner, databaseName); err != nil {
+			errors = append(errors, err.Error())
+		}
+	}
+	return errors
 }
 
 func (c *Cluster) syncPreparedDatabases() error {
@@ -1628,6 +1623,11 @@ func (c *Cluster) syncPreparedDatabases() error {
 		}
 
 		c.logger.Debugf("syncing prepared database %q", preparedDbName)
+
+		// (re)apply global default privileges; this is idempotent and makes sure
+		// a failure right after database creation is retried on the next sync
+		errors = append(errors, c.syncGlobalDefaultPrivileges(preparedDbName, preparedDB.DefaultUsers)...)
+
 		// now, prepare defined schemas
 		preparedSchemas := preparedDB.PreparedSchemas
 		if len(preparedDB.PreparedSchemas) == 0 {
