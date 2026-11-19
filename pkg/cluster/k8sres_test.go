@@ -1512,6 +1512,21 @@ func TestNodeAffinity(t *testing.T) {
 
 	assert.NotNil(t, s.Spec.Template.Spec.Affinity.NodeAffinity, "node affinity in statefulset shouldn't be nil")
 	assert.Equal(t, s.Spec.Template.Spec.Affinity.NodeAffinity, nodeAff, "cluster template has correct node affinity")
+
+	// the logical backup job runs with the same node affinity as the database pods
+	cluster.Spec = spec
+	job, err := cluster.generateLogicalBackupJob()
+	assert.NoError(t, err)
+	jobAffinity := job.Spec.JobTemplate.Spec.Template.Spec.Affinity
+	assert.NotNil(t, jobAffinity.NodeAffinity, "node affinity in logical backup job shouldn't be nil")
+	assert.Equal(t, nodeAff, jobAffinity.NodeAffinity, "logical backup job has the cluster's node affinity")
+	assert.NotNil(t, jobAffinity.PodAffinity, "logical backup job keeps its pod affinity to the database pods")
+
+	// without a node affinity in the manifest the job has none either
+	cluster.Spec = makeSpec(nil)
+	job, err = cluster.generateLogicalBackupJob()
+	assert.NoError(t, err)
+	assert.Nil(t, job.Spec.JobTemplate.Spec.Template.Spec.Affinity.NodeAffinity, "logical backup job shouldn't get a node affinity")
 }
 
 func TestNodeAffinityReadinessLabelOrder(t *testing.T) {

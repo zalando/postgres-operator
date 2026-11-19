@@ -2420,7 +2420,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 
 	labels := labels.Merge(c.labelsSet(true), logicalBackupJobLabel)
 
-	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil)
+	// like the tolerations below, the backup pods follow the node affinity of the database pods
+	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity)
 	podAffinity := podAffinity(
 		labels,
 		"kubernetes.io/hostname",
@@ -2446,7 +2447,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		util.False(),
 		topologySpreadConstraintsSpec,
 		&tolerationsSpec,
-		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
+		nodeAffinity,
 		nil,
 		int64(util.CoalesceDuration(c.OpConfig.PodTerminateGracePeriod, "5m").Seconds()),
 		c.OpConfig.PodServiceAccountName,
