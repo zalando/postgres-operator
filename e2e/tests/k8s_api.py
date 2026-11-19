@@ -86,7 +86,10 @@ class K8s:
             'default', label_selector='name=postgres-operator'
         ).items
 
-        pods = list(filter(lambda x: x.status.phase == 'Running', pods))
+        pods = list(filter(
+            lambda x: x.status.phase == 'Running' and x.metadata.deletion_timestamp is None,
+            pods
+        ))
 
         if len(pods):
             return pods[0]
@@ -100,6 +103,138 @@ class K8s:
             name=pod_name,
             namespace='default'
         )
+
+    def get_failure_diagnostics(self):
+        lines = ["Kubernetes failure diagnostics:"]
+        pods = []
+        try:
+            pods.extend(self.api.core_v1.list_pod_for_all_namespaces(
+                label_selector='application=spilo'
+            ).items)
+        except Exception as e:
+            lines.append("Could not list Postgres pods: {}".format(e))
+
+        try:
+            operator_pods = self.api.core_v1.list_pod_for_all_namespaces(
+                label_selector='name=postgres-operator'
+            ).items
+            pods.extend(operator_pods)
+        except Exception as e:
+            operator_pods = []
+            lines.append("Could not list operator pods: {}".format(e))
+
+        pod_names = set()
+        for pod in pods:
+            namespace = pod.metadata.namespace
+            name = pod.metadata.name
+            pod_names.add(name)
+            lines.append(
+                "Pod {}/{}: phase={}, node={}, pod_ip={}".format(
+                    namespace, name, pod.status.phase, pod.spec.node_name, pod.status.pod_ip
+                )
+            )
+            for status in pod.status.init_container_statuses or []:
+                state = status.state.waiting or status.state.terminated
+                if state:
+                    lines.append(
+                        "  Init container {}: restarts={}, state={}".format(
+                            status.name, status.restart_count, state
+                        )
+                    )
+            for status in pod.status.container_statuses or []:
+                state = status.state.waiting or status.state.terminated
+                if state:
+                    lines.append(
+                        "  Container {}: restarts={}, state={}".format(
+                            status.name, status.restart_count, state
+                        )
+                    )
+
+        try:
+            stateful_sets = self.api.apps_v1.list_stateful_set_for_all_namespaces(
+                label_selector='application=spilo'
+            ).items
+            for stateful_set in stateful_sets:
+                status = stateful_set.status
+                lines.append(
+                    "StatefulSet {}/{}: desired={}, current={}, ready={}, updated={}".format(
+                        stateful_set.metadata.namespace, stateful_set.metadata.name,
+                        stateful_set.spec.replicas,
+                        status.current_replicas if status else None,
+                        status.ready_replicas if status else None,
+                        status.updated_replicas if status else None
+                    )
+                )
+        except Exception as e:
+            lines.append("Could not list Postgres StatefulSets: {}".format(e))
+
+        for pod in operator_pods:
+            try:
+                log = self.api.core_v1.read_namespaced_pod_log(
+                    name=pod.metadata.name,
+                    namespace=pod.metadata.namespace,
+                    tail_lines=200
+                )
+                lines.append(
+                    "Operator log {}/{} (last 200 lines):\n{}".format(
+                        pod.metadata.namespace, pod.metadata.name, log
+                    )
+                )
+            except Exception as e:
+                lines.append(
+                    "Could not read operator log {}/{}: {}".format(
+                        pod.metadata.namespace, pod.metadata.name, e
+                    )
+                )
+            for status in pod.status.container_statuses or []:
+                if status.restart_count:
+                    try:
+                        log = self.api.core_v1.read_namespaced_pod_log(
+                            name=pod.metadata.name,
+                            namespace=pod.metadata.namespace,
+                            container=status.name,
+                            previous=True,
+                            tail_lines=200
+                        )
+                        lines.append(
+                            "Previous operator log {}/{} container {} (last 200 lines):\n{}".format(
+                                pod.metadata.namespace, pod.metadata.name, status.name, log
+                            )
+                        )
+                    except Exception as e:
+                        lines.append(
+                            "Could not read previous operator log {}/{} container {}: {}".format(
+                                pod.metadata.namespace, pod.metadata.name, status.name, e
+                            )
+                        )
+
+        try:
+            events = self.api.core_v1.list_event_for_all_namespaces().items
+            relevant_events = [
+                event for event in events
+                if event.type == 'Warning' or (
+                    event.involved_object and event.involved_object.name in pod_names
+                )
+            ]
+            relevant_events.sort(
+                key=lambda event: str(
+                    event.last_timestamp or event.event_time or event.metadata.creation_timestamp
+                ),
+                reverse=True
+            )
+            lines.append("Recent Kubernetes warning and pod events:")
+            for event in relevant_events[:50]:
+                event_time = event.last_timestamp or event.event_time or event.metadata.creation_timestamp
+                lines.append(
+                    "  {} {} {}/{} {}: {}".format(
+                        event_time, event.type, event.metadata.namespace,
+                        event.involved_object.name, event.reason, event.message
+                    )
+                )
+        except Exception as e:
+            lines.append("Could not list Kubernetes events: {}".format(e))
+
+        return '\n'.join(lines)
 
     def pg_get_status(self, name="acid-minimal-cluster", namespace="default"):
         pg = self.api.custom_objects_api.get_namespaced_custom_object(

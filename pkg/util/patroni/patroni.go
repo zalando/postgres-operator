@@ -255,12 +255,14 @@ func (p *Patroni) GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, 
 		return patroniConfig, nil, err
 	}
 	pgParameters := make(map[string]string)
-	if _, exists := pgConfig["postgresql"]; exists {
-		effectivePostgresql := pgConfig["postgresql"].(map[string]interface{})
-		effectivePgParameters := effectivePostgresql[constants.PatroniPGParametersParameterName].(map[string]interface{})
-		for parameter, value := range effectivePgParameters {
-			strValue := fmt.Sprintf("%v", value)
-			pgParameters[parameter] = strValue
+	if postgresql, exists := pgConfig["postgresql"]; exists {
+		if effectivePostgresql, ok := postgresql.(map[string]interface{}); ok {
+			if effectivePgParameters, ok := effectivePostgresql[constants.PatroniPGParametersParameterName].(map[string]interface{}); ok {
+				for parameter, value := range effectivePgParameters {
+					strValue := fmt.Sprintf("%v", value)
+					pgParameters[parameter] = strValue
+				}
+			}
 		}
 	}
 

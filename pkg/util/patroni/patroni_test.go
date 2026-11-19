@@ -257,6 +257,48 @@ func TestGetConfig(t *testing.T) {
 	}
 }
 
+func TestGetConfigWithoutParameters(t *testing.T) {
+	tests := []struct {
+		name       string
+		configJson string
+	}{
+		{
+			name:       "postgresql section without parameters key",
+			configJson: `{"ttl": 30, "loop_wait": 10, "retry_timeout": 10, "postgresql": {"use_pg_rewind": true, "use_slots": true}}`,
+		},
+		{
+			name:       "postgresql section set to null",
+			configJson: `{"ttl": 30, "loop_wait": 10, "retry_timeout": 10, "postgresql": null}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			r := io.NopCloser(bytes.NewReader([]byte(tt.configJson)))
+			response := http.Response{
+				StatusCode: 200,
+				Body:       r,
+			}
+
+			mockClient := mocks.NewMockHTTPClient(ctrl)
+			mockClient.EXPECT().Get(gomock.Any()).Return(&response, nil)
+
+			p := New(logger, mockClient)
+
+			_, pgParameters, err := p.GetConfig(newMockPod("192.168.100.1"))
+			if err != nil {
+				t.Errorf("Could not read Patroni config endpoint: %v", err)
+			}
+			if len(pgParameters) != 0 {
+				t.Errorf("expected no Postgres parameters, got: %#v", pgParameters)
+			}
+		})
+	}
+}
+
 func TestSetPostgresParameters(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
