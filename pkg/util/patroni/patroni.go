@@ -191,11 +191,12 @@ type ClusterMembers struct {
 
 // ClusterMember cluster member data from Patroni API
 type ClusterMember struct {
-	Name     string         `json:"name"`
-	Role     string         `json:"role"`
-	State    string         `json:"state"`
-	Timeline int            `json:"timeline"`
-	Lag      ReplicationLag `json:"lag,omitempty"`
+	Name      string          `json:"name"`
+	Role      string          `json:"role"`
+	State     string          `json:"state"`
+	Timeline  int             `json:"timeline"`
+	Lag       ReplicationLag  `json:"lag,omitempty"`
+	ReplayLag *ReplicationLag `json:"replay_lag,omitempty"`
 }
 
 type ReplicationLag uint64
