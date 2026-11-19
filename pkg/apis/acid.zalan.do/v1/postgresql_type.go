@@ -7,6 +7,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // +genclient
@@ -108,6 +109,7 @@ type PostgresSpec struct {
 	Sidecars                  []Sidecar                     `json:"sidecars,omitempty"`
 	InitContainers            []v1.Container                `json:"initContainers,omitempty"`
 	PodPriorityClassName      string                        `json:"podPriorityClassName,omitempty"`
+	PodDisruptionBudget       *PodDisruptionBudget          `json:"podDisruptionBudget,omitempty"`
 	ShmVolume                 *bool                         `json:"enableShmVolume,omitempty"`
 	EnableLogicalBackup       bool                          `json:"enableLogicalBackup,omitempty"`
 	LogicalBackupRetention    string                        `json:"logicalBackupRetention,omitempty"`
@@ -157,6 +159,15 @@ type MaintenanceWindow struct {
 	Weekday   time.Weekday `json:"weekday,omitempty"`
 	StartTime metav1.Time  `json:"startTime"`
 	EndTime   metav1.Time  `json:"endTime"`
+}
+
+// PodDisruptionBudget overrides the budget of the primary pod disruption budget.
+// Set either MinAvailable or MaxUnavailable. When both are set, MinAvailable is used.
+type PodDisruptionBudget struct {
+	// MinAvailable is the number or percentage of selected pods that must stay available
+	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty"`
+	// MaxUnavailable is the number or percentage of selected pods that may be unavailable
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 }
 
 // Volume describes a single volume in the manifest.

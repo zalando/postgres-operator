@@ -2568,6 +2568,75 @@ func TestContainerValidation(t *testing.T) {
 	}
 }
 
+func TestGeneratePodDisruptionBudgetFromManifest(t *testing.T) {
+	newCluster := func(opConfig config.Config, instances int32, pdb *acidv1.PodDisruptionBudget) *Cluster {
+		opConfig.Resources = config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}
+		opConfig.PDBNameFormat = "postgres-{cluster}-pdb"
+		return New(
+			Config{OpConfig: opConfig},
+			k8sutil.KubernetesClient{},
+			acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+				Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: instances, PodDisruptionBudget: pdb}},
+			logger,
+			eventRecorder)
+	}
+	intOrString := func(v intstr.IntOrString) *intstr.IntOrString { return &v }
+	noMasterSelector := config.Config{EnablePodDisruptionBudget: util.True(), PDBMasterLabelSelector: util.False()}
+
+	tests := []struct {
+		scenario           string
+		cluster            *Cluster
+		wantMinAvailable   *intstr.IntOrString
+		wantMaxUnavailable *intstr.IntOrString
+	}{
+		{
+			scenario:         "no budget in the manifest",
+			cluster:          newCluster(noMasterSelector, 3, nil),
+			wantMinAvailable: intOrString(intstr.FromInt(1)),
+		},
+		{
+			scenario:         "minAvailable from the manifest",
+			cluster:          newCluster(noMasterSelector, 3, &acidv1.PodDisruptionBudget{MinAvailable: intOrString(intstr.FromInt(2))}),
+			wantMinAvailable: intOrString(intstr.FromInt(2)),
+		},
+		{
+			scenario:           "maxUnavailable from the manifest",
+			cluster:            newCluster(noMasterSelector, 3, &acidv1.PodDisruptionBudget{MaxUnavailable: intOrString(intstr.FromInt(1))}),
+			wantMaxUnavailable: intOrString(intstr.FromInt(1)),
+		},
+		{
+			scenario:           "percentage from the manifest",
+			cluster:            newCluster(noMasterSelector, 3, &acidv1.PodDisruptionBudget{MaxUnavailable: intOrString(intstr.FromString("34%"))}),
+			wantMaxUnavailable: intOrString(intstr.FromString("34%")),
+		},
+		{
+			scenario: "minAvailable wins when both are set",
+			cluster: newCluster(noMasterSelector, 3, &acidv1.PodDisruptionBudget{
+				MinAvailable: intOrString(intstr.FromInt(2)), MaxUnavailable: intOrString(intstr.FromInt(1))}),
+			wantMinAvailable: intOrString(intstr.FromInt(2)),
+		},
+		{
+			scenario:         "ignored when the budget is disabled",
+			cluster:          newCluster(config.Config{EnablePodDisruptionBudget: util.False()}, 3, &acidv1.PodDisruptionBudget{MaxUnavailable: intOrString(intstr.FromInt(1))}),
+			wantMinAvailable: intOrString(intstr.FromInt(0)),
+		},
+		{
+			scenario:         "ignored without pods",
+			cluster:          newCluster(noMasterSelector, 0, &acidv1.PodDisruptionBudget{MinAvailable: intOrString(intstr.FromInt(2))}),
+			wantMinAvailable: intOrString(intstr.FromInt(0)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.scenario, func(t *testing.T) {
+			pdb := tt.cluster.generatePrimaryPodDisruptionBudget()
+			assert.Equal(t, tt.wantMinAvailable, pdb.Spec.MinAvailable)
+			assert.Equal(t, tt.wantMaxUnavailable, pdb.Spec.MaxUnavailable)
+		})
+	}
+}
+
 func TestGeneratePodDisruptionBudget(t *testing.T) {
 	testName := "Test PodDisruptionBudget spec generation"
 

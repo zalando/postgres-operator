@@ -2310,6 +2310,30 @@ func (c *Cluster) generatePrimaryPodDisruptionBudget() *policyv1.PodDisruptionBu
 		minAvailable = intstr.FromInt32(int32(c.Spec.SynchronousNodeCount + 1))
 	}
 
+	spec := policyv1.PodDisruptionBudgetSpec{
+		MinAvailable: &minAvailable,
+		Selector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+	}
+
+	// a budget from the manifest replaces the default one, unless the budget is
+	// disabled or the cluster has no pods
+	if override := c.Spec.PodDisruptionBudget; override != nil && minAvailable.IntVal > 0 {
+		switch {
+		case override.MinAvailable != nil:
+			if override.MaxUnavailable != nil {
+				c.logger.Warningf("both minAvailable and maxUnavailable are set in podDisruptionBudget, using minAvailable")
+			}
+			value := *override.MinAvailable
+			spec.MinAvailable = &value
+		case override.MaxUnavailable != nil:
+			value := *override.MaxUnavailable
+			spec.MinAvailable = nil
+			spec.MaxUnavailable = &value
+		}
+	}
+
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.PrimaryPodDisruptionBudgetName(),
@@ -2318,12 +2342,7 @@ func (c *Cluster) generatePrimaryPodDisruptionBudget() *policyv1.PodDisruptionBu
 			Annotations:     c.annotationsSet(nil),
 			OwnerReferences: c.ownerReferences(),
 		},
-		Spec: policyv1.PodDisruptionBudgetSpec{
-			MinAvailable: &minAvailable,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-		},
+		Spec: spec,
 	}
 }
 
