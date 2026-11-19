@@ -165,6 +165,13 @@ type ConnectionPooler struct {
 	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request"`
 	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit"`
 	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit"`
+	// PodSecurityContext and SecurityContext let operators override the pooler
+	// pod- and container-level security contexts. They are populated only from the
+	// OperatorConfiguration CRD (name:"-" excludes them from the ConfigMap decoder,
+	// mirroring LivenessProbe). When nil, the operator falls back to the historical
+	// defaults (pod RunAsUser/RunAsGroup 100/101, container AllowPrivilegeEscalation=false).
+	PodSecurityContext *v1.PodSecurityContext `name:"-"`
+	SecurityContext    *v1.SecurityContext    `name:"-"`
 }
 
 // Config describes operator config
