@@ -1876,6 +1876,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # check if next rotation date was set in secret
+        self.eventuallyTrue(lambda: "nextRotation" in k8s.get_secret("zalando").data,
+                            "Password rotation date not set in zalando secret")
         zalando_secret = k8s.get_secret("zalando")
         next_rotation_timestamp = datetime.strptime(str(base64.b64decode(zalando_secret.data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
         today90days = today+timedelta(days=90)
@@ -1925,6 +1927,8 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
         # check if next rotation date and username have been replaced
+        self.eventuallyTrue(lambda: "nextRotation" in k8s.get_secret("foo_user").data,
+                            "Password rotation date not set in foo_user secret")
         foo_user_secret = k8s.get_secret("foo_user")
         secret_username = str(base64.b64decode(foo_user_secret.data["username"]), 'utf-8')
         next_rotation_timestamp = datetime.strptime(str(base64.b64decode(foo_user_secret.data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
