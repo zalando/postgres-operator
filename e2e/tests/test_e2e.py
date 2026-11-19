@@ -1857,6 +1857,10 @@ class EndToEndTestCase(unittest.TestCase):
         leader = k8s.get_cluster_leader_pod()
         today = date.today()
 
+        def secret_value(username, key):
+            encoded = k8s.get_secret(username).data.get(key, "")
+            return str(base64.b64decode(encoded), 'utf-8')
+
         # remember number of secrets to make sure it stays the same
         secret_count = k8s.count_secrets_with_label(cluster_label)
 
@@ -1876,11 +1880,11 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # check if next rotation date was set in secret
-        self.eventuallyTrue(lambda: "nextRotation" in k8s.get_secret("zalando").data,
-                            "Password rotation date not set in zalando secret")
+        today90days = today+timedelta(days=90)
+        self.eventuallyEqual(lambda: secret_value("zalando", "nextRotation").split("T", 1)[0],
+                             today90days.isoformat(), "Password rotation date not set in zalando secret")
         zalando_secret = k8s.get_secret("zalando")
         next_rotation_timestamp = datetime.strptime(str(base64.b64decode(zalando_secret.data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
-        today90days = today+timedelta(days=90)
         self.assertEqual(today90days, next_rotation_timestamp.date(),
                         "Unexpected rotation date in secret of zalando user: expected {}, got {}".format(today90days, next_rotation_timestamp.date()))
 
@@ -1927,13 +1931,15 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
         # check if next rotation date and username have been replaced
-        self.eventuallyTrue(lambda: "nextRotation" in k8s.get_secret("foo_user").data,
-                            "Password rotation date not set in foo_user secret")
+        rotation_user = "foo_user"+today.strftime("%y%m%d")
+        today30days = today+timedelta(days=30)
+        self.eventuallyEqual(lambda: secret_value("foo_user", "username"), rotation_user,
+                             "Rotated username not set in foo_user secret")
+        self.eventuallyEqual(lambda: secret_value("foo_user", "nextRotation").split("T", 1)[0],
+                             today30days.isoformat(), "Password rotation date not set in foo_user secret")
         foo_user_secret = k8s.get_secret("foo_user")
         secret_username = str(base64.b64decode(foo_user_secret.data["username"]), 'utf-8')
         next_rotation_timestamp = datetime.strptime(str(base64.b64decode(foo_user_secret.data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
-        rotation_user = "foo_user"+today.strftime("%y%m%d")
-        today30days = today+timedelta(days=30)
 
         self.assertEqual(rotation_user, secret_username,
                         "Unexpected username in secret of foo_user: expected {}, got {}".format(rotation_user, secret_username))
@@ -1977,7 +1983,9 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_annotation_patch)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        time.sleep(10)
+        self.eventuallyTrue(
+            lambda: "environment" in (k8s.get_secret(username="test.db_user", namespace="test").metadata.annotations or {}),
+            "Added annotation was not propagated to secret")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), secret_count, "Unexpected number of secrets")
 
         # check if rotation has been ignored for user from test_cross_namespace_secrets test
@@ -1985,9 +1993,6 @@ class EndToEndTestCase(unittest.TestCase):
         secret_username = str(base64.b64decode(db_user_secret.data["username"]), 'utf-8')
         self.assertEqual("test.db_user", secret_username,
                         "Unexpected username in secret of test.db_user: expected {}, got {}".format("test.db_user", secret_username))
-
-        # check if annotation for secret has been updated
-        self.assertTrue("environment" in db_user_secret.metadata.annotations, "Added annotation was not propagated to secret")
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped
@@ -2003,6 +2008,10 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
         # check if username in foo_user secret is reset
+        self.eventuallyEqual(lambda: secret_value("foo_user", "username"), "foo_user",
+                             "Username in foo_user secret was not reset")
+        self.eventuallyEqual(lambda: secret_value("foo_user", "nextRotation"), "",
+                             "Rotation date in foo_user secret was not cleared")
         foo_user_secret = k8s.get_secret("foo_user")
         secret_username = str(base64.b64decode(foo_user_secret.data["username"]), 'utf-8')
         next_rotation_timestamp = str(base64.b64decode(foo_user_secret.data["nextRotation"]), 'utf-8')
