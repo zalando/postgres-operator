@@ -624,6 +624,8 @@ configuration:
 
 By default the type of pod anti affinity is `requiredDuringSchedulingIgnoredDuringExecution`,
 you can switch to  `preferredDuringSchedulingIgnoredDuringExecution` by setting `pod_antiaffinity_preferred_during_scheduling: true`.
+The connection pooler pods follow the same setting unless `connection_pooler_pod_antiaffinity_preferred_during_scheduling`
+is set, e.g. to keep the rule required for Postgres but only preferred for the pooler.
 
 By default the topology key for the pod anti affinity is set to
 `kubernetes.io/hostname`, you can set another topology key e.g.

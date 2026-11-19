@@ -483,11 +483,17 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	nodeAffinity := c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity)
 	if c.OpConfig.EnablePodAntiAffinity {
 		labelsSet := labels.Set(c.connectionPoolerLabels(role, false).MatchLabels)
+		// the pooler is a Deployment and can need a softer rule than the statefulset,
+		// e.g. when it runs more replicas than there are zones
+		preferredDuringScheduling := c.OpConfig.PodAntiAffinityPreferredDuringScheduling
+		if preferred := c.OpConfig.ConnectionPooler.PodAntiAffinityPreferredDuringScheduling; preferred != nil {
+			preferredDuringScheduling = *preferred
+		}
 		podTemplate.Spec.Affinity = podAffinity(
 			labelsSet,
 			c.OpConfig.PodAntiAffinityTopologyKey,
 			nodeAffinity,
-			c.OpConfig.PodAntiAffinityPreferredDuringScheduling,
+			preferredDuringScheduling,
 			true,
 		)
 	} else if nodeAffinity != nil {

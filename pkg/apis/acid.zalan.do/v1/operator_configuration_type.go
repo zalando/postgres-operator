@@ -345,6 +345,9 @@ type ConnectionPoolerConfiguration struct {
 	DefaultCPULimit string `json:"connection_pooler_default_cpu_limit,omitempty"`
 	// +kubebuilder:validation:Pattern=`^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$`
 	DefaultMemoryLimit string `json:"connection_pooler_default_memory_limit,omitempty"`
+	// PodAntiAffinityPreferredDuringScheduling overrides pod_antiaffinity_preferred_during_scheduling
+	// for the pooler pods when set
+	PodAntiAffinityPreferredDuringScheduling *bool `json:"connection_pooler_pod_antiaffinity_preferred_during_scheduling,omitempty"`
 }
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup

@@ -114,6 +114,11 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
+                  connection_pooler_pod_antiaffinity_preferred_during_scheduling:
+                    description: |-
+                      PodAntiAffinityPreferredDuringScheduling overrides pod_antiaffinity_preferred_during_scheduling
+                      for the pooler pods when set
+                    type: boolean
                   connection_pooler_schema:
                     default: pooler
                     type: string

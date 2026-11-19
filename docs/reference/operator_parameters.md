@@ -1105,6 +1105,14 @@ operator being able to provide some reasonable defaults.
 * **connection_pooler_mode**
   Default pooler mode, `session` or `transaction`. Default is `transaction`.
 
+* **connection_pooler_pod_antiaffinity_preferred_during_scheduling**
+  Overrides `pod_antiaffinity_preferred_during_scheduling` for the connection
+  pooler pods when `enable_pod_antiaffinity` is on. This lets the pooler
+  Deployment use `preferredDuringSchedulingIgnoredDuringExecution` while the
+  Postgres pods keep `requiredDuringSchedulingIgnoredDuringExecution`, or the
+  other way round. When not set, the pooler follows
+  `pod_antiaffinity_preferred_during_scheduling`.
+
 * **connection_pooler_default_cpu_request**
   **connection_pooler_default_memory_request**
   **connection_pooler_default_cpu_limit**
