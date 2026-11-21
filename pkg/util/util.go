@@ -342,6 +342,17 @@ func MapContains(haystack, needle map[string]string) bool {
 	return true
 }
 
+// Truncate returns s cut to at most n bytes. Shorter strings are returned unchanged.
+func Truncate(s string, n int) string {
+	if n < 0 {
+		n = 0
+	}
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
+}
+
 // Coalesce returns the first argument if it is not null, otherwise the second one.
 func Coalesce(val, defaultVal string) string {
 	if val == "" {
