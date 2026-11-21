@@ -290,7 +290,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 			}
 
 			c.annotatePostgresResource(isUpgradeSuccess)
-			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
+			c.logger.Infof("upgrade action triggered and command completed: %s", util.Truncate(result, 100))
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "upgrade from %d to %d finished", c.currentMajorVersion, desiredVersion)
 		}
 	}

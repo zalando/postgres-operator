@@ -294,3 +294,23 @@ func TestNiceDiff(t *testing.T) {
 	// t.Errorf("Lets see output")
 }
 */
+
+func TestTruncate(t *testing.T) {
+	tests := []struct {
+		in  string
+		n   int
+		out string
+	}{
+		{"", 100, ""},
+		{"short output", 100, "short output"},
+		{"exactly ten", 11, "exactly ten"},
+		{"longer than the limit", 6, "longer"},
+		{"anything", 0, ""},
+		{"anything", -1, ""},
+	}
+	for _, tt := range tests {
+		if got := Truncate(tt.in, tt.n); got != tt.out {
+			t.Errorf("Truncate(%q, %d) = %q, expected %q", tt.in, tt.n, got, tt.out)
+		}
+	}
+}
