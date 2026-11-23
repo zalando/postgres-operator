@@ -791,10 +791,14 @@ metadata:
   name: acid-minimal-cluster
 spec:
   topologySpreadConstraints:
-    - maxskew: 1
+    - maxSkew: 1
       topologyKey: topology.kubernetes.io/zone
       whenUnsatisfiable: DoNotSchedule
 ```
+
+The operator sets the `labelSelector` of each constraint to the labels of the
+cluster's pods, so pods of the same Postgres cluster are spread among each other.
+A `labelSelector` defined in the manifest is replaced by the operator.
 
 ## In-place major version upgrade
 
