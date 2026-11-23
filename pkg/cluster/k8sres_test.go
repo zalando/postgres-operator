@@ -23,6 +23,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -4697,9 +4698,6 @@ func TestGenerateContainerWithEnvFrom(t *testing.T) {
 func TestTopologySpreadConstraints(t *testing.T) {
 	clusterName := "acid-test-cluster"
 	namespace := "default"
-	labelSelector := &metav1.LabelSelector{
-		MatchLabels: cluster.labelsSet(true),
-	}
 
 	pg := acidv1.Postgresql{
 		ObjectMeta: metav1.ObjectMeta{
@@ -4720,7 +4718,6 @@ func TestTopologySpreadConstraints(t *testing.T) {
 					MaxSkew:           1,
 					TopologyKey:       "topology.kubernetes.io/zone",
 					WhenUnsatisfiable: v1.DoNotSchedule,
-					LabelSelector:     labelSelector,
 				},
 			},
 		},
@@ -4738,11 +4735,16 @@ func TestTopologySpreadConstraints(t *testing.T) {
 
 	s, err := cluster.generateStatefulSet(&pg.Spec)
 	assert.NoError(t, err)
-	assert.Contains(t, s.Spec.Template.Spec.TopologySpreadConstraints, v1.TopologySpreadConstraint{
-		MaxSkew:           int32(1),
-		TopologyKey:       "topology.kubernetes.io/zone",
-		WhenUnsatisfiable: v1.DoNotSchedule,
-		LabelSelector:     labelSelector,
-	},
-	)
+	constraints := s.Spec.Template.Spec.TopologySpreadConstraints
+	if len(constraints) != 1 {
+		t.Fatalf("expected 1 topology spread constraint, got %d", len(constraints))
+	}
+	constraint := constraints[0]
+	if constraint.LabelSelector == nil {
+		t.Fatal("expected topology spread constraint to have a label selector")
+	}
+	assert.Equal(t, int32(1), constraint.MaxSkew)
+	assert.Equal(t, "topology.kubernetes.io/zone", constraint.TopologyKey)
+	assert.Equal(t, v1.DoNotSchedule, constraint.WhenUnsatisfiable)
+	assert.Equal(t, cluster.labelsSet(true), labels.Set(constraint.LabelSelector.MatchLabels))
 }

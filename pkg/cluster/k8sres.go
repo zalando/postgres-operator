@@ -614,8 +614,8 @@ func generatePodAntiAffinity(podAffinityTerm v1.PodAffinityTerm, preferredDuring
 }
 
 func generateTopologySpreadConstraints(labels labels.Set, topologySpreadConstraints []v1.TopologySpreadConstraint) []v1.TopologySpreadConstraint {
-	for _, topologySpreadConstraint := range topologySpreadConstraints {
-		topologySpreadConstraint.LabelSelector = &metav1.LabelSelector{MatchLabels: labels}
+	for i := range topologySpreadConstraints {
+		topologySpreadConstraints[i].LabelSelector = &metav1.LabelSelector{MatchLabels: labels}
 	}
 	return topologySpreadConstraints
 }
