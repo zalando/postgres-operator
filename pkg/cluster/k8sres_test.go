@@ -4747,4 +4747,5 @@ func TestTopologySpreadConstraints(t *testing.T) {
 	assert.Equal(t, "topology.kubernetes.io/zone", constraint.TopologyKey)
 	assert.Equal(t, v1.DoNotSchedule, constraint.WhenUnsatisfiable)
 	assert.Equal(t, cluster.labelsSet(true), labels.Set(constraint.LabelSelector.MatchLabels))
+	assert.Nil(t, pg.Spec.TopologySpreadConstraints[0].LabelSelector, "generating the statefulset must not mutate the spec")
 }
