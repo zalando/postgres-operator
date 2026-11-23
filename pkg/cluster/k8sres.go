@@ -702,6 +702,7 @@ func generateContainer(
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
 	privilegeEscalationMode *bool,
+	runAsNonRoot *bool,
 	additionalPodCapabilities *v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{
@@ -730,6 +731,7 @@ func generateContainer(
 			AllowPrivilegeEscalation: privilegeEscalationMode,
 			Privileged:               &privilegedMode,
 			ReadOnlyRootFilesystem:   util.False(),
+			RunAsNonRoot:             runAsNonRoot,
 			Capabilities:             additionalPodCapabilities,
 		},
 	}
@@ -848,9 +850,10 @@ func (c *Cluster) generatePodTemplate(
 	containers := []v1.Container{*spiloContainer}
 	containers = append(containers, sidecarContainers...)
 	securityContext := v1.PodSecurityContext{
-		RunAsUser:  c.OpConfig.Resources.SpiloRunAsUser,
-		RunAsGroup: c.OpConfig.Resources.SpiloRunAsGroup,
-		FSGroup:    c.OpConfig.Resources.SpiloFSGroup,
+		RunAsUser:    c.OpConfig.Resources.SpiloRunAsUser,
+		RunAsGroup:   c.OpConfig.Resources.SpiloRunAsGroup,
+		FSGroup:      c.OpConfig.Resources.SpiloFSGroup,
+		RunAsNonRoot: c.OpConfig.Resources.SpiloRunAsNonRoot,
 	}
 
 	if c.Spec.SpiloRunAsUser != nil {
@@ -863,6 +866,10 @@ func (c *Cluster) generatePodTemplate(
 
 	if c.Spec.SpiloFSGroup != nil {
 		securityContext.FSGroup = c.Spec.SpiloFSGroup
+	}
+
+	if c.Spec.SpiloRunAsNonRoot != nil {
+		securityContext.RunAsNonRoot = c.Spec.SpiloRunAsNonRoot
 	}
 
 	podSpec := v1.PodSpec{
@@ -1396,6 +1403,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
+		util.CoalesceBool(spec.SpiloRunAsNonRoot, c.OpConfig.Resources.SpiloRunAsNonRoot),
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
 	)
 
@@ -2411,6 +2419,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1.CronJob, error) {
 		[]v1.VolumeMount{},
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
 		c.OpConfig.SpiloAllowPrivilegeEscalation,
+		c.OpConfig.Resources.SpiloRunAsNonRoot, // use same value as for normal DB pods
 		nil,
 	)
 
