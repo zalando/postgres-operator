@@ -2550,13 +2550,13 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.core_v1.patch_node(master_nodes[0], patch_node_label)
         k8s.api.core_v1.patch_node(replica_nodes[0], patch_node_label)
 
-        # Patch topologySpreadConstraint and scale-out postgresql pods to postgresqls manifest.
+        # Patch topologySpreadConstraints and scale-out postgresql pods to postgresqls manifest.
         patch_topologySpreadConstraint_config = {
             "spec": {
                 "numberOfInstances": 6,
-                "topologySpreadConstraint": [
+                "topologySpreadConstraints": [
                     {
-                        "maxskew": 1,
+                        "maxSkew": 1,
                         "topologyKey": "topology.kubernetes.io/zone",
                         "whenUnsatisfiable": "DoNotSchedule"
                     }
@@ -2588,7 +2588,7 @@ class EndToEndTestCase(unittest.TestCase):
         patch_topologySpreadConstraint_config = {
             "spec": {
                 "numberOfInstances": 2,
-                "topologySpreadConstraint": []
+                "topologySpreadConstraints": []
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
