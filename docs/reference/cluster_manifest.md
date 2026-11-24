@@ -351,7 +351,7 @@ required in the manifest.
 ## Patroni parameters
 
 Those parameters are grouped under the `patroni` top-level key. See the [Patroni
-documentation](https://patroni.readthedocs.io/en/latest/SETTINGS.html) for the
+documentation](https://patroni.readthedocs.io/en/latest/dynamic_configuration.html) for the
 explanation of `ttl` and `loop_wait` parameters.
 
 * **initdb**

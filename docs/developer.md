@@ -109,9 +109,8 @@ See comments there for minor issues that can sometimes broke the generation proc
 
 To debug the generated API locally, use the
 [kubectl proxy](https://kubernetes.io/docs/tasks/access-kubernetes-api/http-proxy-access-api/)
-and `kubectl --v=8` log level to display contents of HTTP requests (run the
-operator itself with `--v=8` to log all REST API requests). To attach a debugger
-to the operator, use the `-outofcluster` option to run the operator locally on
+and `kubectl --v=8` log level to display contents of HTTP requests. To attach a
+debugger to the operator, use the `-outofcluster` option to run the operator locally on
 the developer's laptop (and not in a docker container).
 
 ## Debugging the operator

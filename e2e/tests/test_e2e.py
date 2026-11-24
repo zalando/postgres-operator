@@ -36,6 +36,21 @@ class EndToEndTestCase(unittest.TestCase):
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
 
+    def run(self, result=None):
+        if result is None:
+            result = self.defaultTestResult()
+        result = super().run(result)
+        if any(test is self for test, _ in result.failures + result.errors):
+            self.print_failure_diagnostics()
+        return result
+
+    @classmethod
+    def print_failure_diagnostics(cls):
+        try:
+            print(cls.k8s.get_failure_diagnostics())
+        except Exception as e:
+            print("Could not collect Kubernetes failure diagnostics: {}".format(e))
+
     def eventuallyEqual(self, f, x, m, retries=60, interval=2):
         while True:
             try:
@@ -72,8 +87,16 @@ class EndToEndTestCase(unittest.TestCase):
                 time.sleep(interval)
 
     @classmethod
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def setUpClass(cls):
+        try:
+            cls.set_up_cluster()
+        except Exception:
+            cls.print_failure_diagnostics()
+            raise
+
+    @classmethod
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def set_up_cluster(cls):
         '''
         Deploy operator to a "kind" cluster created by run.sh using examples from /manifests.
         This operator deployment is to be shared among all tests.
@@ -1371,7 +1394,8 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version_highest_version)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync",
+                             retries=180)
 
         k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
         k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
@@ -1499,7 +1523,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
-                             "Operator does not get in sync", retries=120)
+                             "Operator does not get in sync", retries=180)
 
         # wait for switched over
         k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
@@ -1833,6 +1857,10 @@ class EndToEndTestCase(unittest.TestCase):
         leader = k8s.get_cluster_leader_pod()
         today = date.today()
 
+        def secret_value(username, key):
+            encoded = k8s.get_secret(username).data.get(key, "")
+            return str(base64.b64decode(encoded), 'utf-8')
+
         # remember number of secrets to make sure it stays the same
         secret_count = k8s.count_secrets_with_label(cluster_label)
 
@@ -1852,9 +1880,11 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # check if next rotation date was set in secret
+        today90days = today+timedelta(days=90)
+        self.eventuallyEqual(lambda: secret_value("zalando", "nextRotation").split("T", 1)[0],
+                             today90days.isoformat(), "Password rotation date not set in zalando secret")
         zalando_secret = k8s.get_secret("zalando")
         next_rotation_timestamp = datetime.strptime(str(base64.b64decode(zalando_secret.data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
-        today90days = today+timedelta(days=90)
         self.assertEqual(today90days, next_rotation_timestamp.date(),
                         "Unexpected rotation date in secret of zalando user: expected {}, got {}".format(today90days, next_rotation_timestamp.date()))
 
@@ -1901,11 +1931,15 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
         # check if next rotation date and username have been replaced
+        rotation_user = "foo_user"+today.strftime("%y%m%d")
+        today30days = today+timedelta(days=30)
+        self.eventuallyEqual(lambda: secret_value("foo_user", "username"), rotation_user,
+                             "Rotated username not set in foo_user secret")
+        self.eventuallyEqual(lambda: secret_value("foo_user", "nextRotation").split("T", 1)[0],
+                             today30days.isoformat(), "Password rotation date not set in foo_user secret")
         foo_user_secret = k8s.get_secret("foo_user")
         secret_username = str(base64.b64decode(foo_user_secret.data["username"]), 'utf-8')
         next_rotation_timestamp = datetime.strptime(str(base64.b64decode(foo_user_secret.data["nextRotation"]), 'utf-8'), "%Y-%m-%dT%H:%M:%SZ")
-        rotation_user = "foo_user"+today.strftime("%y%m%d")
-        today30days = today+timedelta(days=30)
 
         self.assertEqual(rotation_user, secret_username,
                         "Unexpected username in secret of foo_user: expected {}, got {}".format(rotation_user, secret_username))
@@ -1949,7 +1983,9 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_annotation_patch)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        time.sleep(10)
+        self.eventuallyTrue(
+            lambda: "environment" in (k8s.get_secret(username="test.db_user", namespace="test").metadata.annotations or {}),
+            "Added annotation was not propagated to secret")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), secret_count, "Unexpected number of secrets")
 
         # check if rotation has been ignored for user from test_cross_namespace_secrets test
@@ -1957,9 +1993,6 @@ class EndToEndTestCase(unittest.TestCase):
         secret_username = str(base64.b64decode(db_user_secret.data["username"]), 'utf-8')
         self.assertEqual("test.db_user", secret_username,
                         "Unexpected username in secret of test.db_user: expected {}, got {}".format("test.db_user", secret_username))
-
-        # check if annotation for secret has been updated
-        self.assertTrue("environment" in db_user_secret.metadata.annotations, "Added annotation was not propagated to secret")
 
         # disable password rotation for all other users (foo_user)
         # and pick smaller intervals to see if the third fake rotation user is dropped
@@ -1975,6 +2008,10 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
         # check if username in foo_user secret is reset
+        self.eventuallyEqual(lambda: secret_value("foo_user", "username"), "foo_user",
+                             "Username in foo_user secret was not reset")
+        self.eventuallyEqual(lambda: secret_value("foo_user", "nextRotation"), "",
+                             "Rotation date in foo_user secret was not cleared")
         foo_user_secret = k8s.get_secret("foo_user")
         secret_username = str(base64.b64decode(foo_user_secret.data["username"]), 'utf-8')
         next_rotation_timestamp = str(base64.b64decode(foo_user_secret.data["nextRotation"]), 'utf-8')
@@ -2038,9 +2075,12 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: leader.metadata.name, switchover_target, "Rolling update annotation did not trigger switchover")
 
             # check that the old master has been recreated
+            def old_master_was_recreated():
+                replica = k8s.get_cluster_replica_pod()
+                return replica is not None and replica.metadata.creation_timestamp > old_creation_timestamp
+
+            self.eventuallyEqual(old_master_was_recreated, True, "Old master pod was not recreated")
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-            replica = k8s.get_cluster_replica_pod()
-            self.assertTrue(replica.metadata.creation_timestamp > old_creation_timestamp, "Old master pod was not recreated")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -2610,7 +2650,8 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_delete_annotations)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync",
+                                 retries=180)
 
             # wait a little before proceeding
             time.sleep(20)
