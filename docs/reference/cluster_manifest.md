@@ -656,6 +656,14 @@ for both master and replica pooler services (if `enableReplicaConnectionPooler`
 * **mode**
   In which mode to run connection pooler, transaction or session.
 
+* **priorityClassName**
+  a name of the [priority
+  class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
+  that should be assigned to the connection pooler pods. When not specified, the
+  value is taken from the `connection_pooler_priority_class_name` operator
+  parameter, if not set then the default priority class is taken. The priority
+  class itself must be defined in advance. Optional.
+
 * **resources**
   Resource configuration for connection pooler deployment.
 
